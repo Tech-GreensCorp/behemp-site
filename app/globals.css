@@ -1,26 +1,295 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/* ═══════════════════════════════════════════════════
+   Be4Hope — Design System (Organic / Editorial Caloroso)
+   Paleta: creme + vermelho terracota + verde musgo
+   Tipografia: Fraunces (display) + Epilogue (body)
+   ═══════════════════════════════════════════════════ */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-epilogue);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-fraunces);
+  --font-display: var(--font-fraunces);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Cores semânticas customizadas */
+  --color-terracotta: #C34C32;
+  --color-moss: #2D4F3C;
+  --color-stone: #8A7F73;
+  --color-sand: #F5F2ED;
+  --color-peach: #D4A388;
+  --color-clay: #C69B7B;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* Fundo creme/areia — essência do design orgânico */
+  --background: #F5F2ED;
+  --foreground: #1A1612;
+
+  /* Cards e popovers brancos para contraste com fundo creme */
+  --card: #FFFFFF;
+  --card-foreground: #1A1612;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1612;
+
+  /* Primário: vermelho terracota — a cor da marca */
+  --primary: #E63946;
+  --primary-foreground: #FFFFFF;
+
+  /* Secundário: verde musgo */
+  --secondary: #2D4F3C;
+  --secondary-foreground: #FFFFFF;
+
+  /* Muted: tom quente do fundo */
+  --muted: #EDE8E1;
+  --muted-foreground: #8A7F73;
+
+  /* Accent: variação sutil do fundo */
+  --accent: #E8E2DA;
+  --accent-foreground: #1A1612;
+
+  --destructive: #DC2626;
+  --border: #DDD8D1;
+  --input: #DDD8D1;
+  --ring: #E63946;
+
+  /* Charts: paleta orgânica */
+  --chart-1: #E63946;
+  --chart-2: #2D4F3C;
+  --chart-3: #C69B7B;
+  --chart-4: #D4A388;
+  --chart-5: #8A7F73;
+
+  --radius: 0.75rem;
+
+  /* Sidebar: tom creme levemente mais escuro */
+  --sidebar: #F0EBE5;
+  --sidebar-foreground: #1A1612;
+  --sidebar-primary: #E63946;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E8E2DA;
+  --sidebar-accent-foreground: #1A1612;
+  --sidebar-border: #DDD8D1;
+  --sidebar-ring: #E63946;
+}
+
+/* Dark mode para dashboards internos */
+.dark {
+  --background: #141210;
+  --foreground: #F5F2ED;
+  --card: #1E1B18;
+  --card-foreground: #F5F2ED;
+  --popover: #1E1B18;
+  --popover-foreground: #F5F2ED;
+  --primary: #E63946;
+  --primary-foreground: #FFFFFF;
+  --secondary: #3D6B52;
+  --secondary-foreground: #F5F2ED;
+  --muted: #2A2520;
+  --muted-foreground: #A09688;
+  --accent: #2A2520;
+  --accent-foreground: #F5F2ED;
+  --destructive: #EF4444;
+  --border: rgba(245, 242, 237, 0.1);
+  --input: rgba(245, 242, 237, 0.15);
+  --ring: #E63946;
+  --chart-1: #E63946;
+  --chart-2: #4D8B68;
+  --chart-3: #D4A388;
+  --chart-4: #C69B7B;
+  --chart-5: #A09688;
+  --sidebar: #1E1B18;
+  --sidebar-foreground: #F5F2ED;
+  --sidebar-primary: #E63946;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #2A2520;
+  --sidebar-accent-foreground: #F5F2ED;
+  --sidebar-border: rgba(245, 242, 237, 0.1);
+  --sidebar-ring: #E63946;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply scroll-smooth;
+    font-family: var(--font-epilogue), system-ui, sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Tipografia: Fraunces display ──────────────────── */
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+}
+
+.font-heading {
+  font-family: var(--font-fraunces), Georgia, serif;
+}
+
+/* Padrão editorial: palavra em itálico vermelho nos títulos */
+.text-accent-italic {
+  color: #E63946;
+  font-style: italic;
+  font-family: var(--font-fraunces), Georgia, serif;
+}
+
+/* ── Animações customizadas ──────────────────────── */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s ease-out both;
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 3s ease-in-out infinite;
+}
+
+/* ── Delay classes ──────────────────────────────── */
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* ── Gradientes de placeholder (tons pêssego/verde/salmon) ── */
+
+.gradient-peach {
+  background: linear-gradient(135deg, #D4A388 0%, #C69B7B 50%, #E6C5AF 100%);
+}
+
+.gradient-moss {
+  background: linear-gradient(135deg, #2D4F3C 0%, #3D6B52 50%, #4A7F62 100%);
+}
+
+.gradient-salmon {
+  background: linear-gradient(135deg, #C34C32 0%, #D4A388 50%, #E6C5AF 100%);
+}
+
+.gradient-warm {
+  background: linear-gradient(135deg, #D4A388 0%, #C69B7B 100%);
+}
+
+/* ── Glass (para navbar on-scroll) ──────────────── */
+
+.glass {
+  background: rgba(245, 242, 237, 0.85);
+  backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba(221, 216, 209, 0.5);
+}
+
+.dark .glass {
+  background: rgba(30, 27, 24, 0.85);
+  border-bottom: 1px solid rgba(245, 242, 237, 0.1);
+}
+
+/* ── Drop cap editorial ──────────────────────────── */
+
+.drop-cap::first-letter {
+  float: left;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 4rem;
+  line-height: 0.8;
+  padding-right: 0.5rem;
+  color: #E63946;
+  font-weight: 700;
+}
+
+/* ── Seção escura (CTA) ──────────────────────────── */
+
+.section-dark {
+  background: #1A1612;
+  color: #F5F2ED;
+}
+
+/* ── Botão pill ──────────────────────────────────── */
+
+.btn-pill {
+  border-radius: 9999px;
 }
