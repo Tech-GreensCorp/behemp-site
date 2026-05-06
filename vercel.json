@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/verificar-validade-documentos",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/verificar-recompra-medicamentos",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
