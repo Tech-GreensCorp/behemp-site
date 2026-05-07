@@ -51,7 +51,7 @@ function criarOAuth2Client(refreshToken?: string) {
   const oauth2Client = new google.auth.OAuth2(
     clientId,
     clientSecret,
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/google/callback`,
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`,
   );
 
   if (refreshToken) {
@@ -199,3 +199,57 @@ export async function cancelarEventoGoogleCalendar(params: {
     return { sucesso: false, erro: mensagem };
   }
 }
+
+// ── Atualizar evento (remarcar) ──────────────────────────────
+
+/**
+ * Atualiza data/hora de um evento existente no Google Calendar.
+ * Mantém o mesmo link do Meet e notifica participantes.
+ */
+export async function atualizarEventoGoogleCalendar(params: {
+  eventId: string;
+  refreshToken: string;
+  novaDataInicio: Date;
+  novaDataFim: Date;
+  calendarId?: string;
+}): Promise<EventoResult> {
+  try {
+    const oauth2Client = criarOAuth2Client(params.refreshToken);
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const evento = await calendar.events.patch({
+      calendarId: params.calendarId || 'primary',
+      eventId: params.eventId,
+      sendUpdates: 'all',
+      requestBody: {
+        start: {
+          dateTime: params.novaDataInicio.toISOString(),
+          timeZone: 'America/Sao_Paulo',
+        },
+        end: {
+          dateTime: params.novaDataFim.toISOString(),
+          timeZone: 'America/Sao_Paulo',
+        },
+      },
+    });
+
+    const meetLink =
+      evento.data.conferenceData?.entryPoints?.find(
+        (ep) => ep.entryPointType === 'video',
+      )?.uri || '';
+
+    return {
+      sucesso: true,
+      dados: {
+        eventId: evento.data.id || '',
+        meetLink,
+        htmlLink: evento.data.htmlLink || '',
+      },
+    };
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[Google Calendar] Erro ao atualizar evento:', mensagem);
+    return { sucesso: false, erro: mensagem };
+  }
+}
+

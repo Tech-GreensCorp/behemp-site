@@ -234,3 +234,92 @@ export async function listarConsultasMedico(params: {
     return { sucesso: false, erro: 'Erro ao listar consultas' };
   }
 }
+
+/**
+ * Lista médicos disponíveis para agendamento público.
+ * Retorna apenas nome, especialidade e disponibilidade (se Google Calendar conectado).
+ */
+export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
+  id: string;
+  nome: string;
+  especialidade: string;
+  bio: string | null;
+  googleConectado: boolean;
+}>>> {
+  try {
+    const resultado = await db
+      .select({
+        id: medicos.id,
+        nome: users.nome,
+        especialidade: medicos.especialidade,
+        bio: medicos.bio,
+        googleRefreshToken: medicos.googleRefreshToken,
+      })
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id));
+
+    const lista = resultado.map((m) => ({
+      id: m.id,
+      nome: m.nome,
+      especialidade: m.especialidade,
+      bio: m.bio,
+      googleConectado: !!m.googleRefreshToken,
+    }));
+
+    return { sucesso: true, dados: lista };
+  } catch (error) {
+    console.error('[Action] Erro ao listar médicos:', error);
+    return { sucesso: false, erro: 'Erro ao listar médicos' };
+  }
+}
+
+/**
+ * Lista horários livres de um médico em uma data específica.
+ * Slots de 1h, das 08:00 às 18:00 (horário comercial).
+ * Exclui horários com consultas já agendadas ou confirmadas.
+ */
+export async function listarHorariosLivres(params: {
+  medicoId: string;
+  data: string; // formato YYYY-MM-DD
+}): Promise<ActionResult<string[]>> {
+  try {
+    const { medicoId, data } = params;
+
+    // Gerar todos os slots possíveis (08:00–17:00 = início, cada slot dura 1h)
+    const HORARIOS_POSSIVEIS = [
+      '08:00', '09:00', '10:00', '11:00',
+      '13:00', '14:00', '15:00', '16:00', '17:00',
+    ];
+
+    const inicioData = new Date(`${data}T00:00:00`);
+    const fimData = new Date(`${data}T23:59:59`);
+
+    // Buscar consultas existentes neste dia para este médico
+    const consultasExistentes = await db
+      .select({ dataHora: consultas.dataHora })
+      .from(consultas)
+      .where(
+        and(
+          eq(consultas.medicoId, medicoId),
+          gte(consultas.dataHora, inicioData),
+          lte(consultas.dataHora, fimData),
+        ),
+      );
+
+    // Filtrar horários ocupados
+    const horariosOcupados = new Set(
+      consultasExistentes.map((c) =>
+        format(new Date(c.dataHora), 'HH:mm'),
+      ),
+    );
+
+    const horariosLivres = HORARIOS_POSSIVEIS.filter(
+      (h) => !horariosOcupados.has(h),
+    );
+
+    return { sucesso: true, dados: horariosLivres };
+  } catch (error) {
+    console.error('[Action] Erro ao listar horários:', error);
+    return { sucesso: false, erro: 'Erro ao listar horários livres' };
+  }
+}

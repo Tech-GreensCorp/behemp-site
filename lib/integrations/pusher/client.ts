@@ -32,5 +32,18 @@ export function getPusherClient(): PusherClient {
   return pusherClient;
 }
 
-// Reexporta as convenções do server para uso no client
-export { canalChat, canalUsuario, EVENTOS_PUSHER } from './server';
+// Convenções de canal (duplicadas do server para evitar importar código server-only)
+export function canalChat(grupoId: string): string {
+  return `private-chat-${grupoId}`;
+}
+
+export function canalUsuario(userId: string): string {
+  return `private-user-${userId}`;
+}
+
+export const EVENTOS_PUSHER = {
+  NOVA_MENSAGEM: 'nova-mensagem',
+  MENSAGEM_LIDA: 'mensagem-lida',
+  DIGITANDO: 'client-digitando',
+  NOVA_NOTIFICACAO: 'nova-notificacao',
+} as const;

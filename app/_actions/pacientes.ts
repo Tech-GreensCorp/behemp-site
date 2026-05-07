@@ -960,6 +960,102 @@ export async function exportarPacientesCSV(): Promise<ActionResult<string>> {
 }
 
 /**
+ * Obtém dados agregados para os gráficos do dashboard do médico.
+ * Retorna 3 datasets: distribuição por tratamento, por status e evolução mensal.
+ */
+export async function obterDadosGraficosDashboard(): Promise<ActionResult<{
+  tratamentos: Array<{ tipo: string; quantidade: number }>;
+  statusDistribuicao: Array<{ status: string; quantidade: number }>;
+  evolucaoMensal: Array<{ mes: string; pacientes: number }>;
+}>> {
+  try {
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: auth.erro };
+    }
+
+    const medicoId = await obterMedicoIdDoUsuario(auth.clerkId!);
+
+    const medicoFilter = auth.role === 'medico' && medicoId
+      ? sql`AND p.medico_id = ${medicoId}`
+      : sql``;
+
+    // Distribuição por tipo de tratamento
+    const tratamentosResult = await db.execute(sql`
+      SELECT
+        COALESCE(p.tratamento_tipo, 'nao_definido') as tipo,
+        COUNT(*)::int as quantidade
+      FROM pacientes p
+      WHERE p.deleted_at IS NULL ${medicoFilter}
+      GROUP BY p.tratamento_tipo
+      ORDER BY quantidade DESC
+    `);
+
+    const TRATAMENTO_LABELS: Record<string, string> = {
+      cbd: 'CBD',
+      thc: 'THC',
+      cbd_thc: 'CBD + THC',
+      nao_definido: 'Não definido',
+    };
+
+    const tratamentos = (tratamentosResult.rows as Array<{ tipo: string; quantidade: number }>).map((r) => ({
+      tipo: TRATAMENTO_LABELS[r.tipo] ?? r.tipo,
+      quantidade: Number(r.quantidade),
+    }));
+
+    // Distribuição por status
+    const statusResult = await db.execute(sql`
+      SELECT
+        p.status,
+        COUNT(*)::int as quantidade
+      FROM pacientes p
+      WHERE p.deleted_at IS NULL ${medicoFilter}
+      GROUP BY p.status
+      ORDER BY quantidade DESC
+    `);
+
+    const STATUS_LABELS: Record<string, string> = {
+      aguardando_consulta: 'Aguardando',
+      em_tratamento: 'Em tratamento',
+      concluido: 'Concluído',
+      arquivado: 'Arquivado',
+    };
+
+    const statusDistribuicao = (statusResult.rows as Array<{ status: string; quantidade: number }>).map((r) => ({
+      status: STATUS_LABELS[r.status] ?? r.status,
+      quantidade: Number(r.quantidade),
+    }));
+
+    // Evolução mensal (últimos 6 meses)
+    const evolucaoResult = await db.execute(sql`
+      SELECT
+        TO_CHAR(p.created_at, 'YYYY-MM') as mes_raw,
+        TO_CHAR(p.created_at, 'Mon/YY') as mes,
+        COUNT(*)::int as pacientes
+      FROM pacientes p
+      WHERE p.deleted_at IS NULL
+        AND p.created_at >= NOW() - INTERVAL '6 months'
+        ${medicoFilter}
+      GROUP BY mes_raw, mes
+      ORDER BY mes_raw ASC
+    `);
+
+    const evolucaoMensal = (evolucaoResult.rows as Array<{ mes: string; pacientes: number }>).map((r) => ({
+      mes: r.mes,
+      pacientes: Number(r.pacientes),
+    }));
+
+    return {
+      sucesso: true,
+      dados: { tratamentos, statusDistribuicao, evolucaoMensal },
+    };
+  } catch (error) {
+    console.error('[Action] Erro ao obter dados dos gráficos:', error);
+    return { sucesso: false, erro: 'Erro ao obter dados dos gráficos' };
+  }
+}
+
+/**
  * Busca o medicoId a partir do clerkId do usuário.
  */
 async function obterMedicoIdDoUsuario(clerkId: string): Promise<string | null> {

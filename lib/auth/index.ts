@@ -9,5 +9,6 @@ export {
   verificarMedico,
   verificarPaciente,
   verificarMedicoOuAdmin,
+  verificarUsuarioAutenticado,
   type Role,
 } from './permissions';

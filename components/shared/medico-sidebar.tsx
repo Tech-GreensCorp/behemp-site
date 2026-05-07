@@ -15,6 +15,8 @@ import {
   Logout01Icon,
   ArrowLeft01Icon,
   Menu02Icon,
+  Message01Icon,
+  Calendar03Icon,
 } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -25,6 +27,8 @@ const NAV_ITEMS: { label: string; href: string; icon: IconSvgElement }[] = [
   { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route01Icon },
   { label: 'Pacientes', href: '/medico/pacientes', icon: UserMultiple02Icon },
   { label: 'Triagem', href: '/medico/triagem', icon: FileValidationIcon },
+  { label: 'Agenda', href: '/medico/agenda', icon: Calendar03Icon },
+  { label: 'Chat', href: '/medico/chat', icon: Message01Icon },
   { label: 'Notificações', href: '/medico/notificacoes', icon: Notification03Icon },
   { label: 'Configurações', href: '/medico/configuracoes', icon: Settings01Icon },
 ];

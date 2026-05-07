@@ -11,7 +11,7 @@ import {
   SheetTrigger,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Menu02Icon, Login01Icon } from '@hugeicons/core-free-icons';
+import { Menu02Icon, Login01Icon, Calendar03Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { cn } from '@/lib/utils';
 
@@ -98,6 +98,17 @@ export function Navbar() {
               </Link>
             )}
           </ClerkLoaded>
+
+          <Link href="/agendamento">
+            <Button
+              size="sm"
+              className="btn-pill gap-2 bg-[#C08E3A] px-5 text-white hover:bg-[#a8762f]"
+              nativeButton={false}
+            >
+              <HugeiconsIcon icon={Calendar03Icon} size={16} />
+              Agendar Consulta
+            </Button>
+          </Link>
 
           <Link
             href="https://wa.me/5511932047360"

@@ -114,3 +114,13 @@ export async function verificarPaciente(): Promise<PermissaoResult> {
 export async function verificarMedicoOuAdmin(): Promise<PermissaoResult> {
   return verificarRole(['medico', 'admin']);
 }
+
+/**
+ * Verifica se o usuário está autenticado (qualquer role).
+ * Retorna { clerkId, role } ou null se não autenticado.
+ */
+export async function verificarUsuarioAutenticado(): Promise<{ clerkId: string; role: Role } | null> {
+  const usuario = await obterUsuarioAtual();
+  if (!usuario.autorizado || !usuario.clerkId) return null;
+  return { clerkId: usuario.clerkId, role: usuario.role ?? 'paciente' };
+}

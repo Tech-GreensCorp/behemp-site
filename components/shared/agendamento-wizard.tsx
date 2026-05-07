@@ -1,0 +1,516 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Loading03Icon,
+  ArrowRight01Icon,
+  ArrowLeft01Icon,
+  CheckmarkCircle01Icon,
+  Stethoscope02Icon,
+  Calendar03Icon,
+  Clock01Icon,
+  Video01Icon,
+  UserCheck01Icon,
+} from '@hugeicons/core-free-icons';
+import {
+  listarMedicosDisponiveis,
+  listarHorariosLivres,
+  agendarConsulta,
+} from '@/app/(public)/_actions/agendamento';
+import { useAuth, SignInButton } from '@clerk/nextjs';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+/**
+ * Wizard multi-step para agendamento de consultas.
+ *
+ * Steps:
+ * 1. Seleção de médico
+ * 2. Seleção de data e horário
+ * 3. Confirmação (login required)
+ * 4. Sucesso
+ */
+
+interface Medico {
+  id: string;
+  nome: string;
+  especialidade: string;
+  bio: string | null;
+  googleConectado: boolean;
+}
+
+const STEPS = [
+  { label: 'Médico', icon: Stethoscope02Icon },
+  { label: 'Data/Hora', icon: Calendar03Icon },
+  { label: 'Confirmação', icon: CheckmarkCircle01Icon },
+];
+
+const INFO_CARDS = [
+  {
+    icon: Video01Icon,
+    titulo: '100% Online',
+    descricao: 'Consulta por videoconferência via Google Meet',
+  },
+  {
+    icon: Clock01Icon,
+    titulo: 'Duração: ~60 min',
+    descricao: 'Avaliação completa e orientação personalizada',
+  },
+  {
+    icon: UserCheck01Icon,
+    titulo: 'Confirmação Imediata',
+    descricao: 'Receba o link do Meet por e-mail na hora',
+  },
+];
+
+export function AgendamentoWizard() {
+  const { isSignedIn } = useAuth();
+  const [step, setStep] = useState(0);
+  const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(null);
+  const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>();
+  const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
+  const [horarioSelecionado, setHorarioSelecionado] = useState<string | null>(null);
+  const [observacoes, setObservacoes] = useState('');
+  const [carregando, setCarregando] = useState(true);
+  const [carregandoHorarios, setCarregandoHorarios] = useState(false);
+  const [agendando, setAgendando] = useState(false);
+  const [resultado, setResultado] = useState<{ meetLink: string; consultaId: string } | null>(null);
+
+  // Carregar médicos
+  useEffect(() => {
+    if (!isSignedIn) return; // Não carrega se não logado
+    async function load() {
+      setCarregando(true);
+      const res = await listarMedicosDisponiveis();
+      if (res.sucesso && res.dados) {
+        setMedicos(res.dados);
+      }
+      setCarregando(false);
+    }
+    load();
+  }, [isSignedIn]);
+
+  // Carregar horários ao selecionar data
+  const carregarHorarios = useCallback(async (data: Date) => {
+    if (!medicoSelecionado) return;
+    setCarregandoHorarios(true);
+    setHorarioSelecionado(null);
+
+    const res = await listarHorariosLivres({
+      medicoId: medicoSelecionado.id,
+      data: format(data, 'yyyy-MM-dd'),
+    });
+
+    if (res.sucesso && res.dados) {
+      setHorariosLivres(res.dados);
+    }
+    setCarregandoHorarios(false);
+  }, [medicoSelecionado]);
+
+  function handleDataChange(data: Date | undefined) {
+    setDataSelecionada(data);
+    if (data) {
+      carregarHorarios(data);
+    }
+  }
+
+  function handleSelecionarMedico(medico: Medico) {
+    setMedicoSelecionado(medico);
+    setStep(1);
+    setDataSelecionada(undefined);
+    setHorarioSelecionado(null);
+  }
+
+  async function handleConfirmar() {
+    if (!medicoSelecionado || !dataSelecionada || !horarioSelecionado) return;
+
+    setAgendando(true);
+
+    const [hora, minuto] = horarioSelecionado.split(':');
+    const dataHora = new Date(dataSelecionada);
+    dataHora.setHours(parseInt(hora), parseInt(minuto), 0, 0);
+
+    // Para agendamento público, usamos um pacienteId placeholder
+    // Em produção, será o pacienteId do usuário autenticado
+    const res = await agendarConsulta({
+      medicoId: medicoSelecionado.id,
+      pacienteId: 'auto', // A action deveria resolver pelo user autenticado
+      dataHora: dataHora.toISOString(),
+      observacoes: observacoes || undefined,
+    });
+
+    if (res.sucesso && res.dados) {
+      setResultado(res.dados);
+      setStep(3); // Sucesso
+      toast.success('Consulta agendada com sucesso!');
+    } else {
+      toast.error(res.erro ?? 'Erro ao agendar consulta');
+    }
+
+    setAgendando(false);
+  }
+
+  // ── Gate: exigir login ──────────────────────────────────────
+  if (!isSignedIn) {
+    return (
+      <div className="space-y-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          {INFO_CARDS.map((card) => (
+            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
+              <CardContent className="p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                </div>
+                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card className="border-0 shadow-xl">
+          <CardContent className="flex flex-col items-center py-16 text-center">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
+              <HugeiconsIcon icon={Calendar03Icon} size={40} className="text-[#C08E3A]" />
+            </div>
+            <h2 className="text-2xl font-bold">Entre para agendar</h2>
+            <p className="mt-3 max-w-md text-muted-foreground">
+              Para agendar sua consulta, faça login ou crie sua conta. É rápido e gratuito.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <SignInButton mode="modal" forceRedirectUrl="/agendamento">
+                <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
+                  Entrar para agendar
+                </Button>
+              </SignInButton>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Info Cards ──────────────────────────────────────────────
+  if (step === 0 && medicos.length === 0 && !carregando) {
+    return (
+      <div className="space-y-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          {INFO_CARDS.map((card) => (
+            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
+              <CardContent className="p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                </div>
+                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="border-0 shadow-xl">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <p className="text-lg font-medium">Nenhum médico disponível no momento</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Entre em contato conosco para mais informações
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Info Cards no topo */}
+      {step === 0 && (
+        <div className="grid gap-4 md:grid-cols-3">
+          {INFO_CARDS.map((card) => (
+            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
+              <CardContent className="p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                </div>
+                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Step indicator */}
+      {step < 3 && (
+        <div className="flex items-center justify-center gap-2">
+          {STEPS.map((s, i) => (
+            <div key={s.label} className="flex items-center gap-2">
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                  i <= step
+                    ? 'bg-[#C08E3A] text-white'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {i + 1}
+              </div>
+              <span
+                className={`hidden text-sm font-medium sm:block ${
+                  i <= step ? 'text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                {s.label}
+              </span>
+              {i < STEPS.length - 1 && (
+                <div className={`mx-2 h-px w-8 ${i < step ? 'bg-[#C08E3A]' : 'bg-border'}`} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Step 0 — Seleção de Médico */}
+      {step === 0 && (
+        <Card className="border-0 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <HugeiconsIcon icon={Stethoscope02Icon} size={20} className="text-[#C08E3A]" />
+              Escolha seu médico
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {carregando ? (
+              <div className="flex justify-center py-12">
+                <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {medicos.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => handleSelecionarMedico(m)}
+                    className="flex items-start gap-4 rounded-xl border border-border/50 p-5 text-left transition-all hover:border-[#C08E3A]/50 hover:shadow-md"
+                  >
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <HugeiconsIcon icon={Stethoscope02Icon} size={24} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{m.nome}</p>
+                      <p className="text-sm text-muted-foreground">{m.especialidade}</p>
+                      {m.bio && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{m.bio}</p>}
+                      {m.googleConectado && (
+                        <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
+                          <HugeiconsIcon icon={Video01Icon} size={10} />
+                          Google Meet
+                        </Badge>
+                      )}
+                    </div>
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="mt-1 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 1 — Data e Horário */}
+      {step === 1 && medicoSelecionado && (
+        <Card className="border-0 shadow-xl">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <HugeiconsIcon icon={Calendar03Icon} size={20} className="text-[#C08E3A]" />
+                Escolha data e horário
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1">
+                <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+                Trocar médico
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Consulta com <strong>{medicoSelecionado.nome}</strong> — {medicoSelecionado.especialidade}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-8 md:grid-cols-2">
+              {/* Calendário */}
+              <div>
+                <Calendar
+                  mode="single"
+                  selected={dataSelecionada}
+                  onSelect={handleDataChange}
+                  locale={ptBR}
+                  disabled={(date) => {
+                    const hoje = new Date();
+                    hoje.setHours(0, 0, 0, 0);
+                    return date < hoje || date.getDay() === 0 || date.getDay() === 6;
+                  }}
+                  className="rounded-xl border"
+                />
+              </div>
+
+              {/* Horários */}
+              <div>
+                {!dataSelecionada ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <HugeiconsIcon icon={Clock01Icon} size={32} className="mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma data para ver os horários disponíveis
+                    </p>
+                  </div>
+                ) : carregandoHorarios ? (
+                  <div className="flex justify-center py-12">
+                    <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-primary" />
+                  </div>
+                ) : horariosLivres.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum horário disponível nesta data
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="mb-3 text-sm font-medium">
+                      {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {horariosLivres.map((h) => (
+                        <button
+                          key={h}
+                          onClick={() => setHorarioSelecionado(h)}
+                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                            horarioSelecionado === h
+                              ? 'border-[#C08E3A] bg-[#C08E3A] text-white'
+                              : 'border-border hover:border-[#C08E3A]/50'
+                          }`}
+                        >
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+
+                    {horarioSelecionado && (
+                      <div className="mt-6">
+                        <Textarea
+                          value={observacoes}
+                          onChange={(e) => setObservacoes(e.target.value)}
+                          placeholder="Observações para o médico (opcional)"
+                          className="min-h-[80px]"
+                        />
+                        <Button
+                          onClick={() => setStep(2)}
+                          className="mt-4 w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+                        >
+                          Continuar
+                          <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 2 — Confirmação */}
+      {step === 2 && medicoSelecionado && dataSelecionada && horarioSelecionado && (
+        <Card className="border-0 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={20} className="text-[#C08E3A]" />
+              Confirme sua consulta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Resumo */}
+            <div className="rounded-xl border border-border/50 p-6 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Médico</span>
+                <span className="font-medium">{medicoSelecionado.nome}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Especialidade</span>
+                <span className="font-medium">{medicoSelecionado.especialidade}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Data</span>
+                <span className="font-medium">
+                  {format(dataSelecionada, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Horário</span>
+                <span className="font-medium">{horarioSelecionado}</span>
+              </div>
+              {observacoes && (
+                <div className="border-t pt-3">
+                  <span className="text-sm text-muted-foreground">Observações</span>
+                  <p className="mt-1 text-sm">{observacoes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Ação */}
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep(1)} className="gap-1">
+                <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+                Voltar
+              </Button>
+              <Button
+                onClick={handleConfirmar}
+                disabled={agendando}
+                className="flex-1 gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+              >
+                {agendando ? (
+                  <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                ) : (
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                )}
+                {agendando ? 'Agendando...' : 'Confirmar Agendamento'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3 — Sucesso */}
+      {step === 3 && resultado && (
+        <Card className="border-0 shadow-xl">
+          <CardContent className="flex flex-col items-center py-16 text-center">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={40} className="text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold">Consulta agendada!</h2>
+            <p className="mt-3 max-w-md text-muted-foreground">
+              Sua consulta foi agendada com sucesso. Você receberá um e-mail de confirmação
+              com os detalhes e o link do Google Meet.
+            </p>
+            {resultado.meetLink && (
+              <a
+                href={resultado.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6"
+              >
+                <Button className="gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
+                  <HugeiconsIcon icon={Video01Icon} size={16} />
+                  Acessar Google Meet
+                </Button>
+              </a>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

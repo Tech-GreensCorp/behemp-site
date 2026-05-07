@@ -14,8 +14,15 @@ import { toast } from 'sonner';
 
 interface TabRelatoriosProps { pacienteId: string; pacienteNome: string }
 
+interface Relatorio {
+  id: string;
+  titulo: string;
+  urlPdf: string | null;
+  createdAt: string | Date;
+}
+
 export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) {
-  const [relatorios, setRelatorios] = useState<any[]>([]);
+  const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
 
@@ -41,72 +48,169 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
       // Importar jspdf dinamicamente (client-side only)
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginLeft = 20;
+      const marginRight = 20;
+      const contentWidth = pageWidth - marginLeft - marginRight;
+      let pageNum = 1;
 
-      let y = 20;
-      const addLine = (text: string, bold = false) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.setFontSize(bold ? 13 : 10);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        const lines = doc.splitTextToSize(text, 175);
-        doc.text(lines, 15, y);
-        y += lines.length * 5 + 2;
+      // ── Funções auxiliares ──────────────────────────────────────
+      const addHeader = () => {
+        // Barra dourada superior
+        doc.setFillColor(192, 142, 58); // #C08E3A
+        doc.rect(0, 0, pageWidth, 4, 'F');
+
+        // Nome da organização
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(192, 142, 58);
+        doc.text('Be4Hope', marginLeft, 18);
+
+        // Subtítulo
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(130, 130, 130);
+        doc.text('Associação de Medicina Endocanabinóide', marginLeft, 24);
+
+        // Linha separadora
+        doc.setDrawColor(220, 220, 220);
+        doc.line(marginLeft, 28, pageWidth - marginRight, 28);
+
+        doc.setTextColor(0, 0, 0);
       };
-      const addSpacer = () => { y += 5; };
 
-      // Header
-      doc.setFontSize(18);
+      const addFooter = () => {
+        // Linha separadora
+        doc.setDrawColor(220, 220, 220);
+        doc.line(marginLeft, pageHeight - 16, pageWidth - marginRight, pageHeight - 16);
+
+        // Texto do rodapé
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(160, 160, 160);
+        doc.text('CONFIDENCIAL — Documento gerado pela plataforma Be4Hope', marginLeft, pageHeight - 10);
+        doc.text(`Página ${pageNum}`, pageWidth - marginRight, pageHeight - 10, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+      };
+
+      addHeader();
+      addFooter();
+
+      let y = 36;
+      const checkPage = (needed: number = 20) => {
+        if (y > pageHeight - 30 - needed) {
+          doc.addPage();
+          pageNum++;
+          addHeader();
+          addFooter();
+          y = 36;
+        }
+      };
+
+      const addLine = (text: string, bold = false, fontSize = 10) => {
+        checkPage();
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setTextColor(0, 0, 0);
+        const lines = doc.splitTextToSize(text, contentWidth);
+        doc.text(lines, marginLeft, y);
+        y += lines.length * (fontSize * 0.45) + 2;
+      };
+
+      const addSection = (title: string) => {
+        checkPage(15);
+        y += 4;
+        // Linha dourada da seção
+        doc.setFillColor(192, 142, 58);
+        doc.rect(marginLeft, y - 2, 40, 0.8, 'F');
+        y += 4;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(50, 50, 50);
+        doc.text(title, marginLeft, y);
+        doc.setTextColor(0, 0, 0);
+        y += 8;
+      };
+
+      const addSpacer = (size = 5) => { y += size; };
+      const addLabel = (label: string, value: string) => {
+        checkPage();
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(100, 100, 100);
+        doc.text(label, marginLeft, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const labelWidth = doc.getTextWidth(label + ' ');
+        const valueLines = doc.splitTextToSize(value, contentWidth - labelWidth);
+        doc.text(valueLines, marginLeft + labelWidth, y);
+        y += valueLines.length * 4.5 + 2;
+      };
+
+      // ── Título do Relatório ──────────────────────────────────
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      doc.text('Relatório Médico Completo', 15, y);
+      doc.setTextColor(50, 50, 50);
+      doc.text('Relatório Médico Completo', marginLeft, y);
       y += 10;
+
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Paciente: ${pacienteNome}`, 15, y); y += 6;
-      doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 15, y);
-      y += 10;
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Paciente: ${pacienteNome}`, marginLeft, y);
+      y += 6;
+      doc.text(
+        `Gerado em: ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+        marginLeft,
+        y,
+      );
+      y += 4;
+
+      // Linha dourada principal
       doc.setDrawColor(192, 142, 58);
-      doc.line(15, y, 195, y);
-      y += 8;
+      doc.setLineWidth(0.8);
+      doc.line(marginLeft, y + 4, pageWidth - marginRight, y + 4);
+      doc.setLineWidth(0.2);
+      y += 12;
 
       // Anamnese
       if (anamRes.sucesso && anamRes.dados && anamRes.dados.length > 0) {
-        addLine('ANAMNESE', true);
-        addSpacer();
+        addSection('Anamnese');
         const a = anamRes.dados[0];
-        if (a.queixaPrincipal) { addLine(`Queixa Principal: ${a.queixaPrincipal}`); }
-        if (a.historiaDoencaAtual) { addLine(`História da Doença Atual: ${a.historiaDoencaAtual}`); }
-        if (a.doencasPrevias) { addLine(`Doenças Prévias: ${a.doencasPrevias}`); }
-        if (a.medicamentosEmUso) { addLine(`Medicamentos em Uso: ${a.medicamentosEmUso}`); }
-        if (a.alergias) { addLine(`Alergias: ${a.alergias}`); }
-        addLine(`Tabagismo: ${a.tabagismo?.replace('_', ' ')}`);
-        addLine(`Consumo de Álcool: ${a.consumoAlcool?.replace('_', ' ')}`);
-        addLine(`Qualidade do Sono: ${a.qualidadeSono}`);
-        if (a.nivelDor != null) addLine(`Nível de Dor: ${a.nivelDor}/10`);
+        if (a.queixaPrincipal) addLabel('Queixa Principal:', a.queixaPrincipal);
+        if (a.historiaDoencaAtual) addLabel('HDA:', a.historiaDoencaAtual);
+        if (a.doencasPrevias) addLabel('Doenças Prévias:', a.doencasPrevias);
+        if (a.medicamentosEmUso) addLabel('Medicamentos:', a.medicamentosEmUso);
+        if (a.alergias) addLabel('Alergias:', a.alergias);
+        addLabel('Tabagismo:', a.tabagismo?.replace('_', ' ') ?? '—');
+        addLabel('Álcool:', a.consumoAlcool?.replace('_', ' ') ?? '—');
+        addLabel('Sono:', a.qualidadeSono ?? '—');
+        if (a.nivelDor != null) addLabel('Nível de Dor:', `${a.nivelDor}/10`);
         addSpacer();
       }
 
       // Evoluções
       if (evRes.sucesso && evRes.dados && evRes.dados.length > 0) {
-        addLine('EVOLUÇÃO DO TRATAMENTO', true);
-        addSpacer();
+        addSection('Evolução do Tratamento');
         for (const ev of evRes.dados.slice(0, 10)) {
-          addLine(`${new Date(ev.data + 'T00:00:00').toLocaleDateString('pt-BR')} — ${ev.tipo?.toUpperCase()}`);
+          addLine(`${new Date(ev.data + 'T00:00:00').toLocaleDateString('pt-BR')} — ${ev.tipo?.toUpperCase()}`, true, 10);
           addLine(ev.conteudo);
-          if (ev.sintomasAtuais) addLine(`Sintomas: ${ev.sintomasAtuais}`);
-          if (ev.nivelDor != null) addLine(`Dor: ${ev.nivelDor}/10`);
-          addSpacer();
+          if (ev.sintomasAtuais) addLabel('Sintomas:', ev.sintomasAtuais);
+          if (ev.nivelDor != null) addLabel('Dor:', `${ev.nivelDor}/10`);
+          addSpacer(3);
         }
       }
 
       // Dosagem
       if (dosRes.sucesso && dosRes.dados && dosRes.dados.length > 0) {
-        addLine('HISTÓRICO DE DOSAGEM', true);
-        addSpacer();
+        addSection('Histórico de Dosagem');
         for (const aj of dosRes.dados.slice(0, 10)) {
-          addLine(`Ajuste em ${new Date(aj.dataAjuste + 'T00:00:00').toLocaleDateString('pt-BR')} — ${aj.motivoAjuste}`);
+          addLine(`Ajuste em ${new Date(aj.dataAjuste + 'T00:00:00').toLocaleDateString('pt-BR')} — ${aj.motivoAjuste}`, true, 10);
           for (const it of aj.itens || []) {
-            addLine(`  • ${it.tipoCanabinoide}: ${it.novaDosagem} (${it.frequencia})`);
+            addLabel(`  • ${it.tipoCanabinoide}:`, `${it.novaDosagem} (${it.frequencia})`);
           }
-          addSpacer();
+          addSpacer(3);
         }
       }
 

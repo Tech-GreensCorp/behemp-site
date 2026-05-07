@@ -1,23 +1,66 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shield, User, FileText, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Loading03Icon,
+  SecurityCheckIcon,
+  ViewIcon,
+  Edit01Icon,
+  Delete01Icon,
+  Add01Icon,
+  Download01Icon,
+  Calendar03Icon,
+} from '@hugeicons/core-free-icons';
+import { listarLogs } from '@/app/(admin)/_actions/auditoria';
 
-const LOGS_MOCK = [
-  { id: '1', acao: 'Acesso a prontuário', usuario: 'Dr. André Lima', recurso: 'Maria Silva', data: '2026-05-04 10:30', ip: '192.168.1.100' },
-  { id: '2', acao: 'Upload de documento', usuario: 'Maria Silva', recurso: 'Receita_CBD.pdf', data: '2026-05-04 09:15', ip: '201.45.12.89' },
-  { id: '3', acao: 'Exportação de relatório', usuario: 'Dr. André Lima', recurso: 'Relatório de João Santos', data: '2026-05-03 16:42', ip: '192.168.1.100' },
-  { id: '4', acao: 'Alteração de dosagem', usuario: 'Dra. Camila Santos', recurso: 'Ana Oliveira', data: '2026-05-03 14:20', ip: '10.0.0.55' },
-  { id: '5', acao: 'Login no sistema', usuario: 'Admin Principal', recurso: 'Painel administrativo', data: '2026-05-03 08:00', ip: '203.0.113.50' },
-];
+/**
+ * Página de auditoria LGPD — logs de operações sensíveis.
+ */
 
-const ACAO_ICONES: Record<string, typeof Shield> = {
-  'Acesso a prontuário': User,
-  'Upload de documento': FileText,
-  'Exportação de relatório': FileText,
-  'Alteração de dosagem': Shield,
-  'Login no sistema': Shield,
+interface LogAuditoria {
+  id: string;
+  userId: string | null;
+  acao: string;
+  entidade: string;
+  entidadeId: string | null;
+  ip: string | null;
+  createdAt: Date;
+}
+
+const ACAO_CONFIG: Record<string, { label: string; icon: typeof ViewIcon; cor: string }> = {
+  visualizar: { label: 'Visualizar', icon: ViewIcon, cor: 'bg-blue-500/10 text-blue-600' },
+  criar: { label: 'Criar', icon: Add01Icon, cor: 'bg-emerald-500/10 text-emerald-600' },
+  atualizar: { label: 'Atualizar', icon: Edit01Icon, cor: 'bg-amber-500/10 text-amber-600' },
+  deletar: { label: 'Deletar', icon: Delete01Icon, cor: 'bg-red-500/10 text-red-600' },
+  exportar: { label: 'Exportar', icon: Download01Icon, cor: 'bg-purple-500/10 text-purple-600' },
 };
 
 export default function AuditoriaPage() {
+  const [logs, setLogs] = useState<LogAuditoria[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [filtroEntidade, setFiltroEntidade] = useState('');
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    const res = await listarLogs({
+      entidade: filtroEntidade || undefined,
+      limite: 100,
+    });
+    if (res.sucesso && res.dados) {
+      setLogs(res.dados as LogAuditoria[]);
+    }
+    setCarregando(false);
+  }, [filtroEntidade]);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -27,34 +70,93 @@ export default function AuditoriaPage() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        {LOGS_MOCK.map((log) => {
-          const Icon = ACAO_ICONES[log.acao] || Shield;
-          return (
-            <Card key={log.id} className="border-0 shadow-sm">
-              <CardContent className="flex items-start gap-4 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{log.acao}</p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{log.usuario}</span>{' '}
-                    → {log.recurso}
-                  </p>
-                </div>
-                <div className="hidden text-right text-xs text-muted-foreground sm:block">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{log.data}</span>
-                  </div>
-                  <p className="mt-0.5">IP: {log.ip}</p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Filtros */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Input
+          value={filtroEntidade}
+          onChange={(e) => setFiltroEntidade(e.target.value)}
+          placeholder="Filtrar por entidade (paciente, documento, evolucao...)"
+          className="max-w-xs"
+        />
+        {['paciente', 'documento', 'evolucao', 'dosagem'].map((ent) => (
+          <Button
+            key={ent}
+            variant={filtroEntidade === ent ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFiltroEntidade(filtroEntidade === ent ? '' : ent)}
+            className="capitalize"
+          >
+            {ent}
+          </Button>
+        ))}
       </div>
+
+      {/* Lista */}
+      {carregando ? (
+        <div className="flex justify-center py-12">
+          <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+        </div>
+      ) : logs.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <HugeiconsIcon icon={SecurityCheckIcon} size={40} className="mb-3 text-muted-foreground/40" />
+            <p className="text-lg font-medium">Nenhum registro de auditoria</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              As operações sensíveis serão registradas automaticamente
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log) => {
+            const acaoConf = ACAO_CONFIG[log.acao] ?? ACAO_CONFIG.visualizar;
+            const Icon = acaoConf?.icon ?? SecurityCheckIcon;
+
+            return (
+              <Card key={log.id} className="border-0 shadow-sm">
+                <CardContent className="flex items-start gap-4 p-4">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${acaoConf?.cor ?? 'bg-muted'}`}>
+                    <HugeiconsIcon icon={Icon} size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {log.acao}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] capitalize">
+                        {log.entidade}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {log.entidadeId && (
+                        <span className="font-mono text-xs">ID: {log.entidadeId.slice(0, 8)}... </span>
+                      )}
+                      {log.userId && (
+                        <span className="text-xs">Usuário: {log.userId.slice(0, 8)}...</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">
+                    <div className="flex items-center gap-1">
+                      <HugeiconsIcon icon={Calendar03Icon} size={12} />
+                      <span>
+                        {new Date(log.createdAt).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    {log.ip && <p className="mt-0.5">IP: {log.ip}</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

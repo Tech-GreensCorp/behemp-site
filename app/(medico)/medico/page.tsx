@@ -1,5 +1,6 @@
 import { obterKpisMedico, listarPacientes } from '@/app/_actions/pacientes';
 import { obterDadosUsuario } from '@/lib/auth';
+import { DashboardCharts } from '@/components/medico/dashboard-charts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,6 +109,9 @@ export default async function MedicoDashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Gráficos do Dashboard */}
+      <DashboardCharts />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Pacientes recentes */}
