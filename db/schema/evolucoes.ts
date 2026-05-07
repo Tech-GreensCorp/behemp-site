@@ -2,13 +2,11 @@ import { pgTable, text, date, integer, index } from 'drizzle-orm/pg-core';
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { pacientes } from './pacientes';
 import { medicos } from './medicos';
+import { evolucaoTipoEnum, qualidadeSonoEnum } from './enums';
 
 /**
  * Tabela de evoluções clínicas — registro contínuo da evolução do paciente.
- * Inclui indicadores numéricos (0-10) para gráficos de acompanhamento:
- * - Nível de dor
- * - Qualidade de sono
- * - Bem-estar geral
+ * Inclui tipo de evolução, sintomas, efeitos colaterais e indicadores numéricos.
  */
 export const evolucoes = pgTable(
   'evolucoes',
@@ -18,10 +16,13 @@ export const evolucoes = pgTable(
       .notNull()
       .references(() => pacientes.id),
     data: date('data').notNull(),
-    conteudo: text('conteudo').notNull(),
+    tipo: evolucaoTipoEnum('tipo').notNull(),
+    sintomasAtuais: text('sintomas_atuais'),
+    efeitosColaterais: text('efeitos_colaterais'),
+    conteudo: text('conteudo').notNull(), // observações
     nivelDor: integer('nivel_dor'), // 0-10
-    qualidadeSono: integer('qualidade_sono'), // 0-10
-    bemEstar: integer('bem_estar'), // 0-10
+    qualidadeSono: qualidadeSonoEnum('qualidade_sono'),
+    bemEstar: text('bem_estar'), // ruim, regular, boa, excelente
     criadoPor: text('criado_por')
       .notNull()
       .references(() => medicos.id),

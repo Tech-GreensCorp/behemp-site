@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,17 @@ import {
   UserIcon,
   ArrowRight01Icon,
   Loading03Icon,
+  Upload01Icon,
+  Download01Icon,
+  CheckmarkCircle01Icon,
+  Alert02Icon,
 } from '@hugeicons/core-free-icons';
-import { listarPacientes } from '@/app/_actions/pacientes';
+import {
+  listarPacientes,
+  importarPacientesCSV,
+  exportarPacientesCSV,
+} from '@/app/_actions/pacientes';
+import { toast } from 'sonner';
 
 // ── Configurações de display ───────────────────────────────────
 
@@ -38,12 +47,21 @@ const TRATAMENTO_LABELS: Record<string, string> = {
   cbd_thc: 'CBD + THC',
 };
 
+const JORNADA_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+  acolhimento: { label: 'Acolhimento', icon: '🤝', color: '#1A6B41' },
+  avaliacao_medica: { label: 'Avaliação Médica', icon: '🩺', color: '#B83220' },
+  burocracia_anvisa: { label: 'Burocracia / ANVISA', icon: '📋', color: '#9A6C00' },
+  logistica: { label: 'Logística', icon: '📦', color: '#2563EB' },
+  acompanhamento_continuo: { label: 'Acompanhamento', icon: '🔄', color: '#7C3AED' },
+};
+
 interface Paciente {
   id: string;
   nome: string;
   email: string;
   telefone: string | null;
   status: string;
+  jornadaFase: string | null;
   tratamentoTipo: string | null;
   createdAt: Date;
 }
@@ -52,8 +70,12 @@ export default function PacientesPage() {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroTratamento, setFiltroTratamento] = useState('todos');
+  const [filtroJornada, setFiltroJornada] = useState('todos');
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [importando, setImportando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const carregarPacientes = useCallback(async () => {
     setCarregando(true);
@@ -61,12 +83,13 @@ export default function PacientesPage() {
       busca: busca || undefined,
       status: filtroStatus,
       tratamento: filtroTratamento,
+      jornada: filtroJornada,
     });
     if (resultado.sucesso && resultado.dados) {
       setPacientes(resultado.dados);
     }
     setCarregando(false);
-  }, [busca, filtroStatus, filtroTratamento]);
+  }, [busca, filtroStatus, filtroTratamento, filtroJornada]);
 
   // Debounce na busca
   useEffect(() => {
@@ -76,26 +99,146 @@ export default function PacientesPage() {
     return () => clearTimeout(timer);
   }, [carregarPacientes]);
 
+  // ── Importar CSV ──────────────────────────────────────────────
+  async function handleImportar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportando(true);
+
+    try {
+      const conteudo = await file.text();
+      const resultado = await importarPacientesCSV(conteudo);
+
+      if (resultado.sucesso && resultado.dados) {
+        const { importados, ignorados, erros } = resultado.dados;
+
+        if (importados > 0) {
+          toast.success(`${importados} paciente${importados > 1 ? 's' : ''} importado${importados > 1 ? 's' : ''} com sucesso!`, {
+            description: ignorados > 0 ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} (ignorados)` : undefined,
+          });
+        } else {
+          toast.info('Nenhum paciente novo importado.', {
+            description: ignorados > 0 ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} no sistema` : undefined,
+          });
+        }
+
+        if (erros.length > 0) {
+          toast.warning(`${erros.length} erro${erros.length > 1 ? 's' : ''} durante a importação`, {
+            description: erros[0],
+          });
+        }
+
+        // Recarregar lista
+        await carregarPacientes();
+      } else {
+        toast.error(resultado.erro || 'Erro ao importar CSV');
+      }
+    } catch {
+      toast.error('Erro ao ler o arquivo CSV');
+    } finally {
+      setImportando(false);
+      // Limpar input para permitir reimport do mesmo arquivo
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }
+
+  // ── Exportar CSV ──────────────────────────────────────────────
+  async function handleExportar() {
+    setExportando(true);
+    try {
+      const resultado = await exportarPacientesCSV();
+      if (resultado.sucesso && resultado.dados) {
+        // Criar e baixar arquivo
+        const blob = new Blob(['\uFEFF' + resultado.dados], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const data = new Date().toISOString().split('T')[0];
+        a.download = `pacientes-${data}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast.success('Arquivo CSV exportado com sucesso!');
+      } else {
+        toast.error(resultado.erro || 'Erro ao exportar');
+      }
+    } catch {
+      toast.error('Erro ao exportar pacientes');
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pacientes</h1>
-          <p className="text-sm text-muted-foreground">
-            {carregando ? 'Carregando...' : `${pacientes.length} paciente${pacientes.length !== 1 ? 's' : ''}`}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Gestão
+          </p>
+          <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+            <span className="text-accent-italic">Pacientes</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {carregando ? 'Carregando...' : `${pacientes.length} paciente${pacientes.length !== 1 ? 's' : ''} cadastrado${pacientes.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <Link href="/medico/pacientes/novo">
-          <Button className="gap-2" nativeButton={false}>
-            <HugeiconsIcon icon={UserAdd01Icon} size={16} />
-            Novo paciente
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Input oculto para upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleImportar}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importando}
+          >
+            {importando ? (
+              <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+            ) : (
+              <HugeiconsIcon icon={Upload01Icon} size={14} />
+            )}
+            {importando ? 'Importando...' : 'Importar CSV'}
           </Button>
-        </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl"
+            onClick={handleExportar}
+            disabled={exportando || pacientes.length === 0}
+          >
+            {exportando ? (
+              <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+            ) : (
+              <HugeiconsIcon icon={Download01Icon} size={14} />
+            )}
+            {exportando ? 'Exportando...' : 'Exportar CSV'}
+          </Button>
+          <Link href="/medico/pacientes/novo">
+            <Button className="gap-2 rounded-xl" nativeButton={false}>
+              <HugeiconsIcon icon={UserAdd01Icon} size={16} />
+              Novo paciente
+            </Button>
+          </Link>
+        </div>
       </div>
 
+      <div className="h-px bg-gradient-to-r from-border/60 via-border to-transparent" />
+
       {/* Filtros */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border/40 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
           <div className="relative flex-1">
             <HugeiconsIcon
@@ -132,6 +275,26 @@ export default function PacientesPage() {
               <SelectItem value="cbd_thc">CBD + THC</SelectItem>
             </SelectContent>
           </Select>
+          {/* Filtro por fase da jornada */}
+          <Select value={filtroJornada} onValueChange={(v) => setFiltroJornada(v ?? 'todos')}>
+            <SelectTrigger className="w-full sm:w-52">
+              <SelectValue placeholder="Fase da jornada" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as fases</SelectItem>
+              {Object.entries(JORNADA_LABELS).map(([key, { label, icon, color }]) => (
+                <SelectItem key={key} value={key}>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    {icon} {label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
@@ -141,22 +304,33 @@ export default function PacientesPage() {
           <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
         </div>
       ) : pacientes.length === 0 ? (
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border/40 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <HugeiconsIcon icon={UserIcon} size={48} className="mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium">Nenhum paciente encontrado</p>
             <p className="text-sm text-muted-foreground">
-              {busca || filtroStatus !== 'todos' || filtroTratamento !== 'todos'
+              {busca || filtroStatus !== 'todos' || filtroTratamento !== 'todos' || filtroJornada !== 'todos'
                 ? 'Tente ajustar os filtros'
-                : 'Comece cadastrando seu primeiro paciente'}
+                : 'Comece cadastrando ou importando pacientes'}
             </p>
-            {!busca && filtroStatus === 'todos' && filtroTratamento === 'todos' && (
-              <Link href="/medico/pacientes/novo" className="mt-4">
-                <Button size="sm" className="gap-2" nativeButton={false}>
-                  <HugeiconsIcon icon={UserAdd01Icon} size={14} />
-                  Cadastrar paciente
+            {!busca && filtroStatus === 'todos' && filtroTratamento === 'todos' && filtroJornada === 'todos' && (
+              <div className="mt-4 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <HugeiconsIcon icon={Upload01Icon} size={14} />
+                  Importar CSV
                 </Button>
-              </Link>
+                <Link href="/medico/pacientes/novo">
+                  <Button size="sm" className="gap-2" nativeButton={false}>
+                    <HugeiconsIcon icon={UserAdd01Icon} size={14} />
+                    Cadastrar paciente
+                  </Button>
+                </Link>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -166,10 +340,10 @@ export default function PacientesPage() {
             const statusConfig = STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
             return (
               <Link key={paciente.id} href={`/medico/pacientes/${paciente.id}`}>
-                <Card className="group border-0 shadow-sm transition-all hover:shadow-md">
+                <Card className="group border-border/40 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
                   <CardContent className="flex items-center gap-4 p-4">
                     {/* Inicial */}
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 font-heading text-sm font-semibold text-secondary">
                       {paciente.nome.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -177,6 +351,22 @@ export default function PacientesPage() {
                       <p className="truncate text-sm text-muted-foreground">{paciente.email}</p>
                     </div>
                     <div className="hidden items-center gap-2 sm:flex">
+                      {paciente.jornadaFase && (() => {
+                        const jornada = JORNADA_LABELS[paciente.jornadaFase!];
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                            style={{
+                              backgroundColor: jornada ? `${jornada.color}18` : undefined,
+                              color: jornada?.color,
+                              border: `1px solid ${jornada ? `${jornada.color}35` : 'transparent'}`,
+                            }}
+                          >
+                            <span>{jornada?.icon}</span>
+                            {jornada?.label ?? paciente.jornadaFase}
+                          </span>
+                        );
+                      })()}
                       {paciente.tratamentoTipo && (
                         <Badge variant="outline" className="text-xs">
                           {TRATAMENTO_LABELS[paciente.tratamentoTipo] ?? paciente.tratamentoTipo}

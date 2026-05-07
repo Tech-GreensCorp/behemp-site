@@ -4,13 +4,13 @@ import { NextResponse } from 'next/server';
 /**
  * Middleware de proteção de rotas com Clerk.
  *
- * Rotas públicas são acessíveis sem autenticação.
- * Rotas protegidas (/medico, /paciente, /admin) exigem login
- * e redirecionam para sign-in se não autenticado.
+ * ESTRATÉGIA: O middleware verifica APENAS se o usuário está autenticado (userId).
+ * A verificação de ROLE (admin, medico, paciente) é feita nos layouts de cada área,
+ * pois o JWT pode ter delay (clock skew) entre a criação da sessão e a propagação
+ * dos claims customizados — o que causava um loop de redirecionamento.
  *
- * A verificação de role (admin, medico, paciente) é feita via:
- * 1. sessionClaims.metadata.role (requer configuração no Clerk Dashboard → Sessions)
- * 2. Fallback: sessionClaims.publicMetadata.role (alternativa)
+ * Rotas públicas são acessíveis sem autenticação.
+ * Rotas protegidas (/medico, /paciente, /admin) exigem apenas userId válido.
  */
 
 const isPublicRoute = createRouteMatcher([
@@ -30,76 +30,18 @@ const isPublicRoute = createRouteMatcher([
   '/redirect',
 ]);
 
-const isMedicoRoute = createRouteMatcher(['/medico(.*)']);
-const isPacienteRoute = createRouteMatcher(['/paciente(.*)']);
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
-
-/**
- * Extrai o role do usuário a partir do sessionClaims.
- * Tenta múltiplos caminhos possíveis no JWT para garantir compatibilidade.
- */
-function extrairRole(sessionClaims: Record<string, unknown> | null): string | undefined {
-  if (!sessionClaims) return undefined;
-
-  // Caminho 1: metadata.role (quando session token customizado está configurado)
-  const metadata = sessionClaims.metadata as { role?: string } | undefined;
-  if (metadata?.role) return metadata.role;
-
-  // Caminho 2: publicMetadata.role (estrutura alternativa do Clerk)
-  const publicMeta = sessionClaims.publicMetadata as { role?: string } | undefined;
-  if (publicMeta?.role) return publicMeta.role;
-
-  // Caminho 3: role direto no claims (caso customizado diferente)
-  if (typeof sessionClaims.role === 'string') return sessionClaims.role;
-
-  return undefined;
-}
-
 export default clerkMiddleware(async (auth, req) => {
-  // Rotas públicas: não precisa de autenticação
+  // Rotas públicas: passa sem verificação
   if (isPublicRoute(req)) {
     return NextResponse.next();
   }
 
-  // Todas as rotas protegidas: exigir autenticação
-  const { userId, sessionClaims, redirectToSignIn } = await auth();
+  // Rotas protegidas: apenas verifica se o usuário tem sessão ativa
+  // A verificação de role é feita nos layouts individuais de cada área
+  const { userId, redirectToSignIn } = await auth();
 
   if (!userId) {
     return redirectToSignIn();
-  }
-
-  // Verificação de role via sessionClaims
-  const role = extrairRole(sessionClaims as Record<string, unknown>);
-
-  // Se não tem role no JWT, redireciona para a home
-  // (o usuário precisa configurar o session token no Clerk Dashboard)
-  if (!role) {
-    // Log para debug — visível no terminal do dev server
-    console.warn(
-      `[Middleware] Usuário ${userId} sem role no JWT. Configure o session token no Clerk Dashboard.`,
-      'sessionClaims:', JSON.stringify(sessionClaims),
-    );
-    // Permite acessar mas sem rota protegida específica
-    const url = new URL('/', req.url);
-    return NextResponse.redirect(url);
-  }
-
-  // Médico: apenas role 'medico' ou 'admin'
-  if (isMedicoRoute(req) && role !== 'medico' && role !== 'admin') {
-    const url = new URL('/', req.url);
-    return NextResponse.redirect(url);
-  }
-
-  // Paciente: apenas role 'paciente' ou 'admin'
-  if (isPacienteRoute(req) && role !== 'paciente' && role !== 'admin') {
-    const url = new URL('/', req.url);
-    return NextResponse.redirect(url);
-  }
-
-  // Admin: apenas role 'admin'
-  if (isAdminRoute(req) && role !== 'admin') {
-    const url = new URL('/', req.url);
-    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();

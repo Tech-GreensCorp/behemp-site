@@ -1,0 +1,26 @@
+ALTER TABLE "pacientes" ADD COLUMN "rg" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "genero" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "cep" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "cidade" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "uf" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "peso" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "altura" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "historico_medico" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "patologia" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "atendimento" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "tem_advogado" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "nome_advogado" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "cid" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "categorizacao" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "como_conheceu" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "data_associacao" date;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "entrada_paciente" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "etapa" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "hospital_proximo" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "home_care" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "plano_saude" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "possui_plano_saude" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "renda_familia" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "termo_associado" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "valor_contribuicao" text;--> statement-breakpoint
+ALTER TABLE "pacientes" ADD COLUMN "processo_judicializacao" text;

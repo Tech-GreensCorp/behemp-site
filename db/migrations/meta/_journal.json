@@ -15,6 +15,34 @@
       "when": 1778070366410,
       "tag": "0001_melted_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778090420464,
+      "tag": "0002_cheerful_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778093016060,
+      "tag": "0003_lowly_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778149084228,
+      "tag": "0004_optimal_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778156925319,
+      "tag": "0005_green_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

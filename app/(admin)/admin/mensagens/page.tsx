@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Mail01Icon,
@@ -13,13 +14,16 @@ import {
   UserIcon,
   Calendar01Icon,
   Message01Icon,
+  MailReply01Icon,
+  MailSend01Icon,
 } from '@hugeicons/core-free-icons';
-import { listarContatos, atualizarStatusContato } from '@/app/(public)/_actions/contato';
+import { listarContatos, atualizarStatusContato, responderContato } from '@/app/(public)/_actions/contato';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 /**
  * Página admin de mensagens recebidas via formulário de contato.
+ * Inclui painel de resposta inline com envio via Brevo.
  */
 
 const STATUS_CONFIG: Record<
@@ -46,9 +50,20 @@ export default function MensagensAdminPage() {
   const [carregando, setCarregando] = useState(true);
   const [contatoSelecionado, setContatoSelecionado] = useState<Contato | null>(null);
 
+  // Estado do painel de resposta
+  const [respondendo, setRespondendo] = useState(false);
+  const [respostaTexto, setRespostaTexto] = useState('');
+  const [enviandoResposta, setEnviandoResposta] = useState(false);
+
   useEffect(() => {
     carregarContatos();
   }, []);
+
+  // Reseta o painel de resposta ao trocar de mensagem
+  useEffect(() => {
+    setRespondendo(false);
+    setRespostaTexto('');
+  }, [contatoSelecionado?.id]);
 
   async function carregarContatos() {
     const resultado = await listarContatos();
@@ -85,6 +100,40 @@ export default function MensagensAdminPage() {
       toast.success('Mensagem marcada como respondida');
       // Notifica o sidebar para atualizar o badge
       window.dispatchEvent(new CustomEvent('mensagens-atualizadas'));
+    }
+  }
+
+  async function handleEnviarResposta() {
+    if (!contatoSelecionado || !respostaTexto.trim()) return;
+
+    setEnviandoResposta(true);
+    try {
+      const resultado = await responderContato(
+        contatoSelecionado.id,
+        {
+          nome: contatoSelecionado.nome,
+          email: contatoSelecionado.email,
+          assunto: contatoSelecionado.assunto,
+          mensagem: contatoSelecionado.mensagem,
+        },
+        respostaTexto,
+      );
+
+      if (resultado.sucesso) {
+        // Atualiza localmente
+        setContatos((prev) =>
+          prev.map((c) =>
+            c.id === contatoSelecionado.id ? { ...c, statusLeitura: 'respondida' } : c,
+          ),
+        );
+        toast.success(`Resposta enviada para ${contatoSelecionado.email}`);
+        window.dispatchEvent(new CustomEvent('mensagens-atualizadas'));
+        setContatoSelecionado(null);
+      } else {
+        toast.error(resultado.erro || 'Erro ao enviar resposta');
+      }
+    } finally {
+      setEnviandoResposta(false);
     }
   }
 
@@ -161,7 +210,9 @@ export default function MensagensAdminPage() {
         </div>
       )}
 
-      {/* Modal de detalhe */}
+      {/* ═══════════════════════════════════════════════ */}
+      {/* ══ Modal de detalhe + painel de resposta ══════ */}
+      {/* ═══════════════════════════════════════════════ */}
       {contatoSelecionado && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-8 pb-8 backdrop-blur-sm sm:items-center sm:pt-4"
@@ -237,14 +288,80 @@ export default function MensagensAdminPage() {
                   </p>
                 </div>
 
-                {/* Responder por e-mail */}
-                <a
-                  href={`mailto:${contatoSelecionado.email}?subject=Re: ${encodeURIComponent(contatoSelecionado.assunto)}`}
-                  className="mt-4 flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                >
-                  <HugeiconsIcon icon={Mail01Icon} size={15} />
-                  Responder por e-mail
-                </a>
+                {/* ── Painel de Resposta ──────────────────────── */}
+                <div className={cn(
+                  'mt-4 overflow-hidden rounded-xl border transition-all duration-300',
+                  respondendo
+                    ? 'border-primary/30 bg-primary/[0.03]'
+                    : 'border-dashed border-muted-foreground/20 bg-transparent',
+                )}>
+                  {!respondendo ? (
+                    /* Botão para abrir o painel */
+                    <button
+                      onClick={() => setRespondendo(true)}
+                      className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    >
+                      <HugeiconsIcon icon={MailReply01Icon} size={16} />
+                      Escrever resposta
+                    </button>
+                  ) : (
+                    /* Área de composição da resposta */
+                    <div className="p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                            <HugeiconsIcon icon={MailReply01Icon} size={14} className="text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold tracking-wide text-foreground">Responder</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Para: <span className="font-medium text-foreground">{contatoSelecionado.email}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setRespondendo(false)}
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                        </button>
+                      </div>
+
+                      <Textarea
+                        id="resposta-contato"
+                        placeholder={`Olá, ${contatoSelecionado.nome.split(' ')[0]}! Obrigado por entrar em contato...`}
+                        value={respostaTexto}
+                        onChange={(e) => setRespostaTexto(e.target.value)}
+                        rows={5}
+                        className="mb-3 resize-none border-muted/50 bg-background/80 text-sm focus-visible:ring-primary/30"
+                      />
+
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-muted-foreground">
+                          {respostaTexto.length} caracteres
+                        </p>
+                        <Button
+                          onClick={handleEnviarResposta}
+                          disabled={!respostaTexto.trim() || enviandoResposta}
+                          size="sm"
+                          className="gap-2 bg-primary text-white hover:bg-primary/90"
+                        >
+                          {enviandoResposta ? (
+                            <>
+                              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                              Enviando…
+                            </>
+                          ) : (
+                            <>
+                              <HugeiconsIcon icon={MailSend01Icon} size={14} />
+                              Enviar resposta
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Footer */}
@@ -255,7 +372,8 @@ export default function MensagensAdminPage() {
                 {contatoSelecionado.statusLeitura !== 'respondida' && (
                   <Button
                     onClick={() => handleMarcarRespondida(contatoSelecionado.id)}
-                    className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                    variant="outline"
+                    className="gap-2"
                   >
                     <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
                     Marcar como respondida

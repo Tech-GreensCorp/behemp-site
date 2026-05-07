@@ -17,14 +17,16 @@ import {
   HeartbreakIcon,
   CallIcon,
   Mail01Icon,
-  Location01Icon,
   Calendar01Icon,
   Download01Icon,
-  Clock01Icon,
+  GoogleSheetIcon,
 } from '@hugeicons/core-free-icons';
 import { listarTriagens, atualizarStatusTriagem } from '@/app/(public)/_actions/triagem';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+/** URL da planilha Google Sheets centralizada */
+const SHEETS_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID || '1hchr4CFjtHmVYGrRyBjp7H7RbBM0PWRMeuBWWhQjmJ8'}/edit`;
 
 /**
  * Página de triagens do admin com modal de detalhe premium.
@@ -44,6 +46,7 @@ interface Triagem {
   telefoneContato: string | null;
   nomeContato: string | null;
   statusVisualizacao: string;
+  medicoClerkId: string | null;
   createdAt: Date;
 }
 
@@ -294,6 +297,12 @@ export default function TriagensAdminPage() {
                     </p>
                   </div>
                   <div className="hidden items-center gap-3 sm:flex">
+                    {triagem.medicoClerkId && (
+                      <Badge className="border-0 font-medium bg-indigo-500/10 text-indigo-600">
+                        <HugeiconsIcon icon={Stethoscope02Icon} size={12} className="mr-1" />
+                        Via médico
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {new Date(triagem.createdAt).toLocaleDateString('pt-BR')}
                     </span>
@@ -488,18 +497,34 @@ export default function TriagensAdminPage() {
 
                 {/* ── Footer com ações ────────────────────── */}
                 <div className="flex flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                  {/* Documento para download */}
-                  {(triagemSelecionada.dados as Record<string, string>)['relatorio_medico_arquivo'] && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => handleDownloadDocumento(triagemSelecionada)}
+                  {/* Ações de download */}
+                  <div className="flex flex-wrap gap-2">
+                    {(triagemSelecionada.dados as Record<string, string>)['relatorio_medico_arquivo'] && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleDownloadDocumento(triagemSelecionada)}
+                      >
+                        <HugeiconsIcon icon={Download01Icon} size={15} />
+                        Baixar relatório médico
+                      </Button>
+                    )}
+                    <a
+                      href={SHEETS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <HugeiconsIcon icon={Download01Icon} size={15} />
-                      Baixar relatório médico
-                    </Button>
-                  )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                      >
+                        <HugeiconsIcon icon={GoogleSheetIcon} size={15} />
+                        Ver na planilha
+                      </Button>
+                    </a>
+                  </div>
 
                   <div className="flex items-center gap-3 sm:ml-auto">
                     <Button

@@ -24,6 +24,9 @@ export * from './grupos-chat';
 export * from './mensagens';
 export * from './notificacoes';
 export * from './logs-auditoria';
+export * from './exames';
+export * from './ajustes-dosagem';
+export * from './relatorios';
 
 // Relations
 export * from './relations';

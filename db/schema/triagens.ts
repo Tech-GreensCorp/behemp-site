@@ -16,4 +16,5 @@ export const triagens = pgTable('triagens', {
   statusVisualizacao: triagemStatusEnum('status_visualizacao')
     .notNull()
     .default('pendente'),
+  medicoClerkId: text('medico_clerk_id'), // null = triagem pública, preenchido = médico
 });

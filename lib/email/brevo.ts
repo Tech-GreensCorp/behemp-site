@@ -422,3 +422,171 @@ export async function enviarEmailConfirmacaoUsuario(
     to: [{ email: dados.email, name: dados.nome }],
   });
 }
+
+// ── Template: Resposta do Admin ao Usuário ─────────────────────
+
+function templateRespostaAdmin(dados: DadosContatoEmail, resposta: string): string {
+  const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }).format(new Date());
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resposta da Be4Hope</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:${CORES.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:${CORES.bg};">
+    <tr>
+      <td style="padding:32px 16px;">
+        <table align="center" width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;margin:0 auto;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding:0 0 24px;">
+              <img src="${LOGO_URL()}" alt="Be4Hope" width="120" height="auto" style="display:block;border:0;outline:none;max-width:120px;" />
+            </td>
+          </tr>
+
+          <!-- Card principal -->
+          <tr>
+            <td style="background-color:${CORES.cardBg};border-radius:16px;border:1px solid ${CORES.cardBorder};overflow:hidden;">
+
+              <!-- Header -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="background:linear-gradient(135deg, ${CORES.primary} 0%, ${CORES.primaryDark} 100%);padding:32px 36px 28px;">
+                    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:12px;">
+                      <tr>
+                        <td style="background:rgba(255,255,255,0.18);border-radius:20px;padding:4px 14px;">
+                          <span style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;">✉ Resposta da equipe</span>
+                        </td>
+                      </tr>
+                    </table>
+                    <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;line-height:1.35;">
+                      Olá, ${escapeHtml(dados.nome)}!
+                    </h1>
+                    <p style="margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.75);">
+                      ${dataFormatada}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Corpo -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="padding:28px 36px 32px;">
+
+                    <!-- Intro -->
+                    <p style="margin:0 0 20px;font-size:14px;line-height:1.7;color:${CORES.textSecondary};">
+                      A equipe Be4Hope respondeu sua mensagem sobre <strong style="color:${CORES.textPrimary};">${escapeHtml(dados.assunto)}</strong>.
+                    </p>
+
+                    <!-- Resposta em destaque -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
+                      <tr>
+                        <td>
+                          <p style="margin:0 0 10px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${CORES.textMuted};">Nossa resposta</p>
+                          <div style="background:${CORES.bg};border-radius:12px;padding:20px 24px;border-left:3px solid ${CORES.primary};">
+                            <p style="margin:0;font-size:14px;line-height:1.8;color:${CORES.textPrimary};white-space:pre-wrap;">${escapeHtml(resposta)}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Divider -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:20px;">
+                      <tr>
+                        <td style="border-top:1px solid ${CORES.divider};"></td>
+                      </tr>
+                    </table>
+
+                    <!-- Mensagem original -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
+                      <tr>
+                        <td>
+                          <p style="margin:0 0 10px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${CORES.textMuted};">Sua mensagem original</p>
+                          <div style="background:${CORES.accent};border-radius:12px;padding:16px 20px;opacity:0.85;">
+                            <p style="margin:0;font-size:13px;line-height:1.7;color:${CORES.textSecondary};white-space:pre-wrap;">${escapeHtml(dados.mensagem).length > 300 ? escapeHtml(dados.mensagem).slice(0, 300) + '…' : escapeHtml(dados.mensagem)}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- CTA -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td align="center">
+                          <a href="https://wa.me/5511932047360"
+                             style="display:inline-block;background:#25D366;color:#ffffff;font-size:13px;font-weight:600;padding:12px 28px;border-radius:50px;text-decoration:none;letter-spacing:0.02em;">
+                            💬 Continuar pelo WhatsApp
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:28px 0 0;text-align:center;">
+              <p style="margin:0 0 4px;font-size:12px;color:${CORES.textMuted};">
+                Be4Hope — Cuidar de quem cuida é nosso ato de amor
+              </p>
+              <p style="margin:0;font-size:11px;color:${CORES.textMuted};">
+                Esta é uma resposta da equipe Be4Hope ao seu formulário de contato.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Envia a resposta do admin diretamente para o e-mail do usuário.
+ */
+export async function enviarRespostaAdmin(
+  dados: DadosContatoEmail,
+  resposta: string,
+): Promise<void> {
+  const client = criarClienteBrevo();
+
+  await client.transactionalEmails.sendTransacEmail({
+    subject: `Re: ${dados.assunto} — Be4Hope`,
+    htmlContent: templateRespostaAdmin(dados, resposta),
+    sender: {
+      name: process.env.BREVO_FROM_NAME ?? 'Be4Hope',
+      email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org',
+    },
+    to: [{ email: dados.email, name: dados.nome }],
+    replyTo: {
+      email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org',
+      name: process.env.BREVO_FROM_NAME ?? 'Be4Hope',
+    },
+  });
+}
+

@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
 
   // Configuração de imagens para domínios permitidos
   images: {
+    qualities: [75, 80, 85, 90],
     remotePatterns: [
       {
         protocol: 'https',
@@ -13,6 +14,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
 
   // Headers de segurança
   async headers() {

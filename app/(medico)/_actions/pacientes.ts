@@ -276,6 +276,11 @@ export async function criarAnamnese(
         pacienteId: parsed.data.pacienteId,
         conteudo: parsed.data.conteudo,
         criadoPor: parsed.data.criadoPor,
+        queixaPrincipal: parsed.data.conteudo,
+        historiaDoencaAtual: '',
+        tabagismo: 'nunca_fumou',
+        consumoAlcool: 'nao_consome',
+        qualidadeSono: 'regular',
       })
       .returning({ id: anamneses.id });
 
@@ -303,10 +308,11 @@ export async function criarEvolucao(
       .values({
         pacienteId: parsed.data.pacienteId,
         data: parsed.data.data,
+        tipo: 'estavel',
         conteudo: parsed.data.conteudo,
         nivelDor: parsed.data.nivelDor,
-        qualidadeSono: parsed.data.qualidadeSono,
-        bemEstar: parsed.data.bemEstar,
+        qualidadeSono: parsed.data.qualidadeSono as any,
+        bemEstar: String(parsed.data.bemEstar ?? ''),
         criadoPor: parsed.data.criadoPor,
       })
       .returning({ id: evolucoes.id });

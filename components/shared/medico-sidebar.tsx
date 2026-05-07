@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   DashboardSquare01Icon,
+  Route01Icon,
   UserMultiple02Icon,
+  FileValidationIcon,
   Notification03Icon,
   Settings01Icon,
   Logout01Icon,
@@ -20,7 +22,9 @@ import type { IconSvgElement } from '@hugeicons/react';
 
 const NAV_ITEMS: { label: string; href: string; icon: IconSvgElement }[] = [
   { label: 'Dashboard', href: '/medico', icon: DashboardSquare01Icon },
+  { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route01Icon },
   { label: 'Pacientes', href: '/medico/pacientes', icon: UserMultiple02Icon },
+  { label: 'Triagem', href: '/medico/triagem', icon: FileValidationIcon },
   { label: 'Notificações', href: '/medico/notificacoes', icon: Notification03Icon },
   { label: 'Configurações', href: '/medico/configuracoes', icon: Settings01Icon },
 ];

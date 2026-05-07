@@ -30,6 +30,8 @@ export const documentoTipoEnum = pgEnum('documento_tipo', [
   'receita_medica',
   'comprovante_residencia',
   'autorizacao_anvisa',
+  'documento_pessoal',
+  'oficio_anvisa',
 ]);
 
 /** Status da consulta */
@@ -60,9 +62,47 @@ export const recompraStatusEnum = pgEnum('recompra_status', [
 /** Tipo de grupo de chat */
 export const grupoChatTipoEnum = pgEnum('grupo_chat_tipo', ['direto', 'grupo']);
 
+/** Fase da jornada do paciente no fluxo operacional (Kanban CRM) */
+export const jornadaFaseEnum = pgEnum('jornada_fase', [
+  'acolhimento',
+  'avaliacao_medica',
+  'burocracia_anvisa',
+  'logistica',
+  'acompanhamento_continuo',
+]);
+
 /** Status de visualização da triagem pelo admin */
 export const triagemStatusEnum = pgEnum('triagem_status', [
   'pendente',
   'visualizada',
   'respondida',
+]);
+
+/** Tabagismo do paciente */
+export const tabagismoEnum = pgEnum('tabagismo', [
+  'nunca_fumou',
+  'ex_fumante',
+  'fumante',
+]);
+
+/** Consumo de álcool */
+export const consumoAlcoolEnum = pgEnum('consumo_alcool', [
+  'nao_consome',
+  'regular',
+  'ocasional',
+]);
+
+/** Qualidade do sono */
+export const qualidadeSonoEnum = pgEnum('qualidade_sono_enum', [
+  'ruim',
+  'regular',
+  'boa',
+  'excelente',
+]);
+
+/** Tipo de evolução clínica */
+export const evolucaoTipoEnum = pgEnum('evolucao_tipo', [
+  'positiva',
+  'estavel',
+  'negativa',
 ]);

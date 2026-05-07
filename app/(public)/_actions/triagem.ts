@@ -7,7 +7,8 @@ import { z } from 'zod';
 
 /**
  * Server Actions de triagem.
- * Formulário público (sem login) + visualização exclusiva do admin.
+ * Formulário público (sem login) + formulário do médico (logado).
+ * Visualização: admin vê todas, médico vê apenas as que ele criou.
  */
 
 // ── Schemas ───────────────────────────────────────────────────
@@ -19,6 +20,7 @@ const criarTriagemSchema = z.object({
   emailContato: z.string().email('E-mail inválido').optional(),
   telefoneContato: z.string().optional(),
   nomeContato: z.string().optional(),
+  medicoClerkId: z.string().optional(),
 });
 
 // ── Types ─────────────────────────────────────────────────────
@@ -32,7 +34,9 @@ interface ActionResult<T = unknown> {
 // ── Actions ───────────────────────────────────────────────────
 
 /**
- * Cria uma nova triagem (chamada pelo formulário público).
+ * Cria uma nova triagem (chamada pelo formulário público ou pelo médico).
+ * Se `medicoClerkId` estiver presente, vincula a triagem ao médico.
+ * Após salvar no banco, insere automaticamente na planilha Google Sheets.
  */
 export async function criarTriagem(
   dados: z.infer<typeof criarTriagemSchema>,
@@ -51,8 +55,26 @@ export async function criarTriagem(
         telefoneContato: parsed.data.telefoneContato,
         nomeContato: parsed.data.nomeContato,
         statusVisualizacao: 'pendente',
+        medicoClerkId: parsed.data.medicoClerkId ?? null,
       })
       .returning({ id: triagens.id });
+
+    // Insere na planilha em paralelo — falha não impacta o usuário
+    const { inserirLinhaTriagem } = await import('@/lib/integrations/google-sheets');
+    const resultadoSheets = await Promise.allSettled([
+      inserirLinhaTriagem({
+        nomeContato: parsed.data.nomeContato ?? null,
+        emailContato: parsed.data.emailContato ?? null,
+        telefoneContato: parsed.data.telefoneContato ?? null,
+        createdAt: new Date(),
+        statusVisualizacao: 'pendente',
+        dados: parsed.data.dados as Record<string, unknown>,
+      }),
+    ]);
+
+    if (resultadoSheets[0].status === 'rejected') {
+      console.error('[Action] Falha ao inserir no Google Sheets (triagem salva no banco):', resultadoSheets[0].reason);
+    }
 
     return { sucesso: true, dados: { triagemId: nova.id } };
   } catch (error) {
@@ -60,6 +82,7 @@ export async function criarTriagem(
     return { sucesso: false, erro: 'Erro ao enviar triagem' };
   }
 }
+
 
 /**
  * Lista todas as triagens (admin only).
@@ -82,6 +105,42 @@ export async function listarTriagens(): Promise<
     return { sucesso: true, dados: resultado };
   } catch (error) {
     console.error('[Action] Erro ao listar triagens:', error);
+    return { sucesso: false, erro: 'Erro ao listar triagens' };
+  }
+}
+
+/**
+ * Lista triagens criadas por um médico específico.
+ * Acessível por médico (vê só as próprias) e admin (vê de qualquer médico).
+ */
+export async function listarTriagensMedico(medicoClerkId?: string): Promise<
+  ActionResult<typeof triagens.$inferSelect[]>
+> {
+  try {
+    const { verificarMedicoOuAdmin } = await import('@/lib/auth');
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: auth.erro };
+    }
+
+    // Médico vê apenas as próprias, admin pode ver de qualquer médico
+    const clerkIdFiltro = auth.role === 'admin' && medicoClerkId
+      ? medicoClerkId
+      : auth.clerkId;
+
+    if (!clerkIdFiltro) {
+      return { sucesso: false, erro: 'Não foi possível identificar o médico' };
+    }
+
+    const resultado = await db
+      .select()
+      .from(triagens)
+      .where(eq(triagens.medicoClerkId, clerkIdFiltro))
+      .orderBy(desc(triagens.createdAt));
+
+    return { sucesso: true, dados: resultado };
+  } catch (error) {
+    console.error('[Action] Erro ao listar triagens do médico:', error);
     return { sucesso: false, erro: 'Erro ao listar triagens' };
   }
 }

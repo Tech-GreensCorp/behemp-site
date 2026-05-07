@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   enviarEmailNotificacaoAdmin,
   enviarEmailConfirmacaoUsuario,
+  enviarRespostaAdmin,
 } from '@/lib/email/brevo';
 
 /**
@@ -146,5 +147,40 @@ export async function contarContatosNaoLidos(): Promise<ActionResult<number>> {
     return { sucesso: true, dados: resultado.length };
   } catch {
     return { sucesso: true, dados: 0 };
+  }
+}
+
+/**
+ * Envia uma resposta por e-mail ao usuário e marca a mensagem como respondida.
+ */
+export async function responderContato(
+  contatoId: string,
+  dados: { nome: string; email: string; assunto: string; mensagem: string },
+  resposta: string,
+): Promise<ActionResult> {
+  try {
+    const { verificarAdmin } = await import('@/lib/auth');
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: 'Acesso não autorizado' };
+    }
+
+    if (!resposta.trim()) {
+      return { sucesso: false, erro: 'A resposta não pode estar vazia' };
+    }
+
+    // Envia o e-mail de resposta via Brevo
+    await enviarRespostaAdmin(dados, resposta.trim());
+
+    // Marca como respondida no banco
+    await db
+      .update(contatos)
+      .set({ statusLeitura: 'respondida' })
+      .where(eq(contatos.id, contatoId));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao responder contato:', error);
+    return { sucesso: false, erro: 'Erro ao enviar resposta. Tente novamente.' };
   }
 }
