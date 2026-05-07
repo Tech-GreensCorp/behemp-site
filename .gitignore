@@ -43,15 +43,38 @@ yarn-error.log*
 next-env.d.ts
 
 # drizzle — snapshots gerados automaticamente não precisam de versionamento manual
-# (mantenha as migrations, ignore só arquivos temporários)
 *.sql.snap
 
-# pnpm lock temporário
+# pnpm lock temporários
 pnpm-lock.yaml.*
 
 # IDEs
 .idea/
 .vscode/settings.json
+.cursor/
 
 # OS
 Thumbs.db
+
+# ── Pastas internas / não pertencem ao repositório ──────────────
+
+# Materiais de design e referência visual (apenas uso local)
+/frontend-design-main/
+
+# Prompts, documentos de IA e arquivos de planejamento (internos)
+/prompts/
+
+# Configurações de agentes de IA (Antigravity, Cursor, etc)
+/.agents/
+
+# ── Dados sensíveis — LGPD ───────────────────────────────────────
+
+# CSVs com dados de pacientes — NUNCA no git
+*.csv
+*.xlsx
+*.xls
+
+# Arquivos de export/importação de dados
+/exports/
+/imports/
+/backups/
