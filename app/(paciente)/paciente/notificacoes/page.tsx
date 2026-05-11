@@ -4,30 +4,29 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Notification03Icon,
-  CheckmarkCircle01Icon,
-  Calendar01Icon,
-  MedicineBottle01Icon,
-  File01Icon,
-  Message01Icon,
-} from '@hugeicons/core-free-icons';
 import { listarNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '@/app/_actions/notificacoes';
 import { toast } from 'sonner';
+import {
+  Bell,
+  Calendar,
+  CheckCircle2,
+  FileText,
+  MessageSquare,
+  Pill,
+} from 'lucide-react';
 
 /**
  * Página de notificações do paciente.
  * Lista todas as notificações com ações de marcar como lida.
  */
 
-const TIPO_ICONE: Record<string, typeof Notification03Icon> = {
-  renovacao_documento: File01Icon,
-  recompra_medicamento: MedicineBottle01Icon,
-  consulta_agendada: Calendar01Icon,
-  consulta_cancelada: Calendar01Icon,
-  nova_mensagem: Message01Icon,
-  geral: Notification03Icon,
+const TIPO_ICONE: Record<string, typeof Bell> = {
+  renovacao_documento: FileText,
+  recompra_medicamento: Pill,
+  consulta_agendada: Calendar,
+  consulta_cancelada: Calendar,
+  nova_mensagem: MessageSquare,
+  geral: Bell,
 };
 
 const TIPO_COR: Record<string, string> = {
@@ -106,7 +105,7 @@ export default function NotificacoesPacientePage() {
         </div>
         {naoLidas > 0 && (
           <Button variant="outline" size="sm" onClick={handleMarcarTodasLidas} className="gap-2">
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+            <CheckCircle2 size={16} />
             Marcar todas como lidas
           </Button>
         )}
@@ -116,7 +115,7 @@ export default function NotificacoesPacientePage() {
       {notificacoes.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={Notification03Icon} size={48} className="mb-4 text-muted-foreground/30" />
+            <Bell size={48} className="mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium">Nenhuma notificação</p>
             <p className="text-sm text-muted-foreground">
               Quando houver algo novo, você verá aqui.
@@ -126,7 +125,7 @@ export default function NotificacoesPacientePage() {
       ) : (
         <div className="space-y-3">
           {notificacoes.map((notificacao) => {
-            const Icone = TIPO_ICONE[notificacao.tipo] || Notification03Icon;
+            const Icone = TIPO_ICONE[notificacao.tipo] || Bell;
             const cor = TIPO_COR[notificacao.tipo] || TIPO_COR.geral;
 
             return (
@@ -136,7 +135,7 @@ export default function NotificacoesPacientePage() {
               >
                 <CardContent className="flex items-start gap-4 p-4">
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${cor}`}>
-                    <HugeiconsIcon icon={Icone} size={20} />
+                    <Icone size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -164,7 +163,7 @@ export default function NotificacoesPacientePage() {
                       className="shrink-0"
                       title="Marcar como lida"
                     >
-                      <HugeiconsIcon icon={CheckmarkCircle01Icon} size={18} />
+                      <CheckCircle2 size={18} />
                     </Button>
                   )}
                 </CardContent>

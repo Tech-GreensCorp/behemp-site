@@ -2,18 +2,18 @@ import { obterKpisAdmin, obterAtividadeRecente } from '@/app/_actions/admin';
 import { listarTriagens } from '@/app/(public)/_actions/triagem';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  UserMultiple02Icon,
-  StethoscopeIcon,
-  FileValidationIcon,
-  ShieldUserIcon,
-  Clock01Icon,
-  CheckmarkCircle01Icon,
-  RefreshIcon,
-} from '@hugeicons/core-free-icons';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import {
+  CheckCircle2,
+  Clock,
+  FileCheck,
+  RefreshCw,
+  ShieldCheck,
+  Stethoscope,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * Dashboard administrativo — Server Component com dados reais do banco.
@@ -30,30 +30,30 @@ export default async function AdminDashboardPage() {
   const triagens = triagensResult.dados ?? [];
   const triagensPendentes = triagens.filter((t) => t.statusVisualizacao === 'pendente');
 
-  const cards = [
+  const cards: { label: string; valor: number; icon: LucideIcon; cor: string; urgente?: boolean }[] = [
     {
       label: 'Total de Usuários',
       valor: kpis?.totalUsuarios ?? 0,
-      icon: UserMultiple02Icon,
+      icon: Users,
       cor: 'bg-primary/10 text-primary',
     },
     {
       label: 'Médicos Ativos',
       valor: kpis?.totalMedicos ?? 0,
-      icon: StethoscopeIcon,
+      icon: Stethoscope,
       cor: 'bg-violet-500/10 text-violet-600',
     },
     {
       label: 'Triagens Pendentes',
       valor: kpis?.triagensPendentes ?? 0,
-      icon: FileValidationIcon,
+      icon: FileCheck,
       cor: 'bg-amber-500/10 text-amber-600',
       urgente: (kpis?.triagensPendentes ?? 0) > 0,
     },
     {
       label: 'Pacientes no Sistema',
       valor: kpis?.totalPacientes ?? 0,
-      icon: ShieldUserIcon,
+      icon: ShieldCheck,
       cor: 'bg-emerald-500/10 text-emerald-600',
     },
   ];
@@ -70,7 +70,7 @@ export default async function AdminDashboardPage() {
         </div>
         <form action="/admin">
           <Button variant="outline" size="sm" className="gap-2" type="submit">
-            <HugeiconsIcon icon={RefreshIcon} size={14} />
+            <RefreshCw size={14} />
             Atualizar
           </Button>
         </form>
@@ -78,14 +78,16 @@ export default async function AdminDashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
           <Card
             key={card.label}
             className={`border-0 shadow-sm ${card.urgente ? 'ring-1 ring-amber-400/40' : ''}`}
           >
             <CardContent className="flex items-center gap-4 p-6">
               <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.cor}`}>
-                <HugeiconsIcon icon={card.icon} size={24} />
+                <Icon size={24} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{card.label}</p>
@@ -93,7 +95,8 @@ export default async function AdminDashboardPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -173,7 +176,7 @@ export default async function AdminDashboardPage() {
                       className={`h-2 w-2 shrink-0 rounded-full ${a.urgente ? 'bg-amber-500' : 'bg-primary'}`}
                     />
                     <span className="flex-1 truncate text-muted-foreground">{a.descricao}</span>
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="shrink-0 text-muted-foreground" />
+                    <CheckCircle2 size={14} className="shrink-0 text-muted-foreground" />
                   </div>
                 ))}
               </>

@@ -6,10 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, Add01Icon, MicroscopeIcon } from '@hugeicons/core-free-icons';
 import { criarExame, listarExames } from '@/app/_actions/exames';
 import { toast } from 'sonner';
+import {
+  Loader2,
+  Microscope,
+  Plus,
+} from 'lucide-react';
 
 interface TabExamesProps { pacienteId: string }
 
@@ -52,13 +55,13 @@ export function TabExames({ pacienteId }: TabExamesProps) {
     } else { toast.error(res.erro || 'Erro ao salvar'); }
   }
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Exames</h2>
-        {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><HugeiconsIcon icon={Add01Icon} size={14} /> Novo Exame</Button>}
+        {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><Plus size={14} /> Novo Exame</Button>}
       </div>
 
       {mostrarForm && (
@@ -74,7 +77,7 @@ export function TabExames({ pacienteId }: TabExamesProps) {
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
               <Button onClick={handleSalvar} disabled={salvando || !nomeExame || !dataExame} className="gap-2 rounded-xl">
-                {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={Add01Icon} size={16} />}
+                {salvando ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 {salvando ? 'Salvando...' : 'Registrar Exame'}
               </Button>
             </div>
@@ -93,7 +96,7 @@ export function TabExames({ pacienteId }: TabExamesProps) {
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                  <HugeiconsIcon icon={MicroscopeIcon} size={18} className="text-blue-500" />
+                  <Microscope size={18} className="text-blue-500" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">{e.nomeExame}</p>

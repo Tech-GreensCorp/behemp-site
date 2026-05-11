@@ -1,10 +1,5 @@
 import Link from 'next/link';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Mail01Icon,
-  SmartPhone01Icon,
-  Location01Icon,
-} from '@hugeicons/core-free-icons';
+import { Mail, Smartphone, MapPin } from 'lucide-react';
 
 const LINKS_RAPIDOS = [
   { label: 'Início', href: '/' },
@@ -81,19 +76,19 @@ export function Footer() {
             </h3>
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                <HugeiconsIcon icon={Mail01Icon} size={16} className="shrink-0 text-primary" />
+                <Mail size={16} className="shrink-0 text-primary" />
                 contato@be4hope.org
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                <HugeiconsIcon icon={Mail01Icon} size={16} className="shrink-0 text-primary" />
+                <Mail size={16} className="shrink-0 text-primary" />
                 contato@behemp.org
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                <HugeiconsIcon icon={SmartPhone01Icon} size={16} className="shrink-0 text-primary" />
+                <Smartphone size={16} className="shrink-0 text-primary" />
                 +55 (11) 93204-7360
               </li>
               <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                <HugeiconsIcon icon={Location01Icon} size={16} className="mt-0.5 shrink-0 text-primary" />
+                <MapPin size={16} className="mt-0.5 shrink-0 text-primary" />
                 São Paulo, SP — Brasil
               </li>
             </ul>

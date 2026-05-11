@@ -4,26 +4,24 @@ import { useState, useTransition, useCallback } from 'react';
 import { toast } from 'sonner';
 import { PacienteCard } from './paciente-card';
 import { atualizarJornadaFase, type PacienteKanban } from '@/app/_actions/pacientes';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  UserMultiple02Icon,
-  Stethoscope02Icon,
-  FileValidationIcon,
-  DeliveryTruck01Icon,
-  HeartCheckIcon,
-  HelpCircleIcon,
-  Search01Icon,
-  LayoutGridIcon,
-  Menu01Icon,
-} from '@hugeicons/core-free-icons';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
 } from '@/components/ui/tooltip';
-import type { IconSvgElement } from '@hugeicons/react';
-
+import {
+  FileCheck,
+  HeartPulse,
+  HelpCircle,
+  LayoutGrid,
+  Menu,
+  Search,
+  Stethoscope,
+  Truck,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 /**
  * Kanban Board — Jornada do Paciente.
  *
@@ -40,7 +38,7 @@ const COLUNAS: {
   id: FaseId;
   titulo: string;
   subtitulo: string;
-  icon: IconSvgElement;
+  icon: LucideIcon;
   cores: {
     header: string;
     dot: string;
@@ -57,7 +55,7 @@ const COLUNAS: {
     id: 'acolhimento',
     titulo: 'Acolhimento',
     subtitulo: 'Primeiro contato e triagem inicial',
-    icon: HeartCheckIcon,
+    icon: HeartPulse,
     cores: {
       header: 'bg-gradient-to-br from-[#1A6B41] to-[#2D9160]',
       dot: 'bg-white',
@@ -74,7 +72,7 @@ const COLUNAS: {
     id: 'avaliacao_medica',
     titulo: 'Avaliação Médica',
     subtitulo: 'Consulta com profissional',
-    icon: Stethoscope02Icon,
+    icon: Stethoscope,
     cores: {
       header: 'bg-gradient-to-br from-[#B83220] to-[#D94F35]',
       dot: 'bg-white',
@@ -91,7 +89,7 @@ const COLUNAS: {
     id: 'burocracia_anvisa',
     titulo: 'Burocracia / ANVISA',
     subtitulo: 'Documentos e autorização',
-    icon: FileValidationIcon,
+    icon: FileCheck,
     cores: {
       header: 'bg-gradient-to-br from-[#9A6C00] to-[#C48F00]',
       dot: 'bg-white',
@@ -108,7 +106,7 @@ const COLUNAS: {
     id: 'logistica',
     titulo: 'Logística',
     subtitulo: 'Pedido e entrega',
-    icon: DeliveryTruck01Icon,
+    icon: Truck,
     cores: {
       header: 'bg-gradient-to-br from-[#2563EB] to-[#3B82F6]',
       dot: 'bg-white',
@@ -125,7 +123,7 @@ const COLUNAS: {
     id: 'acompanhamento_continuo',
     titulo: 'Acompanhamento',
     subtitulo: 'Renovação e cuidado contínuo',
-    icon: UserMultiple02Icon,
+    icon: Users,
     cores: {
       header: 'bg-gradient-to-br from-[#7C3AED] to-[#9D5CF6]',
       dot: 'bg-white',
@@ -273,11 +271,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Busca */}
           <div className="relative flex-1 max-w-sm">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={busca}
@@ -328,10 +322,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
                     : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
                 }`}
               >
-                <HugeiconsIcon
-                  icon={modoCompacto ? LayoutGridIcon : Menu01Icon}
-                  size={15}
-                />
+                {(() => { const DynIcon = modoCompacto ? LayoutGrid : Menu; return <DynIcon size={15} />; })()}
               </TooltipTrigger>
               <TooltipContent>
                 {modoCompacto ? 'Modo completo' : 'Modo compacto'}
@@ -340,7 +331,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
 
             <Tooltip>
               <TooltipTrigger className="text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-                <HugeiconsIcon icon={HelpCircleIcon} size={16} />
+                <HelpCircle size={16} />
               </TooltipTrigger>
               <TooltipContent>
                 Arraste os cartões para mudar a fase do paciente
@@ -381,7 +372,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${coluna.cores.iconBg}`}>
-                        <HugeiconsIcon icon={coluna.icon} size={18} />
+                        {(() => { const DynIcon = coluna.icon; return <DynIcon size={18} />; })()}
                       </div>
                       <div className="min-w-0">
                         <h3 className={`text-xs font-bold uppercase tracking-wide leading-snug ${coluna.cores.titulo}`}>
@@ -412,11 +403,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
                       return (
                         <div className="flex flex-col items-center justify-center py-10 text-center">
                           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60">
-                            <HugeiconsIcon
-                              icon={busca ? Search01Icon : coluna.icon}
-                              size={20}
-                              className="text-muted-foreground/30"
-                            />
+                            {(() => { const DynIcon = busca ? Search : coluna.icon; return <DynIcon size={20} className="text-muted-foreground/30" />; })()}
                           </div>
                           <p className="text-[11px] text-muted-foreground/50 leading-relaxed max-w-[160px]">
                             {busca

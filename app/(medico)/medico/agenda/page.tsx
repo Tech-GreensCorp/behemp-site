@@ -9,12 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon, Add01Icon, Calendar03Icon, Clock01Icon,
-  CheckmarkCircle01Icon, Cancel01Icon, ArrowRight01Icon,
-  Search01Icon, Video01Icon, Stethoscope02Icon, UserIcon,
-} from '@hugeicons/core-free-icons';
 import {
   listarConsultasMedico, listarPacientesMedico,
   criarConsultaMedico, remarcarConsulta, cancelarConsultaMedico,
@@ -23,6 +17,18 @@ import { listarHorariosLivres } from '@/app/(public)/_actions/agendamento';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  CalendarDays as CalendarIcon,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Plus,
+  Search,
+  User,
+  Video,
+  X,
+} from 'lucide-react';
 
 interface Consulta {
   id: string; dataHora: Date; status: string;
@@ -159,12 +165,12 @@ export default function AgendaPage() {
         <TabsContent value="consultas" className="space-y-4 mt-4">
           {carregando ? (
             <div className="flex justify-center py-12">
-              <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+              <Loader2 size={32} className="animate-spin text-primary" />
             </div>
           ) : consultasAtivas.length === 0 ? (
             <Card className="border-0 shadow-sm">
               <CardContent className="flex flex-col items-center py-16">
-                <HugeiconsIcon icon={Calendar03Icon} size={40} className="mb-3 text-muted-foreground/40" />
+                <CalendarIcon size={40} className="mb-3 text-muted-foreground/40" />
                 <p className="text-lg font-medium">Nenhuma consulta agendada</p>
                 <p className="mt-1 text-sm text-muted-foreground">Crie uma nova consulta na aba ao lado</p>
               </CardContent>
@@ -176,7 +182,7 @@ export default function AgendaPage() {
                 <Card key={c.id} className="border-0 shadow-sm">
                   <CardContent className="flex items-center gap-4 p-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <HugeiconsIcon icon={UserIcon} size={20} className="text-primary" />
+                      <User size={20} className="text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{c.pacienteNome}</p>
@@ -189,17 +195,17 @@ export default function AgendaPage() {
                       {c.googleMeetLink && (
                         <a href={c.googleMeetLink} target="_blank" rel="noopener noreferrer">
                           <Button variant="ghost" size="icon" title="Google Meet">
-                            <HugeiconsIcon icon={Video01Icon} size={16} />
+                            <Video size={16} />
                           </Button>
                         </a>
                       )}
                       <Button variant="ghost" size="icon" title="Remarcar"
                         onClick={() => { setRemarcarId(c.id); setRemarcarData(undefined); setRemarcarHorSel(''); }}>
-                        <HugeiconsIcon icon={Calendar03Icon} size={16} />
+                        <CalendarIcon size={16} />
                       </Button>
                       <Button variant="ghost" size="icon" title="Cancelar"
                         onClick={() => { setCancelarId(c.id); setMotivo(''); }}>
-                        <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-destructive" />
+                        <X size={16} className="text-destructive" />
                       </Button>
                     </div>
                   </CardContent>
@@ -213,7 +219,7 @@ export default function AgendaPage() {
         <TabsContent value="nova" className="mt-4 space-y-4">
           <Card className="border-0 shadow-sm">
             <CardHeader><CardTitle className="flex items-center gap-2 text-lg">
-              <HugeiconsIcon icon={Add01Icon} size={20} className="text-[#C08E3A]" /> Nova Consulta
+              <Plus size={20} className="text-[#C08E3A]" /> Nova Consulta
             </CardTitle></CardHeader>
             <CardContent className="space-y-6">
               {/* Paciente */}
@@ -250,7 +256,7 @@ export default function AgendaPage() {
                       <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma data</p>
                     ) : carregandoH ? (
                       <div className="flex justify-center py-8">
-                        <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-primary" />
+                        <Loader2 size={24} className="animate-spin text-primary" />
                       </div>
                     ) : horarios.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">Sem horários disponíveis</p>
@@ -274,8 +280,8 @@ export default function AgendaPage() {
                     placeholder="Observações (opcional)" className="min-h-[80px]" />
                   <Button onClick={handleCriar} disabled={criando}
                     className="w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
-                    {criando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
-                      : <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />}
+                    {criando ? <Loader2 size={16} className="animate-spin" />
+                      : <CheckCircle2 size={16} />}
                     {criando ? 'Agendando...' : 'Confirmar Agendamento'}
                   </Button>
                 </>
@@ -298,7 +304,7 @@ export default function AgendaPage() {
               <Card key={c.id} className="border-0 shadow-sm opacity-70">
                 <CardContent className="flex items-center gap-4 p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <HugeiconsIcon icon={UserIcon} size={18} className="text-muted-foreground" />
+                    <User size={18} className="text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{c.pacienteNome}</p>
@@ -325,7 +331,7 @@ export default function AgendaPage() {
             {remarcarData && (
               carregandoRH ? (
                 <div className="flex justify-center py-4">
-                  <HugeiconsIcon icon={Loading03Icon} size={20} className="animate-spin text-primary" />
+                  <Loader2 size={20} className="animate-spin text-primary" />
                 </div>
               ) : remarcarHorarios.length === 0 ? (
                 <p className="text-sm text-center text-muted-foreground">Sem horários</p>

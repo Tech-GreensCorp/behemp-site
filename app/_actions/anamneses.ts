@@ -1,10 +1,11 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { anamneses } from '@/db/schema';
+import { anamneses, users } from '@/db/schema';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 async function obterMedicoId(clerkId: string): Promise<string | null> {
   const res = await db.execute(
@@ -60,6 +61,18 @@ export async function criarAnamnese(dados: z.infer<typeof criarAnamneseSchema>) 
       criadoPor: medicoId,
     }).returning();
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'criar',
+        entidade: 'anamneses',
+        entidadeId: nova.id,
+        dadosDepois: { pacienteId: parsed.data.pacienteId, queixaPrincipal: parsed.data.queixaPrincipal },
+      });
+    }
+
     return { sucesso: true, dados: nova };
   } catch (error) {
     console.error('[Action] Erro ao criar anamnese:', error);
@@ -79,4 +92,14 @@ export async function listarAnamneses(pacienteId: string) {
     console.error('[Action] Erro ao listar anamneses:', error);
     return { sucesso: false, erro: 'Erro ao listar anamneses' };
   }
+}
+
+/**
+ * Busca o userId interno a partir do clerkId (para auditoria).
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const res = await db.execute(
+    sql`SELECT u.id FROM users u WHERE u.clerk_id = ${clerkId} LIMIT 1`,
+  );
+  return (res.rows[0]?.id as string) ?? null;
 }

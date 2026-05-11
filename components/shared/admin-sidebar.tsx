@@ -4,30 +4,29 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  DashboardSquare01Icon,
-  UserMultiple02Icon,
-  FileValidationIcon,
-  Shield01Icon,
-  Settings01Icon,
-  Logout01Icon,
-  ArrowLeft01Icon,
-  Menu02Icon,
-  Message01Icon,
-} from '@hugeicons/core-free-icons';
+  LayoutDashboard,
+  Users,
+  FileCheck,
+  Shield,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  Menu,
+  MessageSquare,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import type { IconSvgElement } from '@hugeicons/react';
+import type { LucideIcon } from 'lucide-react';
 import { contarContatosNaoLidos } from '@/app/(public)/_actions/contato';
 
-const NAV_ITEMS: { label: string; href: string; icon: IconSvgElement }[] = [
-  { label: 'Visão Geral', href: '/admin', icon: DashboardSquare01Icon },
-  { label: 'Usuários', href: '/admin/usuarios', icon: UserMultiple02Icon },
-  { label: 'Triagens', href: '/admin/triagens', icon: FileValidationIcon },
-  { label: 'Mensagens', href: '/admin/mensagens', icon: Message01Icon },
-  { label: 'Auditoria', href: '/admin/auditoria', icon: Shield01Icon },
-  { label: 'Configurações', href: '/admin/configuracoes', icon: Settings01Icon },
+const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: 'Visão Geral', href: '/admin', icon: LayoutDashboard },
+  { label: 'Usuários', href: '/admin/usuarios', icon: Users },
+  { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
+  { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
+  { label: 'Auditoria', href: '/admin/auditoria', icon: Shield },
+  { label: 'Configurações', href: '/admin/configuracoes', icon: Settings },
 ];
 
 export function AdminSidebar() {
@@ -59,7 +58,7 @@ export function AdminSidebar() {
         className="fixed top-4 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg lg:hidden"
         aria-label="Menu"
       >
-        <HugeiconsIcon icon={Menu02Icon} size={20} />
+        <Menu size={20} />
       </button>
 
       {!collapsed && (
@@ -78,10 +77,8 @@ export function AdminSidebar() {
         <div className="flex h-16 items-center justify-between border-b px-4">
           <Link href="/admin" className="flex items-center gap-2">
             {collapsed ? (
-              /* Colapsado: apenas ícone pequeno */
               <img src="/logo.png" alt="Be4Hope" className="h-12 w-auto" />
             ) : (
-              /* Expandido: logo completa + badge Admin */
               <div className="flex items-center gap-2">
                 <img src="/logo.png" alt="Be4Hope" className="h-12 w-auto" />
                 <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
@@ -96,8 +93,7 @@ export function AdminSidebar() {
             onClick={() => setCollapsed(!collapsed)}
             className="hidden lg:flex"
           >
-            <HugeiconsIcon
-              icon={ArrowLeft01Icon}
+            <ChevronLeft
               size={16}
               className={cn('transition-transform', collapsed && 'rotate-180')}
             />
@@ -110,6 +106,8 @@ export function AdminSidebar() {
               item.href === '/admin'
                 ? pathname === '/admin'
                 : pathname.startsWith(item.href);
+
+            const Icon = item.icon;
 
             return (
               <Link
@@ -125,7 +123,7 @@ export function AdminSidebar() {
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <HugeiconsIcon icon={item.icon} size={20} className="shrink-0" />
+                <Icon size={20} className="shrink-0" />
                 {!collapsed && (
                   <span className="flex-1">{item.label}</span>
                 )}
@@ -141,7 +139,7 @@ export function AdminSidebar() {
 
         <div className="border-t p-3">
           <button onClick={() => signOut({ redirectUrl: '/' })} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-            <HugeiconsIcon icon={Logout01Icon} size={20} className="shrink-0" />
+            <LogOut size={20} className="shrink-0" />
             {!collapsed && <span>Sair</span>}
           </button>
         </div>

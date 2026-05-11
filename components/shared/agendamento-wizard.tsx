@@ -7,18 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon,
-  ArrowRight01Icon,
-  ArrowLeft01Icon,
-  CheckmarkCircle01Icon,
-  Stethoscope02Icon,
-  Calendar03Icon,
-  Clock01Icon,
-  Video01Icon,
-  UserCheck01Icon,
-} from '@hugeicons/core-free-icons';
 import {
   listarMedicosDisponiveis,
   listarHorariosLivres,
@@ -28,6 +16,17 @@ import { useAuth, SignInButton } from '@clerk/nextjs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Stethoscope,
+  UserCheck,
+  Video,
+} from 'lucide-react';
 
 /**
  * Wizard multi-step para agendamento de consultas.
@@ -48,24 +47,24 @@ interface Medico {
 }
 
 const STEPS = [
-  { label: 'Médico', icon: Stethoscope02Icon },
-  { label: 'Data/Hora', icon: Calendar03Icon },
-  { label: 'Confirmação', icon: CheckmarkCircle01Icon },
+  { label: 'Médico', icon: Stethoscope },
+  { label: 'Data/Hora', icon: CalendarDays },
+  { label: 'Confirmação', icon: CheckCircle2 },
 ];
 
 const INFO_CARDS = [
   {
-    icon: Video01Icon,
+    icon: Video,
     titulo: '100% Online',
     descricao: 'Consulta por videoconferência via Google Meet',
   },
   {
-    icon: Clock01Icon,
+    icon: Clock,
     titulo: 'Duração: ~60 min',
     descricao: 'Avaliação completa e orientação personalizada',
   },
   {
-    icon: UserCheck01Icon,
+    icon: UserCheck,
     titulo: 'Confirmação Imediata',
     descricao: 'Receba o link do Meet por e-mail na hora',
   },
@@ -164,22 +163,24 @@ export function AgendamentoWizard() {
     return (
       <div className="space-y-8">
         <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => (
+          {INFO_CARDS.map((card) => {
+            const CardIcon = card.icon;
+            return (
             <Card key={card.titulo} className="border-0 bg-card shadow-sm">
               <CardContent className="p-6 text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                  <CardIcon size={24} className="text-foreground" />
                 </div>
                 <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
               </CardContent>
             </Card>
-          ))}
+          ); })}
         </div>
         <Card className="border-0 shadow-xl">
           <CardContent className="flex flex-col items-center py-16 text-center">
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
-              <HugeiconsIcon icon={Calendar03Icon} size={40} className="text-[#C08E3A]" />
+              <CalendarDays size={40} className="text-[#C08E3A]" />
             </div>
             <h2 className="text-2xl font-bold">Entre para agendar</h2>
             <p className="mt-3 max-w-md text-muted-foreground">
@@ -203,17 +204,19 @@ export function AgendamentoWizard() {
     return (
       <div className="space-y-8">
         <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => (
+          {INFO_CARDS.map((card) => {
+            const CardIcon = card.icon;
+            return (
             <Card key={card.titulo} className="border-0 bg-card shadow-sm">
               <CardContent className="p-6 text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                  <CardIcon size={24} className="text-foreground" />
                 </div>
                 <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
               </CardContent>
             </Card>
-          ))}
+          ); })}
         </div>
 
         <Card className="border-0 shadow-xl">
@@ -233,17 +236,19 @@ export function AgendamentoWizard() {
       {/* Info Cards no topo */}
       {step === 0 && (
         <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => (
+          {INFO_CARDS.map((card) => {
+            const CardIcon = card.icon;
+            return (
             <Card key={card.titulo} className="border-0 bg-card shadow-sm">
               <CardContent className="p-6 text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <HugeiconsIcon icon={card.icon} size={24} className="text-foreground" />
+                  <CardIcon size={24} className="text-foreground" />
                 </div>
                 <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
               </CardContent>
             </Card>
-          ))}
+          ); })}
         </div>
       )}
 
@@ -281,14 +286,14 @@ export function AgendamentoWizard() {
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <HugeiconsIcon icon={Stethoscope02Icon} size={20} className="text-[#C08E3A]" />
+              <Stethoscope size={20} className="text-[#C08E3A]" />
               Escolha seu médico
             </CardTitle>
           </CardHeader>
           <CardContent>
             {carregando ? (
               <div className="flex justify-center py-12">
-                <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+                <Loader2 size={32} className="animate-spin text-primary" />
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
@@ -299,7 +304,7 @@ export function AgendamentoWizard() {
                     className="flex items-start gap-4 rounded-xl border border-border/50 p-5 text-left transition-all hover:border-[#C08E3A]/50 hover:shadow-md"
                   >
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <HugeiconsIcon icon={Stethoscope02Icon} size={24} className="text-primary" />
+                      <Stethoscope size={24} className="text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{m.nome}</p>
@@ -307,12 +312,12 @@ export function AgendamentoWizard() {
                       {m.bio && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{m.bio}</p>}
                       {m.googleConectado && (
                         <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
-                          <HugeiconsIcon icon={Video01Icon} size={10} />
+                          <Video size={10} />
                           Google Meet
                         </Badge>
                       )}
                     </div>
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="mt-1 shrink-0 text-muted-foreground" />
+                    <ChevronRight size={16} className="mt-1 shrink-0 text-muted-foreground" />
                   </button>
                 ))}
               </div>
@@ -327,11 +332,11 @@ export function AgendamentoWizard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <HugeiconsIcon icon={Calendar03Icon} size={20} className="text-[#C08E3A]" />
+                <CalendarDays size={20} className="text-[#C08E3A]" />
                 Escolha data e horário
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1">
-                <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+                <ChevronLeft size={14} />
                 Trocar médico
               </Button>
             </div>
@@ -361,14 +366,14 @@ export function AgendamentoWizard() {
               <div>
                 {!dataSelecionada ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <HugeiconsIcon icon={Clock01Icon} size={32} className="mb-2 text-muted-foreground" />
+                    <Clock size={32} className="mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       Selecione uma data para ver os horários disponíveis
                     </p>
                   </div>
                 ) : carregandoHorarios ? (
                   <div className="flex justify-center py-12">
-                    <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-primary" />
+                    <Loader2 size={24} className="animate-spin text-primary" />
                   </div>
                 ) : horariosLivres.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -410,7 +415,7 @@ export function AgendamentoWizard() {
                           className="mt-4 w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
                         >
                           Continuar
-                          <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+                          <ChevronRight size={14} />
                         </Button>
                       </div>
                     )}
@@ -427,7 +432,7 @@ export function AgendamentoWizard() {
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={20} className="text-[#C08E3A]" />
+              <CheckCircle2 size={20} className="text-[#C08E3A]" />
               Confirme sua consulta
             </CardTitle>
           </CardHeader>
@@ -463,7 +468,7 @@ export function AgendamentoWizard() {
             {/* Ação */}
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep(1)} className="gap-1">
-                <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+                <ChevronLeft size={14} />
                 Voltar
               </Button>
               <Button
@@ -472,9 +477,9 @@ export function AgendamentoWizard() {
                 className="flex-1 gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
               >
                 {agendando ? (
-                  <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                  <CheckCircle2 size={16} />
                 )}
                 {agendando ? 'Agendando...' : 'Confirmar Agendamento'}
               </Button>
@@ -488,7 +493,7 @@ export function AgendamentoWizard() {
         <Card className="border-0 shadow-xl">
           <CardContent className="flex flex-col items-center py-16 text-center">
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
-              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={40} className="text-emerald-600" />
+              <CheckCircle2 size={40} className="text-emerald-600" />
             </div>
             <h2 className="text-2xl font-bold">Consulta agendada!</h2>
             <p className="mt-3 max-w-md text-muted-foreground">
@@ -503,7 +508,7 @@ export function AgendamentoWizard() {
                 className="mt-6"
               >
                 <Button className="gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
-                  <HugeiconsIcon icon={Video01Icon} size={16} />
+                  <Video size={16} />
                   Acessar Google Meet
                 </Button>
               </a>

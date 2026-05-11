@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { recompras, dosagens, medicamentos } from '@/db/schema';
+import { recompras, dosagens, medicamentos, pacientes, users } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { obterUsuarioAtual } from '@/lib/auth';
@@ -45,16 +45,24 @@ export async function pedirRecompraAgora(
     const parsed = pedirRecompraSchema.safeParse(dados);
     if (!parsed.success) return { sucesso: false, erro: parsed.error.errors[0].message };
 
-    // Buscar dosagem com data prevista
-    const [dosagem] = await db
+    // Buscar dados da dosagem e paciente para envio de e-mail
+    const [dadosDosagem] = await db
       .select({
         dataFimPrevista: dosagens.dataFimPrevista,
+        pacienteNome: users.nome,
+        pacienteEmail: users.email,
+        nomeMedicamento: medicamentos.nome,
+        gotasPorDia: dosagens.gotasPorDia,
+        mlFrasco: dosagens.mlFrasco,
       })
       .from(dosagens)
+      .innerJoin(pacientes, eq(dosagens.pacienteId, pacientes.id))
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .innerJoin(medicamentos, eq(dosagens.medicamentoId, medicamentos.id))
       .where(eq(dosagens.id, parsed.data.dosagemId))
       .limit(1);
 
-    if (!dosagem) {
+    if (!dadosDosagem) {
       return { sucesso: false, erro: 'Dosagem não encontrada' };
     }
 
@@ -62,14 +70,28 @@ export async function pedirRecompraAgora(
       .insert(recompras)
       .values({
         dosagemId: parsed.data.dosagemId,
-        dataPrevista: dosagem.dataFimPrevista,
+        dataPrevista: dadosDosagem.dataFimPrevista,
         status: 'pedida',
         emailEnviadoEm: new Date(),
       })
       .returning({ id: recompras.id });
 
-    // TODO: Enviar e-mail via Resend quando configurado
-    // await enviarEmailRecompra(paciente, medicamento);
+    // Enviar e-mail para a equipe de recompra via Brevo
+    if (dadosDosagem) {
+      try {
+        const { enviarEmailRecompraEquipe } = await import('@/lib/email/notificacoes');
+        await enviarEmailRecompraEquipe({
+          pacienteNome: dadosDosagem.pacienteNome,
+          nomeMedicamento: dadosDosagem.nomeMedicamento,
+          dataPrevista: dadosDosagem.dataFimPrevista,
+          gotasPorDia: dadosDosagem.gotasPorDia,
+          mlFrasco: dadosDosagem.mlFrasco,
+        });
+      } catch (emailError) {
+        console.error('[Action] Erro ao enviar e-mail de recompra:', emailError);
+        // Não falha a action principal — o registro já foi criado
+      }
+    }
 
     return { sucesso: true, dados: { recompraId: novaRecompra.id } };
   } catch (error) {

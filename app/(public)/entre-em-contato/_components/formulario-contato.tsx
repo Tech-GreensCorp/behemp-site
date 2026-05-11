@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowRight01Icon, CheckmarkCircle01Icon, AlertCircleIcon } from '@hugeicons/core-free-icons';
 import { enviarMensagemContato } from '@/app/(public)/_actions/contato';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+} from 'lucide-react';
 
 /**
  * Formulário de contato com estado gerenciado no client.
@@ -53,7 +56,7 @@ export function FormularioContato() {
       <Card className="border-0 shadow-md">
         <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={32} className="text-emerald-600" />
+            <CheckCircle2 size={32} className="text-emerald-600" />
           </div>
           <div>
             <h3 className="text-lg font-bold">Mensagem enviada!</h3>
@@ -145,7 +148,7 @@ export function FormularioContato() {
           {/* Erro */}
           {erro && (
             <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <HugeiconsIcon icon={AlertCircleIcon} size={16} />
+              <AlertCircle size={16} />
               {erro}
             </div>
           )}
@@ -163,7 +166,7 @@ export function FormularioContato() {
             ) : (
               <>
                 Enviar mensagem
-                <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                <ChevronRight size={16} />
               </>
             )}
           </Button>

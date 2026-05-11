@@ -5,16 +5,50 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon,
-  UserIcon,
-  Stethoscope02Icon,
-  SecurityCheckIcon,
-  UserMultiple02Icon,
-  Search01Icon,
-} from '@hugeicons/core-free-icons';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
+import {
+  Award,
+  Baby,
+  BadgeCheck,
+  Bell,
+  Brain,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  Dumbbell,
+  ExternalLink,
+  Eye,
+  FileCheck,
+  FileText,
+  HeartCrack,
+  HeartPulse,
+  Home,
+  Loader2,
+  Mail,
+  MapPin,
+  MapPinned,
+  Menu,
+  MessageSquare,
+  Package,
+  Pencil,
+  Pill,
+  Search,
+  Shield,
+  ShieldCheck,
+  Smartphone,
+  Smile,
+  Sparkles,
+  Stethoscope,
+  Truck,
+  User,
+  UserCheck,
+  UserPlus,
+  Users,
+  Video,
+  X,
+} from 'lucide-react';
 
 /**
  * Página de administração de usuários — dados reais do banco.
@@ -32,12 +66,12 @@ interface Usuario {
 const ROLE_CONFIG: Record<string, {
   label: string;
   variant: 'default' | 'secondary' | 'outline';
-  icon: typeof UserIcon;
+  icon: typeof User;
   cor: string;
 }> = {
-  admin: { label: 'Admin', variant: 'default', icon: SecurityCheckIcon, cor: 'bg-red-500/10 text-red-600' },
-  medico: { label: 'Médico', variant: 'secondary', icon: Stethoscope02Icon, cor: 'bg-primary/10 text-primary' },
-  paciente: { label: 'Paciente', variant: 'outline', icon: UserIcon, cor: 'bg-emerald-500/10 text-emerald-600' },
+  admin: { label: 'Admin', variant: 'default', icon: Shield, cor: 'bg-red-500/10 text-red-600' },
+  medico: { label: 'Médico', variant: 'secondary', icon: Stethoscope, cor: 'bg-primary/10 text-primary' },
+  paciente: { label: 'Paciente', variant: 'outline', icon: User, cor: 'bg-emerald-500/10 text-emerald-600' },
 };
 
 export default function UsuariosPage() {
@@ -80,15 +114,15 @@ export default function UsuariosPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {[
-          { label: 'Total', valor: stats.total, icon: UserMultiple02Icon, cor: 'bg-muted text-foreground' },
-          { label: 'Admins', valor: stats.admins, icon: SecurityCheckIcon, cor: 'bg-red-500/10 text-red-600' },
-          { label: 'Médicos', valor: stats.medicos, icon: Stethoscope02Icon, cor: 'bg-primary/10 text-primary' },
-          { label: 'Pacientes', valor: stats.pacientes, icon: UserIcon, cor: 'bg-emerald-500/10 text-emerald-600' },
+          { label: 'Total', valor: stats.total, icon: Users, cor: 'bg-muted text-foreground' },
+          { label: 'Admins', valor: stats.admins, icon: Shield, cor: 'bg-red-500/10 text-red-600' },
+          { label: 'Médicos', valor: stats.medicos, icon: Stethoscope, cor: 'bg-primary/10 text-primary' },
+          { label: 'Pacientes', valor: stats.pacientes, icon: User, cor: 'bg-emerald-500/10 text-emerald-600' },
         ].map((kpi) => (
           <Card key={kpi.label} className="border-0 shadow-sm">
             <CardContent className="flex items-center gap-3 p-4">
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kpi.cor}`}>
-                <HugeiconsIcon icon={kpi.icon} size={18} />
+                {(() => { const DynIcon = kpi.icon; return <DynIcon size={18} />; })()}
               </div>
               <div>
                 <p className="text-2xl font-bold">{kpi.valor}</p>
@@ -102,11 +136,7 @@ export default function UsuariosPage() {
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
@@ -131,12 +161,12 @@ export default function UsuariosPage() {
       {/* Lista */}
       {carregando ? (
         <div className="flex justify-center py-12">
-          <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+          <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : usuarios.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={UserMultiple02Icon} size={40} className="mb-3 text-muted-foreground/40" />
+            <Users size={40} className="mb-3 text-muted-foreground/40" />
             <p className="text-lg font-medium">Nenhum usuário encontrado</p>
           </CardContent>
         </Card>
@@ -148,7 +178,7 @@ export default function UsuariosPage() {
               <Card key={user.id} className="border-0 shadow-sm transition-all hover:shadow-md">
                 <CardContent className="flex items-center gap-4 p-4">
                   <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${config?.cor ?? 'bg-muted'}`}>
-                    <HugeiconsIcon icon={config?.icon ?? UserIcon} size={20} />
+                    {(() => { const DynIcon = config?.icon ?? User; return <DynIcon size={20} />; })()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{user.nome}</p>

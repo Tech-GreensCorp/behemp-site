@@ -54,10 +54,37 @@ export async function obterDadosUsuario() {
     return null;
   }
 
+  // Tenta buscar o nome na tabela users do banco (mais confiável que o Clerk)
+  let nomeDb: string | null = null;
+  try {
+    const { db } = await import('@/lib/db');
+    const { users } = await import('@/db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    const [registro] = await db
+      .select({ nome: users.nome })
+      .from(users)
+      .where(eq(users.clerkId, user.id))
+      .limit(1);
+
+    if (registro?.nome) {
+      nomeDb = registro.nome;
+    }
+  } catch {
+    // Se falhar, usa o fallback do Clerk abaixo
+  }
+
+  // Fallback: firstName + lastName do Clerk, ou email (parte antes do @)
+  const nomeClerk = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  const email = user.emailAddresses[0]?.emailAddress || '';
+  const nomeEmail = email.split('@')[0]?.replace(/[._-]/g, ' ') || '';
+
+  const nome = nomeDb || nomeClerk || nomeEmail || 'Usuário';
+
   return {
     clerkId: user.id,
-    nome: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Usuário',
-    email: user.emailAddresses[0]?.emailAddress || '',
+    nome,
+    email,
     avatarUrl: user.imageUrl,
     role: (user.publicMetadata?.role as Role) || 'paciente',
   };

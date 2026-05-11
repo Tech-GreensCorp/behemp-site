@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import type { PacienteKanban } from '@/app/_actions/pacientes';
+import {
+  ChevronRight,
+} from 'lucide-react';
 
 /**
  * Card de paciente para o Kanban da Jornada.
@@ -108,7 +109,7 @@ export function PacienteCard({ paciente, onDragStart, accentColor, compact = fal
                 />
               }
             >
-              <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+              <ChevronRight size={12} />
             </TooltipTrigger>
             <TooltipContent>Ver paciente</TooltipContent>
           </Tooltip>
@@ -167,7 +168,7 @@ export function PacienteCard({ paciente, onDragStart, accentColor, compact = fal
                   />
                 }
               >
-                <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+                <ChevronRight size={14} />
               </TooltipTrigger>
               <TooltipContent>Ver paciente</TooltipContent>
             </Tooltip>

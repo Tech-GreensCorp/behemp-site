@@ -1,4 +1,7 @@
 import { inngest } from './client';
+import { db } from '@/lib/db';
+import { documentos, dosagens, medicamentos, pacientes, users, notificacoes } from '@/db/schema';
+import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
 
 /**
  * Job: Verificar documentos próximos do vencimento.
@@ -6,7 +9,7 @@ import { inngest } from './client';
  * Roda diariamente às 9h (Inngest Schedule).
  * Busca documentos com validade nos próximos 30 dias e:
  * 1. Cria notificação no sistema
- * 2. Envia e-mail ao paciente via Resend
+ * 2. Envia e-mail ao paciente via Brevo
  */
 export const verificarValidadeDocumentos = inngest.createFunction(
   {
@@ -15,38 +18,76 @@ export const verificarValidadeDocumentos = inngest.createFunction(
     triggers: [{ cron: '0 9 * * *' }],
   },
   async ({ step }) => {
-    // Step 1: Buscar documentos próximos do vencimento
+    // Step 1: Buscar documentos próximos do vencimento (30 dias)
     const documentosVencendo = await step.run(
       'buscar-documentos-vencendo',
       async () => {
-        // Esta lógica será conectada ao banco via Server Action na Fase 4
+        const hoje = new Date();
+        const daqui30dias = new Date();
+        daqui30dias.setDate(hoje.getDate() + 30);
+
+        const resultado = await db
+          .select({
+            id: documentos.id,
+            tipo: documentos.tipo,
+            dataValidade: documentos.dataValidade,
+            pacienteId: documentos.pacienteId,
+            pacienteNome: users.nome,
+            pacienteEmail: users.email,
+            pacienteUserId: pacientes.userId,
+          })
+          .from(documentos)
+          .innerJoin(pacientes, eq(documentos.pacienteId, pacientes.id))
+          .innerJoin(users, eq(pacientes.userId, users.id))
+          .where(
+            and(
+              isNull(documentos.deletedAt),
+              lte(documentos.dataValidade, daqui30dias.toISOString().split('T')[0]),
+              gte(documentos.dataValidade, hoje.toISOString().split('T')[0]),
+            ),
+          );
+
         console.log(
-          '[Job] Buscando documentos com validade nos próximos 30 dias...',
+          `[Job] Encontrados ${resultado.length} documentos próximos do vencimento`,
         );
-        return [] as Array<{
-          id: string;
-          pacienteEmail: string;
-          pacienteNome: string;
-          tipoDocumento: string;
-          dataValidade: string;
-          pacienteUserId: string;
-        }>;
+
+        return resultado.map((doc) => ({
+          id: doc.id,
+          pacienteEmail: doc.pacienteEmail,
+          pacienteNome: doc.pacienteNome,
+          tipoDocumento: doc.tipo,
+          dataValidade: doc.dataValidade,
+          pacienteUserId: doc.pacienteUserId,
+        }));
       },
     );
 
-    // Step 2: Enviar notificações para cada documento
+    // Step 2: Criar notificações e enviar e-mails
     for (const doc of documentosVencendo) {
       await step.run(`notificar-documento-${doc.id}`, async () => {
-        const { enviarEmailRenovacaoDocumento } = await import(
-          '@/lib/integrations/resend'
-        );
-
-        await enviarEmailRenovacaoDocumento({
-          emailPaciente: doc.pacienteEmail,
-          nomePaciente: doc.pacienteNome,
-          tipoDocumento: doc.tipoDocumento,
-          dataValidade: doc.dataValidade,
+        // Criar notificação no sistema
+        await db.insert(notificacoes).values({
+          userId: doc.pacienteUserId,
+          titulo: 'Documento próximo do vencimento',
+          mensagem: `Seu documento "${doc.tipoDocumento}" vence em ${doc.dataValidade}. Providencie a renovação.`,
+          tipo: 'renovacao_documento',
         });
+
+        // Enviar e-mail via Brevo
+        try {
+          const { enviarEmailRenovacaoDocumento } = await import(
+            '@/lib/email/notificacoes'
+          );
+
+          await enviarEmailRenovacaoDocumento({
+            emailPaciente: doc.pacienteEmail,
+            nomePaciente: doc.pacienteNome,
+            tipoDocumento: doc.tipoDocumento,
+            dataValidade: doc.dataValidade,
+          });
+        } catch (error) {
+          console.error(`[Job] Erro ao enviar e-mail para ${doc.pacienteEmail}:`, error);
+        }
 
         console.log(
           `[Job] Notificação enviada para ${doc.pacienteEmail} — Documento: ${doc.tipoDocumento}`,
@@ -74,37 +115,77 @@ export const verificarRecompraMedicamentos = inngest.createFunction(
     triggers: [{ cron: '0 9 * * *' }],
   },
   async ({ step }) => {
-    // Step 1: Buscar dosagens com recompra próxima
+    // Step 1: Buscar dosagens com recompra próxima (10 dias)
     const recomprasPendentes = await step.run(
       'buscar-recompras-pendentes',
       async () => {
+        const hoje = new Date();
+        const daqui10dias = new Date();
+        daqui10dias.setDate(hoje.getDate() + 10);
+
+        const resultado = await db
+          .select({
+            id: dosagens.id,
+            dataPrevista: dosagens.dataFimPrevista,
+            nomeMedicamento: medicamentos.nome,
+            pacienteId: dosagens.pacienteId,
+            pacienteNome: users.nome,
+            pacienteEmail: users.email,
+            pacienteUserId: pacientes.userId,
+          })
+          .from(dosagens)
+          .innerJoin(medicamentos, eq(dosagens.medicamentoId, medicamentos.id))
+          .innerJoin(pacientes, eq(dosagens.pacienteId, pacientes.id))
+          .innerJoin(users, eq(pacientes.userId, users.id))
+          .where(
+            and(
+              eq(dosagens.ativa, true),
+              lte(dosagens.dataFimPrevista, daqui10dias.toISOString().split('T')[0]),
+              gte(dosagens.dataFimPrevista, hoje.toISOString().split('T')[0]),
+            ),
+          );
+
         console.log(
-          '[Job] Buscando dosagens com recompra nos próximos 10 dias...',
+          `[Job] Encontradas ${resultado.length} dosagens com recompra nos próximos 10 dias`,
         );
-        return [] as Array<{
-          id: string;
-          pacienteEmail: string;
-          pacienteNome: string;
-          nomeMedicamento: string;
-          dataPrevista: string;
-          pacienteUserId: string;
-        }>;
+
+        return resultado.map((r) => ({
+          id: r.id,
+          pacienteEmail: r.pacienteEmail,
+          pacienteNome: r.pacienteNome,
+          nomeMedicamento: r.nomeMedicamento,
+          dataPrevista: r.dataPrevista,
+          pacienteUserId: r.pacienteUserId,
+        }));
       },
     );
 
-    // Step 2: Enviar notificações
+    // Step 2: Criar notificações e enviar e-mails
     for (const recompra of recomprasPendentes) {
       await step.run(`notificar-recompra-${recompra.id}`, async () => {
-        const { enviarEmailRecompraMedicamento } = await import(
-          '@/lib/integrations/resend'
-        );
-
-        await enviarEmailRecompraMedicamento({
-          emailPaciente: recompra.pacienteEmail,
-          nomePaciente: recompra.pacienteNome,
-          nomeMedicamento: recompra.nomeMedicamento,
-          dataPrevista: recompra.dataPrevista,
+        // Criar notificação no sistema
+        await db.insert(notificacoes).values({
+          userId: recompra.pacienteUserId,
+          titulo: 'Recompra de medicamento',
+          mensagem: `Seu medicamento "${recompra.nomeMedicamento}" está previsto para acabar em ${recompra.dataPrevista}.`,
+          tipo: 'recompra_medicamento',
         });
+
+        // Enviar e-mail via Brevo
+        try {
+          const { enviarEmailRecompraPaciente } = await import(
+            '@/lib/email/notificacoes'
+          );
+
+          await enviarEmailRecompraPaciente({
+            emailPaciente: recompra.pacienteEmail,
+            nomePaciente: recompra.pacienteNome,
+            nomeMedicamento: recompra.nomeMedicamento,
+            dataPrevista: recompra.dataPrevista,
+          });
+        } catch (error) {
+          console.error(`[Job] Erro ao enviar e-mail para ${recompra.pacienteEmail}:`, error);
+        }
 
         console.log(
           `[Job] Notificação de recompra enviada para ${recompra.pacienteEmail}`,
@@ -140,11 +221,11 @@ export const enviarEmailRecompraAgendado = inngest.createFunction(
 
     // Enviar o e-mail
     await step.run('enviar-email', async () => {
-      const { enviarEmailRecompraMedicamento } = await import(
-        '@/lib/integrations/resend'
+      const { enviarEmailRecompraPaciente } = await import(
+        '@/lib/email/notificacoes'
       );
 
-      await enviarEmailRecompraMedicamento({
+      await enviarEmailRecompraPaciente({
         emailPaciente: pacienteEmail,
         nomePaciente: pacienteNome,
         nomeMedicamento,

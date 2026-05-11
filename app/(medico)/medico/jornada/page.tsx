@@ -2,9 +2,9 @@ import { listarPacientesPorJornada } from '@/app/_actions/pacientes';
 import { KanbanBoard } from '@/components/medico/kanban-board';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { UserAdd01Icon } from '@hugeicons/core-free-icons';
-
+import {
+  UserPlus,
+} from 'lucide-react';
 /**
  * Página "Jornada do Paciente" — Board Kanban CRM.
  *
@@ -42,7 +42,7 @@ export default async function JornadaPage() {
         </div>
         <Link href="/medico/pacientes/novo">
           <Button className="gap-2 rounded-xl">
-            <HugeiconsIcon icon={UserAdd01Icon} size={16} />
+            <UserPlus size={16} />
             Novo paciente
           </Button>
         </Link>

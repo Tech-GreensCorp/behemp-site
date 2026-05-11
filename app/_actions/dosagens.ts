@@ -1,10 +1,11 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { dosagens, medicamentos } from '@/db/schema';
+import { dosagens, medicamentos, users } from '@/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
  * Server Actions para gestão de dosagens.
@@ -94,6 +95,18 @@ export async function criarDosagem(
       })
       .returning({ id: dosagens.id });
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'criar',
+        entidade: 'dosagens',
+        entidadeId: nova.id,
+        dadosDepois: { pacienteId: parsed.data.pacienteId, gotasPorDia: parsed.data.gotasPorDia, mlFrasco: parsed.data.mlFrasco },
+      });
+    }
+
     return { sucesso: true, dados: { dosagemId: nova.id } };
   } catch (error) {
     console.error('[Action] Erro ao criar dosagem:', error);
@@ -151,6 +164,19 @@ export async function atualizarDosagem(
       })
       .where(eq(dosagens.id, parsed.data.dosagemId));
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'atualizar',
+        entidade: 'dosagens',
+        entidadeId: parsed.data.dosagemId,
+        dadosAntes: { gotasPorDia: dosagemAtual.gotasPorDia, mlFrasco: dosagemAtual.mlFrasco },
+        dadosDepois: { gotasPorDia, mlFrasco },
+      });
+    }
+
     return { sucesso: true };
   } catch (error) {
     console.error('[Action] Erro ao atualizar dosagem:', error);
@@ -172,6 +198,19 @@ export async function desativarDosagem(
       .update(dosagens)
       .set({ ativa: false })
       .where(eq(dosagens.id, dosagemId));
+
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'atualizar',
+        entidade: 'dosagens',
+        entidadeId: dosagemId,
+        dadosAntes: { ativa: true },
+        dadosDepois: { ativa: false },
+      });
+    }
 
     return { sucesso: true };
   } catch (error) {
@@ -235,4 +274,16 @@ export async function listarMedicamentos(): Promise<ActionResult<typeof medicame
     console.error('[Action] Erro ao listar medicamentos:', error);
     return { sucesso: false, erro: 'Erro ao listar medicamentos' };
   }
+}
+
+/**
+ * Busca o userId interno a partir do clerkId (para auditoria).
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return user?.id ?? null;
 }

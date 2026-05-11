@@ -5,7 +5,7 @@ import { consultas, medicos, pacientes, users } from '@/db/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
-import { enviarEmailConfirmacaoConsulta } from '@/lib/integrations/resend';
+import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -127,15 +127,18 @@ export async function agendarConsulta(
       })
       .returning({ id: consultas.id });
 
-    // Enviar e-mail de confirmação ao paciente
-    if (meetLink) {
-      await enviarEmailConfirmacaoConsulta({
-        emailPaciente: paciente.users.email,
-        nomePaciente: paciente.users.nome,
-        nomeMedico: medico.users.nome,
-        dataHora: format(dataConsulta, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }),
-        linkMeet: meetLink,
+    // Enviar e-mail de confirmação ao paciente via Brevo
+    try {
+      await enviarEmailConsultaAgendada({
+        pacienteNome: paciente.users.nome,
+        pacienteEmail: paciente.users.email,
+        medicoNome: medico.users.nome,
+        dataHora: dataConsulta,
+        meetLink,
       });
+    } catch (emailError) {
+      console.error('[Action] Erro ao enviar e-mail de confirmação:', emailError);
+      // Não falha a action — consulta já foi criada
     }
 
     return {

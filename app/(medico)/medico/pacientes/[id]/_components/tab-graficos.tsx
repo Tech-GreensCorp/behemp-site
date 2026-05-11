@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon } from '@hugeicons/core-free-icons';
 import { listarEvolucoes } from '@/app/_actions/evolucoes';
 import { listarAjustesDosagem } from '@/app/_actions/ajustes-dosagem';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  Loader2,
+} from 'lucide-react';
 
 interface TabGraficosProps { pacienteId: string }
 
@@ -47,7 +48,7 @@ export function TabGraficos({ pacienteId }: TabGraficosProps) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   const semDados = dadosEvolucao.length === 0 && dadosDosagem.length === 0;
 

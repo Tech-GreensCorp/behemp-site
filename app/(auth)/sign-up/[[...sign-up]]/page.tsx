@@ -2,42 +2,41 @@
 
 import { SignUp } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Calendar03Icon,
-  HeartCheckIcon,
-  LocationUpdate01Icon,
-  Certificate01Icon,
-  UserAdd01Icon,
-} from '@hugeicons/core-free-icons';
-
+  BadgeCheck,
+  Calendar,
+  CalendarDays,
+  HeartPulse,
+  MapPinned,
+  UserPlus,
+} from 'lucide-react';
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
   {
     num: 21,
     suffix: '',
     label: 'Anos de história',
-    icon: Calendar03Icon,
+    icon: CalendarDays,
   },
   {
     num: null,
     text: 'ONG',
     suffix: '',
     label: 'Sem fins lucrativos',
-    icon: HeartCheckIcon,
+    icon: HeartPulse,
   },
   {
     num: 26,
     suffix: '',
     label: 'Estados atendidos',
-    icon: LocationUpdate01Icon,
+    icon: MapPinned,
   },
   {
     num: null,
     text: 'Anvisa',
     suffix: '',
     label: 'Regulamentado RDC 660',
-    icon: Certificate01Icon,
+    icon: BadgeCheck,
   },
 ];
 
@@ -277,11 +276,7 @@ export default function SignUpPage() {
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
                     style={{ background: 'rgba(230,57,70,0.08)' }}
                   >
-                    <HugeiconsIcon
-                      icon={stat.icon}
-                      size={18}
-                      style={{ color: '#E63946' }}
-                    />
+                    {(() => { const DynIcon = stat.icon; return <DynIcon size={18} />; })()}
                   </div>
                   <div>
                     <p
@@ -411,7 +406,7 @@ export default function SignUpPage() {
                 className="h-8 w-8 rounded-lg flex items-center justify-center"
                 style={{ background: 'rgba(230,57,70,0.1)' }}
               >
-                <HugeiconsIcon icon={UserAdd01Icon} size={18} style={{ color: '#E63946' }} />
+                <UserPlus size={18} style={{ color: '#E63946' }}  />
               </div>
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
                 Be4Hope

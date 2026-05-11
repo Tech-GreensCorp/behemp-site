@@ -6,29 +6,28 @@ import { TriagemForm } from '@/components/shared/triagem-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  FileValidationIcon,
-  Add01Icon,
-  TaskDaily01Icon,
-  ViewIcon,
-  Cancel01Icon,
-  UserIcon,
-  Stethoscope02Icon,
-  Home01Icon,
-  Money01Icon,
-  HeartbreakIcon,
-  CallIcon,
-  Mail01Icon,
-  Calendar01Icon,
-  Download01Icon,
-  Loading03Icon,
-} from '@hugeicons/core-free-icons';
 import {
   listarTriagensMedico,
   atualizarStatusTriagem,
 } from '@/app/(public)/_actions/triagem';
 import { cn } from '@/lib/utils';
+import {
+  Calendar,
+  ClipboardList,
+  DollarSign,
+  Download,
+  Eye,
+  FileCheck,
+  HeartCrack,
+  Home,
+  Loader2,
+  Mail,
+  Phone,
+  Plus,
+  Stethoscope,
+  User,
+  X,
+} from 'lucide-react';
 
 /* ── Tipos ────────────────────────────────────────────── */
 
@@ -95,7 +94,7 @@ const LABEL_MAP: Record<string, string> = {
 
 interface Secao {
   titulo: string;
-  icon: typeof UserIcon;
+  icon: typeof User;
   campos: string[];
   cor: string;
 }
@@ -103,7 +102,7 @@ interface Secao {
 const SECOES: Secao[] = [
   {
     titulo: 'Dados Pessoais',
-    icon: UserIcon,
+    icon: User,
     cor: 'text-primary bg-primary/10',
     campos: [
       'nome_paciente', 'cpf', 'data_nascimento', 'peso_altura',
@@ -113,7 +112,7 @@ const SECOES: Secao[] = [
   },
   {
     titulo: 'Informações Clínicas',
-    icon: Stethoscope02Icon,
+    icon: Stethoscope,
     cor: 'text-rose-600 bg-rose-500/10',
     campos: [
       'diagnostico_principal', 'nivel_tratamento',
@@ -122,7 +121,7 @@ const SECOES: Secao[] = [
   },
   {
     titulo: 'Composição Familiar',
-    icon: Home01Icon,
+    icon: Home,
     cor: 'text-violet-600 bg-violet-500/10',
     campos: [
       'total_residencia', 'num_criancas', 'num_idosos', 'num_deficiencia',
@@ -131,7 +130,7 @@ const SECOES: Secao[] = [
   },
   {
     titulo: 'Situação Financeira',
-    icon: Money01Icon,
+    icon: DollarSign,
     cor: 'text-emerald-600 bg-emerald-500/10',
     campos: [
       'renda_total', 'fontes_renda', 'situacao_trabalho', 'profissao',
@@ -140,7 +139,7 @@ const SECOES: Secao[] = [
   },
   {
     titulo: 'Moradia e Saúde',
-    icon: HeartbreakIcon,
+    icon: HeartCrack,
     cor: 'text-sky-600 bg-sky-500/10',
     campos: [
       'convenio_medico', 'convenio_qual',
@@ -265,7 +264,7 @@ export default function MedicoTriagemPage() {
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          <HugeiconsIcon icon={Add01Icon} size={16} />
+          <Plus size={16} />
           Nova triagem
         </button>
         <button
@@ -277,7 +276,7 @@ export default function MedicoTriagemPage() {
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          <HugeiconsIcon icon={TaskDaily01Icon} size={16} />
+          <ClipboardList size={16} />
           Minhas triagens
           {pendentes > 0 && (
             <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-white">
@@ -311,7 +310,7 @@ export default function MedicoTriagemPage() {
               onClick={carregarTriagens}
               className="gap-1.5 text-xs"
             >
-              <HugeiconsIcon icon={Loading03Icon} size={14} className={carregando ? 'animate-spin' : ''} />
+              <Loader2 size={14} className={carregando ? 'animate-spin' : ''}  />
               Atualizar
             </Button>
           </div>
@@ -327,7 +326,7 @@ export default function MedicoTriagemPage() {
           {!carregando && triagens.length === 0 && (
             <Card className="border-0 shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <HugeiconsIcon icon={FileValidationIcon} size={48} className="mb-4 text-muted-foreground/30" />
+                <FileCheck size={48} className="mb-4 text-muted-foreground/30" />
                 <p className="text-lg font-medium">Nenhuma triagem enviada</p>
                 <p className="text-sm text-muted-foreground">
                   Suas triagens aparecerão aqui após envio.
@@ -336,7 +335,7 @@ export default function MedicoTriagemPage() {
                   className="mt-4 gap-2"
                   onClick={() => setTab('nova')}
                 >
-                  <HugeiconsIcon icon={Add01Icon} size={16} />
+                  <Plus size={16} />
                   Criar primeira triagem
                 </Button>
               </CardContent>
@@ -359,7 +358,7 @@ export default function MedicoTriagemPage() {
                   >
                     <CardContent className="flex items-center gap-4 p-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                        <HugeiconsIcon icon={FileValidationIcon} size={20} className="text-primary" />
+                        <FileCheck size={20} className="text-primary" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">
@@ -378,7 +377,7 @@ export default function MedicoTriagemPage() {
                         </Badge>
                       </div>
                       <Button variant="ghost" size="icon">
-                        <HugeiconsIcon icon={ViewIcon} size={18} />
+                        <Eye size={18} />
                       </Button>
                     </CardContent>
                   </Card>
@@ -429,18 +428,18 @@ export default function MedicoTriagemPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
                       {triagemSelecionada.emailContato && (
                         <span className="flex items-center gap-1.5">
-                          <HugeiconsIcon icon={Mail01Icon} size={14} />
+                          <Mail size={14} />
                           {triagemSelecionada.emailContato}
                         </span>
                       )}
                       {triagemSelecionada.telefoneContato && (
                         <span className="flex items-center gap-1.5">
-                          <HugeiconsIcon icon={CallIcon} size={14} />
+                          <Phone size={14} />
                           {triagemSelecionada.telefoneContato}
                         </span>
                       )}
                       <span className="flex items-center gap-1.5">
-                        <HugeiconsIcon icon={Calendar01Icon} size={14} />
+                        <Calendar size={14} />
                         {new Date(triagemSelecionada.createdAt).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: 'long',
@@ -456,7 +455,7 @@ export default function MedicoTriagemPage() {
                     onClick={() => setTriagemSelecionada(null)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={18} />
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -504,7 +503,7 @@ export default function MedicoTriagemPage() {
                       <Fragment key={secao.titulo}>
                         <div className={cn('flex items-center gap-3 pb-3', ehPrimeira ? 'pt-3' : 'pt-4')}>
                           <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg', secao.cor)}>
-                            <HugeiconsIcon icon={secao.icon} size={16} />
+                            {(() => { const DynIcon = secao.icon; return <DynIcon size={16} />; })()}
                           </div>
                           <h3 className="text-sm font-bold tracking-tight">{secao.titulo}</h3>
                         </div>
@@ -540,7 +539,7 @@ export default function MedicoTriagemPage() {
                     <>
                       <div className="flex items-center gap-3 pb-3 pt-4">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                          <HugeiconsIcon icon={FileValidationIcon} size={16} />
+                          <FileCheck size={16} />
                         </div>
                         <h3 className="text-sm font-bold tracking-tight">Outras Informações</h3>
                       </div>
@@ -568,7 +567,7 @@ export default function MedicoTriagemPage() {
                       className="gap-2"
                       onClick={() => handleDownloadDocumento(triagemSelecionada)}
                     >
-                      <HugeiconsIcon icon={Download01Icon} size={15} />
+                      <Download size={15} />
                       Baixar relatório médico
                     </Button>
                   )}

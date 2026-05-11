@@ -1,13 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  SmartPhone01Icon,
-  Mail01Icon,
-  Location01Icon,
-  Clock01Icon,
-} from '@hugeicons/core-free-icons';
 import {
   Accordion,
   AccordionContent,
@@ -15,6 +8,12 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { FormularioContato } from './_components/formulario-contato';
+import {
+  Clock,
+  Mail,
+  MapPin,
+  Smartphone,
+} from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Contato',
@@ -52,21 +51,21 @@ const FAQ = [
 
 const CANAIS = [
   {
-    icon: SmartPhone01Icon,
+    icon: Smartphone,
     titulo: 'WhatsApp',
     info: '+55 (11) 93204-7360',
     detalhe: 'Resposta em até 4h úteis',
     href: 'https://wa.me/5511932047360',
   },
   {
-    icon: Mail01Icon,
+    icon: Mail,
     titulo: 'E-mail',
     info: 'contato@be4hope.org',
     detalhe: 'Resposta em até 24h',
     href: 'mailto:contato@be4hope.org',
   },
   {
-    icon: Location01Icon,
+    icon: MapPin,
     titulo: 'Localização',
     info: 'São Paulo, SP — Brasil',
     detalhe: 'Atendimento 100% online',
@@ -98,17 +97,13 @@ export default function ContatoPage() {
               <Card className="group h-full border-0 bg-card shadow-sm transition-all hover:shadow-md">
                 <CardContent className="flex items-start gap-4 p-6">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted transition-colors group-hover:bg-primary/10">
-                    <HugeiconsIcon
-                      icon={canal.icon}
-                      size={20}
-                      className="text-foreground transition-colors group-hover:text-primary"
-                    />
+                    {(() => { const DynIcon = canal.icon; return <DynIcon size={20} />; })()}
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold">{canal.titulo}</h3>
                     <p className="mt-0.5 text-sm text-muted-foreground">{canal.info}</p>
                     <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/70">
-                      <HugeiconsIcon icon={Clock01Icon} size={12} />
+                      <Clock size={12} />
                       {canal.detalhe}
                     </p>
                   </div>

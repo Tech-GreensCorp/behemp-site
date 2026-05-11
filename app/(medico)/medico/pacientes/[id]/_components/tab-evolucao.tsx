@@ -9,10 +9,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, Add01Icon, ArrowUp01Icon, ArrowDown01Icon, MinusSignIcon } from '@hugeicons/core-free-icons';
 import { criarEvolucao, listarEvolucoes } from '@/app/_actions/evolucoes';
 import { toast } from 'sonner';
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Minus,
+  Plus,
+} from 'lucide-react';
 
 const TIPO_COLORS: Record<string, string> = { positiva: 'bg-emerald-100 text-emerald-800', estavel: 'bg-amber-100 text-amber-800', negativa: 'bg-red-100 text-red-800' };
 const TIPO_LABELS: Record<string, string> = { positiva: 'Positiva', estavel: 'Estável', negativa: 'Negativa' };
@@ -59,19 +64,19 @@ export function TabEvolucao({ pacienteId }: TabEvolucaoProps) {
   }
 
   const TipoIcon = ({ tipo }: { tipo: string }) => {
-    if (tipo === 'positiva') return <HugeiconsIcon icon={ArrowUp01Icon} size={16} className="text-emerald-600" />;
-    if (tipo === 'negativa') return <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="text-red-600" />;
-    return <HugeiconsIcon icon={MinusSignIcon} size={16} className="text-amber-600" />;
+    if (tipo === 'positiva') return <ChevronUp size={16} className="text-emerald-600" />;
+    if (tipo === 'negativa') return <ChevronDown size={16} className="text-red-600" />;
+    return <Minus size={16} className="text-amber-600" />;
   };
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Evoluções</h2>
         <Dialog open={aberto} onOpenChange={setAberto}>
-          <DialogTrigger><Button size="sm" className="gap-2 rounded-xl"><HugeiconsIcon icon={Add01Icon} size={14} /> Nova Evolução</Button></DialogTrigger>
+          <DialogTrigger><Button size="sm" className="gap-2 rounded-xl"><Plus size={14} /> Nova Evolução</Button></DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader><DialogTitle className="font-heading">Nova Evolução</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
@@ -105,7 +110,7 @@ export function TabEvolucao({ pacienteId }: TabEvolucaoProps) {
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => setAberto(false)}>Cancelar</Button>
                 <Button onClick={handleSalvar} disabled={salvando || !form.data || !form.tipo || !form.conteudo} className="gap-2 rounded-xl">
-                  {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : null}
+                  {salvando ? <Loader2 size={16} className="animate-spin" /> : null}
                   {salvando ? 'Salvando...' : 'Registrar'}
                 </Button>
               </div>

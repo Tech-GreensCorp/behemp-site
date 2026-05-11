@@ -1,10 +1,11 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { evolucoes } from '@/db/schema';
+import { evolucoes, users } from '@/db/schema';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 async function obterMedicoId(clerkId: string): Promise<string | null> {
   const res = await db.execute(
@@ -47,6 +48,18 @@ export async function criarEvolucao(dados: z.infer<typeof criarEvolucaoSchema>) 
       criadoPor: medicoId,
     }).returning();
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'criar',
+        entidade: 'evolucoes',
+        entidadeId: nova.id,
+        dadosDepois: { pacienteId: parsed.data.pacienteId, tipo: parsed.data.tipo },
+      });
+    }
+
     return { sucesso: true, dados: nova };
   } catch (error) {
     console.error('[Action] Erro ao criar evolução:', error);
@@ -66,4 +79,14 @@ export async function listarEvolucoes(pacienteId: string) {
     console.error('[Action] Erro ao listar evoluções:', error);
     return { sucesso: false, erro: 'Erro ao listar evoluções' };
   }
+}
+
+/**
+ * Busca o userId interno a partir do clerkId (para auditoria).
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const res = await db.execute(
+    sql`SELECT u.id FROM users u WHERE u.clerk_id = ${clerkId} LIMIT 1`,
+  );
+  return (res.rows[0]?.id as string) ?? null;
 }

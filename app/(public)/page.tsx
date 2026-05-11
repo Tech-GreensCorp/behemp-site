@@ -3,26 +3,23 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  ArrowRight01Icon,
-  BrainIcon,
-  HeartCheckIcon,
-  StethoscopeIcon,
-  Shield01Icon,
-  FileValidationIcon,
-  Calendar03Icon,
-  UserMultiple02Icon,
-  Leaf01Icon,
-  Search01Icon,
-  UserGroupIcon,
-  Award01Icon,
-  CheckmarkCircle01Icon,
-  DeliveryBox01Icon,
-  Certificate01Icon,
-  Doctor01Icon,
-} from '@hugeicons/core-free-icons';
-
+  Award,
+  BadgeCheck,
+  Brain,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  FileCheck,
+  HeartPulse,
+  Leaf,
+  Package,
+  Search,
+  Shield,
+  Stethoscope,
+  Users,
+} from 'lucide-react';
 export const metadata: Metadata = {
   title: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
   description:
@@ -41,22 +38,22 @@ const STATS = [
 
 const ESPECIALIDADES = [
   {
-    icon: BrainIcon,
+    icon: Brain,
     titulo: 'Neurologia',
     descricao: 'Epilepsia, dor neuropática e esclerose múltipla',
   },
   {
-    icon: HeartCheckIcon,
+    icon: HeartPulse,
     titulo: 'Saúde Mental',
     descricao: 'Ansiedade, depressão e transtorno de estresse',
   },
   {
-    icon: StethoscopeIcon,
+    icon: Stethoscope,
     titulo: 'Dor Crônica',
     descricao: 'Fibromialgia, artrite e dores musculoesqueléticas',
   },
   {
-    icon: Shield01Icon,
+    icon: Shield,
     titulo: 'Oncologia',
     descricao: 'Suporte ao tratamento oncológico e efeitos colaterais',
   },
@@ -64,19 +61,19 @@ const ESPECIALIDADES = [
 
 const COMO_FUNCIONA = [
   {
-    icon: FileValidationIcon,
+    icon: FileCheck,
     passo: '1',
     titulo: 'Você preenche o formulário',
     descricao: 'Leva cerca de 5 minutos. Pode pausar e retomar quando quiser.',
   },
   {
-    icon: UserMultiple02Icon,
+    icon: Users,
     passo: '2',
     titulo: 'Equipe analisa em até 48h',
     descricao: 'Profissionais multidisciplinares avaliam o melhor caminho.',
   },
   {
-    icon: Calendar03Icon,
+    icon: CalendarDays,
     passo: '3',
     titulo: 'Plano personalizado por WhatsApp',
     descricao: 'Você recebe orientação clara dos próximos passos.',
@@ -143,7 +140,7 @@ export default function HomePage() {
                     nativeButton={false}
                   >
                     Iniciar triagem
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                    <ChevronRight size={16} />
                   </Button>
                 </Link>
                 <Link href="/#quem-somos">
@@ -269,11 +266,7 @@ export default function HomePage() {
                 >
                   <CardContent className="p-6">
                     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-muted transition-colors group-hover:bg-primary/10">
-                      <HugeiconsIcon
-                        icon={esp.icon}
-                        size={20}
-                        className="text-foreground transition-colors group-hover:text-primary"
-                      />
+                      {(() => { const DynIcon = esp.icon; return <DynIcon size={20} />; })()}
                     </div>
                     <h3 className="text-sm font-semibold">{esp.titulo}</h3>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -309,25 +302,25 @@ export default function HomePage() {
           <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                icon: UserMultiple02Icon,
+                icon: Users,
                 titulo: 'Centenas de vidas',
                 descricao:
                   'Atendemos centenas de pessoas que experimentam melhorias significativas em sua qualidade de vida, graças a tratamentos assistidos por especialistas e medicamentos de alta qualidade.',
               },
               {
-                icon: UserGroupIcon,
+                icon: Users,
                 titulo: 'Parcerias estratégicas',
                 descricao:
                   'Temos parcerias com fabricantes internacionais renomados, garantindo um portfólio diversificado que atende às necessidades de diferentes perfis de pacientes.',
               },
               {
-                icon: Search01Icon,
+                icon: Search,
                 titulo: 'Transparência nos preços',
                 descricao:
                   'Promovemos a transparência nos preços dos medicamentos, negociando ativamente com fornecedores para garantir custos acessíveis e justos.',
               },
               {
-                icon: Award01Icon,
+                icon: Award,
                 titulo: 'Educação e conscientização',
                 descricao:
                   'Investimos em educação sobre o uso adequado dos medicamentos, promovendo a saúde preventiva e a importância do acompanhamento médico regular.',
@@ -339,11 +332,7 @@ export default function HomePage() {
               >
                 <CardContent className="p-6">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 transition-colors group-hover:bg-primary/20">
-                    <HugeiconsIcon
-                      icon={item.icon}
-                      size={22}
-                      className="text-primary"
-                    />
+                    {(() => { const DynIcon = item.icon; return <DynIcon size={22} />; })()}
                   </div>
                   <h3 className="text-sm font-semibold">{item.titulo}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -380,13 +369,13 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 lg:grid-cols-3">
+          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:max-w-4xl lg:mx-auto">
             {/* Greens */}
             <Card className="group relative overflow-hidden border-0 bg-card shadow-sm transition-all hover:shadow-lg">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-500 to-green-400" />
               <CardContent className="p-8">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-100">
-                  <HugeiconsIcon icon={Leaf01Icon} size={22} className="text-green-600" />
+                  <Leaf size={22} className="text-green-600" />
                 </div>
                 <h3 className="font-display text-lg font-bold">Greens</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -397,45 +386,12 @@ export default function HomePage() {
                 </p>
                 <ul className="mt-4 space-y-2">
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-green-500" />
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
                     Investimento em pesquisa e inovação
                   </li>
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-green-500" />
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
                     Padrões internacionais de cultivo e extração
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Connect */}
-            <Card className="group relative overflow-hidden border-0 bg-card shadow-sm transition-all hover:shadow-lg">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 to-blue-400" />
-              <CardContent className="p-8">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100">
-                  <HugeiconsIcon icon={Doctor01Icon} size={22} className="text-blue-600" />
-                </div>
-                <h3 className="font-display text-lg font-bold">Connect</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Oferece <strong className="text-foreground">acompanhamento médico especializado</strong>{' '}
-                  através do programa <strong className="text-foreground">Connect Cuida</strong>, que inclui:
-                </p>
-                <ul className="mt-4 space-y-2">
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-blue-500" />
-                    Ajuste personalizado de dosagens
-                  </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-blue-500" />
-                    Suporte contínuo durante o tratamento
-                  </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-blue-500" />
-                    Subsídios em consultas e fretes
-                  </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-blue-500" />
-                    Médicos experientes em cannabis medicinal
                   </li>
                 </ul>
               </CardContent>
@@ -446,7 +402,7 @@ export default function HomePage() {
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/70" />
               <CardContent className="p-8">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                  <HugeiconsIcon icon={HeartCheckIcon} size={22} className="text-primary" />
+                  <HeartPulse size={22} className="text-primary" />
                 </div>
                 <h3 className="font-display text-lg font-bold">Be 4Hope</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -456,15 +412,15 @@ export default function HomePage() {
                 </p>
                 <ul className="mt-4 space-y-2">
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-primary" />
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
                     Ponte entre pacientes e tratamentos
                   </li>
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-primary" />
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
                     Soluções personalizadas em rede
                   </li>
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mt-0.5 shrink-0 text-primary" />
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
                     Missão: colaboração salva vidas
                   </li>
                 </ul>
@@ -511,7 +467,7 @@ export default function HomePage() {
                   nativeButton={false}
                 >
                   Quero saber mais
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                  <ChevronRight size={16} />
                 </Button>
               </Link>
             </div>
@@ -552,28 +508,28 @@ export default function HomePage() {
           <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                icon: StethoscopeIcon,
+                icon: Stethoscope,
                 passo: '1',
                 titulo: 'Consulta Médica',
                 descricao:
                   'O primeiro passo é ter um diagnóstico médico. Se ainda não tem, te ajudamos a encontrar um profissional. Se já possui, é só nos enviar para continuar o processo.',
               },
               {
-                icon: Certificate01Icon,
+                icon: BadgeCheck,
                 passo: '2',
                 titulo: 'Autorização',
                 descricao:
                   'Para importar a medicação, será necessário solicitar uma autorização da Anvisa. A Be4Hope te ajuda nesse processo.',
               },
               {
-                icon: FileValidationIcon,
+                icon: FileCheck,
                 passo: '3',
                 titulo: 'Receita',
                 descricao:
                   'Feito diagnóstico e com a prescrição em mãos você pode efetuar o pedido do seu produto.',
               },
               {
-                icon: DeliveryBox01Icon,
+                icon: Package,
                 passo: '4',
                 titulo: 'Pedido Aprovado',
                 descricao:
@@ -584,11 +540,7 @@ export default function HomePage() {
                 {/* Número do passo */}
                 <div className="relative mx-auto mb-6">
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 transition-all group-hover:bg-primary/20 group-hover:shadow-md">
-                    <HugeiconsIcon
-                      icon={item.icon}
-                      size={28}
-                      className="text-primary"
-                    />
+                    {(() => { const DynIcon = item.icon; return <DynIcon size={28} />; })()}
                   </div>
                   <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                     {item.passo}
@@ -610,7 +562,7 @@ export default function HomePage() {
                 nativeButton={false}
               >
                 Iniciar minha jornada
-                <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                <ChevronRight size={16} />
               </Button>
             </Link>
           </div>
@@ -684,7 +636,7 @@ export default function HomePage() {
                     nativeButton={false}
                   >
                     Preencher formulário
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                    <ChevronRight size={16} />
                   </Button>
                 </Link>
               </CardContent>
@@ -706,7 +658,7 @@ export default function HomePage() {
               className="hidden text-sm font-medium text-primary hover:underline sm:inline-flex sm:items-center sm:gap-1"
             >
               Ver todas as histórias
-              <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+              <ChevronRight size={14} />
             </Link>
           </div>
 
@@ -771,7 +723,7 @@ export default function HomePage() {
                   nativeButton={false}
                 >
                   WhatsApp
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                  <ChevronRight size={16} />
                 </Button>
               </Link>
               <Link href="/entre-em-contato">

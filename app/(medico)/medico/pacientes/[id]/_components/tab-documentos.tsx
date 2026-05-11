@@ -7,10 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, Add01Icon, FileValidationIcon } from '@hugeicons/core-free-icons';
 import { uploadDocumento, listarDocumentos } from '@/app/_actions/documentos-paciente';
 import { toast } from 'sonner';
+import {
+  FileCheck,
+  Loader2,
+  Plus,
+} from 'lucide-react';
 
 const TIPO_LABELS: Record<string, string> = {
   documento_pessoal: 'Documento Pessoal', comprovante_residencia: 'Comprovante de Residência',
@@ -65,13 +68,13 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
     return acc;
   }, {});
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Documentos</h2>
-        {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><HugeiconsIcon icon={Add01Icon} size={14} /> Enviar Documento</Button>}
+        {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><Plus size={14} /> Enviar Documento</Button>}
       </div>
 
       {mostrarForm && (
@@ -99,7 +102,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
               <Button onClick={handleUpload} disabled={salvando || !tipo || !dataEmissao} className="gap-2 rounded-xl">
-                {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={Add01Icon} size={16} />}
+                {salvando ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 {salvando ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>
@@ -121,7 +124,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C08E3A]/10">
-                      <HugeiconsIcon icon={FileValidationIcon} size={18} className="text-[#C08E3A]" />
+                      <FileCheck size={18} className="text-[#C08E3A]" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">{doc.nomeArquivo}</p>

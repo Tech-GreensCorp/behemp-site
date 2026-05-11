@@ -78,3 +78,6 @@ Thumbs.db
 /exports/
 /imports/
 /backups/
+
+# Uploads locais de desenvolvimento (em produção usa Vercel Blob)
+/public/uploads/

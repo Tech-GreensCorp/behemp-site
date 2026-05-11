@@ -5,15 +5,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon,
-  SentIcon,
-  Add01Icon,
-  UserIcon,
-  Stethoscope02Icon,
-  Message01Icon,
-} from '@hugeicons/core-free-icons';
 import {
   listarGrupos,
   listarMensagens,
@@ -31,6 +22,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Loader2,
+  MessageSquare,
+  Plus,
+  Send,
+  Stethoscope,
+  User,
+} from 'lucide-react';
 
 /**
  * Componente de chat reutilizável — usado tanto na área do paciente
@@ -240,8 +239,8 @@ export function ChatContainer({
   }
 
   function roleIcon(role: string | null) {
-    if (role === 'medico') return Stethoscope02Icon;
-    return UserIcon;
+    if (role === 'medico') return Stethoscope;
+    return User;
   }
 
   const grupoSelecionado = grupos.find((g) => g.id === grupoAtivo);
@@ -257,7 +256,7 @@ export function ChatContainer({
         <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
           <DialogTrigger>
             <Button size="sm" className="gap-2">
-              <HugeiconsIcon icon={Add01Icon} size={14} />
+              <Plus size={14} />
               Nova conversa
             </Button>
           </DialogTrigger>
@@ -275,7 +274,7 @@ export function ChatContainer({
                 />
                 <Button onClick={handleBuscarUsuarios} disabled={buscandoUsuarios} size="sm">
                   {buscandoUsuarios ? (
-                    <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin" />
                   ) : (
                     'Buscar'
                   )}
@@ -325,11 +324,11 @@ export function ChatContainer({
             <div className="flex-1 overflow-y-auto">
               {carregandoGrupos ? (
                 <div className="flex justify-center py-8">
-                  <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-primary" />
+                  <Loader2 size={24} className="animate-spin text-primary" />
                 </div>
               ) : grupos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-                  <HugeiconsIcon icon={Message01Icon} size={32} className="mb-2 text-muted-foreground" />
+                  <MessageSquare size={32} className="mb-2 text-muted-foreground" />
                   <p className="text-sm font-medium">Nenhuma conversa</p>
                   <p className="mt-1 text-xs text-muted-foreground">Inicie uma nova conversa</p>
                 </div>
@@ -343,11 +342,7 @@ export function ChatContainer({
                     }`}
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <HugeiconsIcon
-                        icon={roleIcon(g.participantes.find((p) => p.role !== roleAtual)?.role ?? null)}
-                        size={18}
-                        className="text-primary"
-                      />
+                      {(() => { const DynIcon = roleIcon(g.participantes.find((p) => p.role !== roleAtual)?.role ?? null); return <DynIcon size={18} />; })()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{nomeGrupo(g)}</p>
@@ -372,7 +367,7 @@ export function ChatContainer({
           <CardContent className="flex h-full flex-col p-0">
             {!grupoAtivo ? (
               <div className="flex flex-1 flex-col items-center justify-center text-center">
-                <HugeiconsIcon icon={Message01Icon} size={48} className="mb-3 text-muted-foreground/40" />
+                <MessageSquare size={48} className="mb-3 text-muted-foreground/40" />
                 <p className="text-lg font-medium">Selecione uma conversa</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Ou inicie uma nova conversa pelo botão acima
@@ -383,13 +378,9 @@ export function ChatContainer({
                 {/* Header do chat */}
                 <div className="flex items-center gap-3 border-b p-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <HugeiconsIcon
-                      icon={roleIcon(
+                    {(() => { const DynIcon = roleIcon(
                         grupoSelecionado?.participantes.find((p) => p.role !== roleAtual)?.role ?? null,
-                      )}
-                      size={18}
-                      className="text-primary"
-                    />
+                      ); return <DynIcon size={18} />; })()}
                   </div>
                   <div>
                     <p className="text-sm font-medium">
@@ -405,7 +396,7 @@ export function ChatContainer({
                 <div ref={mensagensRef} className="flex-1 space-y-3 overflow-y-auto p-4">
                   {carregandoMensagens ? (
                     <div className="flex justify-center py-8">
-                      <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-primary" />
+                      <Loader2 size={24} className="animate-spin text-primary" />
                     </div>
                   ) : mensagensLista.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12">
@@ -427,11 +418,7 @@ export function ChatContainer({
                               msg.autorRole === 'medico' ? 'bg-primary/10' : 'bg-muted'
                             }`}
                           >
-                            <HugeiconsIcon
-                              icon={roleIcon(msg.autorRole)}
-                              size={14}
-                              className={msg.autorRole === 'medico' ? 'text-primary' : 'text-muted-foreground'}
-                            />
+                            {(() => { const DynIcon = roleIcon(msg.autorRole); return <DynIcon size={14} />; })()}
                           </div>
                           <div className="max-w-[75%]">
                             <p
@@ -485,9 +472,9 @@ export function ChatContainer({
                     />
                     <Button type="submit" size="icon" disabled={!textoMensagem.trim() || enviando}>
                       {enviando ? (
-                        <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <HugeiconsIcon icon={SentIcon} size={16} />
+                        <Send size={16} />
                       )}
                     </Button>
                   </form>

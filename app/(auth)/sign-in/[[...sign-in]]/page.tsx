@@ -1,22 +1,22 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
+import { SignIn, useAuth } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
-import { HugeiconsIcon } from '@hugeicons/react';
+import { useRouter } from 'next/navigation';
 import {
-  Calendar03Icon,
-  HeartCheckIcon,
-  LocationUpdate01Icon,
-  Certificate01Icon,
-} from '@hugeicons/core-free-icons';
-
+  BadgeCheck,
+  Calendar,
+  CalendarDays,
+  HeartPulse,
+  MapPinned,
+} from 'lucide-react';
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
   {
     num: 21,
     suffix: '',
     label: 'Anos de história',
-    icon: Calendar03Icon,
+    icon: CalendarDays,
     color: '#E63946',
   },
   {
@@ -24,14 +24,14 @@ const STATS = [
     text: 'ONG',
     suffix: '',
     label: 'Sem fins lucrativos',
-    icon: HeartCheckIcon,
+    icon: HeartPulse,
     color: '#E63946',
   },
   {
     num: 26,
     suffix: '',
     label: 'Estados atendidos',
-    icon: LocationUpdate01Icon,
+    icon: MapPinned,
     color: '#E63946',
   },
   {
@@ -39,7 +39,7 @@ const STATS = [
     text: 'Anvisa',
     suffix: '',
     label: 'Regulamentado RDC 660',
-    icon: Certificate01Icon,
+    icon: BadgeCheck,
     color: '#E63946',
   },
 ];
@@ -94,6 +94,15 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
 export default function SignInPage() {
   const [mounted, setMounted] = useState(false);
   const [particles, setParticles] = useState<Particle[]>([]);
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
+
+  // Se o usuário já está logado, redireciona para /redirect
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.replace('/redirect');
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
     setMounted(true);
@@ -282,11 +291,7 @@ export default function SignInPage() {
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
                     style={{ background: 'rgba(230,57,70,0.08)' }}
                   >
-                    <HugeiconsIcon
-                      icon={stat.icon}
-                      size={18}
-                      style={{ color: '#E63946' }}
-                    />
+                    {(() => { const DynIcon = stat.icon; return <DynIcon size={18} />; })()}
                   </div>
 
                   <div>
@@ -419,7 +424,7 @@ export default function SignInPage() {
                 className="h-8 w-8 rounded-lg flex items-center justify-center"
                 style={{ background: 'rgba(230,57,70,0.1)' }}
               >
-                <HugeiconsIcon icon={HeartCheckIcon} size={18} style={{ color: '#E63946' }} />
+                <HeartPulse size={18} style={{ color: '#E63946' }}  />
               </div>
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Be4Hope</span>
             </div>

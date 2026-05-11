@@ -5,6 +5,7 @@ import { users, pacientes, medicos } from '@/db/schema';
 import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
  * Server Actions de pacientes.
@@ -160,6 +161,18 @@ export async function criarPaciente(
       })
       .returning({ id: pacientes.id });
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'criar',
+        entidade: 'pacientes',
+        entidadeId: novoPaciente.id,
+        dadosDepois: { nome: parsed.data.nome, email: parsed.data.email },
+      });
+    }
+
     return { sucesso: true, dados: { pacienteId: novoPaciente.id } };
   } catch (error) {
     console.error('[Action] Erro ao criar paciente:', error);
@@ -235,6 +248,18 @@ export async function atualizarPaciente(
       }
     }
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'atualizar',
+        entidade: 'pacientes',
+        entidadeId: pacienteId,
+        dadosDepois: dadosPaciente,
+      });
+    }
+
     return { sucesso: true };
   } catch (error) {
     console.error('[Action] Erro ao atualizar paciente:', error);
@@ -261,6 +286,19 @@ export async function arquivarPaciente(
         deletedAt: new Date(),
       })
       .where(eq(pacientes.id, pacienteId));
+
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'deletar',
+        entidade: 'pacientes',
+        entidadeId: pacienteId,
+        dadosAntes: { status: 'ativo' },
+        dadosDepois: { status: 'arquivado' },
+      });
+    }
 
     return { sucesso: true };
   } catch (error) {
@@ -980,17 +1018,6 @@ export async function obterDadosGraficosDashboard(): Promise<ActionResult<{
       ? sql`AND p.medico_id = ${medicoId}`
       : sql``;
 
-    // Distribuição por tipo de tratamento
-    const tratamentosResult = await db.execute(sql`
-      SELECT
-        COALESCE(p.tratamento_tipo, 'nao_definido') as tipo,
-        COUNT(*)::int as quantidade
-      FROM pacientes p
-      WHERE p.deleted_at IS NULL ${medicoFilter}
-      GROUP BY p.tratamento_tipo
-      ORDER BY quantidade DESC
-    `);
-
     const TRATAMENTO_LABELS: Record<string, string> = {
       cbd: 'CBD',
       thc: 'THC',
@@ -998,52 +1025,75 @@ export async function obterDadosGraficosDashboard(): Promise<ActionResult<{
       nao_definido: 'Não definido',
     };
 
-    const tratamentos = (tratamentosResult.rows as Array<{ tipo: string; quantidade: number }>).map((r) => ({
-      tipo: TRATAMENTO_LABELS[r.tipo] ?? r.tipo,
-      quantidade: Number(r.quantidade),
-    }));
-
-    // Distribuição por status
-    const statusResult = await db.execute(sql`
-      SELECT
-        p.status,
-        COUNT(*)::int as quantidade
-      FROM pacientes p
-      WHERE p.deleted_at IS NULL ${medicoFilter}
-      GROUP BY p.status
-      ORDER BY quantidade DESC
-    `);
-
     const STATUS_LABELS: Record<string, string> = {
-      aguardando_consulta: 'Aguardando',
-      em_tratamento: 'Em tratamento',
+      aguardando_consulta: 'Aguardando Consulta',
+      em_tratamento: 'Em Tratamento',
       concluido: 'Concluído',
       arquivado: 'Arquivado',
     };
 
-    const statusDistribuicao = (statusResult.rows as Array<{ status: string; quantidade: number }>).map((r) => ({
-      status: STATUS_LABELS[r.status] ?? r.status,
-      quantidade: Number(r.quantidade),
-    }));
+    // 1) Distribuição por tipo de tratamento — cada query isolada
+    let tratamentos: Array<{ tipo: string; quantidade: number }> = [];
+    try {
+      const tratamentosResult = await db.execute(sql`
+        SELECT
+          COALESCE(p.tratamento_tipo::text, 'nao_definido') as tipo,
+          COUNT(*)::int as quantidade
+        FROM pacientes p
+        WHERE p.deleted_at IS NULL ${medicoFilter}
+        GROUP BY 1
+        ORDER BY quantidade DESC
+      `);
+      tratamentos = (tratamentosResult.rows as Array<{ tipo: string; quantidade: number }>).map((r) => ({
+        tipo: TRATAMENTO_LABELS[r.tipo] ?? r.tipo,
+        quantidade: Number(r.quantidade),
+      }));
+    } catch (e) {
+      console.error('[Gráficos] Erro na query de tratamentos:', e);
+    }
 
-    // Evolução mensal (últimos 6 meses)
-    const evolucaoResult = await db.execute(sql`
-      SELECT
-        TO_CHAR(p.created_at, 'YYYY-MM') as mes_raw,
-        TO_CHAR(p.created_at, 'Mon/YY') as mes,
-        COUNT(*)::int as pacientes
-      FROM pacientes p
-      WHERE p.deleted_at IS NULL
-        AND p.created_at >= NOW() - INTERVAL '6 months'
-        ${medicoFilter}
-      GROUP BY mes_raw, mes
-      ORDER BY mes_raw ASC
-    `);
+    // 2) Distribuição por status
+    let statusDistribuicao: Array<{ status: string; quantidade: number }> = [];
+    try {
+      const statusResult = await db.execute(sql`
+        SELECT
+          p.status::text,
+          COUNT(*)::int as quantidade
+        FROM pacientes p
+        WHERE p.deleted_at IS NULL ${medicoFilter}
+        GROUP BY 1
+        ORDER BY quantidade DESC
+      `);
+      statusDistribuicao = (statusResult.rows as Array<{ status: string; quantidade: number }>).map((r) => ({
+        status: STATUS_LABELS[r.status] ?? r.status,
+        quantidade: Number(r.quantidade),
+      }));
+    } catch (e) {
+      console.error('[Gráficos] Erro na query de status:', e);
+    }
 
-    const evolucaoMensal = (evolucaoResult.rows as Array<{ mes: string; pacientes: number }>).map((r) => ({
-      mes: r.mes,
-      pacientes: Number(r.pacientes),
-    }));
+    // 3) Evolução mensal (últimos 6 meses)
+    let evolucaoMensal: Array<{ mes: string; pacientes: number }> = [];
+    try {
+      const evolucaoResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(p.created_at, 'YYYY-MM') as mes_raw,
+          TO_CHAR(p.created_at, 'Mon/YY') as mes,
+          COUNT(*)::int as pacientes
+        FROM pacientes p
+        WHERE p.deleted_at IS NULL
+          AND p.created_at >= NOW() - INTERVAL '6 months'
+          ${medicoFilter}
+        GROUP BY mes_raw, mes
+        ORDER BY mes_raw ASC
+      `);
+      evolucaoMensal = (evolucaoResult.rows as Array<{ mes: string; pacientes: number }>).map((r) => ({
+        mes: r.mes,
+        pacientes: Number(r.pacientes),
+      }));
+    } catch (e) {
+      console.error('[Gráficos] Erro na query de evolução:', e);
+    }
 
     return {
       sucesso: true,
@@ -1074,4 +1124,16 @@ async function obterMedicoIdDoUsuario(clerkId: string): Promise<string | null> {
     .limit(1);
 
   return medico?.id ?? null;
+}
+
+/**
+ * Busca o userId interno a partir do clerkId (para auditoria).
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return user?.id ?? null;
 }

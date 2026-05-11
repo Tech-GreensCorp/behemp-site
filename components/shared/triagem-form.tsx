@@ -7,16 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { criarTriagem } from '@/app/(public)/_actions/triagem';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  CheckmarkCircle01Icon,
-  ArrowRight01Icon,
-  ArrowLeft01Icon,
-  Loading03Icon,
-  UploadSquare02Icon,
-} from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Upload,
+} from 'lucide-react';
 
 /* ── Tipos ───────────────────────────────────────────── */
 
@@ -469,7 +468,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
       <Card className="mx-auto max-w-md border-0 shadow-lg">
         <CardContent className="p-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={32} className="text-primary" />
+            <CheckCircle2 size={32} className="text-primary" />
           </div>
           <h2 className="font-display text-2xl font-bold">Triagem enviada!</h2>
           <p className="mt-3 text-muted-foreground">
@@ -536,7 +535,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                       )}
                     >
                       {i < step ? (
-                        <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
+                        <CheckCircle2 size={14} />
                       ) : (
                         i + 1
                       )}
@@ -714,7 +713,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                                   : 'border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground',
                               )}
                             >
-                              <HugeiconsIcon icon={UploadSquare02Icon} size={18} />
+                              <Upload size={18} />
                               {arquivo ? arquivo.name : 'Clique para enviar (PDF, imagem ou Word)'}
                             </button>
                           </div>
@@ -746,7 +745,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                     step === 0 ? 'invisible' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+                  <ChevronLeft size={16} />
                   Voltar
                 </button>
 
@@ -757,7 +756,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                     className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
                   >
                     Continuar
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                    <ChevronRight size={16} />
                   </Button>
                 ) : (
                   <Button
@@ -768,13 +767,13 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                   >
                     {enviando ? (
                       <>
-                        <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                         Enviando...
                       </>
                     ) : (
                       <>
                         Enviar triagem
-                        <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                        <ChevronRight size={16} />
                       </>
                     )}
                   </Button>

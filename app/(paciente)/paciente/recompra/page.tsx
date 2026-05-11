@@ -4,17 +4,15 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  MedicineBottle01Icon,
-  Calendar01Icon,
-  ShoppingCart01Icon,
-  CheckmarkCircle01Icon,
-  Loading03Icon,
-} from '@hugeicons/core-free-icons';
 import { listarDosagens } from '@/app/_actions/dosagens';
 import { pedirRecompraAgora, agendarRecompra } from '@/app/_actions/recompras';
 import { toast } from 'sonner';
+import {
+  Calendar,
+  Loader2,
+  Pill,
+  ShoppingCart,
+} from 'lucide-react';
 
 /**
  * Página de recompra de medicamento do paciente.
@@ -103,7 +101,7 @@ export default function RecompraPage() {
       <Card className="border-0 bg-primary/5 shadow-sm">
         <CardContent className="flex items-start gap-4 p-6">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <HugeiconsIcon icon={MedicineBottle01Icon} size={20} className="text-primary" />
+            <Pill size={20} className="text-primary" />
           </div>
           <div>
             <p className="font-medium">Como funciona?</p>
@@ -120,7 +118,7 @@ export default function RecompraPage() {
       {dosagens.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={MedicineBottle01Icon} size={48} className="mb-4 text-muted-foreground/30" />
+            <Pill size={48} className="mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium">Nenhuma dosagem ativa</p>
             <p className="text-sm text-muted-foreground">
               Quando seu médico registrar uma dosagem, ela aparecerá aqui para controle de recompra.
@@ -151,7 +149,7 @@ export default function RecompraPage() {
                 <CardContent>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="flex items-center gap-2">
-                      <HugeiconsIcon icon={MedicineBottle01Icon} size={16} className="text-muted-foreground" />
+                      <Pill size={16} className="text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">Frasco</p>
                         <p className="text-sm font-medium">{dosagem.mlFrasco} ml</p>
@@ -165,7 +163,7 @@ export default function RecompraPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <HugeiconsIcon icon={Calendar01Icon} size={16} className="text-muted-foreground" />
+                      <Calendar size={16} className="text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">Previsão de término</p>
                         <p className="text-sm font-medium">
@@ -198,9 +196,9 @@ export default function RecompraPage() {
                       className="gap-2"
                     >
                       {processando === dosagem.id ? (
-                        <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <HugeiconsIcon icon={ShoppingCart01Icon} size={16} />
+                        <ShoppingCart size={16} />
                       )}
                       Pedir agora
                     </Button>
@@ -211,7 +209,7 @@ export default function RecompraPage() {
                       disabled={processando === dosagem.id}
                       className="gap-2"
                     >
-                      <HugeiconsIcon icon={Calendar01Icon} size={16} />
+                      <Calendar size={16} />
                       Pedir no futuro
                     </Button>
                   </div>

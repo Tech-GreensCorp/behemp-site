@@ -3,14 +3,12 @@
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  UserIcon,
-  Mail01Icon,
-  SmartPhone01Icon,
-  Camera01Icon,
-} from '@hugeicons/core-free-icons';
-
+  Camera,
+  Mail,
+  Smartphone,
+  User,
+} from 'lucide-react';
 /**
  * Página de perfil do paciente.
  * Mostra dados do Clerk e permite edição básica.
@@ -50,11 +48,11 @@ export default function PerfilPacientePage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <HugeiconsIcon icon={UserIcon} size={40} className="text-primary" />
+                  <User size={40} className="text-primary" />
                 )}
               </div>
               <button className="absolute right-0 bottom-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105">
-                <HugeiconsIcon icon={Camera01Icon} size={14} />
+                <Camera size={14} />
               </button>
             </div>
 
@@ -78,7 +76,7 @@ export default function PerfilPacientePage() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <HugeiconsIcon icon={Mail01Icon} size={18} className="text-primary" />
+                <Mail size={18} className="text-primary" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">E-mail</p>
@@ -89,7 +87,7 @@ export default function PerfilPacientePage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <HugeiconsIcon icon={SmartPhone01Icon} size={18} className="text-primary" />
+                <Smartphone size={18} className="text-primary" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Telefone</p>

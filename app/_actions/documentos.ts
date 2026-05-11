@@ -1,11 +1,12 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { documentos, pacientes } from '@/db/schema';
+import { documentos, pacientes, users } from '@/db/schema';
 import { eq, desc, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
 import { put, del } from '@vercel/blob';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
  * Server Actions para gestão de documentos do paciente.
@@ -115,6 +116,18 @@ export async function uploadDocumento(
       })
       .returning({ id: documentos.id });
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'criar',
+        entidade: 'documentos',
+        entidadeId: doc.id,
+        dadosDepois: { tipo: parsed.data.tipo, pacienteId: parsed.data.pacienteId, nomeArquivo: arquivo.name },
+      });
+    }
+
     return { sucesso: true, dados: { documentoId: doc.id } };
   } catch (error) {
     console.error('[Action] Erro ao upload documento:', error);
@@ -156,6 +169,17 @@ export async function removerDocumento(
       .set({ deletedAt: new Date() })
       .where(eq(documentos.id, documentoId));
 
+    // Registrar auditoria LGPD
+    const userIdInterno = await obterUserIdInterno(auth.clerkId!);
+    if (userIdInterno) {
+      await registrarAuditoria({
+        userId: userIdInterno,
+        acao: 'deletar',
+        entidade: 'documentos',
+        entidadeId: documentoId,
+      });
+    }
+
     return { sucesso: true };
   } catch (error) {
     console.error('[Action] Erro ao remover documento:', error);
@@ -191,4 +215,16 @@ export async function listarDocumentos(
     console.error('[Action] Erro ao listar documentos:', error);
     return { sucesso: false, erro: 'Erro ao listar documentos' };
   }
+}
+
+/**
+ * Busca o userId interno a partir do clerkId (para auditoria).
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return user?.id ?? null;
 }

@@ -8,10 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, Add01Icon, Delete02Icon, MedicineBottle01Icon } from '@hugeicons/core-free-icons';
 import { criarAjusteDosagem, listarAjustesDosagem } from '@/app/_actions/ajustes-dosagem';
 import { toast } from 'sonner';
+import {
+  Loader2,
+  Pill,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 
 const ITEM_VAZIO = { tipoCanabinoide: '', novaDosagem: '', dosagemAnterior: '', frequencia: '', concentracaoTHC: '', concentracaoCBD: '', viaAdministracao: '' };
 
@@ -57,7 +61,7 @@ export function TabDosagem({ pacienteId }: TabDosagemProps) {
 
   const dosagemAtual = ajustes[0];
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -82,7 +86,7 @@ export function TabDosagem({ pacienteId }: TabDosagemProps) {
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Histórico de Dosagem</h2>
         <Dialog open={aberto} onOpenChange={setAberto}>
-          <DialogTrigger><Button size="sm" className="gap-2 rounded-xl"><HugeiconsIcon icon={Add01Icon} size={14} /> Novo Ajuste</Button></DialogTrigger>
+          <DialogTrigger><Button size="sm" className="gap-2 rounded-xl"><Plus size={14} /> Novo Ajuste</Button></DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
             <DialogHeader><DialogTitle className="font-heading">Novo Ajuste de Dosagem</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
@@ -94,14 +98,14 @@ export function TabDosagem({ pacienteId }: TabDosagemProps) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Medicamentos</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1.5 text-xs"><HugeiconsIcon icon={Add01Icon} size={12} /> Adicionar Medicamento</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1.5 text-xs"><Plus size={12} /> Adicionar Medicamento</Button>
                 </div>
                 {itens.map((item, idx) => (
                   <Card key={idx} className="border-border/40">
                     <CardContent className="space-y-3 p-4">
                       <div className="flex items-center justify-between">
                         <Badge variant="outline">Medicamento {idx + 1}</Badge>
-                        {itens.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}><HugeiconsIcon icon={Delete02Icon} size={14} className="text-destructive" /></Button>}
+                        {itens.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}><Trash2 size={14} className="text-destructive" /></Button>}
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div><Label>Tipo de Canabinóide *</Label><Input value={item.tipoCanabinoide} onChange={e => updateItem(idx, 'tipoCanabinoide', e.target.value)} placeholder="Ex: CBD, THC, Full Spectrum" /></div>
@@ -122,7 +126,7 @@ export function TabDosagem({ pacienteId }: TabDosagemProps) {
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => setAberto(false)}>Cancelar</Button>
                 <Button onClick={handleSalvar} disabled={salvando || !dataAjuste || !motivoAjuste || !itens[0]?.tipoCanabinoide} className="gap-2 rounded-xl">
-                  {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : null}
+                  {salvando ? <Loader2 size={16} className="animate-spin" /> : null}
                   {salvando ? 'Salvando...' : 'Registrar Ajuste'}
                 </Button>
               </div>
@@ -141,7 +145,7 @@ export function TabDosagem({ pacienteId }: TabDosagemProps) {
             <CardContent className="p-5">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <HugeiconsIcon icon={MedicineBottle01Icon} size={16} className="text-[#C08E3A]" />
+                  <Pill size={16} className="text-[#C08E3A]" />
                   <p className="text-sm font-medium">{new Date(aj.dataAjuste + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                 </div>
                 <Badge variant="outline">{aj.itens?.length || 0} medicamento(s)</Badge>

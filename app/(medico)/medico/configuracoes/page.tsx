@@ -5,18 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Settings01Icon,
-  UserIcon,
-  Calendar03Icon,
-  SecurityCheckIcon,
-  Loading03Icon,
-  CheckmarkCircle01Icon,
-  LinkSquare01Icon,
-} from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
 import { obterPerfilMedico, obterUrlGoogleCalendar } from '@/app/(medico)/_actions/configuracoes';
+import {
+  Calendar,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  Settings,
+  Shield,
+  User,
+} from 'lucide-react';
 
 /**
  * Página de configurações do médico.
@@ -87,7 +86,7 @@ export default function ConfiguracoesPage() {
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-32">
-        <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+        <Loader2 size={32} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -107,7 +106,7 @@ export default function ConfiguracoesPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <HugeiconsIcon icon={UserIcon} size={20} className="text-primary" />
+                <User size={20} className="text-primary" />
               </div>
               <CardTitle className="text-base">Perfil Profissional</CardTitle>
             </div>
@@ -143,7 +142,7 @@ export default function ConfiguracoesPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
-                <HugeiconsIcon icon={Calendar03Icon} size={20} className="text-violet-600" />
+                <Calendar size={20} className="text-violet-600" />
               </div>
               <CardTitle className="text-base">Google Calendar</CardTitle>
             </div>
@@ -153,7 +152,7 @@ export default function ConfiguracoesPage() {
               <span className="text-muted-foreground">Status</span>
               {perfil?.googleConectado ? (
                 <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
-                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} />
+                  <CheckCircle2 size={12} />
                   Conectado
                 </Badge>
               ) : (
@@ -180,9 +179,9 @@ export default function ConfiguracoesPage() {
                   variant="outline"
                 >
                   {conectandoGoogle ? (
-                    <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <HugeiconsIcon icon={LinkSquare01Icon} size={16} />
+                    <ExternalLink size={16} />
                   )}
                   {conectandoGoogle ? 'Redirecionando...' : 'Conectar Google Calendar'}
                 </Button>
@@ -196,7 +195,7 @@ export default function ConfiguracoesPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
-                <HugeiconsIcon icon={Settings01Icon} size={20} className="text-amber-600" />
+                <Settings size={20} className="text-amber-600" />
               </div>
               <CardTitle className="text-base">Preferências</CardTitle>
             </div>
@@ -218,7 +217,7 @@ export default function ConfiguracoesPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                <HugeiconsIcon icon={SecurityCheckIcon} size={20} className="text-emerald-600" />
+                <Shield size={20} className="text-emerald-600" />
               </div>
               <CardTitle className="text-base">Segurança</CardTitle>
             </div>
@@ -227,7 +226,7 @@ export default function ConfiguracoesPage() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Autenticação</span>
               <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} />
+                <CheckCircle2 size={12} />
                 Clerk ativo
               </Badge>
             </div>

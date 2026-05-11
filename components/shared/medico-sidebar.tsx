@@ -4,33 +4,32 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  DashboardSquare01Icon,
-  Route01Icon,
-  UserMultiple02Icon,
-  FileValidationIcon,
-  Notification03Icon,
-  Settings01Icon,
-  Logout01Icon,
-  ArrowLeft01Icon,
-  Menu02Icon,
-  Message01Icon,
-  Calendar03Icon,
-} from '@hugeicons/core-free-icons';
+  LayoutDashboard,
+  Route,
+  Users,
+  FileCheck,
+  Bell,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  Menu,
+  MessageSquare,
+  Calendar,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import type { IconSvgElement } from '@hugeicons/react';
+import type { LucideIcon } from 'lucide-react';
 
-const NAV_ITEMS: { label: string; href: string; icon: IconSvgElement }[] = [
-  { label: 'Dashboard', href: '/medico', icon: DashboardSquare01Icon },
-  { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route01Icon },
-  { label: 'Pacientes', href: '/medico/pacientes', icon: UserMultiple02Icon },
-  { label: 'Triagem', href: '/medico/triagem', icon: FileValidationIcon },
-  { label: 'Agenda', href: '/medico/agenda', icon: Calendar03Icon },
-  { label: 'Chat', href: '/medico/chat', icon: Message01Icon },
-  { label: 'Notificações', href: '/medico/notificacoes', icon: Notification03Icon },
-  { label: 'Configurações', href: '/medico/configuracoes', icon: Settings01Icon },
+const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: 'Dashboard', href: '/medico', icon: LayoutDashboard },
+  { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route },
+  { label: 'Pacientes', href: '/medico/pacientes', icon: Users },
+  { label: 'Triagem', href: '/medico/triagem', icon: FileCheck },
+  { label: 'Agenda', href: '/medico/agenda', icon: Calendar },
+  { label: 'Chat', href: '/medico/chat', icon: MessageSquare },
+  { label: 'Notificações', href: '/medico/notificacoes', icon: Bell },
+  { label: 'Configurações', href: '/medico/configuracoes', icon: Settings },
 ];
 
 export function MedicoSidebar() {
@@ -46,7 +45,7 @@ export function MedicoSidebar() {
         className="fixed top-4 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg lg:hidden"
         aria-label="Menu"
       >
-        <HugeiconsIcon icon={Menu02Icon} size={20} />
+        <Menu size={20} />
       </button>
 
       {/* Overlay mobile */}
@@ -75,8 +74,7 @@ export function MedicoSidebar() {
             onClick={() => setCollapsed(!collapsed)}
             className="hidden lg:flex"
           >
-            <HugeiconsIcon
-              icon={ArrowLeft01Icon}
+            <ChevronLeft
               size={16}
               className={cn('transition-transform', collapsed && 'rotate-180')}
             />
@@ -90,6 +88,8 @@ export function MedicoSidebar() {
               item.href === '/medico'
                 ? pathname === '/medico'
                 : pathname.startsWith(item.href);
+
+            const Icon = item.icon;
 
             return (
               <Link
@@ -105,7 +105,7 @@ export function MedicoSidebar() {
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <HugeiconsIcon icon={item.icon} size={20} className="shrink-0" />
+                <Icon size={20} className="shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
               </Link>
             );
@@ -118,7 +118,7 @@ export function MedicoSidebar() {
             onClick={() => signOut({ redirectUrl: '/' })}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
-            <HugeiconsIcon icon={Logout01Icon} size={20} className="shrink-0" />
+            <LogOut size={20} className="shrink-0" />
             {!collapsed && <span>Sair</span>}
           </button>
         </div>

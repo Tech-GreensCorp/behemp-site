@@ -9,10 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, CheckmarkCircle01Icon, Add01Icon } from '@hugeicons/core-free-icons';
 import { criarAnamnese, listarAnamneses } from '@/app/_actions/anamneses';
 import { toast } from 'sonner';
+import {
+  CheckCircle2,
+  Loader2,
+  Plus,
+} from 'lucide-react';
 
 const TABAGISMO_LABELS: Record<string, string> = { nunca_fumou: 'Nunca fumou', ex_fumante: 'Ex-fumante', fumante: 'Fumante' };
 const ALCOOL_LABELS: Record<string, string> = { nao_consome: 'Não consome', regular: 'Regular', ocasional: 'Ocasional' };
@@ -62,7 +65,7 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
     } else { toast.error(res.erro || 'Erro ao salvar'); }
   }
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -70,7 +73,7 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
         <h2 className="font-heading text-lg font-semibold">Anamneses</h2>
         {!mostrarForm && (
           <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}>
-            <HugeiconsIcon icon={Add01Icon} size={14} /> Nova Anamnese
+            <Plus size={14} /> Nova Anamnese
           </Button>
         )}
       </div>
@@ -123,7 +126,7 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
               <Button onClick={handleSalvar} disabled={salvando || !form.queixaPrincipal || !form.tabagismo} className="gap-2 rounded-xl">
-                {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />}
+                {salvando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                 {salvando ? 'Salvando...' : 'Registrar Anamnese'}
               </Button>
             </div>

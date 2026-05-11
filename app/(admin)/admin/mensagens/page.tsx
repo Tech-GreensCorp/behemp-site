@@ -5,21 +5,20 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Mail01Icon,
-  ViewIcon,
-  Cancel01Icon,
-  CheckmarkCircle01Icon,
-  UserIcon,
-  Calendar01Icon,
-  Message01Icon,
-  MailReply01Icon,
-  MailSend01Icon,
-} from '@hugeicons/core-free-icons';
 import { listarContatos, atualizarStatusContato, responderContato } from '@/app/(public)/_actions/contato';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  Calendar,
+  CheckCircle2,
+  Eye,
+  Mail,
+  MessageSquare,
+  Reply,
+  Send,
+  User,
+  X,
+} from 'lucide-react';
 
 /**
  * Página admin de mensagens recebidas via formulário de contato.
@@ -164,7 +163,7 @@ export default function MensagensAdminPage() {
       {contatos.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={Mail01Icon} size={48} className="mb-4 text-muted-foreground/30" />
+            <Mail size={48} className="mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium">Nenhuma mensagem recebida</p>
             <p className="text-sm text-muted-foreground">
               Quando alguém preencher o formulário de contato, as mensagens aparecerão aqui.
@@ -186,7 +185,7 @@ export default function MensagensAdminPage() {
               >
                 <CardContent className="flex items-center gap-4 p-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                    <HugeiconsIcon icon={Message01Icon} size={20} className="text-primary" />
+                    <MessageSquare size={20} className="text-primary" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{contato.nome}</p>
@@ -201,7 +200,7 @@ export default function MensagensAdminPage() {
                     </Badge>
                   </div>
                   <Button variant="ghost" size="icon">
-                    <HugeiconsIcon icon={ViewIcon} size={18} />
+                    <Eye size={18} />
                   </Button>
                 </CardContent>
               </Card>
@@ -245,11 +244,11 @@ export default function MensagensAdminPage() {
 
                     <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
                       <span className="flex items-center gap-1.5">
-                        <HugeiconsIcon icon={Mail01Icon} size={14} />
+                        <Mail size={14} />
                         {contatoSelecionado.email}
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <HugeiconsIcon icon={Calendar01Icon} size={14} />
+                        <Calendar size={14} />
                         {new Date(contatoSelecionado.createdAt).toLocaleDateString('pt-BR', {
                           day: '2-digit', month: 'long', year: 'numeric',
                           hour: '2-digit', minute: '2-digit',
@@ -262,7 +261,7 @@ export default function MensagensAdminPage() {
                     onClick={() => setContatoSelecionado(null)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={18} />
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -277,7 +276,7 @@ export default function MensagensAdminPage() {
               <div className="px-6 py-5 sm:px-8">
                 <div className="flex items-center gap-3 pb-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <HugeiconsIcon icon={UserIcon} size={16} />
+                    <User size={16} />
                   </div>
                   <h3 className="text-sm font-bold tracking-tight">Mensagem</h3>
                 </div>
@@ -301,7 +300,7 @@ export default function MensagensAdminPage() {
                       onClick={() => setRespondendo(true)}
                       className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
                     >
-                      <HugeiconsIcon icon={MailReply01Icon} size={16} />
+                      <Reply size={16} />
                       Escrever resposta
                     </button>
                   ) : (
@@ -310,7 +309,7 @@ export default function MensagensAdminPage() {
                       <div className="mb-3 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                            <HugeiconsIcon icon={MailReply01Icon} size={14} className="text-primary" />
+                            <Reply size={14} className="text-primary" />
                           </div>
                           <div>
                             <p className="text-xs font-bold tracking-wide text-foreground">Responder</p>
@@ -323,7 +322,7 @@ export default function MensagensAdminPage() {
                           onClick={() => setRespondendo(false)}
                           className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
-                          <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                          <X size={13} />
                         </button>
                       </div>
 
@@ -353,7 +352,7 @@ export default function MensagensAdminPage() {
                             </>
                           ) : (
                             <>
-                              <HugeiconsIcon icon={MailSend01Icon} size={14} />
+                              <Send size={14} />
                               Enviar resposta
                             </>
                           )}
@@ -375,7 +374,7 @@ export default function MensagensAdminPage() {
                     variant="outline"
                     className="gap-2"
                   >
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                    <CheckCircle2 size={16} />
                     Marcar como respondida
                   </Button>
                 )}

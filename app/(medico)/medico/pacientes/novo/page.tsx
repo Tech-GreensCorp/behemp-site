@@ -14,20 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  ArrowLeft01Icon,
-  CheckmarkCircle01Icon,
-  Loading03Icon,
-  User02Icon,
-  Home01Icon,
-  Stethoscope02Icon,
-  FileValidationIcon,
-  UserMultiple02Icon,
-} from '@hugeicons/core-free-icons';
 import { criarPaciente } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import {
+  CheckCircle2,
+  ChevronLeft,
+  FileCheck,
+  Home,
+  Loader2,
+  Stethoscope,
+  User,
+  Users,
+} from 'lucide-react';
 
 /**
  * Página de criação de novo paciente — formulário completo.
@@ -110,7 +109,7 @@ export default function NovoPacientePage() {
       <div className="flex items-center gap-4">
         <Link href="/medico/pacientes">
           <Button variant="ghost" size="icon" nativeButton={false}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} />
+            <ChevronLeft size={20} />
           </Button>
         </Link>
         <div>
@@ -135,7 +134,7 @@ export default function NovoPacientePage() {
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-secondary/10">
-                <HugeiconsIcon icon={User02Icon} size={16} className="text-secondary" />
+                <User size={16} className="text-secondary" />
               </div>
               <CardTitle className="font-heading text-lg">Dados Pessoais</CardTitle>
             </div>
@@ -227,7 +226,7 @@ export default function NovoPacientePage() {
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C08E3A]/10">
-                <HugeiconsIcon icon={Home01Icon} size={16} className="text-[#C08E3A]" />
+                <Home size={16} className="text-[#C08E3A]" />
               </div>
               <CardTitle className="font-heading text-lg">Endereço</CardTitle>
             </div>
@@ -282,7 +281,7 @@ export default function NovoPacientePage() {
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C34C32]/10">
-                <HugeiconsIcon icon={Stethoscope02Icon} size={16} className="text-[#C34C32]" />
+                <Stethoscope size={16} className="text-[#C34C32]" />
               </div>
               <CardTitle className="font-heading text-lg">Dados Clínicos</CardTitle>
             </div>
@@ -337,7 +336,7 @@ export default function NovoPacientePage() {
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#2D4F3C]/10">
-                <HugeiconsIcon icon={FileValidationIcon} size={16} className="text-[#2D4F3C]" />
+                <FileCheck size={16} className="text-[#2D4F3C]" />
               </div>
               <CardTitle className="font-heading text-lg">Dados da Associação</CardTitle>
             </div>
@@ -536,7 +535,7 @@ export default function NovoPacientePage() {
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D4A388]/15">
-                <HugeiconsIcon icon={UserMultiple02Icon} size={16} className="text-[#B08B6E]" />
+                <Users size={16} className="text-[#B08B6E]" />
               </div>
               <CardTitle className="font-heading text-lg">Responsável / Representação Legal</CardTitle>
             </div>
@@ -606,12 +605,12 @@ export default function NovoPacientePage() {
           <Button type="submit" disabled={salvando} className="gap-2 rounded-xl px-6">
             {salvando ? (
               <>
-                <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Salvando...
               </>
             ) : (
               <>
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                <CheckCircle2 size={16} />
                 Cadastrar Paciente
               </>
             )}

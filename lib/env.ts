@@ -26,8 +26,9 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
 
-  // Resend (e-mails)
-  RESEND_API_KEY: z.string().optional(),
+  // Brevo (e-mails transacionais)
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_FROM_EMAIL: z.string().email().optional(),
 
   // Pusher (chat em tempo real)
   NEXT_PUBLIC_PUSHER_KEY: z.string().optional(),

@@ -5,18 +5,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon,
-  SecurityCheckIcon,
-  ViewIcon,
-  Edit01Icon,
-  Delete01Icon,
-  Add01Icon,
-  Download01Icon,
-  Calendar03Icon,
-} from '@hugeicons/core-free-icons';
 import { listarLogs } from '@/app/(admin)/_actions/auditoria';
+import {
+  Calendar,
+  Download,
+  Eye,
+  Loader2,
+  Pencil,
+  Plus,
+  Shield,
+  Trash2,
+} from 'lucide-react';
 
 /**
  * Página de auditoria LGPD — logs de operações sensíveis.
@@ -32,12 +31,12 @@ interface LogAuditoria {
   createdAt: Date;
 }
 
-const ACAO_CONFIG: Record<string, { label: string; icon: typeof ViewIcon; cor: string }> = {
-  visualizar: { label: 'Visualizar', icon: ViewIcon, cor: 'bg-blue-500/10 text-blue-600' },
-  criar: { label: 'Criar', icon: Add01Icon, cor: 'bg-emerald-500/10 text-emerald-600' },
-  atualizar: { label: 'Atualizar', icon: Edit01Icon, cor: 'bg-amber-500/10 text-amber-600' },
-  deletar: { label: 'Deletar', icon: Delete01Icon, cor: 'bg-red-500/10 text-red-600' },
-  exportar: { label: 'Exportar', icon: Download01Icon, cor: 'bg-purple-500/10 text-purple-600' },
+const ACAO_CONFIG: Record<string, { label: string; icon: typeof Eye; cor: string }> = {
+  visualizar: { label: 'Visualizar', icon: Eye, cor: 'bg-blue-500/10 text-blue-600' },
+  criar: { label: 'Criar', icon: Plus, cor: 'bg-emerald-500/10 text-emerald-600' },
+  atualizar: { label: 'Atualizar', icon: Pencil, cor: 'bg-amber-500/10 text-amber-600' },
+  deletar: { label: 'Deletar', icon: Trash2, cor: 'bg-red-500/10 text-red-600' },
+  exportar: { label: 'Exportar', icon: Download, cor: 'bg-purple-500/10 text-purple-600' },
 };
 
 export default function AuditoriaPage() {
@@ -94,12 +93,12 @@ export default function AuditoriaPage() {
       {/* Lista */}
       {carregando ? (
         <div className="flex justify-center py-12">
-          <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+          <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : logs.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={SecurityCheckIcon} size={40} className="mb-3 text-muted-foreground/40" />
+            <Shield size={40} className="mb-3 text-muted-foreground/40" />
             <p className="text-lg font-medium">Nenhum registro de auditoria</p>
             <p className="mt-1 text-sm text-muted-foreground">
               As operações sensíveis serão registradas automaticamente
@@ -110,13 +109,13 @@ export default function AuditoriaPage() {
         <div className="space-y-2">
           {logs.map((log) => {
             const acaoConf = ACAO_CONFIG[log.acao] ?? ACAO_CONFIG.visualizar;
-            const Icon = acaoConf?.icon ?? SecurityCheckIcon;
+            const Icon = acaoConf?.icon ?? Shield;
 
             return (
               <Card key={log.id} className="border-0 shadow-sm">
                 <CardContent className="flex items-start gap-4 p-4">
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${acaoConf?.cor ?? 'bg-muted'}`}>
-                    <HugeiconsIcon icon={Icon} size={18} />
+                    <Icon size={18} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -138,7 +137,7 @@ export default function AuditoriaPage() {
                   </div>
                   <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">
                     <div className="flex items-center gap-1">
-                      <HugeiconsIcon icon={Calendar03Icon} size={12} />
+                      <Calendar size={12} />
                       <span>
                         {new Date(log.createdAt).toLocaleString('pt-BR', {
                           day: '2-digit',

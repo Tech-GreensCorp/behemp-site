@@ -4,22 +4,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Loading03Icon,
-  Notification03Icon,
-  FileValidationIcon,
-  MedicineBottle01Icon,
-  Calendar03Icon,
-  Message01Icon,
-  CheckmarkCircle01Icon,
-} from '@hugeicons/core-free-icons';
 import {
   listarNotificacoes,
   marcarNotificacaoLida,
   marcarTodasNotificacoesLidas,
 } from '@/app/_actions/notificacoes';
 import { toast } from 'sonner';
+import {
+  Bell,
+  Calendar,
+  CheckCircle2,
+  FileCheck,
+  Loader2,
+  MessageSquare,
+  Pill,
+} from 'lucide-react';
 
 /**
  * Página de notificações do médico — dados reais do banco.
@@ -35,12 +34,12 @@ interface Notificacao {
   createdAt: Date;
 }
 
-const TIPO_ICONES: Record<string, typeof Notification03Icon> = {
-  renovacao_documento: FileValidationIcon,
-  recompra_medicamento: MedicineBottle01Icon,
-  consulta_agendada: Calendar03Icon,
-  mensagem_recebida: Message01Icon,
-  geral: Notification03Icon,
+const TIPO_ICONES: Record<string, typeof Bell> = {
+  renovacao_documento: FileCheck,
+  recompra_medicamento: Pill,
+  consulta_agendada: Calendar,
+  mensagem_recebida: MessageSquare,
+  geral: Bell,
 };
 
 export default function NotificacoesPage() {
@@ -82,7 +81,7 @@ export default function NotificacoesPage() {
   if (carregando) {
     return (
       <div className="flex justify-center py-20">
-        <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+        <Loader2 size={32} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -105,7 +104,7 @@ export default function NotificacoesPage() {
             className="gap-1.5"
             onClick={handleMarcarTodasLidas}
           >
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
+            <CheckCircle2 size={14} />
             Marcar todas como lidas
           </Button>
         )}
@@ -114,7 +113,7 @@ export default function NotificacoesPage() {
       {notifs.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <HugeiconsIcon icon={Notification03Icon} size={40} className="mb-3 text-muted-foreground/40" />
+            <Bell size={40} className="mb-3 text-muted-foreground/40" />
             <p className="text-lg font-medium">Nenhuma notificação</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Quando houver novidades, elas aparecerão aqui
@@ -124,7 +123,7 @@ export default function NotificacoesPage() {
       ) : (
         <div className="space-y-3">
           {notifs.map((notif) => {
-            const Icon = TIPO_ICONES[notif.tipo] || Notification03Icon;
+            const Icon = TIPO_ICONES[notif.tipo] || Bell;
             return (
               <Card
                 key={notif.id}
@@ -141,7 +140,7 @@ export default function NotificacoesPage() {
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    <HugeiconsIcon icon={Icon} size={20} />
+                    <Icon size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

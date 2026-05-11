@@ -13,24 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  Search01Icon,
-  UserAdd01Icon,
-  UserIcon,
-  ArrowRight01Icon,
-  Loading03Icon,
-  Upload01Icon,
-  Download01Icon,
-  CheckmarkCircle01Icon,
-  Alert02Icon,
-} from '@hugeicons/core-free-icons';
 import {
   listarPacientes,
   importarPacientesCSV,
   exportarPacientesCSV,
 } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
+import {
+  ChevronRight,
+  Download,
+  Loader2,
+  Search,
+  Upload,
+  User,
+  UserPlus,
+} from 'lucide-react';
 
 // ── Configurações de display ───────────────────────────────────
 
@@ -206,9 +203,9 @@ export default function PacientesPage() {
             disabled={importando}
           >
             {importando ? (
-              <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+              <Loader2 size={14} className="animate-spin" />
             ) : (
-              <HugeiconsIcon icon={Upload01Icon} size={14} />
+              <Upload size={14} />
             )}
             {importando ? 'Importando...' : 'Importar CSV'}
           </Button>
@@ -220,15 +217,15 @@ export default function PacientesPage() {
             disabled={exportando || pacientes.length === 0}
           >
             {exportando ? (
-              <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+              <Loader2 size={14} className="animate-spin" />
             ) : (
-              <HugeiconsIcon icon={Download01Icon} size={14} />
+              <Download size={14} />
             )}
             {exportando ? 'Exportando...' : 'Exportar CSV'}
           </Button>
           <Link href="/medico/pacientes/novo">
             <Button className="gap-2 rounded-xl" nativeButton={false}>
-              <HugeiconsIcon icon={UserAdd01Icon} size={16} />
+              <UserPlus size={16} />
               Novo paciente
             </Button>
           </Link>
@@ -241,11 +238,7 @@ export default function PacientesPage() {
       <Card className="border-border/40 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
           <div className="relative flex-1">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              size={16}
-              className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-            />
+            <Search size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome..."
               value={busca}
@@ -301,12 +294,12 @@ export default function PacientesPage() {
       {/* Lista */}
       {carregando ? (
         <div className="flex items-center justify-center py-16">
-          <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+          <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : pacientes.length === 0 ? (
         <Card className="border-border/40 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <HugeiconsIcon icon={UserIcon} size={48} className="mb-4 text-muted-foreground/30" />
+            <User size={48} className="mb-4 text-muted-foreground/30" />
             <p className="text-lg font-medium">Nenhum paciente encontrado</p>
             <p className="text-sm text-muted-foreground">
               {busca || filtroStatus !== 'todos' || filtroTratamento !== 'todos' || filtroJornada !== 'todos'
@@ -321,12 +314,12 @@ export default function PacientesPage() {
                   className="gap-2"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <HugeiconsIcon icon={Upload01Icon} size={14} />
+                  <Upload size={14} />
                   Importar CSV
                 </Button>
                 <Link href="/medico/pacientes/novo">
                   <Button size="sm" className="gap-2" nativeButton={false}>
-                    <HugeiconsIcon icon={UserAdd01Icon} size={14} />
+                    <UserPlus size={14} />
                     Cadastrar paciente
                   </Button>
                 </Link>
@@ -376,11 +369,7 @@ export default function PacientesPage() {
                         {statusConfig.label}
                       </Badge>
                     </div>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={16}
-                      className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1"
-                    />
+                    <ChevronRight size={16} className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
                   </CardContent>
                 </Card>
               </Link>

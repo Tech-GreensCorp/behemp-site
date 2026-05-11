@@ -4,33 +4,32 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  DashboardSquare01Icon,
-  MedicineBottle01Icon,
-  File01Icon,
-  Message01Icon,
-  Settings01Icon,
-  Logout01Icon,
-  ArrowLeft01Icon,
-  Menu02Icon,
-  Notification03Icon,
-  UserIcon,
-  ShoppingCart01Icon,
-} from '@hugeicons/core-free-icons';
+  LayoutDashboard,
+  Pill,
+  FileText,
+  MessageSquare,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  Menu,
+  Bell,
+  User,
+  ShoppingCart,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import type { IconSvgElement } from '@hugeicons/react';
+import type { LucideIcon } from 'lucide-react';
 
-const NAV_ITEMS: { label: string; href: string; icon: IconSvgElement }[] = [
-  { label: 'Meu Painel', href: '/paciente', icon: DashboardSquare01Icon },
-  { label: 'Meu Perfil', href: '/paciente/perfil', icon: UserIcon },
-  { label: 'Medicamentos', href: '/paciente/medicamentos', icon: MedicineBottle01Icon },
-  { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart01Icon },
-  { label: 'Documentos', href: '/paciente/documentos', icon: File01Icon },
-  { label: 'Chat', href: '/paciente/chat', icon: Message01Icon },
-  { label: 'Notificações', href: '/paciente/notificacoes', icon: Notification03Icon },
-  { label: 'Configurações', href: '/paciente/configuracoes', icon: Settings01Icon },
+const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
+  { label: 'Meu Painel', href: '/paciente', icon: LayoutDashboard },
+  { label: 'Meu Perfil', href: '/paciente/perfil', icon: User },
+  { label: 'Medicamentos', href: '/paciente/medicamentos', icon: Pill },
+  { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart },
+  { label: 'Documentos', href: '/paciente/documentos', icon: FileText },
+  { label: 'Chat', href: '/paciente/chat', icon: MessageSquare },
+  { label: 'Notificações', href: '/paciente/notificacoes', icon: Bell },
+  { label: 'Configurações', href: '/paciente/configuracoes', icon: Settings },
 ];
 
 export function PacienteSidebar() {
@@ -46,7 +45,7 @@ export function PacienteSidebar() {
         className="fixed top-4 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg lg:hidden"
         aria-label="Menu"
       >
-        <HugeiconsIcon icon={Menu02Icon} size={20} />
+        <Menu size={20} />
       </button>
 
       {/* Overlay mobile */}
@@ -75,8 +74,7 @@ export function PacienteSidebar() {
             onClick={() => setCollapsed(!collapsed)}
             className="hidden lg:flex"
           >
-            <HugeiconsIcon
-              icon={ArrowLeft01Icon}
+            <ChevronLeft
               size={16}
               className={cn('transition-transform', collapsed && 'rotate-180')}
             />
@@ -90,6 +88,8 @@ export function PacienteSidebar() {
               item.href === '/paciente'
                 ? pathname === '/paciente'
                 : pathname.startsWith(item.href);
+
+            const Icon = item.icon;
 
             return (
               <Link
@@ -105,7 +105,7 @@ export function PacienteSidebar() {
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <HugeiconsIcon icon={item.icon} size={20} className="shrink-0" />
+                <Icon size={20} className="shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
               </Link>
             );
@@ -118,7 +118,7 @@ export function PacienteSidebar() {
             onClick={() => signOut({ redirectUrl: '/' })}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
-            <HugeiconsIcon icon={Logout01Icon} size={20} className="shrink-0" />
+            <LogOut size={20} className="shrink-0" />
             {!collapsed && <span>Sair</span>}
           </button>
         </div>

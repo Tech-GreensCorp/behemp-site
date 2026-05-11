@@ -11,14 +11,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HugeiconsIcon } from '@hugeicons/react';
-import {
-  ArrowLeft01Icon, Loading03Icon, CheckmarkCircle01Icon,
-  Home01Icon, Stethoscope02Icon, FileValidationIcon,
-  UserMultiple02Icon, Edit02Icon, Cancel01Icon,
-  NoteIcon, Upload01Icon, MicroscopeIcon, Activity01Icon,
-  MedicineBottle01Icon, ChartLineData01Icon, FileExportIcon,
-} from '@hugeicons/core-free-icons';
 import Link from 'next/link';
 import { obterPaciente, atualizarPaciente } from '@/app/_actions/pacientes';
 import type { PacienteCompleto } from '@/app/_actions/pacientes';
@@ -32,6 +24,24 @@ import { TabEvolucao } from './_components/tab-evolucao';
 import { TabDosagem } from './_components/tab-dosagem';
 import { TabGraficos } from './_components/tab-graficos';
 import { TabRelatorios } from './_components/tab-relatorios';
+import {
+  Activity,
+  CheckCircle2,
+  ChevronLeft,
+  FileCheck,
+  FileOutput,
+  Home,
+  LineChart,
+  Loader2,
+  Microscope,
+  Pencil,
+  Pill,
+  Stethoscope,
+  StickyNote,
+  Upload,
+  Users,
+  X,
+} from 'lucide-react';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
   em_tratamento: { label: 'Em tratamento', variant: 'default' },
@@ -113,7 +123,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-32">
-        <HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
+        <Loader2 size={32} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -137,7 +147,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
       <div className="flex items-start gap-4">
         <Link href="/medico/pacientes">
           <Button variant="ghost" size="icon" className="mt-1 shrink-0" nativeButton={false}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={18} />
+            <ChevronLeft size={18} />
           </Button>
         </Link>
         <div className="min-w-0 flex-1">
@@ -156,7 +166,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
           className="gap-2 rounded-xl"
           onClick={() => { if (editando && paciente) syncForm(paciente); setEditando(!editando); }}
         >
-          <HugeiconsIcon icon={editando ? Cancel01Icon : Edit02Icon} size={14} />
+          {(() => { const DynIcon = editando ? X : Pencil; return <DynIcon size={14} />; })()}
           {editando ? 'Cancelar' : 'Editar'}
         </Button>
       </div>
@@ -166,28 +176,28 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
       <Tabs defaultValue="dados">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="dados" className="gap-1.5">
-            <HugeiconsIcon icon={UserMultiple02Icon} size={14} /> Dados
+            <Users size={14} /> Dados
           </TabsTrigger>
           <TabsTrigger value="anamnese" className="gap-1.5">
-            <HugeiconsIcon icon={NoteIcon} size={14} /> Anamnese
+            <StickyNote size={14} /> Anamnese
           </TabsTrigger>
           <TabsTrigger value="documentos" className="gap-1.5">
-            <HugeiconsIcon icon={Upload01Icon} size={14} /> Documentos
+            <Upload size={14} /> Documentos
           </TabsTrigger>
           <TabsTrigger value="exames" className="gap-1.5">
-            <HugeiconsIcon icon={MicroscopeIcon} size={14} /> Exames
+            <Microscope size={14} /> Exames
           </TabsTrigger>
           <TabsTrigger value="evolucao" className="gap-1.5">
-            <HugeiconsIcon icon={Activity01Icon} size={14} /> Evolução
+            <Activity size={14} /> Evolução
           </TabsTrigger>
           <TabsTrigger value="dosagem" className="gap-1.5">
-            <HugeiconsIcon icon={MedicineBottle01Icon} size={14} /> Dosagem
+            <Pill size={14} /> Dosagem
           </TabsTrigger>
           <TabsTrigger value="graficos" className="gap-1.5">
-            <HugeiconsIcon icon={ChartLineData01Icon} size={14} /> Gráficos
+            <LineChart size={14} /> Gráficos
           </TabsTrigger>
           <TabsTrigger value="relatorios" className="gap-1.5">
-            <HugeiconsIcon icon={FileExportIcon} size={14} /> Relatórios
+            <FileOutput size={14} /> Relatórios
           </TabsTrigger>
         </TabsList>
 
@@ -231,7 +241,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardHeader className="border-b border-border/30 pb-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C08E3A]/10">
-                  <HugeiconsIcon icon={Home01Icon} size={16} className="text-[#C08E3A]" />
+                  <Home size={16} className="text-[#C08E3A]" />
                 </div>
                 <CardTitle className="font-heading text-lg">Endereço</CardTitle>
               </div>
@@ -256,7 +266,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardHeader className="border-b border-border/30 pb-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C34C32]/10">
-                  <HugeiconsIcon icon={Stethoscope02Icon} size={16} className="text-[#C34C32]" />
+                  <Stethoscope size={16} className="text-[#C34C32]" />
                 </div>
                 <CardTitle className="font-heading text-lg">Dados Clínicos</CardTitle>
               </div>
@@ -306,7 +316,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardHeader className="border-b border-border/30 pb-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#2D4F3C]/10">
-                  <HugeiconsIcon icon={FileValidationIcon} size={16} className="text-[#2D4F3C]" />
+                  <FileCheck size={16} className="text-[#2D4F3C]" />
                 </div>
                 <CardTitle className="font-heading text-lg">Dados da Associação</CardTitle>
               </div>
@@ -364,7 +374,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardHeader className="border-b border-border/30 pb-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D4A388]/15">
-                  <HugeiconsIcon icon={UserMultiple02Icon} size={16} className="text-[#B08B6E]" />
+                  <Users size={16} className="text-[#B08B6E]" />
                 </div>
                 <CardTitle className="font-heading text-lg">Responsável / Representação Legal</CardTitle>
               </div>
@@ -418,7 +428,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
         <div className="flex justify-end gap-3 pb-8">
           <Button variant="outline" onClick={() => { if (paciente) syncForm(paciente); setEditando(false); }}>Cancelar</Button>
           <Button onClick={handleSalvar} disabled={salvando} className="gap-2 rounded-xl px-6">
-            {salvando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />}
+            {salvando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
             {salvando ? 'Salvando...' : 'Salvar Alterações'}
           </Button>
         </div>

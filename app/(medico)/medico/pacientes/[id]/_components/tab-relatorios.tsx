@@ -4,13 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Loading03Icon, Add01Icon, FileValidationIcon, Download01Icon, ViewIcon } from '@hugeicons/core-free-icons';
 import { criarRelatorio, listarRelatorios } from '@/app/_actions/relatorios';
 import { listarAnamneses } from '@/app/_actions/anamneses';
 import { listarEvolucoes } from '@/app/_actions/evolucoes';
 import { listarAjustesDosagem } from '@/app/_actions/ajustes-dosagem';
 import { toast } from 'sonner';
+import {
+  Download,
+  Eye,
+  FileCheck,
+  Loader2,
+  Plus,
+} from 'lucide-react';
 
 interface TabRelatoriosProps { pacienteId: string; pacienteNome: string }
 
@@ -248,21 +253,21 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
     setGerando(false);
   }
 
-  if (carregando) return <div className="flex justify-center py-16"><HugeiconsIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" /></div>;
+  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
       <Card className="border-border/40 shadow-sm">
         <CardHeader className="border-b border-border/30 pb-4">
           <CardTitle className="flex items-center gap-2 font-heading text-base">
-            <HugeiconsIcon icon={FileValidationIcon} size={18} className="text-[#C08E3A]" />
+            <FileCheck size={18} className="text-[#C08E3A]" />
             Gerar Novo Relatório
           </CardTitle>
           <p className="text-sm text-muted-foreground">Gere um relatório médico completo em PDF com todos os dados do paciente, anamnese, evolução do tratamento e histórico de dosagem.</p>
         </CardHeader>
         <CardContent className="pt-4">
           <Button onClick={handleGerar} disabled={gerando} className="gap-2 rounded-xl bg-[#C08E3A] hover:bg-[#a8762f]">
-            {gerando ? <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" /> : <HugeiconsIcon icon={Add01Icon} size={16} />}
+            {gerando ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
             {gerando ? 'Gerando...' : 'Gerar Relatório em PDF'}
           </Button>
         </CardContent>
@@ -282,7 +287,7 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
                 <div key={r.id} className="flex items-center justify-between rounded-xl border border-border/30 p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C08E3A]/10">
-                      <HugeiconsIcon icon={FileValidationIcon} size={18} className="text-[#C08E3A]" />
+                      <FileCheck size={18} className="text-[#C08E3A]" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">{r.titulo}</p>
@@ -292,8 +297,8 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
                   <div className="flex gap-2">
                     {r.urlPdf && (
                       <>
-                        <a href={r.urlPdf} download><Button variant="outline" size="sm" className="gap-1.5"><HugeiconsIcon icon={Download01Icon} size={14} /> Download</Button></a>
-                        <a href={r.urlPdf} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="sm" className="gap-1.5"><HugeiconsIcon icon={ViewIcon} size={14} /> Ver</Button></a>
+                        <a href={r.urlPdf} download><Button variant="outline" size="sm" className="gap-1.5"><Download size={14} /> Download</Button></a>
+                        <a href={r.urlPdf} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="sm" className="gap-1.5"><Eye size={14} /> Ver</Button></a>
                       </>
                     )}
                   </div>
