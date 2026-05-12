@@ -75,6 +75,7 @@ export async function enviarMensagemChat(params: {
   mensagemId: string;
   autorId: string;
   autorNome: string;
+  autorRole?: string | null;
   conteudo: string;
   criadoEm: string;
 }): Promise<void> {
@@ -83,6 +84,7 @@ export async function enviarMensagemChat(params: {
     id: params.mensagemId,
     autorId: params.autorId,
     autorNome: params.autorNome,
+    autorRole: params.autorRole ?? null,
     conteudo: params.conteudo,
     criadoEm: params.criadoEm,
   });

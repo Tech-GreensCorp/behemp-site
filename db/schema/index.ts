@@ -20,6 +20,7 @@ export * from './evolucoes';
 export * from './medicamentos';
 export * from './dosagens';
 export * from './recompras';
+export * from './emails-notificacao';
 export * from './grupos-chat';
 export * from './mensagens';
 export * from './notificacoes';

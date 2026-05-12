@@ -201,38 +201,109 @@ export const verificarRecompraMedicamentos = inngest.createFunction(
 );
 
 /**
- * Job: Enviar e-mail de recompra em data específica.
+ * Job: Enviar lembretes de recompra em datas programadas.
  *
- * Disparado por evento quando uma recompra é criada.
- * Usa step.sleepUntil para agendar o envio na data prevista.
+ * Disparado por evento `be4hope/recompra.criada` ao criar uma recompra manual.
+ * Envia notificação no sistema + e-mail ao solicitante em 3 marcos:
+ *   - 60 dias antes da data prevista de término
+ *   - 30 dias antes
+ *   - 15 dias antes
+ *
+ * Usa step.sleepUntil para dormir até cada data sem consumir recursos.
  */
 export const enviarEmailRecompraAgendado = inngest.createFunction(
   {
     id: 'enviar-email-recompra-agendado',
-    name: 'Enviar E-mail de Recompra Agendado',
+    name: 'Lembretes de Recompra (60/30/15 dias)',
     triggers: [{ event: 'be4hope/recompra.criada' }],
   },
   async ({ event, step }) => {
-    const { dataPrevista, pacienteEmail, pacienteNome, nomeMedicamento } =
-      event.data;
+    const {
+      dataPrevista,   // string ISO: '2026-08-15'
+      pacienteEmail,
+      pacienteNome,
+      nomeMedicamento,
+      solicitanteUserId, // userId interno para notificação in-app
+    } = event.data as {
+      dataPrevista: string;
+      pacienteEmail: string;
+      pacienteNome: string;
+      nomeMedicamento: string;
+      solicitanteUserId: string;
+    };
 
-    // Aguardar até a data prevista
-    await step.sleepUntil('aguardar-data-recompra', dataPrevista);
+    const dataTermino = new Date(dataPrevista);
 
-    // Enviar o e-mail
-    await step.run('enviar-email', async () => {
-      const { enviarEmailRecompraPaciente } = await import(
-        '@/lib/email/notificacoes'
+    // Calcular as 3 datas de lembrete
+    const marcos = [
+      { diasAntes: 60, label: '60 dias' },
+      { diasAntes: 30, label: '30 dias' },
+      { diasAntes: 15, label: '15 dias' },
+    ];
+
+    for (const marco of marcos) {
+      const dataLembrete = new Date(dataTermino);
+      dataLembrete.setDate(dataTermino.getDate() - marco.diasAntes);
+
+      // Só agenda se a data de lembrete ainda estiver no futuro
+      const agora = new Date();
+      if (dataLembrete <= agora) {
+        console.log(
+          `[Job] Lembrete de ${marco.label} para ${pacienteEmail} já passou — pulando.`,
+        );
+        continue;
+      }
+
+      // Dormir até a data do lembrete
+      await step.sleepUntil(
+        `aguardar-lembrete-${marco.diasAntes}d`,
+        dataLembrete.toISOString(),
       );
 
-      await enviarEmailRecompraPaciente({
-        emailPaciente: pacienteEmail,
-        nomePaciente: pacienteNome,
-        nomeMedicamento,
-        dataPrevista,
-      });
-    });
+      // Notificação in-app + e-mail em paralelo
+      await step.run(`lembrete-${marco.diasAntes}d`, async () => {
+        const dataFormatada = dataTermino.toLocaleDateString('pt-BR');
 
-    return { enviado: true, timestamp: new Date().toISOString() };
+        // ── Notificação no sistema ────────────────────────────
+        await db.insert(notificacoes).values({
+          userId: solicitanteUserId,
+          tipo: 'recompra_medicamento',
+          titulo: `Recompra em ${marco.label} — ${nomeMedicamento}`,
+          mensagem: `Seu medicamento "${nomeMedicamento}" está previsto para acabar em ${dataFormatada}. Faltam ${marco.diasAntes} dias. Providencie a recompra.`,
+          lida: false,
+          linkAcao: '/paciente/recompra',
+        });
+
+        // ── E-mail via Brevo ──────────────────────────────────
+        try {
+          const { enviarEmailRecompraPaciente } = await import(
+            '@/lib/email/notificacoes'
+          );
+
+          await enviarEmailRecompraPaciente({
+            emailPaciente: pacienteEmail,
+            nomePaciente: pacienteNome,
+            nomeMedicamento,
+            dataPrevista,
+          });
+
+          console.log(
+            `[Job] Lembrete de ${marco.label} enviado para ${pacienteEmail} — ${nomeMedicamento}`,
+          );
+        } catch (error) {
+          console.error(
+            `[Job] Erro ao enviar e-mail de ${marco.label} para ${pacienteEmail}:`,
+            error,
+          );
+        }
+      });
+    }
+
+    return {
+      enviado: true,
+      marcos: marcos.map((m) => m.diasAntes),
+      timestamp: new Date().toISOString(),
+    };
   },
 );
+

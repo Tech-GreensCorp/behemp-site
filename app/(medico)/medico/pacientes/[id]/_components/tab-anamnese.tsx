@@ -94,20 +94,48 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <Label>Tabagismo *</Label>
-                <Select value={form.tabagismo} onValueChange={v => u('tabagismo', v)}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent><SelectItem value="nunca_fumou">Nunca Fumou</SelectItem><SelectItem value="ex_fumante">Ex-Fumante</SelectItem><SelectItem value="fumante">Fumante</SelectItem></SelectContent>
+                <Select value={form.tabagismo} onValueChange={v => u('tabagismo', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione">
+                      {form.tabagismo ? (TABAGISMO_LABELS[form.tabagismo] ?? form.tabagismo) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nunca_fumou">Nunca fumou</SelectItem>
+                    <SelectItem value="ex_fumante">Ex-fumante</SelectItem>
+                    <SelectItem value="fumante">Fumante</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Consumo de Álcool *</Label>
-                <Select value={form.consumoAlcool} onValueChange={v => u('consumoAlcool', v)}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent><SelectItem value="nao_consome">Não consome</SelectItem><SelectItem value="regular">Regular</SelectItem><SelectItem value="ocasional">Ocasional</SelectItem></SelectContent>
+                <Select value={form.consumoAlcool} onValueChange={v => u('consumoAlcool', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione">
+                      {form.consumoAlcool ? (ALCOOL_LABELS[form.consumoAlcool] ?? form.consumoAlcool) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao_consome">Não consome</SelectItem>
+                    <SelectItem value="regular">Regular</SelectItem>
+                    <SelectItem value="ocasional">Ocasional</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Qualidade do Sono *</Label>
-                <Select value={form.qualidadeSono} onValueChange={v => u('qualidadeSono', v)}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent><SelectItem value="ruim">Ruim</SelectItem><SelectItem value="regular">Regular</SelectItem><SelectItem value="boa">Boa</SelectItem><SelectItem value="excelente">Excelente</SelectItem></SelectContent>
+                <Select value={form.qualidadeSono} onValueChange={v => u('qualidadeSono', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione">
+                      {form.qualidadeSono ? (SONO_LABELS[form.qualidadeSono] ?? form.qualidadeSono) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ruim">Ruim</SelectItem>
+                    <SelectItem value="regular">Regular</SelectItem>
+                    <SelectItem value="boa">Boa</SelectItem>
+                    <SelectItem value="excelente">Excelente</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
             </div>

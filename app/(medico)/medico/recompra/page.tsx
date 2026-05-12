@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { solicitarRecompraManual, listarMinhasRecompras } from '@/app/_actions/recompras';
+import { solicitarRecompraManual, listarMinhasRecompras, listarPacientesParaRecompra } from '@/app/_actions/recompras';
 import { toast } from 'sonner';
 import {
   Calendar,
@@ -18,19 +18,23 @@ import {
   Droplets,
   FlaskConical,
   Phone,
-  MessageCircle,
   Mail,
   History,
   Send,
+  Search,
+  Users,
 } from 'lucide-react';
 
-/** Número fixo do WhatsApp da Be4Hope — configurável via env */
-const WHATSAPP_BEHEMP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
-
 /**
- * Página de recompra de medicamento — Paciente.
- * Formulário manual + cálculo em tempo real + histórico de pedidos.
+ * Página de recompra de medicamento — Médico.
+ * Formulário manual + seleção de paciente + cálculo em tempo real + histórico.
  */
+
+interface PacienteItem {
+  pacienteId: string;
+  nome: string;
+  email: string;
+}
 
 interface RecompraHistorico {
   id: string;
@@ -52,8 +56,13 @@ const STATUS_LABELS: Record<string, { label: string; cor: 'default' | 'secondary
   entregue: { label: 'Entregue', cor: 'secondary' },
 };
 
-export default function RecompraPage() {
+export default function RecompraMedicoPage() {
   // Formulário
+  const [pacienteSelecionado, setPacienteSelecionado] = useState<PacienteItem | null>(null);
+  const [buscaPaciente, setBuscaPaciente] = useState('');
+  const [pacientes, setPacientes] = useState<PacienteItem[]>([]);
+  const [carregandoPacientes, setCarregandoPacientes] = useState(true);
+
   const [medicamentoNome, setMedicamentoNome] = useState('');
   const [mlFrasco, setMlFrasco] = useState('');
   const [gotasPorDia, setGotasPorDia] = useState('');
@@ -64,17 +73,7 @@ export default function RecompraPage() {
 
   // UI
   const [enviando, setEnviando] = useState(false);
-  const [sucesso, setSucesso] = useState<{
-    dataTermino: string;
-    diasDuracao: number;
-    medicamentoNome: string;
-    mlFrasco: string;
-    gotasPorDia: string;
-    dataInicioUso: string;
-    contatoTelefone: string;
-    contatoEmail: string;
-    observacoes: string;
-  } | null>(null);
+  const [sucesso, setSucesso] = useState<{ dataTermino: string; diasDuracao: number } | null>(null);
   const [historico, setHistorico] = useState<RecompraHistorico[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(true);
 
@@ -97,9 +96,28 @@ export default function RecompraPage() {
     return { gotasTotais, diasDuracao, dataTermino: termino, diasRestantes };
   }, [mlFrasco, gotasPorDia, dataInicioUso]);
 
+  // Filtro de busca de paciente
+  const pacientesFiltrados = useMemo(() => {
+    if (!buscaPaciente.trim()) return pacientes;
+    const termo = buscaPaciente.toLowerCase();
+    return pacientes.filter(
+      (p) => p.nome.toLowerCase().includes(termo) || p.email.toLowerCase().includes(termo),
+    );
+  }, [pacientes, buscaPaciente]);
+
   useEffect(() => {
+    carregarPacientes();
     carregarHistorico();
   }, []);
+
+  async function carregarPacientes() {
+    setCarregandoPacientes(true);
+    const res = await listarPacientesParaRecompra();
+    if (res.sucesso && res.dados) {
+      setPacientes(res.dados);
+    }
+    setCarregandoPacientes(false);
+  }
 
   async function carregarHistorico() {
     setCarregandoHistorico(true);
@@ -112,12 +130,12 @@ export default function RecompraPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!medicamentoNome || !mlFrasco || !gotasPorDia || !dataInicioUso) {
-      toast.error('Preencha todos os campos obrigatórios');
+    if (!pacienteSelecionado) {
+      toast.error('Selecione um paciente');
       return;
     }
-    if (!contatoTelefone && !contatoEmail) {
-      toast.error('Informe pelo menos um contato (telefone ou e-mail)');
+    if (!medicamentoNome || !mlFrasco || !gotasPorDia || !dataInicioUso) {
+      toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
@@ -128,8 +146,9 @@ export default function RecompraPage() {
       gotasPorDia: Number(gotasPorDia),
       dataInicioUso,
       contatoTelefone: contatoTelefone || undefined,
-      contatoEmail: contatoEmail || undefined,
+      contatoEmail: contatoEmail || pacienteSelecionado.email || undefined,
       observacoes: observacoes || undefined,
+      pacienteId: pacienteSelecionado.pacienteId,
     });
     setEnviando(false);
 
@@ -137,13 +156,6 @@ export default function RecompraPage() {
       setSucesso({
         dataTermino: resultado.dados.dataTermino,
         diasDuracao: resultado.dados.diasDuracao,
-        medicamentoNome,
-        mlFrasco,
-        gotasPorDia,
-        dataInicioUso,
-        contatoTelefone,
-        contatoEmail,
-        observacoes,
       });
       toast.success('Pedido de recompra enviado com sucesso!');
       carregarHistorico();
@@ -154,6 +166,8 @@ export default function RecompraPage() {
 
   function handleNovoPedido() {
     setSucesso(null);
+    setPacienteSelecionado(null);
+    setBuscaPaciente('');
     setMedicamentoNome('');
     setMlFrasco('');
     setGotasPorDia('');
@@ -170,7 +184,7 @@ export default function RecompraPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Solicite a recompra do seu medicamento
+            Solicite a recompra para seus pacientes
           </p>
         </div>
 
@@ -183,10 +197,10 @@ export default function RecompraPage() {
               Pedido Encaminhado!
             </h2>
             <p className="mb-1 text-center text-sm text-muted-foreground">
-              Sua solicitação de recompra foi enviada para nossa equipe.
+              A solicitação de recompra foi enviada para a equipe.
             </p>
             <p className="mb-6 text-center text-sm text-muted-foreground">
-              Entraremos em contato em breve para dar andamento ao seu pedido.
+              O paciente e a equipe serão notificados sobre o andamento.
             </p>
 
             <div className="mb-6 flex items-center gap-3 rounded-xl bg-primary/5 px-6 py-4">
@@ -202,27 +216,6 @@ export default function RecompraPage() {
               </div>
             </div>
 
-            {/* Botão WhatsApp — número fixo da Be4Hope com mensagem pré-preenchida */}
-            <a
-              href={`https://wa.me/${WHATSAPP_BEHEMP}?text=${encodeURIComponent(
-                `Olá, Be4Hope! Acabei de fazer uma solicitação de recompra pelo sistema e gostaria de confirmar:\n\n` +
-                `📦 *Medicamento:* ${sucesso.medicamentoNome}\n` +
-                `💊 *Dosagem:* ${sucesso.mlFrasco}ml — ${sucesso.gotasPorDia} gotas/dia\n` +
-                `📅 *Início do uso:* ${new Date(sucesso.dataInicioUso).toLocaleDateString('pt-BR')}\n` +
-                `⏳ *Previsão de término:* ${new Date(sucesso.dataTermino).toLocaleDateString('pt-BR')} (${sucesso.diasDuracao} dias)\n` +
-                (sucesso.contatoTelefone ? `📞 *Meu telefone:* ${sucesso.contatoTelefone}\n` : '') +
-                (sucesso.contatoEmail ? `✉️ *Meu e-mail:* ${sucesso.contatoEmail}\n` : '') +
-                (sucesso.observacoes ? `📝 *Observações:* ${sucesso.observacoes}\n` : '') +
-                `\nAguardo o retorno. Obrigado(a)!`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#1da851] hover:shadow-lg"
-            >
-              <MessageCircle size={18} />
-              Falar no WhatsApp
-            </a>
-
             <Button onClick={handleNovoPedido} variant="outline" className="gap-2">
               <Send size={16} />
               Novo pedido
@@ -233,42 +226,93 @@ export default function RecompraPage() {
     );
   }
 
-  // ── Formulário + Histórico ────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Solicite a recompra do seu medicamento informando os dados abaixo
+          Solicite a recompra de medicamento para seus pacientes
         </p>
       </div>
-
-      {/* Card explicativo */}
-      <Card className="border-0 bg-primary/5 shadow-sm">
-        <CardContent className="flex items-start gap-4 p-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Pill size={20} className="text-primary" />
-          </div>
-          <div>
-            <p className="font-medium">Como funciona?</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Informe o medicamento, a quantidade do frasco (ml), quantas gotas você toma por dia e
-              quando começou a usar. O sistema calcula automaticamente quando o medicamento vai terminar
-              e notifica nossa equipe para providenciar a recompra.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Formulário */}
         <Card className="border-0 shadow-sm lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-base">Dados do Medicamento</CardTitle>
+            <CardTitle className="text-base">Dados do Pedido</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Seleção de Paciente */}
+              <div className="space-y-2">
+                <Label>Paciente *</Label>
+                {pacienteSelecionado ? (
+                  <div className="flex items-center justify-between rounded-xl border bg-primary/5 p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                        <Users size={16} className="text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{pacienteSelecionado.nome}</p>
+                        <p className="text-xs text-muted-foreground">{pacienteSelecionado.email}</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPacienteSelecionado(null)}
+                    >
+                      Trocar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar paciente por nome ou e-mail..."
+                        value={buscaPaciente}
+                        onChange={(e) => setBuscaPaciente(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                      {carregandoPacientes ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                        </div>
+                      ) : pacientesFiltrados.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">
+                          Nenhum paciente encontrado
+                        </p>
+                      ) : (
+                        pacientesFiltrados.map((p) => (
+                          <button
+                            key={p.pacienteId}
+                            type="button"
+                            onClick={() => {
+                              setPacienteSelecionado(p);
+                              setContatoEmail(p.email);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left hover:bg-accent"
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                              <Users size={14} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{p.nome}</p>
+                              <p className="text-xs text-muted-foreground">{p.email}</p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Medicamento */}
               <div className="space-y-2">
                 <Label htmlFor="medicamento">Nome do Medicamento *</Label>
@@ -337,15 +381,10 @@ export default function RecompraPage() {
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="border-t pt-4">
-                <p className="mb-3 text-sm font-medium">Dados para Contato *</p>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Informe pelo menos um meio de contato para que possamos entrar em contato sobre seu pedido.
-                </p>
-              </div>
-
               {/* Contato */}
+              <div className="border-t pt-4">
+                <p className="mb-3 text-sm font-medium">Dados de Contato do Paciente</p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone / WhatsApp</Label>
@@ -362,13 +401,13 @@ export default function RecompraPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="emailContato">E-mail para Contato</Label>
+                  <Label htmlFor="emailContato">E-mail</Label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="emailContato"
                       type="email"
-                      placeholder="seu@email.com"
+                      placeholder="paciente@email.com"
                       value={contatoEmail}
                       onChange={(e) => setContatoEmail(e.target.value)}
                       className="pl-10"
@@ -382,7 +421,7 @@ export default function RecompraPage() {
                 <Label htmlFor="obs">Observações (opcional)</Label>
                 <Textarea
                   id="obs"
-                  placeholder="Alguma informação adicional sobre seu pedido..."
+                  placeholder="Alguma informação adicional..."
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   rows={3}
@@ -390,7 +429,7 @@ export default function RecompraPage() {
               </div>
 
               {/* Botão */}
-              <Button type="submit" disabled={enviando} className="w-full gap-2">
+              <Button type="submit" disabled={enviando || !pacienteSelecionado} className="w-full gap-2">
                 {enviando ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
@@ -402,7 +441,7 @@ export default function RecompraPage() {
           </CardContent>
         </Card>
 
-        {/* Preview calculado em tempo real */}
+        {/* Preview */}
         <div className="space-y-4 lg:col-span-2">
           <Card className="sticky top-6 border-0 shadow-sm">
             <CardHeader>
@@ -438,7 +477,6 @@ export default function RecompraPage() {
                     </div>
                   </div>
 
-                  {/* Barra de progresso */}
                   <div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
@@ -459,7 +497,7 @@ export default function RecompraPage() {
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <FlaskConical size={32} className="mb-3 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">
-                    Preencha os campos ao lado para visualizar a previsão de término.
+                    Preencha os campos para visualizar a previsão de término.
                   </p>
                 </div>
               )}

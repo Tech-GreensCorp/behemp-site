@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { dosagens, medicamentos, recompras } from '@/db/schema';
+import { dosagens, medicamentos, recompras, pacientes } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { calcularDosagem } from '@/lib/utils/dosagem';
@@ -95,8 +95,17 @@ export async function criarDosagem(
       .returning({ id: dosagens.id });
 
     // Criar recompra agendada
+    // Buscar userId do paciente para solicitanteId
+    const [pacienteInfo] = await db
+      .select({ userId: pacientes.userId })
+      .from(pacientes)
+      .where(eq(pacientes.id, parsed.data.pacienteId))
+      .limit(1);
+
     await db.insert(recompras).values({
       dosagemId: novaDosagem.id,
+      solicitanteId: pacienteInfo?.userId ?? parsed.data.pacienteId,
+      pacienteId: parsed.data.pacienteId,
       dataPrevista: calculo.dataFimPrevista.toISOString().split('T')[0],
       status: 'agendada',
     });

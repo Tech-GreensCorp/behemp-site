@@ -62,6 +62,7 @@ export const pacientesRelations = relations(pacientes, ({ one, many }) => ({
   anamneses: many(anamneses),
   evolucoes: many(evolucoes),
   dosagens: many(dosagens),
+  recompras: many(recompras),
 }));
 
 // ── Documentos ────────────────────────────────────────────────
@@ -131,6 +132,14 @@ export const recomprasRelations = relations(recompras, ({ one }) => ({
   dosagem: one(dosagens, {
     fields: [recompras.dosagemId],
     references: [dosagens.id],
+  }),
+  solicitante: one(users, {
+    fields: [recompras.solicitanteId],
+    references: [users.id],
+  }),
+  paciente: one(pacientes, {
+    fields: [recompras.pacienteId],
+    references: [pacientes.id],
   }),
 }));
 

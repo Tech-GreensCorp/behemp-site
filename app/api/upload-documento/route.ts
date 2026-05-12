@@ -1,17 +1,16 @@
-'use server';
-
+import { put } from '@vercel/blob';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
-import { eq, and, isNull, desc } from 'drizzle-orm';
-import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
-import { put } from '@vercel/blob';
+import { z } from 'zod';
 
 /**
- * Server Actions de documentos de pacientes.
+ * API Route para upload de documentos de pacientes.
  *
- * Upload: salva no Vercel Blob Storage (precisa de BLOB_READ_WRITE_TOKEN no .env).
- * O arquivo é armazenado em documentos/<pacienteId>/<timestamp>-<nome>.
+ * Usa Vercel Blob Storage (precisa de BLOB_BEHEMP_READ_WRITE_TOKEN no .env).
+ * Migrado de server action para API route para evitar conflitos com o middleware
+ * do Clerk ao enviar FormData com arquivos binários.
  */
 
 const TIPOS_VALIDOS = [
@@ -24,29 +23,46 @@ const TIPOS_VALIDOS = [
   'oficio_anvisa',
 ] as const;
 
-const uploadDocumentoSchema = z.object({
+const uploadSchema = z.object({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
   tipo: z.enum(TIPOS_VALIDOS),
   dataEmissao: z.string().min(1, 'Data de emissão é obrigatória'),
   observacoes: z.string().optional(),
 });
 
-export async function uploadDocumento(formData: FormData) {
+export async function POST(request: Request) {
   try {
+    // Verificar autenticação
     const auth = await verificarMedicoOuAdmin();
-    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+    if (!auth.autorizado) {
+      return NextResponse.json(
+        { sucesso: false, erro: auth.erro },
+        { status: 401 },
+      );
+    }
+
+    const formData = await request.formData();
 
     // Validar arquivo
     const file = formData.get('arquivo') as File | null;
     if (!file || file.size === 0) {
-      return { sucesso: false, erro: 'Arquivo é obrigatório' };
+      return NextResponse.json(
+        { sucesso: false, erro: 'Arquivo é obrigatório' },
+        { status: 400 },
+      );
     }
     if (file.size > 100 * 1024 * 1024) {
-      return { sucesso: false, erro: 'Arquivo excede 100MB' };
+      return NextResponse.json(
+        { sucesso: false, erro: 'Arquivo excede 100MB' },
+        { status: 400 },
+      );
     }
     const tiposPermitidos = ['image/jpeg', 'image/png', 'application/pdf'];
     if (!tiposPermitidos.includes(file.type)) {
-      return { sucesso: false, erro: 'Tipo não permitido. Use PDF, JPG ou PNG' };
+      return NextResponse.json(
+        { sucesso: false, erro: 'Tipo não permitido. Use PDF, JPG ou PNG' },
+        { status: 400 },
+      );
     }
 
     // Validar campos do formulário
@@ -57,9 +73,12 @@ export async function uploadDocumento(formData: FormData) {
       observacoes: formData.get('observacoes') ?? undefined,
     };
 
-    const parsed = uploadDocumentoSchema.safeParse(dados);
+    const parsed = uploadSchema.safeParse(dados);
     if (!parsed.success) {
-      return { sucesso: false, erro: parsed.error.errors[0].message };
+      return NextResponse.json(
+        { sucesso: false, erro: parsed.error.errors[0].message },
+        { status: 400 },
+      );
     }
 
     // Upload para Vercel Blob Storage
@@ -99,49 +118,12 @@ export async function uploadDocumento(formData: FormData) {
       })
       .returning();
 
-    return { sucesso: true, dados: doc };
+    return NextResponse.json({ sucesso: true, dados: doc });
   } catch (error) {
-    console.error('[Action] Erro ao fazer upload:', error);
-    return { sucesso: false, erro: 'Erro ao enviar documento. Tente novamente.' };
-  }
-}
-
-export async function listarDocumentos(pacienteId: string) {
-  try {
-    const auth = await verificarMedicoOuAdmin();
-    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
-
-    const lista = await db
-      .select()
-      .from(documentos)
-      .where(and(eq(documentos.pacienteId, pacienteId), isNull(documentos.deletedAt)))
-      .orderBy(desc(documentos.createdAt));
-
-    return { sucesso: true, dados: lista };
-  } catch (error) {
-    console.error('[Action] Erro ao listar documentos:', error);
-    return { sucesso: false, erro: 'Erro ao listar documentos' };
-  }
-}
-
-/**
- * Exclui um documento via soft delete.
- * O arquivo no Blob Storage é mantido para fins de auditoria.
- */
-export async function excluirDocumento(documentoId: string) {
-  try {
-    const auth = await verificarMedicoOuAdmin();
-    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
-
-    const agora = new Date();
-    await db
-      .update(documentos)
-      .set({ deletedAt: agora })
-      .where(and(eq(documentos.id, documentoId), isNull(documentos.deletedAt)));
-
-    return { sucesso: true };
-  } catch (error) {
-    console.error('[Action] Erro ao excluir documento:', error);
-    return { sucesso: false, erro: 'Erro ao excluir documento' };
+    console.error('[API] Erro ao fazer upload de documento:', error);
+    return NextResponse.json(
+      { sucesso: false, erro: 'Erro ao enviar documento. Tente novamente.' },
+      { status: 500 },
+    );
   }
 }

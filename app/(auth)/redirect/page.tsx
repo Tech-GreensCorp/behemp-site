@@ -21,7 +21,9 @@ export default async function AuthRedirectPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    console.warn('[Redirect] Nenhuma sessão via auth(), redirecionando para sign-in');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Redirect] Nenhuma sessão via auth(), redirecionando para sign-in');
+    }
     redirect('/sign-in');
   }
 
@@ -33,9 +35,11 @@ export default async function AuthRedirectPage() {
 
     if (user) {
       role = user.publicMetadata?.role as string | undefined;
-      console.log(
-        `[Redirect] Usuário: ${user.emailAddresses?.[0]?.emailAddress} | Role: ${role ?? 'sem role'}`,
-      );
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(
+          `[Redirect] Usuário: ${user.emailAddresses?.[0]?.emailAddress} | Role: ${role ?? 'sem role'}`,
+        );
+      }
     }
   } catch (error) {
     console.error('[Redirect] Erro ao buscar currentUser:', error);

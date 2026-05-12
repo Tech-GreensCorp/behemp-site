@@ -7,12 +7,25 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { uploadDocumento, listarDocumentos } from '@/app/_actions/documentos-paciente';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-paciente';
 import { toast } from 'sonner';
 import {
+  Download,
+  ExternalLink,
   FileCheck,
   Loader2,
   Plus,
+  Trash2,
 } from 'lucide-react';
 
 const TIPO_LABELS: Record<string, string> = {
@@ -32,6 +45,10 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
   const [dataEmissao, setDataEmissao] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Estado de exclusão
+  const [docParaExcluir, setDocParaExcluir] = useState<{ id: string; nome: string } | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     const res = await listarDocumentos(pacienteId);
@@ -45,19 +62,70 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
     const file = fileRef.current?.files?.[0];
     if (!file || !tipo || !dataEmissao) { toast.error('Preencha todos os campos obrigatórios'); return; }
     setSalvando(true);
-    const fd = new FormData();
-    fd.append('pacienteId', pacienteId);
-    fd.append('tipo', tipo);
-    fd.append('dataEmissao', dataEmissao);
-    fd.append('arquivo', file);
-    const res = await uploadDocumento(fd);
-    setSalvando(false);
-    if (res.sucesso) {
-      toast.success('Documento enviado com sucesso!');
-      setMostrarForm(false); setTipo(''); setDataEmissao('');
-      if (fileRef.current) fileRef.current.value = '';
-      await carregar();
-    } else { toast.error(res.erro || 'Erro ao enviar'); }
+    try {
+      const fd = new FormData();
+      fd.append('pacienteId', pacienteId);
+      fd.append('tipo', tipo);
+      fd.append('dataEmissao', dataEmissao);
+      fd.append('arquivo', file);
+
+      const response = await fetch('/api/upload-documento', {
+        method: 'POST',
+        body: fd,
+      });
+      const res = await response.json();
+
+      if (res.sucesso) {
+        toast.success('Documento enviado com sucesso!');
+        setMostrarForm(false); setTipo(''); setDataEmissao('');
+        if (fileRef.current) fileRef.current.value = '';
+        await carregar();
+      } else {
+        toast.error(res.erro || 'Erro ao enviar');
+      }
+    } catch {
+      toast.error('Erro ao enviar documento. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  /** Força download do arquivo (não apenas abertura em nova aba) */
+  async function handleDownload(url: string, nomeArquivo: string) {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = nomeArquivo;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Fallback: abre em nova aba se o download falhar (CORS)
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  async function handleExcluir() {
+    if (!docParaExcluir) return;
+    setExcluindo(true);
+    try {
+      const res = await excluirDocumento(docParaExcluir.id);
+      if (res.sucesso) {
+        toast.success('Documento excluído com sucesso');
+        setDocParaExcluir(null);
+        await carregar();
+      } else {
+        toast.error(res.erro || 'Erro ao excluir');
+      }
+    } catch {
+      toast.error('Erro ao excluir documento. Tente novamente.');
+    } finally {
+      setExcluindo(false);
+    }
   }
 
   // Agrupar por tipo
@@ -84,7 +152,12 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Tipo de Documento *</Label>
-                <Select value={tipo} onValueChange={v => setTipo(v ?? '')}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Select value={tipo} onValueChange={v => setTipo(v ?? '')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione">
+                      {tipo ? (TIPO_LABELS[tipo] ?? tipo) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="documento_pessoal">Documento Pessoal</SelectItem>
                     <SelectItem value="comprovante_residencia">Comprovante de Residência</SelectItem>
@@ -96,7 +169,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
               <div><Label>Data do Documento *</Label><Input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)} /></div>
             </div>
             <div>
-              <Label>Arquivo (máx. 10MB) — PDF, JPG, PNG</Label>
+              <Label>Arquivo (máx. 100MB) — PDF, JPG, PNG</Label>
               <Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" />
             </div>
             <div className="flex justify-end gap-3 pt-2">
@@ -113,38 +186,99 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
       {Object.keys(agrupados).length === 0 && !mostrarForm ? (
         <Card className="border-border/40 shadow-sm"><CardContent className="flex flex-col items-center justify-center py-16">
           <p className="text-lg font-medium">Nenhum documento enviado</p>
-          <p className="text-sm text-muted-foreground">Clique em "Enviar Documento" para adicionar</p>
+          <p className="text-sm text-muted-foreground">Clique em &quot;Enviar Documento&quot; para adicionar</p>
         </CardContent></Card>
       ) : (
         Object.entries(agrupados).map(([tipoKey, items]) => (
           <div key={tipoKey} className="space-y-3">
             <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">{TIPO_LABELS[tipoKey] ?? tipoKey}</h3>
-            {items.map((doc: any) => (
-              <Card key={doc.id} className="border-border/40 shadow-sm">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C08E3A]/10">
-                      <FileCheck size={18} className="text-[#C08E3A]" />
+            {items.map((doc: any) => {
+              const vencido = new Date(doc.dataValidade) < new Date();
+              return (
+                <Card key={doc.id} className="border-border/40 shadow-sm transition-shadow hover:shadow-md">
+                  <CardContent className="flex items-center justify-between gap-4 p-4">
+                    {/* Info do arquivo */}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C08E3A]/10">
+                        <FileCheck size={18} className="text-[#C08E3A]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{doc.nomeArquivo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          {' · '}
+                          Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{doc.nomeArquivo}</p>
-                      <p className="text-xs text-muted-foreground">Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+
+                    {/* Ações */}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant={vencido ? 'destructive' : 'outline'}>
+                        {vencido ? 'Vencido' : 'Válido'}
+                      </Badge>
+
+                      {/* Visualizar */}
+                      <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                          <ExternalLink size={13} />
+                          Ver
+                        </Button>
+                      </a>
+
+                      {/* Baixar */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
+                      >
+                        <Download size={13} />
+                        Baixar
+                      </Button>
+
+                      {/* Excluir */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+                        onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
+                      >
+                        <Trash2 size={13} />
+                        Excluir
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={new Date(doc.dataValidade) < new Date() ? 'destructive' : 'outline'}>
-                      {new Date(doc.dataValidade) < new Date() ? 'Vencido' : 'Válido'}
-                    </Badge>
-                    <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm">Ver</Button>
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ))
       )}
+
+      {/* Diálogo de confirmação de exclusão */}
+      <AlertDialog open={!!docParaExcluir} onOpenChange={(open) => { if (!open) setDocParaExcluir(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O arquivo <strong>{docParaExcluir?.nome}</strong> será removido permanentemente do perfil do paciente.
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleExcluir}
+              disabled={excluindo}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+            >
+              {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              {excluindo ? 'Excluindo...' : 'Sim, excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

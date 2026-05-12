@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Meu Painel', href: '/paciente', icon: LayoutDashboard },
@@ -36,6 +37,7 @@ export function PacienteSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut } = useClerk();
+  const chatNaoLidas = useChatNaoLidas();
 
   return (
     <>
@@ -99,7 +101,7 @@ export function PacienteSidebar() {
                   if (window.innerWidth < 1024) setCollapsed(true);
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                  'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -107,6 +109,11 @@ export function PacienteSidebar() {
               >
                 <Icon size={20} className="shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
+                {item.label === 'Chat' && chatNaoLidas > 0 && (
+                  <span className="absolute -top-1 left-6 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-sm">
+                    {chatNaoLidas > 99 ? '99+' : chatNaoLidas}
+                  </span>
+                )}
               </Link>
             );
           })}

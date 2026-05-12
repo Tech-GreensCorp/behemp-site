@@ -8,6 +8,9 @@ import { criarRelatorio, listarRelatorios } from '@/app/_actions/relatorios';
 import { listarAnamneses } from '@/app/_actions/anamneses';
 import { listarEvolucoes } from '@/app/_actions/evolucoes';
 import { listarAjustesDosagem } from '@/app/_actions/ajustes-dosagem';
+import { listarDocumentos } from '@/app/_actions/documentos';
+import { listarExames } from '@/app/_actions/exames';
+import { obterPaciente } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
 import {
   Download,
@@ -44,10 +47,13 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
     setGerando(true);
     try {
       // Buscar dados para o relatório
-      const [anamRes, evRes, dosRes] = await Promise.all([
+      const [pacRes, anamRes, evRes, dosRes, docRes, exaRes] = await Promise.all([
+        obterPaciente(pacienteId),
         listarAnamneses(pacienteId),
         listarEvolucoes(pacienteId),
         listarAjustesDosagem(pacienteId),
+        listarDocumentos(pacienteId),
+        listarExames(pacienteId),
       ]);
 
       // Importar jspdf dinamicamente (client-side only)
@@ -179,6 +185,19 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
       doc.setLineWidth(0.2);
       y += 12;
 
+      // Dados Cadastrais
+      if (pacRes.sucesso && pacRes.dados) {
+        addSection('Dados Cadastrais');
+        const p = pacRes.dados;
+        if (p.cpf) addLabel('CPF:', p.cpf);
+        if (p.dataNascimento) addLabel('Data Nasc.:', new Date(p.dataNascimento + 'T00:00:00').toLocaleDateString('pt-BR'));
+        if (p.telefone) addLabel('Telefone:', p.telefone);
+        if (p.email) addLabel('E-mail:', p.email);
+        if (p.cidade && p.uf) addLabel('Localidade:', `${p.cidade} - ${p.uf}`);
+        if (p.patologia) addLabel('Patologia:', p.patologia);
+        addSpacer();
+      }
+
       // Anamnese
       if (anamRes.sucesso && anamRes.dados && anamRes.dados.length > 0) {
         addSection('Anamnese');
@@ -192,6 +211,29 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
         addLabel('Álcool:', a.consumoAlcool?.replace('_', ' ') ?? '—');
         addLabel('Sono:', a.qualidadeSono ?? '—');
         if (a.nivelDor != null) addLabel('Nível de Dor:', `${a.nivelDor}/10`);
+        addSpacer();
+      }
+
+      // Documentos
+      if (docRes.sucesso && docRes.dados && docRes.dados.length > 0) {
+        addSection('Documentos Anexados');
+        for (const docItem of docRes.dados.slice(0, 10)) {
+          addLine(`• ${docItem.nomeArquivo} (Emissão: ${new Date(docItem.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')})`, false, 9);
+        }
+        addSpacer();
+      }
+
+      // Exames
+      if (exaRes.sucesso && exaRes.dados && exaRes.dados.length > 0) {
+        addSection('Exames Realizados');
+        for (const ex of exaRes.dados.slice(0, 10)) {
+          addLine(`• ${ex.nomeExame} (Realizado em: ${new Date(ex.dataExame + 'T00:00:00').toLocaleDateString('pt-BR')})`, false, 9);
+          if (ex.observacoes) {
+            doc.setTextColor(100, 100, 100);
+            addLine(`  Obs: ${ex.observacoes}`, false, 8);
+            doc.setTextColor(0, 0, 0);
+          }
+        }
         addSpacer();
       }
 
@@ -217,6 +259,36 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
           }
           addSpacer(3);
         }
+      }
+
+      // Indicadores Clínicos (KPIs)
+      if (evRes.sucesso && evRes.dados && evRes.dados.length >= 2) {
+        const evs = [...evRes.dados].sort((a, b) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime());
+        const primeiro = evs[0];
+        const ultimo = evs[evs.length - 1];
+
+        addSection('Indicadores Clínicos (Baseado em Evoluções)');
+
+        if (primeiro.nivelDor != null && ultimo.nivelDor != null && primeiro.nivelDor > 0) {
+          const reducaoDor = Math.round(((primeiro.nivelDor - ultimo.nivelDor) / primeiro.nivelDor) * 100);
+          addLabel('Evolução da Dor:', `${reducaoDor > 0 ? reducaoDor : 0}% de redução (Inicial: ${primeiro.nivelDor} → Atual: ${ultimo.nivelDor})`);
+        }
+
+        const QUALIDADE_MAP: Record<string, number> = { pessima: 2, ruim: 4, regular: 6, boa: 8, excelente: 10 };
+        const sonoPrimeiro = primeiro.qualidadeSono ? QUALIDADE_MAP[primeiro.qualidadeSono] : null;
+        const sonoUltimo = ultimo.qualidadeSono ? QUALIDADE_MAP[ultimo.qualidadeSono] : null;
+        if (sonoPrimeiro && sonoUltimo && sonoPrimeiro > 0) {
+          const melhoraSono = Math.round(((sonoUltimo - sonoPrimeiro) / sonoPrimeiro) * 100);
+          addLabel('Evolução do Sono:', `${melhoraSono > 0 ? melhoraSono : 0}% de melhora`);
+        }
+
+        const bemPrimeiro = primeiro.bemEstar ? QUALIDADE_MAP[primeiro.bemEstar] : null;
+        const bemUltimo = ultimo.bemEstar ? QUALIDADE_MAP[ultimo.bemEstar] : null;
+        if (bemPrimeiro && bemUltimo && bemPrimeiro > 0) {
+          const melhoraBem = Math.round(((bemUltimo - bemPrimeiro) / bemPrimeiro) * 100);
+          addLabel('Evolução do Bem-Estar:', `${melhoraBem > 0 ? melhoraBem : 0}% de melhora`);
+        }
+        addSpacer();
       }
 
       // Salvar

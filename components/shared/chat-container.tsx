@@ -12,8 +12,11 @@ import {
   marcarComoLida,
   buscarUsuariosChat,
   criarGrupo,
+  excluirGrupo,
+  excluirMensagem,
+  editarMensagem,
 } from '@/app/_actions/chat';
-import { getPusherClient, canalChat, EVENTOS_PUSHER } from '@/lib/integrations/pusher/client';
+import { getPusherClient, canalChat, canalUsuario, EVENTOS_PUSHER } from '@/lib/integrations/pusher/client';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -29,6 +32,11 @@ import {
   Send,
   Stethoscope,
   User,
+  Trash2,
+  Pencil,
+  X,
+  Check,
+  XCircle,
 } from 'lucide-react';
 
 /**
@@ -43,6 +51,8 @@ interface ChatContainerProps {
   titulo?: string;
   /** Subtítulo */
   subtitulo?: string;
+  /** Callback para notificar o parent sobre total de não-lidas (para badge na sidebar) */
+  onNaoLidasChange?: (total: number) => void;
 }
 
 interface Grupo {
@@ -68,9 +78,11 @@ export function ChatContainer({
   roleAtual,
   titulo = 'Chat',
   subtitulo = 'Converse em tempo real',
+  onNaoLidasChange,
 }: ChatContainerProps) {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [grupoAtivo, setGrupoAtivo] = useState<string | null>(null);
+  const [meuUserId, setMeuUserId] = useState<string | null>(null);
   const [mensagensLista, setMensagensLista] = useState<MensagemItem[]>([]);
   const [textoMensagem, setTextoMensagem] = useState('');
   const [carregandoGrupos, setCarregandoGrupos] = useState(true);
@@ -83,6 +95,13 @@ export function ChatContainer({
   >([]);
   const [buscandoUsuarios, setBuscandoUsuarios] = useState(false);
 
+  // Context menu de conversas (botão direito)
+  const [ctxGrupo, setCtxGrupo] = useState<{ x: number; y: number; grupoId: string } | null>(null);
+  // Menu de ações de mensagem
+  const [menuMsg, setMenuMsg] = useState<string | null>(null);
+  // Edição inline de mensagem
+  const [editandoMsg, setEditandoMsg] = useState<{ id: string; conteudo: string } | null>(null);
+
   const mensagensRef = useRef<HTMLDivElement>(null);
 
   // Carregar grupos
@@ -90,7 +109,8 @@ export function ChatContainer({
     setCarregandoGrupos(true);
     const res = await listarGrupos();
     if (res.sucesso && res.dados) {
-      setGrupos(res.dados);
+      setGrupos(res.dados.grupos);
+      setMeuUserId(res.dados.meuUserId);
     }
     setCarregandoGrupos(false);
   }, []);
@@ -98,6 +118,14 @@ export function ChatContainer({
   useEffect(() => {
     carregarGrupos();
   }, [carregarGrupos]);
+
+  // Notificar parent sobre total de não-lidas sempre que os grupos mudam
+  useEffect(() => {
+    if (onNaoLidasChange) {
+      const total = grupos.reduce((acc, g) => acc + g.naoLidas, 0);
+      onNaoLidasChange(total);
+    }
+  }, [grupos, onNaoLidasChange]);
 
   // Carregar mensagens de um grupo
   const carregarMensagens = useCallback(async (gId: string) => {
@@ -130,62 +158,118 @@ export function ChatContainer({
     }
   }, [mensagensLista]);
 
-  // Pusher: subscribe ao grupo ativo
+  // Pusher: subscribe a TODOS os grupos do usuário para atualizar badges e mensagens
   useEffect(() => {
-    if (!grupoAtivo) return;
+    if (grupos.length === 0) return;
 
     try {
       const pusher = getPusherClient();
-      const channel = pusher.subscribe(canalChat(grupoAtivo));
+      const canaisInscritos: string[] = [];
 
-      channel.bind(
-        EVENTOS_PUSHER.NOVA_MENSAGEM,
-        (data: {
-          id: string;
-          autorId: string;
-          autorNome: string;
-          conteudo: string;
-          criadoEm: string;
-        }) => {
-          setMensagensLista((prev) => {
-            if (prev.some((m) => m.id === data.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: data.id,
-                autorId: data.autorId,
-                autorNome: data.autorNome,
-                autorRole: null,
-                conteudo: data.conteudo,
-                criadoEm: data.criadoEm,
-              },
-            ];
-          });
-        },
-      );
+      grupos.forEach((g) => {
+        const canal = canalChat(g.id);
+        const channel = pusher.subscribe(canal);
+        canaisInscritos.push(canal);
+
+        channel.bind(
+          EVENTOS_PUSHER.NOVA_MENSAGEM,
+          (data: {
+            id: string;
+            autorId: string;
+            autorNome: string;
+            autorRole?: string | null;
+            conteudo: string;
+            criadoEm: string;
+          }) => {
+            // Ignorar mensagens do próprio usuário (já adicionadas via optimistic update)
+            if (data.autorId === meuUserId) return;
+
+            if (g.id === grupoAtivo) {
+              // Grupo ativo: adicionar mensagem na lista visual
+              setMensagensLista((prev) => {
+                if (prev.some((m) => m.id === data.id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: data.id,
+                    autorId: data.autorId,
+                    autorNome: data.autorNome,
+                    autorRole: data.autorRole ?? null,
+                    conteudo: data.conteudo,
+                    criadoEm: data.criadoEm,
+                  },
+                ];
+              });
+              // Marcar como lida automaticamente
+              marcarComoLida(g.id);
+            } else {
+              // Outro grupo: incrementar badge de não-lidas
+              setGrupos((prev) =>
+                prev.map((gr) =>
+                  gr.id === g.id ? { ...gr, naoLidas: gr.naoLidas + 1, ultimaMensagem: data.conteudo } : gr,
+                ),
+              );
+            }
+          },
+        );
+      });
 
       return () => {
-        pusher.unsubscribe(canalChat(grupoAtivo));
+        canaisInscritos.forEach((canal) => pusher.unsubscribe(canal));
       };
     } catch {
       console.warn('[Chat] Pusher não disponível — modo somente banco.');
     }
-  }, [grupoAtivo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupos.map((g) => g.id).join(','), grupoAtivo, meuUserId]);
 
-  // Enviar mensagem
+  // Enviar mensagem — optimistic update sem reload
   async function handleEnviar() {
     if (!textoMensagem.trim() || !grupoAtivo) return;
+    const conteudo = textoMensagem.trim();
     setEnviando(true);
+    setTextoMensagem('');
+
+    // Optimistic: adicionar a mensagem localmente de imediato
+    const tempId = `temp-${Date.now()}`;
+    const agora = new Date().toISOString();
+
+    setMensagensLista((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        autorId: meuUserId ?? '__self__',
+        autorNome: 'Você',
+        autorRole: roleAtual,
+        conteudo,
+        criadoEm: agora,
+      },
+    ]);
+
+    // Atualizar última mensagem na lista de grupos
+    setGrupos((prev) =>
+      prev.map((g) =>
+        g.id === grupoAtivo
+          ? { ...g, ultimaMensagem: conteudo, ultimaMensagemData: agora }
+          : g,
+      ),
+    );
 
     const res = await enviarMensagem({
       grupoId: grupoAtivo,
-      conteudo: textoMensagem.trim(),
+      conteudo,
     });
 
-    if (res.sucesso) {
-      setTextoMensagem('');
-      await carregarMensagens(grupoAtivo);
+    if (res.sucesso && res.dados) {
+      // Substituir a mensagem temporária pelo ID real do banco
+      setMensagensLista((prev) =>
+        prev.map((m) =>
+          m.id === tempId ? { ...m, id: res.dados!.mensagemId } : m,
+        ),
+      );
     } else {
+      // Reverter optimistic update em caso de erro
+      setMensagensLista((prev) => prev.filter((m) => m.id !== tempId));
       toast.error(res.erro ?? 'Erro ao enviar mensagem');
     }
 
@@ -220,11 +304,80 @@ export function ChatContainer({
     }
   }
 
+  // Context menu da conversa (botão direito)
+  function handleContextMenuGrupo(e: React.MouseEvent, grupoId: string) {
+    e.preventDefault();
+    setCtxGrupo({ x: e.clientX, y: e.clientY, grupoId });
+  }
+
+  // Excluir conversa
+  async function handleExcluirGrupo(grupoId: string) {
+    setCtxGrupo(null);
+    const res = await excluirGrupo(grupoId);
+    if (res.sucesso) {
+      toast.success('Conversa excluída');
+      if (grupoAtivo === grupoId) {
+        setGrupoAtivo(null);
+        setMensagensLista([]);
+      }
+      setGrupos((prev) => prev.filter((g) => g.id !== grupoId));
+    } else {
+      toast.error(res.erro ?? 'Erro ao excluir conversa');
+    }
+  }
+
+  // Fechar conversa (desselecionar)
+  function handleFecharConversa(grupoId: string) {
+    setCtxGrupo(null);
+    if (grupoAtivo === grupoId) {
+      setGrupoAtivo(null);
+      setMensagensLista([]);
+    }
+  }
+
+  // Excluir mensagem
+  async function handleExcluirMensagem(msgId: string) {
+    setMenuMsg(null);
+    const res = await excluirMensagem(msgId);
+    if (res.sucesso) {
+      setMensagensLista((prev) => prev.filter((m) => m.id !== msgId));
+      toast.success('Mensagem excluída');
+    } else {
+      toast.error(res.erro ?? 'Erro ao excluir mensagem');
+    }
+  }
+
+  // Salvar edição de mensagem
+  async function handleSalvarEdicao() {
+    if (!editandoMsg || !editandoMsg.conteudo.trim()) return;
+    const res = await editarMensagem(editandoMsg.id, editandoMsg.conteudo.trim());
+    if (res.sucesso) {
+      setMensagensLista((prev) =>
+        prev.map((m) =>
+          m.id === editandoMsg.id ? { ...m, conteudo: editandoMsg.conteudo.trim() } : m,
+        ),
+      );
+      setEditandoMsg(null);
+      toast.success('Mensagem editada');
+    } else {
+      toast.error(res.erro ?? 'Erro ao editar mensagem');
+    }
+  }
+
+  // Fechar context menu ao clicar fora
+  useEffect(() => {
+    function handleClick() {
+      setCtxGrupo(null);
+      setMenuMsg(null);
+    }
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
   // Helper: nome do grupo
   function nomeGrupo(g: Grupo): string {
     if (g.nome) return g.nome;
     if (g.tipo === 'direto') {
-      // Mostrar o nome do outro participante
       const outro = g.participantes.find((p) => p.role !== roleAtual) ?? g.participantes[0];
       return outro?.nome ?? 'Conversa';
     }
@@ -254,11 +407,9 @@ export function ChatContainer({
         </div>
 
         <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-          <DialogTrigger>
-            <Button size="sm" className="gap-2">
-              <Plus size={14} />
-              Nova conversa
-            </Button>
+          <DialogTrigger render={<Button size="sm" className="gap-2" />}>
+            <Plus size={14} />
+            Nova conversa
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -337,6 +488,7 @@ export function ChatContainer({
                   <button
                     key={g.id}
                     onClick={() => selecionarGrupo(g.id)}
+                    onContextMenu={(e) => handleContextMenuGrupo(e, g.id)}
                     className={`flex w-full items-center gap-3 border-b border-border/30 p-3 text-left transition-colors ${
                       grupoAtivo === g.id ? 'bg-primary/5' : 'hover:bg-accent/50'
                     }`}
@@ -361,6 +513,31 @@ export function ChatContainer({
             </div>
           </CardContent>
         </Card>
+
+        {/* Context menu flutuante para conversas */}
+        {ctxGrupo && (
+          <div
+            className="fixed z-[100] min-w-40 rounded-lg border bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95"
+            style={{ top: ctxGrupo.y, left: ctxGrupo.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => handleFecharConversa(ctxGrupo.grupoId)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+            >
+              <XCircle size={14} />
+              Fechar conversa
+            </button>
+            <div className="my-1 h-px bg-border" />
+            <button
+              onClick={() => handleExcluirGrupo(ctxGrupo.grupoId)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 size={14} />
+              Excluir conversa
+            </button>
+          </div>
+        )}
 
         {/* Área de mensagens */}
         <Card className="flex-1 overflow-hidden border-0 shadow-sm">
@@ -406,12 +583,13 @@ export function ChatContainer({
                     </div>
                   ) : (
                     mensagensLista.map((msg) => {
-                      // Mensagem do usuário atual = alinhada à direita
-                      const isOwn = msg.autorRole === roleAtual;
+                      const isOwn = (meuUserId && msg.autorId === meuUserId) || msg.autorId === '__self__';
+                      const isTemp = msg.id.startsWith('temp-');
+                      const isEditing = editandoMsg?.id === msg.id;
                       return (
                         <div
                           key={msg.id}
-                          className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
+                          className={`group/msg relative flex items-end gap-2 ${isOwn ? '' : 'flex-row-reverse'}`}
                         >
                           <div
                             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -423,23 +601,101 @@ export function ChatContainer({
                           <div className="max-w-[75%]">
                             <p
                               className={`mb-0.5 text-[10px] ${
-                                isOwn ? 'text-right' : ''
+                                isOwn ? '' : 'text-right'
                               } text-muted-foreground`}
                             >
                               {msg.autorNome}
                             </p>
-                            <div
-                              className={`rounded-2xl px-4 py-2.5 ${
-                                isOwn
-                                  ? 'rounded-br-md bg-primary text-primary-foreground'
-                                  : 'rounded-bl-md bg-muted'
-                              }`}
-                            >
-                              <p className="text-sm">{msg.conteudo}</p>
-                            </div>
+
+                            {/* Modo edição inline */}
+                            {isEditing ? (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  autoFocus
+                                  value={editandoMsg.conteudo}
+                                  onChange={(e) =>
+                                    setEditandoMsg({ ...editandoMsg, conteudo: e.target.value })
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSalvarEdicao();
+                                    if (e.key === 'Escape') setEditandoMsg(null);
+                                  }}
+                                  className="rounded-lg border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <button
+                                  onClick={handleSalvarEdicao}
+                                  className="rounded-md p-1 text-green-600 hover:bg-green-50"
+                                  title="Salvar"
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setEditandoMsg(null)}
+                                  className="rounded-md p-1 text-muted-foreground hover:bg-accent"
+                                  title="Cancelar"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <div
+                                  className={`rounded-2xl px-4 py-2.5 ${
+                                    isOwn
+                                      ? 'rounded-bl-md bg-muted'
+                                      : 'rounded-br-md bg-primary text-primary-foreground'
+                                  }`}
+                                >
+                                  <p className="text-sm">{msg.conteudo}</p>
+                                </div>
+
+                                {/* Botão de ações — apenas para mensagens próprias e não temporárias */}
+                                {isOwn && !isTemp && (
+                                  <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/msg:opacity-100 ${isOwn ? '-right-8' : '-left-8'}`}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMenuMsg(menuMsg === msg.id ? null : msg.id);
+                                      }}
+                                      className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                    >
+                                      <Pencil size={12} />
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Menu dropdown da mensagem */}
+                                {menuMsg === msg.id && (
+                                  <div
+                                    className={`absolute z-50 min-w-36 rounded-lg border bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 ${isOwn ? '-right-40 top-0' : '-left-40 top-0'}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        setMenuMsg(null);
+                                        setEditandoMsg({ id: msg.id, conteudo: msg.conteudo });
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                                    >
+                                      <Pencil size={14} />
+                                      Editar
+                                    </button>
+                                    <div className="my-1 h-px bg-border" />
+                                    <button
+                                      onClick={() => handleExcluirMensagem(msg.id)}
+                                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                                    >
+                                      <Trash2 size={14} />
+                                      Excluir
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             <p
                               className={`mt-0.5 text-[10px] ${
-                                isOwn ? 'text-right' : ''
+                                isOwn ? '' : 'text-right'
                               } text-muted-foreground`}
                             >
                               {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', {

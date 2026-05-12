@@ -32,22 +32,29 @@ const isPublicRoute = createRouteMatcher([
   '/api/auth/callback',
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-  // Rotas públicas: passa sem verificação
-  if (isPublicRoute(req)) {
+export default clerkMiddleware(
+  async (auth, req) => {
+    // Rotas públicas: passa sem verificação
+    if (isPublicRoute(req)) {
+      return NextResponse.next();
+    }
+
+    // Rotas protegidas: apenas verifica se o usuário tem sessão ativa
+    // A verificação de role é feita nos layouts individuais de cada área
+    const { userId, redirectToSignIn } = await auth();
+
+    if (!userId) {
+      return redirectToSignIn();
+    }
+
     return NextResponse.next();
-  }
-
-  // Rotas protegidas: apenas verifica se o usuário tem sessão ativa
-  // A verificação de role é feita nos layouts individuais de cada área
-  const { userId, redirectToSignIn } = await auth();
-
-  if (!userId) {
-    return redirectToSignIn();
-  }
-
-  return NextResponse.next();
-});
+  },
+  {
+    // Tolera até 30s de diferença de relógio do sistema (clock skew)
+    // Evita loops de redirect causados por JWT com iat ligeiramente no futuro
+    clockSkewInMs: 30_000,
+  },
+);
 
 export const config = {
   matcher: [

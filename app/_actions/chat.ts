@@ -114,15 +114,18 @@ export async function criarGrupo(
 /**
  * Lista os grupos/conversas do usuário autenticado.
  */
-export async function listarGrupos(): Promise<ActionResult<Array<{
-  id: string;
-  nome: string | null;
-  tipo: string;
-  ultimaMensagem: string | null;
-  ultimaMensagemData: string | null;
-  participantes: Array<{ id: string; nome: string; role: string | null }>;
-  naoLidas: number;
-}>>> {
+export async function listarGrupos(): Promise<ActionResult<{
+  meuUserId: string;
+  grupos: Array<{
+    id: string;
+    nome: string | null;
+    tipo: string;
+    ultimaMensagem: string | null;
+    ultimaMensagemData: string | null;
+    participantes: Array<{ id: string; nome: string; role: string | null }>;
+    naoLidas: number;
+  }>;
+}>> {
   try {
     const auth = await verificarUsuarioAutenticado();
     if (!auth) return { sucesso: false, erro: 'Não autenticado' };
@@ -188,7 +191,7 @@ export async function listarGrupos(): Promise<ActionResult<Array<{
       }),
     );
 
-    return { sucesso: true, dados: grupos };
+    return { sucesso: true, dados: { meuUserId: userId, grupos } };
   } catch (error) {
     console.error('[Chat] Erro ao listar grupos:', error);
     return { sucesso: false, erro: 'Erro ao listar grupos' };
@@ -293,9 +296,9 @@ export async function enviarMensagem(
       return { sucesso: false, erro: 'Você não é participante deste grupo' };
     }
 
-    // Buscar nome do autor
+    // Buscar nome e role do autor
     const [autor] = await db
-      .select({ nome: users.nome })
+      .select({ nome: users.nome, role: users.role })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -318,6 +321,7 @@ export async function enviarMensagem(
         mensagemId: novaMensagem.id,
         autorId: userId,
         autorNome: autor?.nome ?? 'Usuário',
+        autorRole: autor?.role ?? null,
         conteudo: parsed.data.conteudo,
         criadoEm: novaMensagem.createdAt.toISOString(),
       });
@@ -409,3 +413,191 @@ export async function buscarUsuariosChat(busca?: string): Promise<ActionResult<A
     return { sucesso: false, erro: 'Erro ao buscar usuários' };
   }
 }
+
+/**
+ * Conta o total de mensagens não lidas do usuário autenticado (todos os grupos).
+ * Utilizado para exibir badge de notificação na sidebar.
+ */
+export async function contarMensagensNaoLidas(): Promise<ActionResult<number>> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    const resultado = await db.execute(sql`
+      SELECT COALESCE(SUM(sub.nao_lidas), 0)::int as total
+      FROM (
+        SELECT (
+          SELECT COUNT(*)::int FROM mensagens m
+          WHERE m.grupo_id = g.id
+            AND m.deleted_at IS NULL
+            AND m.autor_id != ${userId}
+            AND NOT (m.lida_por @> ${JSON.stringify([userId])}::jsonb)
+        ) as nao_lidas
+        FROM grupos_chat g
+        INNER JOIN participantes_grupo pg ON pg.grupo_id = g.id
+        WHERE pg.user_id = ${userId}
+      ) sub
+    `);
+
+    const total = Number((resultado.rows[0] as { total: number })?.total ?? 0);
+
+    return { sucesso: true, dados: total };
+  } catch (error) {
+    console.error('[Chat] Erro ao contar mensagens não lidas:', error);
+    return { sucesso: false, erro: 'Erro ao contar mensagens não lidas' };
+  }
+}
+
+/**
+ * Exclui (soft-delete) um grupo de chat e todas suas mensagens.
+ * Remove o participante do grupo. Se não houver mais participantes, faz soft delete do grupo.
+ */
+export async function excluirGrupo(grupoId: string): Promise<ActionResult> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    // Verificar que o usuário é participante do grupo
+    const [participante] = await db
+      .select({ id: participantesGrupo.id })
+      .from(participantesGrupo)
+      .where(and(
+        eq(participantesGrupo.grupoId, grupoId),
+        eq(participantesGrupo.userId, userId),
+      ))
+      .limit(1);
+
+    if (!participante) {
+      return { sucesso: false, erro: 'Você não é participante deste grupo' };
+    }
+
+    // Remover o usuário do grupo
+    await db
+      .delete(participantesGrupo)
+      .where(and(
+        eq(participantesGrupo.grupoId, grupoId),
+        eq(participantesGrupo.userId, userId),
+      ));
+
+    // Verificar se restam participantes
+    const restantes = await db.execute(sql`
+      SELECT COUNT(*)::int as total
+      FROM participantes_grupo
+      WHERE grupo_id = ${grupoId}
+    `);
+
+    const totalRestantes = Number((restantes.rows[0] as { total: number })?.total ?? 0);
+
+    // Se não houver mais participantes, soft-delete o grupo e mensagens
+    if (totalRestantes === 0) {
+      const agora = new Date();
+      await db.execute(sql`
+        UPDATE mensagens SET deleted_at = ${agora} WHERE grupo_id = ${grupoId} AND deleted_at IS NULL
+      `);
+      await db.execute(sql`
+        UPDATE grupos_chat SET updated_at = ${agora} WHERE id = ${grupoId}
+      `);
+    }
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Chat] Erro ao excluir grupo:', error);
+    return { sucesso: false, erro: 'Erro ao excluir conversa' };
+  }
+}
+
+/**
+ * Exclui (soft-delete) uma mensagem. Apenas o autor pode excluir.
+ */
+export async function excluirMensagem(mensagemId: string): Promise<ActionResult> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    // Verificar que o usuário é o autor da mensagem
+    const [msg] = await db
+      .select({ id: mensagens.id, autorId: mensagens.autorId })
+      .from(mensagens)
+      .where(and(eq(mensagens.id, mensagemId), isNull(mensagens.deletedAt)))
+      .limit(1);
+
+    if (!msg) {
+      return { sucesso: false, erro: 'Mensagem não encontrada' };
+    }
+
+    if (msg.autorId !== userId) {
+      return { sucesso: false, erro: 'Você só pode excluir suas próprias mensagens' };
+    }
+
+    // Soft-delete da mensagem
+    await db
+      .update(mensagens)
+      .set({ deletedAt: new Date() })
+      .where(eq(mensagens.id, mensagemId));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Chat] Erro ao excluir mensagem:', error);
+    return { sucesso: false, erro: 'Erro ao excluir mensagem' };
+  }
+}
+
+/**
+ * Edita o conteúdo de uma mensagem. Apenas o autor pode editar.
+ */
+export async function editarMensagem(
+  mensagemId: string,
+  novoConteudo: string,
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    if (!novoConteudo.trim()) {
+      return { sucesso: false, erro: 'Mensagem não pode estar vazia' };
+    }
+
+    if (novoConteudo.length > 5000) {
+      return { sucesso: false, erro: 'Mensagem muito longa (máx. 5000 caracteres)' };
+    }
+
+    // Verificar que o usuário é o autor da mensagem
+    const [msg] = await db
+      .select({ id: mensagens.id, autorId: mensagens.autorId })
+      .from(mensagens)
+      .where(and(eq(mensagens.id, mensagemId), isNull(mensagens.deletedAt)))
+      .limit(1);
+
+    if (!msg) {
+      return { sucesso: false, erro: 'Mensagem não encontrada' };
+    }
+
+    if (msg.autorId !== userId) {
+      return { sucesso: false, erro: 'Você só pode editar suas próprias mensagens' };
+    }
+
+    // Atualizar conteúdo
+    await db
+      .update(mensagens)
+      .set({ conteudo: novoConteudo.trim(), updatedAt: new Date() })
+      .where(eq(mensagens.id, mensagemId));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Chat] Erro ao editar mensagem:', error);
+    return { sucesso: false, erro: 'Erro ao editar mensagem' };
+  }
+}
+

@@ -69,3 +69,24 @@ export async function listarExames(pacienteId: string) {
     return { sucesso: false, erro: 'Erro ao listar exames' };
   }
 }
+
+/**
+ * Exclui um exame via soft delete.
+ * O arquivo no Blob Storage é mantido para fins de auditoria.
+ */
+export async function excluirExame(exameId: string) {
+  try {
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    await db
+      .update(exames)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(exames.id, exameId), isNull(exames.deletedAt)));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao excluir exame:', error);
+    return { sucesso: false, erro: 'Erro ao excluir exame' };
+  }
+}

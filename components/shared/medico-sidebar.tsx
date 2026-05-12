@@ -16,10 +16,12 @@ import {
   Menu,
   MessageSquare,
   Calendar,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Dashboard', href: '/medico', icon: LayoutDashboard },
@@ -27,6 +29,7 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Pacientes', href: '/medico/pacientes', icon: Users },
   { label: 'Triagem', href: '/medico/triagem', icon: FileCheck },
   { label: 'Agenda', href: '/medico/agenda', icon: Calendar },
+  { label: 'Recompra', href: '/medico/recompra', icon: RefreshCw },
   { label: 'Chat', href: '/medico/chat', icon: MessageSquare },
   { label: 'Notificações', href: '/medico/notificacoes', icon: Bell },
   { label: 'Configurações', href: '/medico/configuracoes', icon: Settings },
@@ -36,6 +39,7 @@ export function MedicoSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { signOut } = useClerk();
+  const chatNaoLidas = useChatNaoLidas();
 
   return (
     <>
@@ -99,7 +103,7 @@ export function MedicoSidebar() {
                   if (window.innerWidth < 1024) setCollapsed(true);
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                  'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -107,6 +111,11 @@ export function MedicoSidebar() {
               >
                 <Icon size={20} className="shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
+                {item.label === 'Chat' && chatNaoLidas > 0 && (
+                  <span className="absolute -top-1 left-6 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-sm">
+                    {chatNaoLidas > 99 ? '99+' : chatNaoLidas}
+                  </span>
+                )}
               </Link>
             );
           })}

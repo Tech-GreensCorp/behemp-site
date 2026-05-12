@@ -248,18 +248,23 @@ export default function PacientesPage() {
           </div>
           <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v ?? 'todos')}>
             <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="Status">
+                {filtroStatus === 'todos' ? 'Todos os status' : (STATUS_LABELS[filtroStatus]?.label ?? filtroStatus)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               <SelectItem value="em_tratamento">Em tratamento</SelectItem>
               <SelectItem value="aguardando_consulta">Aguardando consulta</SelectItem>
               <SelectItem value="concluido">Concluído</SelectItem>
+              <SelectItem value="arquivado">Arquivado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filtroTratamento} onValueChange={(v) => setFiltroTratamento(v ?? 'todos')}>
             <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Tratamento" />
+              <SelectValue placeholder="Tratamento">
+                {filtroTratamento === 'todos' ? 'Todos os tipos' : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os tipos</SelectItem>
@@ -271,7 +276,17 @@ export default function PacientesPage() {
           {/* Filtro por fase da jornada */}
           <Select value={filtroJornada} onValueChange={(v) => setFiltroJornada(v ?? 'todos')}>
             <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Fase da jornada" />
+              <SelectValue placeholder="Fase da jornada">
+                {filtroJornada === 'todos' ? 'Todas as fases' : (
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: JORNADA_LABELS[filtroJornada]?.color }}
+                    />
+                    {JORNADA_LABELS[filtroJornada]?.icon} {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
+                  </span>
+                )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as fases</SelectItem>

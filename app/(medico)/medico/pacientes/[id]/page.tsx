@@ -55,6 +55,61 @@ function formatDate(d: string | null) {
   try { return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR'); } catch { return d; }
 }
 
+/** Formata valor numérico/string para moeda BRL. Ex: "15000" → "R$ 15.000,00" */
+function formatarMoeda(valor: string | null | undefined): string {
+  if (!valor) return '—';
+  const num = parseFloat(valor.replace(/[^0-9,.]/g, '').replace(',', '.'));
+  if (isNaN(num)) return valor;
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Aplica máscara de CPF: 000.000.000-00 */
+function mascaraCpf(v: string): string {
+  return v
+    .replace(/\D/g, '')
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+/** Aplica máscara de RG: 00.000.000-0 */
+function mascaraRg(v: string): string {
+  return v
+    .replace(/\D/g, '')
+    .slice(0, 9)
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+/** Aplica máscara de moeda BRL enquanto digita */
+function mascaraMoeda(v: string): string {
+  const numeros = v.replace(/\D/g, '');
+  if (!numeros) return '';
+  const centavos = parseInt(numeros, 10);
+  return (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Mapas de exibição para campos select */
+const GENERO_LABEL: Record<string, string> = {
+  masculino: 'Masculino',
+  feminino: 'Feminino',
+  outro: 'Outro',
+  nao_informado: 'Prefiro não informar',
+};
+
+const SIM_NAO_LABEL: Record<string, string> = {
+  sim: 'Sim',
+  nao: 'Não',
+};
+
+const TRATAMENTO_LABEL: Record<string, string> = {
+  cbd: 'CBD',
+  thc: 'THC',
+  cbd_thc: 'CBD + THC',
+};
+
 function InfoItem({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
@@ -211,8 +266,8 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
               {editando ? (<>
                 <div><Label>Data de Nascimento</Label><Input type="date" value={form.dataNascimento} onChange={e => u('dataNascimento', e.target.value)} /></div>
-                <div><Label>CPF</Label><Input value={form.cpf} onChange={e => u('cpf', e.target.value)} placeholder="000.000.000-00" /></div>
-                <div><Label>RG</Label><Input value={form.rg} onChange={e => u('rg', e.target.value)} /></div>
+                <div><Label>CPF</Label><Input value={form.cpf} onChange={e => u('cpf', mascaraCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} /></div>
+                <div><Label>RG</Label><Input value={form.rg} onChange={e => u('rg', mascaraRg(e.target.value))} placeholder="00.000.000-0" maxLength={12} /></div>
                 <div>
                   <Label>Gênero</Label>
                   <Select value={form.genero} onValueChange={v => u('genero', v ?? '')}>
@@ -227,9 +282,9 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
                 </div>
               </>) : (<>
                 <InfoItem label="Data de Nascimento" value={formatDate(paciente.dataNascimento)} />
-                <InfoItem label="CPF" value={paciente.cpf} />
-                <InfoItem label="RG" value={paciente.rg} />
-                <InfoItem label="Gênero" value={paciente.genero} />
+                <InfoItem label="CPF" value={paciente.cpf ? mascaraCpf(paciente.cpf) : null} />
+                <InfoItem label="RG" value={paciente.rg ? mascaraRg(paciente.rg) : null} />
+                <InfoItem label="Gênero" value={paciente.genero ? (GENERO_LABEL[paciente.genero] ?? paciente.genero) : null} />
                 <InfoItem label="Telefone" value={paciente.telefone} />
                 <InfoItem label="E-mail" value={paciente.email} />
               </>)}
@@ -305,7 +360,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
                 <InfoItem label="Altura" value={paciente.altura ? `${paciente.altura} cm` : null} />
                 <div className="sm:col-span-2"><InfoItem label="Histórico médico" value={paciente.historicoMedico} /></div>
                 <div className="sm:col-span-2"><InfoItem label="Patologia" value={paciente.patologia} /></div>
-                <InfoItem label="Tratamento" value={paciente.tratamentoTipo?.toUpperCase().replace('_', ' + ')} />
+                <InfoItem label="Tratamento" value={paciente.tratamentoTipo ? (TRATAMENTO_LABEL[paciente.tratamentoTipo] ?? paciente.tratamentoTipo.toUpperCase()) : null} />
                 <InfoItem label="Status" value={st.label} />
               </>)}
             </CardContent>
@@ -346,9 +401,9 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
                   </Select>
                 </div>
                 {form.possuiPlanoSaude === 'sim' && <div className="sm:col-span-2"><Label>Plano de Saúde</Label><Input value={form.planoSaude} onChange={e => u('planoSaude', e.target.value)} /></div>}
-                <div><Label>Renda Família</Label><Input value={form.rendaFamilia} onChange={e => u('rendaFamilia', e.target.value)} /></div>
+                <div><Label>Renda Família</Label><Input value={form.rendaFamilia} onChange={e => u('rendaFamilia', mascaraMoeda(e.target.value))} placeholder="R$ 0,00" /></div>
                 <div><Label>Termo de Associado</Label><Input value={form.termoAssociado} onChange={e => u('termoAssociado', e.target.value)} /></div>
-                <div><Label>Valor da Contribuição</Label><Input value={form.valorContribuicao} onChange={e => u('valorContribuicao', e.target.value)} placeholder="R$ 0,00" /></div>
+                <div><Label>Valor da Contribuição</Label><Input value={form.valorContribuicao} onChange={e => u('valorContribuicao', mascaraMoeda(e.target.value))} placeholder="R$ 0,00" /></div>
                 <div className="sm:col-span-2"><Label>Processo de Judicialização</Label><Textarea value={form.processoJudicializacao} onChange={e => u('processoJudicializacao', e.target.value)} rows={3} /></div>
               </>) : (<>
                 <InfoItem label="Atendimento" value={paciente.atendimento} />
@@ -359,11 +414,11 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
                 <InfoItem label="Entrada Paciente" value={paciente.entradaPaciente} />
                 <InfoItem label="Etapa" value={paciente.etapa} />
                 <InfoItem label="Hospital mais próximo" value={paciente.hospitalProximo} />
-                <InfoItem label="Home Care" value={paciente.homeCare} />
-                <InfoItem label="Plano de Saúde" value={paciente.possuiPlanoSaude === 'sim' ? paciente.planoSaude : paciente.possuiPlanoSaude} />
-                <InfoItem label="Renda Família" value={paciente.rendaFamilia} />
+                <InfoItem label="Home Care" value={paciente.homeCare ? (SIM_NAO_LABEL[paciente.homeCare] ?? paciente.homeCare) : null} />
+                <InfoItem label="Plano de Saúde" value={paciente.possuiPlanoSaude === 'sim' ? paciente.planoSaude : (paciente.possuiPlanoSaude ? (SIM_NAO_LABEL[paciente.possuiPlanoSaude] ?? paciente.possuiPlanoSaude) : null)} />
+                <InfoItem label="Renda Família" value={formatarMoeda(paciente.rendaFamilia)} />
                 <InfoItem label="Termo de Associado" value={paciente.termoAssociado} />
-                <InfoItem label="Valor da Contribuição" value={paciente.valorContribuicao} />
+                <InfoItem label="Valor da Contribuição" value={formatarMoeda(paciente.valorContribuicao)} />
                 <div className="sm:col-span-2"><InfoItem label="Processo de Judicialização" value={paciente.processoJudicializacao} /></div>
               </>)}
             </CardContent>
@@ -382,7 +437,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
               {editando ? (<>
                 <div><Label>Nome do Responsável</Label><Input value={form.responsavelNome} onChange={e => u('responsavelNome', e.target.value)} /></div>
-                <div><Label>CPF do Responsável</Label><Input value={form.responsavelCpf} onChange={e => u('responsavelCpf', e.target.value)} placeholder="000.000.000-00" /></div>
+                <div><Label>CPF do Responsável</Label><Input value={form.responsavelCpf} onChange={e => u('responsavelCpf', mascaraCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} /></div>
                 <div>
                   <Label>Possui advogado?</Label>
                   <Select value={form.temAdvogado} onValueChange={v => { u('temAdvogado', v ?? ''); if (v === 'nao') u('nomeAdvogado', ''); }}>
@@ -393,8 +448,8 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
                 {form.temAdvogado === 'sim' && <div><Label>Nome do Advogado</Label><Input value={form.nomeAdvogado} onChange={e => u('nomeAdvogado', e.target.value)} /></div>}
               </>) : (<>
                 <InfoItem label="Nome do Responsável" value={paciente.responsavelNome} />
-                <InfoItem label="CPF do Responsável" value={paciente.responsavelCpf} />
-                <InfoItem label="Possui Advogado?" value={paciente.temAdvogado} />
+                <InfoItem label="CPF do Responsável" value={paciente.responsavelCpf ? mascaraCpf(paciente.responsavelCpf) : null} />
+                <InfoItem label="Possui Advogado?" value={paciente.temAdvogado ? (SIM_NAO_LABEL[paciente.temAdvogado] ?? paciente.temAdvogado) : null} />
                 {paciente.temAdvogado === 'sim' && <InfoItem label="Nome do Advogado" value={paciente.nomeAdvogado} />}
               </>)}
             </CardContent>
