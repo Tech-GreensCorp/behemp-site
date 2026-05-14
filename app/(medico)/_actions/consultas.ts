@@ -9,6 +9,7 @@ import {
   atualizarEventoGoogleCalendar,
   cancelarEventoGoogleCalendar,
 } from '@/lib/integrations/google-calendar';
+import { listarTodosHorariosDia } from '@/app/(public)/_actions/agendamento';
 
 /**
  * Server Actions para gestão de consultas pelo médico.
@@ -304,5 +305,25 @@ export async function cancelarConsultaMedico(params: {
   } catch (error) {
     console.error('[Consultas] Erro ao cancelar:', error);
     return { sucesso: false, erro: 'Erro ao cancelar consulta' };
+  }
+}
+
+// ── Listar todos os horários do dia (24h, 48 slots) ──────────
+
+
+
+export async function listarTodosHorariosMedico(params: {
+  data: string; // YYYY-MM-DD
+}): Promise<ActionResult<{ horario: string; livre: boolean }[]>> {
+  try {
+    const auth = await verificarMedico();
+    if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
+    const medicoId = await resolverMedicoId(auth.clerkId);
+    if (!medicoId) return { sucesso: false, erro: 'Médico não encontrado' };
+
+    return listarTodosHorariosDia({ medicoId, data: params.data });
+  } catch (error) {
+    console.error('[Consultas] Erro ao listar horários do dia:', error);
+    return { sucesso: false, erro: 'Erro ao listar horários' };
   }
 }

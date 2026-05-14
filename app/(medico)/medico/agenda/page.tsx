@@ -1,30 +1,29 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { BuscaPaciente } from '@/components/busca-paciente';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   listarConsultasMedico, listarPacientesMedico,
   criarConsultaMedico, remarcarConsulta, cancelarConsultaMedico,
+  listarTodosHorariosMedico,
 } from '@/app/(medico)/_actions/consultas';
-import { listarHorariosLivres } from '@/app/(public)/_actions/agendamento';
+
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   CalendarDays as CalendarIcon,
   CheckCircle2,
-  ChevronRight,
-  Clock,
   Loader2,
+  Lock,
   Plus,
-  Search,
   User,
   Video,
   X,
@@ -52,7 +51,7 @@ export default function AgendaPage() {
   // Nova consulta
   const [pacienteSel, setPacienteSel] = useState<string>('');
   const [dataSel, setDataSel] = useState<Date | undefined>();
-  const [horarios, setHorarios] = useState<string[]>([]);
+  const [horarios, setHorarios] = useState<{ horario: string; livre: boolean }[]>([]);
   const [horarioSel, setHorarioSel] = useState<string>('');
   const [tipo, setTipo] = useState('rotina');
   const [obs, setObs] = useState('');
@@ -62,7 +61,7 @@ export default function AgendaPage() {
   // Remarcar
   const [remarcarId, setRemarcarId] = useState<string | null>(null);
   const [remarcarData, setRemarcarData] = useState<Date | undefined>();
-  const [remarcarHorarios, setRemarcarHorarios] = useState<string[]>([]);
+  const [remarcarHorarios, setRemarcarHorarios] = useState<{ horario: string; livre: boolean }[]>([]);
   const [remarcarHorSel, setRemarcarHorSel] = useState('');
   const [remarcando, setRemarcando] = useState(false);
   const [carregandoRH, setCarregandoRH] = useState(false);
@@ -80,13 +79,13 @@ export default function AgendaPage() {
     setCarregando(false);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { carregar(); }, [carregar]);
 
-  // ── Nova consulta: carregar horários ──
+  // ── Nova consulta: carregar horários (24h) ──
   async function carregarHorNova(data: Date) {
     setDataSel(data); setCarregandoH(true); setHorarioSel('');
-    // Usa o medicoId implícito via auth na action
-    const res = await listarHorariosLivres({ medicoId: 'self', data: format(data, 'yyyy-MM-dd') });
+    const res = await listarTodosHorariosMedico({ data: format(data, 'yyyy-MM-dd') });
     if (res.sucesso && res.dados) setHorarios(res.dados);
     setCarregandoH(false);
   }
@@ -110,7 +109,7 @@ export default function AgendaPage() {
   // ── Remarcar ──
   async function carregarHorRemarcar(data: Date) {
     setRemarcarData(data); setCarregandoRH(true); setRemarcarHorSel('');
-    const res = await listarHorariosLivres({ medicoId: 'self', data: format(data, 'yyyy-MM-dd') });
+    const res = await listarTodosHorariosMedico({ data: format(data, 'yyyy-MM-dd') });
     if (res.sucesso && res.dados) setRemarcarHorarios(res.dados);
     setCarregandoRH(false);
   }
@@ -225,11 +224,11 @@ export default function AgendaPage() {
               {/* Paciente */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Paciente</label>
-                <select value={pacienteSel} onChange={(e) => setPacienteSel(e.target.value)}
-                  className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm">
-                  <option value="">Selecionar paciente...</option>
-                  {pacientes.map((p) => <option key={p.id} value={p.id}>{p.nome} — {p.email}</option>)}
-                </select>
+                <BuscaPaciente
+                  pacientes={pacientes}
+                  value={pacienteSel}
+                  onChange={setPacienteSel}
+                />
               </div>
               {/* Tipo */}
               <div>
@@ -243,7 +242,7 @@ export default function AgendaPage() {
               </div>
               {/* Data + Horários */}
               {pacienteSel && (
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-6">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Data</label>
                     <Calendar mode="single" selected={dataSel} onSelect={(d) => d && carregarHorNova(d)}
@@ -251,9 +250,23 @@ export default function AgendaPage() {
                       className="rounded-xl border" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Horário</label>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium">Horário — 24h do dia</label>
+                      {dataSel && !carregandoH && horarios.length > 0 && (
+                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#C08E3A]/20 border border-[#C08E3A]/40" />
+                            Livre
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted border border-border" />
+                            Ocupado
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     {!dataSel ? (
-                      <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma data</p>
+                      <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma data primeiro</p>
                     ) : carregandoH ? (
                       <div className="flex justify-center py-8">
                         <Loader2 size={24} className="animate-spin text-primary" />
@@ -261,13 +274,47 @@ export default function AgendaPage() {
                     ) : horarios.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">Sem horários disponíveis</p>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2">
-                        {horarios.map((h) => (
-                          <button key={h} onClick={() => setHorarioSel(h)}
-                            className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
-                              horarioSel === h ? 'border-[#C08E3A] bg-[#C08E3A] text-white' : 'border-border hover:border-[#C08E3A]/50'
-                            }`}>{h}</button>
-                        ))}
+                      <div className="space-y-4">
+                        {/* Agrupa os 48 slots em 4 períodos de 6h */}
+                        {[
+                          { label: '🌙 Madrugada', range: [0, 12] },
+                          { label: '🌅 Manhã', range: [12, 24] },
+                          { label: '☀️ Tarde', range: [24, 36] },
+                          { label: '🌆 Noite', range: [36, 48] },
+                        ].map(({ label, range }) => {
+                          const slots = horarios.slice(range[0], range[1]);
+                          return (
+                            <div key={label}>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">{label}</p>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {slots.map(({ horario, livre }) => {
+                                  const selecionado = horarioSel === horario;
+                                  return (
+                                    <button
+                                      key={horario}
+                                      disabled={!livre}
+                                      onClick={() => livre && setHorarioSel(horario)}
+                                      title={livre ? `Agendar às ${horario}` : `${horario} — ocupado`}
+                                      className={[
+                                        'relative flex items-center justify-center rounded-lg border px-1 py-2 text-xs font-medium transition-all',
+                                        selecionado
+                                          ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-md'
+                                          : livre
+                                            ? 'border-[#C08E3A]/30 bg-[#C08E3A]/5 text-foreground hover:border-[#C08E3A] hover:bg-[#C08E3A]/15 cursor-pointer'
+                                            : 'border-border bg-muted text-muted-foreground cursor-not-allowed opacity-50',
+                                      ].join(' ')}
+                                    >
+                                      {!livre && !selecionado && (
+                                        <Lock size={8} className="absolute top-1 right-1 opacity-60" />
+                                      )}
+                                      {horario}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -336,13 +383,38 @@ export default function AgendaPage() {
               ) : remarcarHorarios.length === 0 ? (
                 <p className="text-sm text-center text-muted-foreground">Sem horários</p>
               ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {remarcarHorarios.map((h) => (
-                    <button key={h} onClick={() => setRemarcarHorSel(h)}
-                      className={`rounded-lg border px-3 py-2 text-sm ${
-                        remarcarHorSel === h ? 'border-[#C08E3A] bg-[#C08E3A] text-white' : 'hover:border-[#C08E3A]/50'
-                      }`}>{h}</button>
-                  ))}
+                <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                  {[
+                    { label: '🌙 Madrugada', range: [0, 12] },
+                    { label: '🌅 Manhã', range: [12, 24] },
+                    { label: '☀️ Tarde', range: [24, 36] },
+                    { label: '🌆 Noite', range: [36, 48] },
+                  ].map(({ label, range }) => {
+                    const slots = remarcarHorarios.slice(range[0], range[1]);
+                    return (
+                      <div key={label}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{label}</p>
+                        <div className="grid grid-cols-4 gap-1">
+                          {slots.map(({ horario, livre }) => (
+                            <button key={horario} disabled={!livre}
+                              onClick={() => livre && setRemarcarHorSel(horario)}
+                              title={livre ? `Remarcar às ${horario}` : `${horario} — ocupado`}
+                              className={[
+                                'relative rounded-lg border px-1 py-2 text-xs font-medium transition-all',
+                                remarcarHorSel === horario
+                                  ? 'border-[#C08E3A] bg-[#C08E3A] text-white'
+                                  : livre
+                                    ? 'border-[#C08E3A]/30 bg-[#C08E3A]/5 hover:border-[#C08E3A] cursor-pointer'
+                                    : 'border-border bg-muted text-muted-foreground cursor-not-allowed opacity-40',
+                              ].join(' ')}
+                            >
+                              {horario}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )
             )}

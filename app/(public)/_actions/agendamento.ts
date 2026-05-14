@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 /**
  * Server Actions de agendamento de consultas.
@@ -324,5 +323,61 @@ export async function listarHorariosLivres(params: {
   } catch (error) {
     console.error('[Action] Erro ao listar horários:', error);
     return { sucesso: false, erro: 'Erro ao listar horários livres' };
+  }
+}
+
+/**
+ * Lista TODOS os slots de 30 minutos das 24h de um dia com status.
+ * Retorna array com { horario: 'HH:mm', livre: boolean }.
+ * Usado na agenda do médico para visão completa do dia.
+ */
+export async function listarTodosHorariosDia(params: {
+  medicoId: string;
+  data: string; // formato YYYY-MM-DD
+}): Promise<ActionResult<{ horario: string; livre: boolean }[]>> {
+  try {
+    const { medicoId, data } = params;
+
+    // Gerar todos os slots de 30 em 30 min — 00:00 a 23:30
+    const TODOS_SLOTS: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (const m of [0, 30]) {
+        TODOS_SLOTS.push(
+          `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        );
+      }
+    }
+
+    const inicioData = new Date(`${data}T00:00:00`);
+    const fimData = new Date(`${data}T23:59:59`);
+
+    // Buscar consultas existentes neste dia para este médico
+    const consultasExistentes = await db
+      .select({ dataHora: consultas.dataHora, status: consultas.status })
+      .from(consultas)
+      .where(
+        and(
+          eq(consultas.medicoId, medicoId),
+          gte(consultas.dataHora, inicioData),
+          lte(consultas.dataHora, fimData),
+        ),
+      );
+
+    // Horários ocupados = consultas ativas (não canceladas)
+    const horariosOcupados = new Set(
+      consultasExistentes
+        .filter((c) => c.status !== 'cancelada')
+        .map((c) => format(new Date(c.dataHora), 'HH:mm')),
+    );
+
+    const resultado = TODOS_SLOTS.map((horario) => ({
+      horario,
+      livre: !horariosOcupados.has(horario),
+    }));
+
+    return { sucesso: true, dados: resultado };
+  } catch (error) {
+    console.error('[Action] Erro ao listar todos os horários:', error);
+    return { sucesso: false, erro: 'Erro ao listar horários do dia' };
   }
 }
