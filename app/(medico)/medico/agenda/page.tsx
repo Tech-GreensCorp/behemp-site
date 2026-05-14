@@ -218,7 +218,7 @@ export default function AgendaPage() {
         <TabsContent value="nova" className="mt-4 space-y-4">
           <Card className="border-0 shadow-sm">
             <CardHeader><CardTitle className="flex items-center gap-2 text-lg">
-              <Plus size={20} className="text-[#C08E3A]" /> Nova Consulta
+              <Plus size={20} className="text-primary" /> Nova Consulta
             </CardTitle></CardHeader>
             <CardContent className="space-y-6">
               {/* Paciente */}
@@ -271,7 +271,7 @@ export default function AgendaPage() {
                       {dataSel && !carregandoH && horarios.length > 0 && (
                         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#C08E3A]/20 border border-[#C08E3A]/40" />
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/15 border border-primary/30" />
                             Livre
                           </span>
                           <span className="flex items-center gap-1">
@@ -314,14 +314,14 @@ export default function AgendaPage() {
                                   className={[
                                     'flex flex-col items-center gap-0.5 px-2 py-2.5 text-center text-xs font-medium transition-colors border-r last:border-r-0',
                                     temSelecionado
-                                      ? 'bg-[#C08E3A]/10 text-[#C08E3A]'
+                                      ? 'bg-primary/10 text-primary'
                                       : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
                                   ].join(' ')}
                                 >
                                   <span className="font-semibold">{label}</span>
                                   <span className={[
                                     'text-[10px] tabular-nums',
-                                    temSelecionado ? 'text-[#C08E3A]/80' : 'text-muted-foreground/70',
+                                    temSelecionado ? 'text-primary/70' : 'text-muted-foreground/70',
                                   ].join(' ')}>
                                     {livresNoPeriodo} livre{livresNoPeriodo !== 1 ? 's' : ''}
                                   </span>
@@ -358,9 +358,9 @@ export default function AgendaPage() {
                                           className={[
                                             'relative flex items-center justify-center rounded-lg border py-3 text-xs font-semibold tabular-nums transition-all duration-150',
                                             selecionado
-                                              ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-sm ring-2 ring-[#C08E3A]/25'
+                                              ? 'border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/20'
                                               : livre
-                                                ? 'border-border bg-background text-foreground hover:border-[#C08E3A]/60 hover:bg-[#C08E3A]/8 hover:text-[#C08E3A] cursor-pointer'
+                                                ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary cursor-pointer'
                                                 : 'border-border/50 bg-muted/30 text-muted-foreground/50 cursor-not-allowed line-through',
                                           ].join(' ')}
                                         >
@@ -388,7 +388,7 @@ export default function AgendaPage() {
                   <Textarea value={obs} onChange={(e) => setObs(e.target.value)}
                     placeholder="Observações (opcional)" className="min-h-[80px]" />
                   <Button onClick={handleCriar} disabled={criando}
-                    className="w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
+                    className="w-full gap-2">
                     {criando ? <Loader2 size={16} className="animate-spin" />
                       : <CheckCircle2 size={16} />}
                     {criando ? 'Agendando...' : 'Confirmar Agendamento'}
@@ -447,10 +447,10 @@ export default function AgendaPage() {
               ) : (
                 <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                   {[
-                    { label: '🌙 Madrugada', range: [0, 12] },
-                    { label: '🌅 Manhã', range: [12, 24] },
-                    { label: '☀️ Tarde', range: [24, 36] },
-                    { label: '🌆 Noite', range: [36, 48] },
+                    { label: 'Madrugada', range: [0, 12] },
+                    { label: 'Manhã', range: [12, 24] },
+                    { label: 'Tarde', range: [24, 36] },
+                    { label: 'Noite', range: [36, 48] },
                   ].map(({ label, range }) => {
                     const slots = remarcarHorarios.slice(range[0], range[1]);
                     return (
@@ -462,12 +462,12 @@ export default function AgendaPage() {
                               onClick={() => livre && setRemarcarHorSel(horario)}
                               title={livre ? `Remarcar às ${horario}` : `${horario} — ocupado`}
                               className={[
-                                'relative rounded-lg border px-1 py-2 text-xs font-medium transition-all',
+                                'relative rounded-lg border px-1 py-2.5 text-xs font-semibold tabular-nums transition-all',
                                 remarcarHorSel === horario
-                                  ? 'border-[#C08E3A] bg-[#C08E3A] text-white'
+                                  ? 'border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/20'
                                   : livre
-                                    ? 'border-[#C08E3A]/30 bg-[#C08E3A]/5 hover:border-[#C08E3A] cursor-pointer'
-                                    : 'border-border bg-muted text-muted-foreground cursor-not-allowed opacity-40',
+                                    ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary cursor-pointer'
+                                    : 'border-border/50 bg-muted/30 text-muted-foreground/50 cursor-not-allowed line-through',
                               ].join(' ')}
                             >
                               {horario}
@@ -481,7 +481,7 @@ export default function AgendaPage() {
               )
             )}
             <Button onClick={handleRemarcar} disabled={!remarcarHorSel || remarcando}
-              className="w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
+              className="w-full gap-2">
               {remarcando ? 'Remarcando...' : 'Confirmar Remarcação'}
             </Button>
           </div>
