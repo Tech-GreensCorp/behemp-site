@@ -240,18 +240,34 @@ export default function AgendaPage() {
                   ))}
                 </div>
               </div>
-              {/* Data + Horários */}
+              {/* Data + Horários — layout lado a lado */}
               {pacienteSel && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Data</label>
-                    <Calendar mode="single" selected={dataSel} onSelect={(d) => d && carregarHorNova(d)}
-                      locale={ptBR} disabled={(d) => { const h = new Date(); h.setHours(0,0,0,0); return d < h || d.getDay() === 0; }}
-                      className="rounded-xl border" />
+                <div className="grid gap-6 lg:grid-cols-[auto_1fr] items-start">
+
+                  {/* ── Calendário (maior) ── */}
+                  <div className="min-w-0">
+                    <label className="text-sm font-medium mb-3 block">Data</label>
+                    <Calendar
+                      mode="single"
+                      selected={dataSel}
+                      onSelect={(d) => d && carregarHorNova(d)}
+                      locale={ptBR}
+                      disabled={(d) => { const h = new Date(); h.setHours(0,0,0,0); return d < h || d.getDay() === 0; }}
+                      className="rounded-xl border [&_table]:w-full [&_td]:p-1.5 [&_th]:p-1.5 [&_button]:h-10 [&_button]:w-10 [&_button]:text-sm"
+                    />
                   </div>
-                  <div>
+
+                  {/* ── Horários (coluna direita, scroll interno) ── */}
+                  <div className="min-w-0">
                     <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium">Horário — 24h do dia</label>
+                      <label className="text-sm font-medium">
+                        Horários — 24h
+                        {dataSel && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {dataSel.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                          </span>
+                        )}
+                      </label>
                       {dataSel && !carregandoH && horarios.length > 0 && (
                         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -265,17 +281,20 @@ export default function AgendaPage() {
                         </div>
                       )}
                     </div>
+
                     {!dataSel ? (
-                      <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma data primeiro</p>
+                      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+                        <CalendarIcon size={32} className="mb-2 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">Selecione uma data no calendário</p>
+                      </div>
                     ) : carregandoH ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 size={24} className="animate-spin text-primary" />
+                      <div className="flex justify-center py-16">
+                        <Loader2 size={28} className="animate-spin text-primary" />
                       </div>
                     ) : horarios.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">Sem horários disponíveis</p>
                     ) : (
-                      <div className="space-y-4">
-                        {/* Agrupa os 48 slots em 4 períodos de 6h */}
+                      <div className="max-h-[420px] overflow-y-auto space-y-4 pr-1 rounded-xl border p-4 bg-muted/20">
                         {[
                           { label: '🌙 Madrugada', range: [0, 12] },
                           { label: '🌅 Manhã', range: [12, 24] },
@@ -285,7 +304,7 @@ export default function AgendaPage() {
                           const slots = horarios.slice(range[0], range[1]);
                           return (
                             <div key={label}>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">{label}</p>
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 sticky top-0 bg-muted/20 py-0.5">{label}</p>
                               <div className="grid grid-cols-4 gap-1.5">
                                 {slots.map(({ horario, livre }) => {
                                   const selecionado = horarioSel === horario;
@@ -296,16 +315,16 @@ export default function AgendaPage() {
                                       onClick={() => livre && setHorarioSel(horario)}
                                       title={livre ? `Agendar às ${horario}` : `${horario} — ocupado`}
                                       className={[
-                                        'relative flex items-center justify-center rounded-lg border px-1 py-2 text-xs font-medium transition-all',
+                                        'relative flex items-center justify-center rounded-lg border px-1 py-2.5 text-xs font-medium transition-all',
                                         selecionado
-                                          ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-md'
+                                          ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-md ring-2 ring-[#C08E3A]/30'
                                           : livre
-                                            ? 'border-[#C08E3A]/30 bg-[#C08E3A]/5 text-foreground hover:border-[#C08E3A] hover:bg-[#C08E3A]/15 cursor-pointer'
-                                            : 'border-border bg-muted text-muted-foreground cursor-not-allowed opacity-50',
+                                            ? 'border-[#C08E3A]/30 bg-background text-foreground hover:border-[#C08E3A] hover:bg-[#C08E3A]/10 cursor-pointer'
+                                            : 'border-border bg-muted/60 text-muted-foreground cursor-not-allowed opacity-40',
                                       ].join(' ')}
                                     >
                                       {!livre && !selecionado && (
-                                        <Lock size={8} className="absolute top-1 right-1 opacity-60" />
+                                        <Lock size={7} className="absolute top-0.5 right-0.5 opacity-50" />
                                       )}
                                       {horario}
                                     </button>
