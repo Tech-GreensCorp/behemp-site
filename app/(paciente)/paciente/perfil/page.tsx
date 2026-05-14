@@ -370,9 +370,9 @@ export default function PerfilPacientePage() {
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Diagnóstico, prescrição e histórico clínico são controlados pela equipe médica. Para alterações, entre em contato pelo chat.
               </p>
-              <Button asChild variant="link" size="sm" className="mt-2 h-auto px-0 text-xs text-primary">
-                <Link href="/paciente/chat">Falar com a equipe →</Link>
-              </Button>
+              <Link href="/paciente/chat" className="mt-2 inline-flex items-center text-xs font-medium text-primary hover:underline underline-offset-2">
+                Falar com a equipe →
+              </Link>
             </div>
           </div>
         </div>

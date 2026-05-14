@@ -64,7 +64,7 @@ export async function listarPacientesComMedico(): Promise<ActionResult<PacienteS
         p.created_at DESC
     `);
 
-    return { sucesso: true, dados: resultado.rows as PacienteSemMedico[] };
+    return { sucesso: true, dados: resultado.rows as unknown as PacienteSemMedico[] };
   } catch (error) {
     console.error('[Admin] Erro ao listar pacientes com médico:', error);
     return { sucesso: false, erro: 'Erro ao carregar pacientes' };
@@ -90,7 +90,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<MedicoDis
       ORDER BY u.nome
     `);
 
-    return { sucesso: true, dados: resultado.rows as MedicoDisponivel[] };
+    return { sucesso: true, dados: resultado.rows as unknown as MedicoDisponivel[] };
   } catch (error) {
     console.error('[Admin] Erro ao listar médicos:', error);
     return { sucesso: false, erro: 'Erro ao carregar médicos' };

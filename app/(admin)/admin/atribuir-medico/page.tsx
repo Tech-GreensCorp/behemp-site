@@ -160,7 +160,7 @@ export default function AtribuirMedicoPage() {
                   {/* Select de médico + botão */}
                   <div className="flex items-center gap-2">
                     <Select
-                      onValueChange={(val) => handleAtribuir(p.pacienteId, val)}
+                      onValueChange={(val) => handleAtribuir(p.pacienteId, val as string)}
                       disabled={salvando === p.pacienteId}
                     >
                       <SelectTrigger className="w-[220px]">
@@ -215,7 +215,7 @@ export default function AtribuirMedicoPage() {
                     </Badge>
                     {/* Permite reatribuir */}
                     <Select
-                      onValueChange={(val) => handleAtribuir(p.pacienteId, val)}
+                      onValueChange={(val) => handleAtribuir(p.pacienteId, val as string)}
                       disabled={salvando === p.pacienteId}
                     >
                       <SelectTrigger className="w-[180px]">
