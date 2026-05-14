@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
+import { useNotificacoesNaoLidas } from '@/lib/hooks/use-notificacoes-nao-lidas';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Dashboard', href: '/paciente', icon: LayoutDashboard },
@@ -36,6 +37,7 @@ export function PacienteSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut } = useClerk();
   const chatNaoLidas = useChatNaoLidas();
+  const notificacoesNaoLidas = useNotificacoesNaoLidas();
 
   return (
     <>
@@ -110,6 +112,11 @@ export function PacienteSidebar() {
                 {item.label === 'Chat' && chatNaoLidas > 0 && (
                   <span className="absolute -top-1 left-6 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-sm">
                     {chatNaoLidas > 99 ? '99+' : chatNaoLidas}
+                  </span>
+                )}
+                {item.label === 'Notificações' && notificacoesNaoLidas > 0 && (
+                  <span className="absolute -top-1 left-6 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    {notificacoesNaoLidas > 99 ? '99+' : notificacoesNaoLidas}
                   </span>
                 )}
               </Link>

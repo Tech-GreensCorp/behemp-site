@@ -70,6 +70,8 @@ export default function NotificacoesPacientePage() {
       setNotificacoes((prev) =>
         prev.map((n) => (n.id === id ? { ...n, lida: true } : n)),
       );
+      // Atualiza o badge da sidebar imediatamente
+      window.dispatchEvent(new Event('notificacoes-update'));
     }
   }
 
@@ -78,6 +80,8 @@ export default function NotificacoesPacientePage() {
     if (resultado.sucesso) {
       setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
       toast.success('Todas as notificações foram marcadas como lidas');
+      // Atualiza o badge da sidebar imediatamente
+      window.dispatchEvent(new Event('notificacoes-update'));
     }
   }
 

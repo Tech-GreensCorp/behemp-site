@@ -157,14 +157,26 @@ export async function criarConsultaMedico(params: {
       linkAcao: '/paciente/consultas',
     });
 
-    // E-mail via Brevo
+    // E-mail ao paciente via Brevo
     try {
-      const { enviarEmailConsultaAgendada } = await import('@/lib/email/consultas');
+      const { enviarEmailConsultaAgendada, enviarEmailConsultaMedico } = await import('@/lib/email/consultas');
       await enviarEmailConsultaAgendada({
         pacienteNome: paciente.nome, pacienteEmail: paciente.email,
         medicoNome: medico?.nome ?? 'Médico Be4Hope',
         dataHora: dataInicio, meetLink: googleMeetLink,
       });
+      // E-mail ao médico
+      if (medico?.email) {
+        await enviarEmailConsultaMedico({
+          medicoNome: medico.nome,
+          medicoEmail: medico.email,
+          pacienteNome: paciente.nome,
+          pacienteEmail: paciente.email,
+          dataHora: dataInicio,
+          meetLink: googleMeetLink,
+          tipo: params.tipo,
+        });
+      }
     } catch (e) { console.error('[Consultas] Erro e-mail:', e); }
 
     return { sucesso: true, dados: { id: novaConsulta.id, meetLink: googleMeetLink || '' } };
@@ -279,7 +291,7 @@ export async function cancelarConsultaMedico(params: {
       .where(eq(pacientes.id, consulta.pacienteId));
 
     const [medicoData] = await db
-      .select({ nome: users.nome })
+      .select({ nome: users.nome, email: users.email })
       .from(medicos).innerJoin(users, eq(medicos.userId, users.id))
       .where(eq(medicos.id, medicoId));
 
@@ -292,12 +304,22 @@ export async function cancelarConsultaMedico(params: {
       });
 
       try {
-        const { enviarEmailConsultaCancelada } = await import('@/lib/email/consultas');
+        const { enviarEmailConsultaCancelada, enviarEmailCancelamentoMedico } = await import('@/lib/email/consultas');
         await enviarEmailConsultaCancelada({
           pacienteNome: paciente.nome, pacienteEmail: paciente.email,
           medicoNome: medicoData?.nome ?? 'Médico Be4Hope',
           dataHora: consulta.dataHora, motivo: params.motivo,
         });
+        // E-mail ao médico
+        if (medicoData?.email) {
+          await enviarEmailCancelamentoMedico({
+            medicoNome: medicoData.nome,
+            medicoEmail: medicoData.email,
+            pacienteNome: paciente.nome,
+            dataHora: consulta.dataHora,
+            motivo: params.motivo,
+          });
+        }
       } catch (e) { console.error('[Consultas] Erro e-mail cancelamento:', e); }
     }
 

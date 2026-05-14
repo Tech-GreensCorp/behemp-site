@@ -121,6 +121,7 @@ export async function criarConsultaGoogleCalendar(
     const evento = await calendar.events.insert({
       calendarId: params.calendarId || 'primary',
       conferenceDataVersion: 1, // Necessário para criar Meet
+      sendUpdates: 'all', // Envia convite ao paciente + adiciona na agenda dele
       requestBody: {
         summary: params.titulo,
         description: params.descricao || 'Consulta Be4Hope — Medicina Endocanabinóide',
