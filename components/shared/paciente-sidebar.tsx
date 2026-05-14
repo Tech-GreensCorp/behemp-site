@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Pill,
-  FileText,
   MessageSquare,
   Settings,
   LogOut,
@@ -23,11 +22,10 @@ import type { LucideIcon } from 'lucide-react';
 import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: 'Meu Painel', href: '/paciente', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/paciente', icon: LayoutDashboard },
   { label: 'Meu Perfil', href: '/paciente/perfil', icon: User },
   { label: 'Medicamentos', href: '/paciente/medicamentos', icon: Pill },
   { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart },
-  { label: 'Documentos', href: '/paciente/documentos', icon: FileText },
   { label: 'Chat', href: '/paciente/chat', icon: MessageSquare },
   { label: 'Notificações', href: '/paciente/notificacoes', icon: Bell },
   { label: 'Configurações', href: '/paciente/configuracoes', icon: Settings },

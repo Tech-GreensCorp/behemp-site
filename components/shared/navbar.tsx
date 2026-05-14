@@ -28,7 +28,7 @@ import {
   SheetTrigger,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Menu, LogIn, Calendar, LayoutDashboard, MessageCircle } from 'lucide-react';
+import { Menu, LogIn, Calendar, LayoutDashboard, MessageCircle, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -63,11 +63,11 @@ export function Navbar() {
         scrolled ? 'glass shadow-sm' : 'bg-transparent',
       )}
     >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
         {/* ── Logo ── */}
         <Link href="/" className="flex shrink-0 items-center transition-opacity hover:opacity-80">
-          <img src="/logo.png" alt="Be4Hope" className="h-11 w-auto" />
+          <img src="/logo.png" alt="Be4Hope" className="h-16 w-auto" />
         </Link>
 
         {/* ── Desktop: nav links (centro) ── */}
@@ -118,18 +118,31 @@ export function Navbar() {
                 <span className="h-5 w-px bg-border" />
               </div>
             ) : (
-              /* Não logado: Entrar ghost */
-              <Link href="/sign-in">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                  nativeButton={false}
-                >
-                  <LogIn size={14} />
-                  Entrar
-                </Button>
-              </Link>
+              /* Não logado: Registrar-se + Entrar ghost */
+              <div className="flex items-center gap-1.5">
+                <Link href="/sign-up">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    nativeButton={false}
+                  >
+                    <UserPlus size={14} />
+                    Registrar-se
+                  </Button>
+                </Link>
+                <Link href="/sign-in">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    nativeButton={false}
+                  >
+                    <LogIn size={14} />
+                    Entrar
+                  </Button>
+                </Link>
+              </div>
             )}
           </ClerkLoaded>
 
@@ -194,7 +207,7 @@ export function Navbar() {
 
               <div className="flex-1 overflow-y-auto px-6 pt-5 pb-6">
                 <SheetTitle className="mb-6">
-                  <img src="/logo.png" alt="Be4Hope" className="h-10 w-auto" />
+                  <img src="/logo.png" alt="Be4Hope" className="h-12 w-auto" />
                 </SheetTitle>
 
                 {/* Nav links */}
@@ -242,16 +255,28 @@ export function Navbar() {
                         </div>
                       </>
                     ) : (
-                      <Link href="/sign-in" onClick={() => setMobileOpen(false)}>
-                        <Button
-                          variant="outline"
-                          className="h-11 w-full gap-2 rounded-full"
-                          nativeButton={false}
-                        >
-                          <LogIn size={16} />
-                          Entrar na minha conta
-                        </Button>
-                      </Link>
+                      <>
+                        <Link href="/sign-up" onClick={() => setMobileOpen(false)}>
+                          <Button
+                            variant="outline"
+                            className="h-11 w-full gap-2 rounded-full"
+                            nativeButton={false}
+                          >
+                            <UserPlus size={16} />
+                            Registrar-se
+                          </Button>
+                        </Link>
+                        <Link href="/sign-in" onClick={() => setMobileOpen(false)}>
+                          <Button
+                            variant="outline"
+                            className="h-11 w-full gap-2 rounded-full"
+                            nativeButton={false}
+                          >
+                            <LogIn size={16} />
+                            Entrar na minha conta
+                          </Button>
+                        </Link>
+                      </>
                     )}
                   </ClerkLoaded>
 

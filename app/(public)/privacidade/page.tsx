@@ -42,7 +42,7 @@ const SECOES: Secao[] = [
         <p>
           A <strong>Be4Hope</strong> (&ldquo;nós&rdquo;, &ldquo;nosso&rdquo; ou &ldquo;organização&rdquo;)
           é uma organização filantrópica sem fins lucrativos, atuante desde 2004 no acolhimento de
-          pacientes e famílias que buscam tratamentos à base de cannabis medicinal.
+          pacientes e famílias que buscam tratamentos com Medicina Endocanabinóide.
         </p>
         <p>
           Esta Política de Privacidade descreve como coletamos, utilizamos, armazenamos e protegemos

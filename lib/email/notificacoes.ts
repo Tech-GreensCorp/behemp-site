@@ -433,8 +433,12 @@ export async function enviarEmailRecompraCompletoEquipe(params: {
         sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
         to: [{ email: dest.email, name: dest.nome }],
       });
-    } catch (err) {
-      console.error(`[Email] Erro ao enviar para ${dest.email}:`, err);
+    } catch (err: any) {
+      console.error(`[Email] Erro ao enviar para ${dest.email}:`, {
+        message: err?.message,
+        status: err?.status ?? err?.statusCode,
+        body: err?.body ?? err?.response?.body,
+      });
     }
   }
 }

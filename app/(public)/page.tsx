@@ -23,7 +23,7 @@ import {
 export const metadata: Metadata = {
   title: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
   description:
-    'Há mais de duas décadas conectando pessoas ao cuidado com cannabis medicinal. Acolhimento humanizado, sem julgamento, sem custo.',
+    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide. Acolhimento humanizado, sem julgamento, sem custo.',
 };
 
 /* ── Dados ──────────────────────────────────────────── */
@@ -82,7 +82,7 @@ const COMO_FUNCIONA = [
 
 const HISTORIAS = [
   {
-    titulo: 'Cannabis medicinal e qualidade de vida: o que a evidência mostra',
+    titulo: 'Medicina Endocanabinóide e qualidade de vida: o que a evidência mostra',
     subtitulo: 'Como o uso terapêutico responsável tem transformado o dia a dia de quem convive com condições crônicas.',
     categoria: 'Bem-estar',
     imagem: '/images/home/historia-familia-sofa.jpg',
@@ -92,8 +92,8 @@ const HISTORIAS = [
     titulo: 'O que a ciência diz sobre cuidado integrativo em 2026',
     subtitulo: 'Novos estudos apresentam tratamentos inovadores.',
     categoria: 'Ciência',
-    imagem: '/images/home/historia-meditacao.jpg',
-    alt: 'Mulher meditando em meio à natureza — bem-estar e equilíbrio',
+    imagem: '/images/home/historia-familia-sofa2.jpg',
+    alt: 'Família feliz reunida em casa — acolhimento e bem-estar',
   },
   {
     titulo: 'Be4Hope completa 21 anos e os próximos ciclos',
@@ -116,7 +116,7 @@ export default function HomePage() {
             {/* Texto */}
             <div className="animate-fade-up">
               <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
-                Acolhimento · Cannabis Medicinal
+                Acolhimento · Medicina Endocanabinóide
               </p>
 
               <h1 className="font-display text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
@@ -129,7 +129,7 @@ export default function HomePage() {
 
               <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
                 Há mais de duas décadas conectando pessoas ao cuidado com
-                cannabis medicinal. Sem pressa, sem julgamento, sem custo.
+                Medicina Endocanabinóide. Sem pressa, sem julgamento, sem custo.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -243,17 +243,16 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Ilustração família — Quem Somos */}
+            {/* Vídeo — Quem Somos */}
             <div className="flex flex-col gap-6">
-              <div className="relative aspect-[4/3]">
-                <Image
-                  src="/images/home/quem-somos-familia.jpg"
-                  alt="Ilustração de família multigeracional — representando todas as idades atendidas pela Be4Hope"
-                  fill
-                  className="object-contain"
-                  style={{ mixBlendMode: 'multiply' }}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  quality={85}
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+                <video
+                  src="/images/home/shutterstock_1076126774.mov"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               </div>
 
@@ -295,7 +294,7 @@ export default function HomePage() {
             <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
               A Be4Hope é muito mais do que uma ONG. Somos uma rede de acolhimento,
               cuidado e transformação, que conecta pacientes a tratamentos seguros,
-              eficazes e acessíveis com cannabis medicinal.
+              eficazes e acessíveis com Medicina Endocanabinóide.
             </p>
           </div>
 
@@ -364,7 +363,7 @@ export default function HomePage() {
             <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
               A Be4Hope é uma <strong className="text-foreground">collaboration (collab)</strong>{' '}
               formada por empresas e instituições que promovem um modelo inovador de saúde — mais
-              humano, acessível e centrado no paciente, utilizando a cannabis medicinal como terapia,
+              humano, acessível e centrado no paciente, utilizando a Medicina Endocanabinóide como terapia,
               sempre com base científica e responsabilidade.
             </p>
           </div>
@@ -379,8 +378,8 @@ export default function HomePage() {
                 </div>
                 <h3 className="font-display text-lg font-bold">Greens</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  <strong className="text-foreground">Produção e distribuição</strong> de medicamentos
-                  à base de cannabis com qualidade e segurança.{' '}
+                  <strong className="text-foreground">Produção e distribuição</strong> de produtos
+                  de Medicina Endocanabinóide com qualidade e segurança.{' '}
                   <strong className="text-foreground">Educação médica</strong> para promover o uso
                   consciente da terapia canabinóide.
                 </p>
@@ -407,7 +406,7 @@ export default function HomePage() {
                 <h3 className="font-display text-lg font-bold">Be 4Hope</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                   Atua como <strong className="text-foreground">ponte entre pacientes, familiares e o
-                  ecossistema</strong> da cannabis medicinal. Trabalha em rede com parceiros para criar
+                  ecossistema</strong> da Medicina Endocanabinóide. Trabalha em rede com parceiros para criar
                   soluções personalizadas.
                 </p>
                 <ul className="mt-4 space-y-2">
@@ -444,7 +443,7 @@ export default function HomePage() {
               </h2>
               <div className="mt-6 space-y-4 text-base leading-relaxed text-white/70">
                 <p>
-                  A cannabis medicinal tem se mostrado eficaz no tratamento de diversas doenças
+                  A Medicina Endocanabinóide tem se mostrado eficaz no tratamento de diversas doenças
                   raras e crônicas, desde dores crônicas até distúrbios neurológicos.
                 </p>
                 <p>
@@ -472,15 +471,15 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Imagem — Óleo CBD */}
+            {/* Vídeo — Medicina Endocanabinóide */}
             <div className="relative aspect-[4/3] overflow-hidden rounded-2xl shadow-lg">
-              <Image
-                src="/images/home/medicina-oleo-cbd.jpg"
-                alt="Pessoa utilizando óleo de CBD com conta-gotas — medicina canabinóide"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                quality={85}
+              <video
+                src="/images/home/shutterstock_1090570595.mov"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
             </div>
@@ -500,7 +499,7 @@ export default function HomePage() {
               <span className="text-accent-italic">a sua casa</span>
             </h2>
             <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              Entenda o passo a passo para acessar seu tratamento com cannabis medicinal de forma
+              Entenda o passo a passo para acessar seu tratamento com Medicina Endocanabinóide de forma
               segura e legalizada.
             </p>
           </div>
@@ -565,6 +564,117 @@ export default function HomePage() {
                 <ChevronRight size={16} />
               </Button>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Seção Humana — Imagem + Diferenciais ─────────── */}
+      <section className="overflow-hidden py-20 lg:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
+
+            {/* Coluna esquerda — Imagem com detalhe de profundidade */}
+            <div className="relative">
+              {/* Quadrado decorativo de fundo */}
+              <div
+                className="absolute -left-4 -top-4 h-full w-full rounded-3xl bg-primary/6 lg:-left-6 lg:-top-6"
+                aria-hidden="true"
+              />
+              <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-2xl">
+                <Image
+                  src="/images/home/shutterstock_2203716633.jpg"
+                  alt="Paciente idoso sendo acolhido com cuidado e atenção por profissional de saúde"
+                  fill
+                  className="object-cover"
+                  style={{ objectPosition: 'center 35%' }}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  quality={85}
+                />
+                {/* Overlay sutil de gradiente */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+
+                {/* Badge flutuante de credibilidade */}
+                <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-white/90 px-5 py-4 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                      <HeartPulse size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Cuidado humanizado</p>
+                      <p className="text-xs text-muted-foreground">Mais de 21 anos de acolhimento real</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Coluna direita — Texto emocional + diferenciais */}
+            <div>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+                Nossa essência
+              </p>
+              <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+                Cuidado humano{' '}
+                <span className="text-accent-italic">que transforma.</span>
+              </h2>
+              <p className="mt-6 text-base leading-relaxed text-muted-foreground">
+                Por trás de cada paciente existe uma história de luta, esperança e amor. A Be4Hope
+                nasceu justamente para que ninguém precise enfrentar esse caminho sozinho — com
+                acolhimento genuíno, orientação especializada e acesso real ao tratamento.
+              </p>
+
+              <div className="mt-10 space-y-6">
+                {[
+                  {
+                    icon: HeartPulse,
+                    titulo: 'Sem julgamento, sem pressa',
+                    descricao:
+                      'Cada caso é único. Nossa equipe ouve, respeita e acompanha cada etapa do seu processo com empatia e responsabilidade.',
+                  },
+                  {
+                    icon: Shield,
+                    titulo: 'Segurança em cada etapa',
+                    descricao:
+                      'Atuamos dentro da regulamentação Anvisa (RDC 660), garantindo que o acesso ao tratamento seja seguro, legal e transparente.',
+                  },
+                  {
+                    icon: Users,
+                    titulo: 'Rede multidisciplinar',
+                    descricao:
+                      'Médicos, assistentes sociais e especialistas trabalham juntos para oferecer o melhor caminho para cada paciente.',
+                  },
+                ].map((item) => {
+                  const DynIcon = item.icon;
+                  return (
+                    <div key={item.titulo} className="flex items-start gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 transition-colors hover:bg-primary/20">
+                        <DynIcon size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.titulo}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                          {item.descricao}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-10">
+                <Link href="/triagem">
+                  <Button
+                    size="lg"
+                    className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                    nativeButton={false}
+                  >
+                    Quero ser acolhido
+                    <ChevronRight size={16} />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

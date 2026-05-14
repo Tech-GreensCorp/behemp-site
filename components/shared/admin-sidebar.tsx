@@ -14,17 +14,24 @@ import {
   ChevronLeft,
   Menu,
   MessageSquare,
+  UserPlus,
+  Receipt,
+  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { contarContatosNaoLidos } from '@/app/(public)/_actions/contato';
+import { contarPacientesSemMedico } from '@/app/_actions/admin-atribuicao';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Visão Geral', href: '/admin', icon: LayoutDashboard },
   { label: 'Usuários', href: '/admin/usuarios', icon: Users },
+  { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
   { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
   { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
+  { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
+  { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
   { label: 'Auditoria', href: '/admin/auditoria', icon: Shield },
   { label: 'Configurações', href: '/admin/configuracoes', icon: Settings },
 ];
@@ -33,6 +40,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
+  const [semMedico, setSemMedico] = useState(0);
   const { signOut } = useClerk();
 
   useEffect(() => {
@@ -40,16 +48,43 @@ export function AdminSidebar() {
       contarContatosNaoLidos().then((r) => {
         if (r.sucesso && r.dados !== undefined) setNaoLidas(r.dados);
       });
+      contarPacientesSemMedico().then((r) => {
+        if (r.sucesso && r.dados !== undefined) setSemMedico(r.dados);
+      });
     }
 
     // Busca ao montar e quando muda de rota
     atualizarContagem();
 
-    // Escuta evento disparado pela página de mensagens ao marcar como lida/respondida
+    // Escuta eventos para atualizar badges
     window.addEventListener('mensagens-atualizadas', atualizarContagem);
-    return () => window.removeEventListener('mensagens-atualizadas', atualizarContagem);
+    window.addEventListener('paciente-atribuido', atualizarContagem);
+    return () => {
+      window.removeEventListener('mensagens-atualizadas', atualizarContagem);
+      window.removeEventListener('paciente-atribuido', atualizarContagem);
+    };
   }, [pathname]);
 
+  /**
+   * Retorna o badge de contagem para o item de navegação, se aplicável.
+   */
+  function renderBadge(href: string) {
+    if (href === '/admin/mensagens' && naoLidas > 0) {
+      return (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+          {naoLidas > 99 ? '99+' : naoLidas}
+        </span>
+      );
+    }
+    if (href === '/admin/atribuir-medico' && semMedico > 0) {
+      return (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">
+          {semMedico > 99 ? '99+' : semMedico}
+        </span>
+      );
+    }
+    return null;
+  }
 
   return (
     <>
@@ -108,6 +143,7 @@ export function AdminSidebar() {
                 : pathname.startsWith(item.href);
 
             const Icon = item.icon;
+            const badge = !collapsed ? renderBadge(item.href) : null;
 
             return (
               <Link
@@ -123,15 +159,24 @@ export function AdminSidebar() {
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <Icon size={20} className="shrink-0" />
+                <div className="relative shrink-0">
+                  <Icon size={20} />
+                  {/* Badge no modo collapsed */}
+                  {collapsed && item.href === '/admin/atribuir-medico' && semMedico > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-amber-500">
+                      <span className="h-2 w-2 animate-ping rounded-full bg-amber-400" />
+                    </span>
+                  )}
+                  {collapsed && item.href === '/admin/mensagens' && naoLidas > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-primary">
+                      <span className="h-2 w-2 animate-ping rounded-full bg-primary/60" />
+                    </span>
+                  )}
+                </div>
                 {!collapsed && (
                   <span className="flex-1">{item.label}</span>
                 )}
-                {!collapsed && item.href === '/admin/mensagens' && naoLidas > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                    {naoLidas > 99 ? '99+' : naoLidas}
-                  </span>
-                )}
+                {badge}
               </Link>
             );
           })}

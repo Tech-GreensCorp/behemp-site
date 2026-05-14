@@ -42,9 +42,9 @@ export const metadata: Metadata = {
     template: '%s | Be4Hope',
   },
   description:
-    'Há mais de duas décadas conectando pessoas ao cuidado com cannabis medicinal. Acolhimento humanizado, sem julgamento, sem custo.',
+    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide. Acolhimento humanizado, sem julgamento, sem custo.',
   keywords: [
-    'cannabis medicinal',
+    'Medicina Endocanabinóide',
     'medicina endocanabinóide',
     'acolhimento',
     'ONG',
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     siteName: 'Be4Hope',
     title: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
     description:
-      'Há mais de duas décadas conectando pessoas ao cuidado com cannabis medicinal.',
+      'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide.',
   },
 };
 

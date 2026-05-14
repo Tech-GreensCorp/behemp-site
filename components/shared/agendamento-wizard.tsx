@@ -12,7 +12,8 @@ import {
   listarHorariosLivres,
   agendarConsulta,
 } from '@/app/(public)/_actions/agendamento';
-import { useAuth, SignInButton } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -187,11 +188,16 @@ export function AgendamentoWizard() {
               Para agendar sua consulta, faça login ou crie sua conta. É rápido e gratuito.
             </p>
             <div className="mt-6 flex gap-3">
-              <SignInButton mode="modal" forceRedirectUrl="/agendamento">
+              <Link href="/sign-in?redirect_url=/agendamento">
                 <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
                   Entrar para agendar
                 </Button>
-              </SignInButton>
+              </Link>
+              <Link href="/sign-up?redirect_url=/agendamento">
+                <Button variant="outline" className="gap-2 px-8">
+                  Criar conta grátis
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

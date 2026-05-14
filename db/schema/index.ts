@@ -28,6 +28,7 @@ export * from './logs-auditoria';
 export * from './exames';
 export * from './ajustes-dosagem';
 export * from './relatorios';
+export * from './invoices';
 
 // Relations
 export * from './relations';

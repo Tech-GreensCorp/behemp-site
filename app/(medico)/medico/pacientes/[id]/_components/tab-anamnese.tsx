@@ -149,7 +149,7 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
             <div><Label>Objetivos do Tratamento</Label><Textarea value={form.objetivosTratamento} onChange={e => u('objetivosTratamento', e.target.value)} rows={2} /></div>
             <div className="flex items-center gap-2">
               <Checkbox checked={form.usoPrevioCannabis} onCheckedChange={v => u('usoPrevioCannabis', !!v)} id="cannabis" />
-              <Label htmlFor="cannabis" className="cursor-pointer">Uso prévio de cannabis medicinal</Label>
+              <Label htmlFor="cannabis" className="cursor-pointer">Uso prévio de Medicina Endocanabinóide</Label>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
@@ -184,7 +184,7 @@ export function TabAnamnese({ pacienteId }: TabAnamneseProps) {
               {a.doencasPrevias && <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Doenças Prévias</p><p className="text-sm">{a.doencasPrevias}</p></div>}
               {a.medicamentosEmUso && <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Medicamentos em Uso</p><p className="text-sm">{a.medicamentosEmUso}</p></div>}
               {a.nivelDor != null && <p className="text-sm">Nível de Dor: <strong>{a.nivelDor}/10</strong></p>}
-              {a.usoPrevioCannabis && <Badge variant="secondary">Cannabis medicinal prévia</Badge>}
+              {a.usoPrevioCannabis && <Badge variant="secondary">Medicina Endocanabinóide prévia</Badge>}
             </CardContent>
           </Card>
         ))

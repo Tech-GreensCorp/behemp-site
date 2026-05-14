@@ -2,7 +2,7 @@
 
 import { SignIn, useAuth } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   BadgeCheck,
   Calendar,
@@ -96,6 +96,8 @@ export default function SignInPage() {
   const [particles, setParticles] = useState<Particle[]>([]);
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect_url') || '/redirect';
 
   // Se o usuário já está logado, redireciona para /redirect
   useEffect(() => {
@@ -357,7 +359,7 @@ export default function SignInPage() {
           }}
         >
           <p className="text-xs text-gray-400">
-            © {new Date().getFullYear()} Be4Hope · Cannabis Medicinal com Ciência e Cuidado
+            © {new Date().getFullYear()} Be4Hope · Medicina Endocanabinóide com Ciência e Cuidado
           </p>
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -417,25 +419,32 @@ export default function SignInPage() {
             transition: 'opacity 0.8s ease-out 0.25s, transform 0.8s ease-out 0.25s',
           }}
         >
-          {/* Cabeçalho */}
+          {/* Cabeçalho — contexto inequívoco de LOGIN */}
           <div className="mb-7 space-y-1.5">
-            <div className="flex items-center gap-2 mb-4">
-              <div
-                className="h-8 w-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'rgba(230,57,70,0.1)' }}
-              >
-                <HeartPulse size={18} style={{ color: '#E63946' }}  />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Be4Hope</span>
+            {/* Badge de contexto */}
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-xs font-semibold" style={{ color: '#2563eb' }}>Acessar conta</span>
             </div>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-              Acessar conta
-            </h2>
-            <p className="text-sm text-gray-500">Entre com suas credenciais para continuar</p>
+
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="h-9 w-9 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(59,130,246,0.1)' }}
+              >
+                <HeartPulse size={18} style={{ color: '#2563eb' }} />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
+                  Acessar conta
+                </h2>
+                <p className="text-sm text-gray-500">Entre com suas credenciais para continuar</p>
+              </div>
+            </div>
           </div>
 
           <SignIn
-            forceRedirectUrl="/redirect"
+            forceRedirectUrl={redirectUrl}
             appearance={{
               layout: {
                 logoPlacement: 'none',

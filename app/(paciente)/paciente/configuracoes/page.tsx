@@ -1,19 +1,44 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Shield, Bell } from 'lucide-react';
+import { User, Shield, Bell, Loader2 } from 'lucide-react';
+import { obterPerfilPaciente } from '@/app/_actions/documentos-paciente-self';
+
+interface Perfil {
+  nome: string;
+  email: string;
+  telefone: string | null;
+}
 
 export default function ConfiguracoesPacientePage() {
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    obterPerfilPaciente().then((res) => {
+      if (res.sucesso && res.dados) {
+        setPerfil({
+          nome: res.dados.nome ?? '—',
+          email: res.dados.email ?? '—',
+          telefone: res.dados.telefone ?? null,
+        });
+      }
+      setCarregando(false);
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie seu perfil e preferências
-        </p>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Configurações</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">Gerencie seu perfil e preferências</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border-0 shadow-sm">
+        {/* Meu Perfil */}
+        <Card className="border-border/40 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
@@ -23,22 +48,31 @@ export default function ConfiguracoesPacientePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Nome</span>
-              <span className="font-medium">Maria Silva</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">E-mail</span>
-              <span className="font-medium">maria@email.com</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Telefone</span>
-              <span className="font-medium">(11) 99999-1234</span>
-            </div>
+            {carregando ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Nome</span>
+                  <span className="font-medium">{perfil?.nome ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">E-mail</span>
+                  <span className="font-medium">{perfil?.email ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Telefone</span>
+                  <span className="font-medium">{perfil?.telefone ?? 'Não informado'}</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        {/* Notificações */}
+        <Card className="border-border/40 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
@@ -63,7 +97,8 @@ export default function ConfiguracoesPacientePage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm md:col-span-2">
+        {/* Privacidade */}
+        <Card className="border-border/40 shadow-sm md:col-span-2">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">

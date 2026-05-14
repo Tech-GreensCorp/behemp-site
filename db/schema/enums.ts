@@ -49,6 +49,7 @@ export const notificacaoTipoEnum = pgEnum('notificacao_tipo', [
   'consulta_agendada',
   'consulta_cancelada',
   'nova_mensagem',
+  'novo_paciente',
   'geral',
 ]);
 
@@ -105,4 +106,18 @@ export const evolucaoTipoEnum = pgEnum('evolucao_tipo', [
   'positiva',
   'estavel',
   'negativa',
+]);
+
+/** Tipo de invoice médica */
+export const invoiceTipoEnum = pgEnum('invoice_tipo', [
+  'donation',
+  'judicialization',
+  'collab',
+  'retail',
+]);
+
+/** Status da invoice */
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+  'draft',
+  'completed',
 ]);

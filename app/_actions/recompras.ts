@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { recompras, users, pacientes, notificacoes, emailsNotificacao } from '@/db/schema';
-import { eq, desc, and, or, sql } from 'drizzle-orm';
+import { eq, desc, and, or, sql, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { inngest } from '@/lib/integrations/inngest';
@@ -166,7 +166,7 @@ export async function solicitarRecompraManual(
 
     // ── E-mails para equipe ────────────────────────────────────
     try {
-      // Buscar nome do paciente se for pedido de médico
+      // Resolver dados do paciente
       let nomePaciente = solicitante.nome;
       let emailPaciente = solicitante.email;
 
@@ -183,21 +183,64 @@ export async function solicitarRecompraManual(
         }
       }
 
-      // Buscar emails de admins, médicos e financeiro
-      const [adminsEmails, medicosEmails, financeiroEmails] = await Promise.all([
-        db.select({ email: users.email, nome: users.nome }).from(users).where(eq(users.role, 'admin')),
-        db.select({ email: users.email, nome: users.nome }).from(users).where(eq(users.role, 'medico')),
-        db.select({ email: emailsNotificacao.email, nome: emailsNotificacao.nome })
-          .from(emailsNotificacao)
-          .where(and(eq(emailsNotificacao.ativo, true), eq(emailsNotificacao.categoria, 'financeiro'))),
-      ]);
+      // 1) Sempre: todos os admins
+      const adminsEmails = await db
+        .select({ email: users.email, nome: users.nome })
+        .from(users)
+        .where(and(eq(users.role, 'admin'), isNull(users.deletedAt)));
 
-      const todosDestinatarios = [...adminsEmails, ...medicosEmails, ...financeiroEmails];
+      // 2) Médico: só o vinculado ao paciente; se não houver, todos os médicos
+      let medicosEmails: { email: string; nome: string }[] = [];
+
+      if (pacienteIdFinal) {
+        // Buscar o médico vinculado ao paciente
+        const medicoVinculado = await db.execute(sql`
+          SELECT u.email, u.nome
+          FROM pacientes p
+          INNER JOIN medicos m ON m.id = p.medico_id
+          INNER JOIN users u   ON u.id = m.user_id
+          WHERE p.id = ${pacienteIdFinal}
+            AND p.deleted_at IS NULL
+          LIMIT 1
+        `);
+
+        if (medicoVinculado.rows.length > 0) {
+          // Só o médico vinculado
+          medicosEmails = medicoVinculado.rows as { email: string; nome: string }[];
+        } else {
+          // Sem médico vinculado → todos os médicos
+          medicosEmails = await db
+            .select({ email: users.email, nome: users.nome })
+            .from(users)
+            .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
+        }
+      } else {
+        // Pedido sem pacienteId vinculado → todos os médicos
+        medicosEmails = await db
+          .select({ email: users.email, nome: users.nome })
+          .from(users)
+          .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
+      }
+
+      // 3) Sempre: e-mails financeiros ativos
+      const financeiroEmails = await db
+        .select({ email: emailsNotificacao.email, nome: emailsNotificacao.nome })
+        .from(emailsNotificacao)
+        .where(and(eq(emailsNotificacao.ativo, true), eq(emailsNotificacao.categoria, 'financeiro')));
+
+      // Montar lista sem duplicatas (por e-mail)
+      const todosMap = new Map<string, { email: string; nome: string }>();
+      for (const d of [...adminsEmails, ...medicosEmails, ...financeiroEmails]) {
+        if (d.email) todosMap.set(d.email.toLowerCase(), { email: d.email, nome: d.nome });
+      }
+      const todosDestinatarios = Array.from(todosMap.values());
+
+      console.info('[Recompra] Destinatários do e-mail:', todosDestinatarios.map((d) => d.email));
 
       if (todosDestinatarios.length > 0) {
         const { enviarEmailRecompraCompletoEquipe } = await import('@/lib/email/notificacoes');
         await enviarEmailRecompraCompletoEquipe({
-          destinatarios: todosDestinatarios.map((d) => ({ email: d.email, nome: d.nome })),
+          destinatarios: todosDestinatarios,
           solicitanteNome: solicitante.nome,
           solicitanteRole: solicitante.role ?? 'paciente',
           pacienteNome: nomePaciente,
@@ -209,10 +252,14 @@ export async function solicitarRecompraManual(
           dataInicioUso: parsed.data.dataInicioUso,
           dataTermino: dataTerminoStr,
         });
+        console.info('[Recompra] E-mails enviados com sucesso para', todosDestinatarios.length, 'destinatário(s)');
+      } else {
+        console.warn('[Recompra] Nenhum destinatário encontrado para envio de e-mail');
       }
     } catch (emailError) {
       console.error('[Recompra] Erro ao enviar e-mails (pedido salvo):', emailError);
     }
+
 
     return {
       sucesso: true,

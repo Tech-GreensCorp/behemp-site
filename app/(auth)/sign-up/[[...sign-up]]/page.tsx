@@ -2,6 +2,7 @@
 
 import { SignUp } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   BadgeCheck,
   Calendar,
@@ -88,6 +89,8 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
 export default function SignUpPage() {
   const [mounted, setMounted] = useState(false);
   const [particles, setParticles] = useState<Particle[]>([]);
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect_url') || '/redirect';
 
   useEffect(() => {
     setMounted(true);
@@ -245,7 +248,7 @@ export default function SignUpPage() {
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
-              Crie sua conta e acesse tratamentos com cannabis medicinal de forma
+              Crie sua conta e acesse tratamentos com Medicina Endocanabinóide de forma
               segura, humanizada e sem custo.
             </p>
           </div>
@@ -341,7 +344,7 @@ export default function SignUpPage() {
           }}
         >
           <p className="text-xs text-gray-400">
-            © {new Date().getFullYear()} Be4Hope · Cannabis Medicinal com Ciência e Cuidado
+            © {new Date().getFullYear()} Be4Hope · Medicina Endocanabinóide com Ciência e Cuidado
           </p>
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -400,26 +403,32 @@ export default function SignUpPage() {
             transition: 'opacity 0.8s ease-out 0.25s, transform 0.8s ease-out 0.25s',
           }}
         >
+          {/* Cabeçalho — contexto inequívoco de REGISTRO */}
           <div className="mb-7 space-y-1.5">
-            <div className="flex items-center gap-2 mb-4">
-              <div
-                className="h-8 w-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'rgba(230,57,70,0.1)' }}
-              >
-                <UserPlus size={18} style={{ color: '#E63946' }}  />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                Be4Hope
-              </span>
+            {/* Badge de contexto */}
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs font-semibold" style={{ color: '#16a34a' }}>Nova conta</span>
             </div>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-              Criar sua conta
-            </h2>
-            <p className="text-sm text-gray-500">Preencha os dados para começar</p>
+
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="h-9 w-9 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(34,197,94,0.1)' }}
+              >
+                <UserPlus size={18} style={{ color: '#16a34a' }} />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
+                  Criar sua conta
+                </h2>
+                <p className="text-sm text-gray-500">Preencha os dados para começar</p>
+              </div>
+            </div>
           </div>
 
           <SignUp
-            forceRedirectUrl="/redirect"
+            forceRedirectUrl={redirectUrl}
             appearance={{
               layout: {
                 logoPlacement: 'none',
