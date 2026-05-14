@@ -293,49 +293,92 @@ export default function AgendaPage() {
                       </div>
                     ) : horarios.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">Sem horários disponíveis</p>
-                    ) : (
-                      <div className="max-h-[420px] overflow-y-auto space-y-4 pr-1 rounded-xl border p-4 bg-muted/20">
-                        {[
-                          { label: '🌙 Madrugada', range: [0, 12] },
-                          { label: '🌅 Manhã', range: [12, 24] },
-                          { label: '☀️ Tarde', range: [24, 36] },
-                          { label: '🌆 Noite', range: [36, 48] },
-                        ].map(({ label, range }) => {
-                          const slots = horarios.slice(range[0], range[1]);
-                          return (
-                            <div key={label}>
-                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 sticky top-0 bg-muted/20 py-0.5">{label}</p>
-                              <div className="grid grid-cols-4 gap-1.5">
-                                {slots.map(({ horario, livre }) => {
-                                  const selecionado = horarioSel === horario;
-                                  return (
-                                    <button
-                                      key={horario}
-                                      disabled={!livre}
-                                      onClick={() => livre && setHorarioSel(horario)}
-                                      title={livre ? `Agendar às ${horario}` : `${horario} — ocupado`}
-                                      className={[
-                                        'relative flex items-center justify-center rounded-lg border px-1 py-2.5 text-xs font-medium transition-all',
-                                        selecionado
-                                          ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-md ring-2 ring-[#C08E3A]/30'
-                                          : livre
-                                            ? 'border-[#C08E3A]/30 bg-background text-foreground hover:border-[#C08E3A] hover:bg-[#C08E3A]/10 cursor-pointer'
-                                            : 'border-border bg-muted/60 text-muted-foreground cursor-not-allowed opacity-40',
-                                      ].join(' ')}
-                                    >
-                                      {!livre && !selecionado && (
-                                        <Lock size={7} className="absolute top-0.5 right-0.5 opacity-50" />
-                                      )}
-                                      {horario}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    ) : (() => {
+                      const PERIODOS = [
+                        { id: 'madrugada', label: 'Madrugada', range: [0, 12] as [number, number] },
+                        { id: 'manha',     label: 'Manhã',     range: [12, 24] as [number, number] },
+                        { id: 'tarde',     label: 'Tarde',     range: [24, 36] as [number, number] },
+                        { id: 'noite',     label: 'Noite',     range: [36, 48] as [number, number] },
+                      ];
+                      return (
+                        <div className="rounded-xl border bg-background overflow-hidden">
+                          {/* Abas de período */}
+                          <div className="grid grid-cols-4 border-b">
+                            {PERIODOS.map(({ id, label, range }) => {
+                              const livresNoPeriodo = horarios.slice(range[0], range[1]).filter(s => s.livre).length;
+                              const temSelecionado  = horarios.slice(range[0], range[1]).some(s => s.horario === horarioSel);
+                              return (
+                                <a
+                                  key={id}
+                                  href={`#periodo-${id}`}
+                                  className={[
+                                    'flex flex-col items-center gap-0.5 px-2 py-2.5 text-center text-xs font-medium transition-colors border-r last:border-r-0',
+                                    temSelecionado
+                                      ? 'bg-[#C08E3A]/10 text-[#C08E3A]'
+                                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                                  ].join(' ')}
+                                >
+                                  <span className="font-semibold">{label}</span>
+                                  <span className={[
+                                    'text-[10px] tabular-nums',
+                                    temSelecionado ? 'text-[#C08E3A]/80' : 'text-muted-foreground/70',
+                                  ].join(' ')}>
+                                    {livresNoPeriodo} livre{livresNoPeriodo !== 1 ? 's' : ''}
+                                  </span>
+                                </a>
+                              );
+                            })}
+                          </div>
+
+                          {/* Grid de slots por período */}
+                          <div className="max-h-[380px] overflow-y-auto">
+                            {PERIODOS.map(({ id, label, range }) => {
+                              const slots = horarios.slice(range[0], range[1]);
+                              return (
+                                <div key={id} id={`periodo-${id}`} className="p-4 border-b last:border-b-0">
+                                  {/* Separador de período */}
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div className="h-px flex-1 bg-border" />
+                                    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground px-2 py-0.5 rounded-full border bg-muted/40">
+                                      {label}
+                                    </span>
+                                    <div className="h-px flex-1 bg-border" />
+                                  </div>
+
+                                  {/* Slots */}
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {slots.map(({ horario, livre }) => {
+                                      const selecionado = horarioSel === horario;
+                                      return (
+                                        <button
+                                          key={horario}
+                                          disabled={!livre}
+                                          onClick={() => livre && setHorarioSel(horario)}
+                                          title={livre ? `Agendar às ${horario}` : `${horario} — ocupado`}
+                                          className={[
+                                            'relative flex items-center justify-center rounded-lg border py-3 text-xs font-semibold tabular-nums transition-all duration-150',
+                                            selecionado
+                                              ? 'border-[#C08E3A] bg-[#C08E3A] text-white shadow-sm ring-2 ring-[#C08E3A]/25'
+                                              : livre
+                                                ? 'border-border bg-background text-foreground hover:border-[#C08E3A]/60 hover:bg-[#C08E3A]/8 hover:text-[#C08E3A] cursor-pointer'
+                                                : 'border-border/50 bg-muted/30 text-muted-foreground/50 cursor-not-allowed line-through',
+                                          ].join(' ')}
+                                        >
+                                          {!livre && !selecionado && (
+                                            <Lock size={7} className="absolute top-1 right-1 opacity-40" />
+                                          )}
+                                          {horario}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
