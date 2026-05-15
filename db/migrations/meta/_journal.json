@@ -43,6 +43,13 @@
       "when": 1778156925319,
       "tag": "0005_green_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778862206638,
+      "tag": "0006_square_stone_men",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { pgTable, text } from 'drizzle-orm/pg-core';
+import { pgTable, text, numeric } from 'drizzle-orm/pg-core';
 import { baseColumns } from './_helpers';
 import { users } from './users';
 
@@ -15,6 +15,7 @@ export const medicos = pgTable('medicos', {
   crm: text('crm').notNull(),
   especialidade: text('especialidade').notNull(),
   bio: text('bio'),
+  valorConsulta: numeric('valor_consulta', { precision: 10, scale: 2 }),
   googleCalendarId: text('google_calendar_id'),
   googleRefreshToken: text('google_refresh_token'), // Criptografado em produção
 });
