@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(irm https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1 | iex)",
+      "PowerShell(\\(New-Object System.Net.WebClient\\).DownloadFile\\('https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1', \"$env:TEMP\\\\caveman-install.ps1\"\\); Write-Host \"Downloaded to $env:TEMP\\\\caveman-install.ps1\")",
+      "PowerShell(powershell.exe -ExecutionPolicy Bypass -File \"$env:TEMP\\\\caveman-install.ps1\" 2>&1)",
+      "PowerShell(Get-Content \"$env:USERPROFILE\\\\.claude\\\\settings.json\" -ErrorAction SilentlyContinue; Write-Host \"---\"; Test-Path \"$env:USERPROFILE\\\\.claude\\\\.caveman-active\"; Write-Host \"---\"; Get-ChildItem \"$env:USERPROFILE\\\\.claude\\\\skills\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\victo\\\\Desktop\\\\greens\\\\projetos\\\\behemp-site\\\\.claude\\\\skills\\\\caveman\" -Raw -ErrorAction SilentlyContinue; Write-Host \"---TYPE---\"; \\(Get-Item \"C:\\\\Users\\\\victo\\\\Desktop\\\\greens\\\\projetos\\\\behemp-site\\\\.claude\\\\skills\\\\caveman\"\\).GetType\\(\\).Name)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm db:migrate)",
+      "Bash(pnpm exec *)",
+      "Bash(echo \"EXIT=$?\")"
+    ]
+  }
+}
