@@ -7,21 +7,24 @@ import { obterUsuarioAtual } from '@/lib/auth';
 /**
  * Server Actions de medicamentos — visão do paciente autenticado.
  *
- * Busca as dosagens vinculadas ao pacienteId inferido via clerkId.
- * Calcula diasRestantes e percentual de consumo.
+ * Busca os ajustes de dosagem (ajustes_dosagem + itens_ajuste_dosagem)
+ * vinculados ao pacienteId inferido via clerkId.
+ * É a mesma fonte de dados que o médico usa ao registrar dosagens.
  */
 
-interface MedicamentoPaciente {
-  id: string;
-  medicamentoNome: string;
-  gotasPorDia: number;
-  mlFrasco: number;
-  dataInicio: string;
-  dataFimPrevista: string;
-  ativa: boolean;
-  diasRestantes: number;
-  diasTotais: number;
-  percentualConsumo: number;
+export interface ItemMedicamentoPaciente {
+  id: string;            // id do item
+  ajusteId: string;
+  tipoCanabinoide: string;
+  novaDosagem: string;
+  dosagemAnterior: string | null;
+  frequencia: string;
+  concentracaoTHC: string | null;
+  concentracaoCBD: string | null;
+  viaAdministracao: string | null;
+  dataAjuste: string;
+  proximaRevisao: string | null;
+  motivoAjuste: string;
 }
 
 interface ActionResult<T = unknown> {
@@ -31,10 +34,11 @@ interface ActionResult<T = unknown> {
 }
 
 /**
- * Lista as dosagens (medicamentos) do paciente logado.
- * Inclui cálculos de consumo, dias restantes e percentual.
+ * Lista os ajustes de dosagem (medicamentos) do paciente logado.
+ * Busca das tabelas ajustes_dosagem e itens_ajuste_dosagem,
+ * que é onde o médico registra as prescrições.
  */
-export async function listarMeusMedicamentos(): Promise<ActionResult<MedicamentoPaciente[]>> {
+export async function listarMeusMedicamentos(): Promise<ActionResult<ItemMedicamentoPaciente[]>> {
   try {
     const auth = await obterUsuarioAtual();
     if (!auth.autorizado || !auth.clerkId) {
@@ -43,47 +47,42 @@ export async function listarMeusMedicamentos(): Promise<ActionResult<Medicamento
 
     const resultado = await db.execute(sql`
       SELECT
-        d.id,
-        m.nome            AS "medicamentoNome",
-        d.gotas_por_dia   AS "gotasPorDia",
-        d.ml_frasco       AS "mlFrasco",
-        d.data_inicio     AS "dataInicio",
-        d.data_fim_prevista AS "dataFimPrevista",
-        d.ativa
-      FROM dosagens d
-      INNER JOIN medicamentos m ON m.id = d.medicamento_id
-      INNER JOIN pacientes p   ON p.id = d.paciente_id
-      INNER JOIN users u       ON u.id = p.user_id
+        iad.id,
+        iad.ajuste_id        AS "ajusteId",
+        iad.tipo_canabinoide AS "tipoCanabinoide",
+        iad.nova_dosagem     AS "novaDosagem",
+        iad.dosagem_anterior AS "dosagemAnterior",
+        iad.frequencia,
+        iad.concentracao_thc AS "concentracaoTHC",
+        iad.concentracao_cbd AS "concentracaoCBD",
+        iad.via_administracao AS "viaAdministracao",
+        ad.data_ajuste       AS "dataAjuste",
+        ad.proxima_revisao   AS "proximaRevisao",
+        ad.motivo_ajuste     AS "motivoAjuste"
+      FROM itens_ajuste_dosagem iad
+      INNER JOIN ajustes_dosagem ad ON ad.id = iad.ajuste_id
+      INNER JOIN pacientes p        ON p.id  = ad.paciente_id
+      INNER JOIN users u            ON u.id  = p.user_id
       WHERE u.clerk_id = ${auth.clerkId}
         AND p.deleted_at IS NULL
-      ORDER BY d.ativa DESC, d.created_at DESC
+        AND ad.deleted_at IS NULL
+      ORDER BY ad.data_ajuste DESC, iad.created_at DESC
     `);
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    const medicamentos: MedicamentoPaciente[] = resultado.rows.map((row: any) => {
-      const inicio = new Date(row.dataInicio + 'T00:00:00');
-      const fim = new Date(row.dataFimPrevista + 'T00:00:00');
-
-      const diasTotais = Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-      const diasRestantes = Math.max(0, Math.round((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
-      const diasConsumidos = diasTotais - diasRestantes;
-      const percentualConsumo = Math.min(100, Math.max(0, Math.round((diasConsumidos / diasTotais) * 100)));
-
-      return {
-        id: row.id,
-        medicamentoNome: row.medicamentoNome,
-        gotasPorDia: Number(row.gotasPorDia),
-        mlFrasco: Number(row.mlFrasco),
-        dataInicio: row.dataInicio,
-        dataFimPrevista: row.dataFimPrevista,
-        ativa: row.ativa,
-        diasRestantes,
-        diasTotais,
-        percentualConsumo,
-      };
-    });
+    const medicamentos: ItemMedicamentoPaciente[] = resultado.rows.map((row: any) => ({
+      id: row.id,
+      ajusteId: row.ajusteId,
+      tipoCanabinoide: row.tipoCanabinoide,
+      novaDosagem: row.novaDosagem,
+      dosagemAnterior: row.dosagemAnterior ?? null,
+      frequencia: row.frequencia,
+      concentracaoTHC: row.concentracaoTHC ?? null,
+      concentracaoCBD: row.concentracaoCBD ?? null,
+      viaAdministracao: row.viaAdministracao ?? null,
+      dataAjuste: row.dataAjuste,
+      proximaRevisao: row.proximaRevisao ?? null,
+      motivoAjuste: row.motivoAjuste,
+    }));
 
     return { sucesso: true, dados: medicamentos };
   } catch (error) {
