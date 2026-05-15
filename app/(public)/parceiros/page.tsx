@@ -22,23 +22,23 @@ export const metadata: Metadata = {
 const DIFERENCIAIS = [
   {
     icon: FlaskConical,
-    titulo: 'Laudos verificados',
-    descricao: 'Todos os produtos possuem análises laboratoriais independentes com certificado de autenticidade.',
+    titulo: 'Certificação Swiss GMP',
+    descricao: 'Protocolos internacionais de fabricação com certificação Swiss GMP — padrão de excelência global na indústria farmacêutica.',
   },
   {
     icon: ShieldCheck,
-    titulo: 'Conformidade Anvisa',
-    descricao: 'Rigoroso cumprimento da regulamentação brasileira e padrões internacionais GMP.',
+    titulo: 'Integração Regulatória',
+    descricao: 'Rigorosa conformidade e integração regulatória permanente, garantindo operação dentro dos mais altos padrões legais.',
   },
   {
     icon: Sprout,
-    titulo: 'Rastreabilidade total',
-    descricao: 'Do cultivo à entrega, cada lote é rastreado para garantir procedência e qualidade.',
+    titulo: 'Cadeia produtiva rastreada',
+    descricao: 'Da cadeia produtiva ao acompanhamento pós-disponibilização, cada etapa é conduzida sob critérios rigorosos de conformidade.',
   },
   {
     icon: HeartHandshake,
-    titulo: 'Suporte dedicado',
-    descricao: 'Equipe exclusiva para pacientes Be4Hope com atendimento prioritário e humanizado.',
+    titulo: 'Governância científica',
+    descricao: 'Maturidade científica e governância de longo prazo, baseada em evidência científica e planejamento multinacional.',
   },
 ];
 
@@ -86,16 +86,20 @@ export default function ParceirosPage() {
                 {/* Título */}
                 <h2 className="mt-6 font-display text-3xl font-bold tracking-tight">
                   Greens
-                  <span className="ml-2 text-green-600">Corp</span>
+                  <span className="ml-2 text-green-600">Pharmaceutical</span>
                 </h2>
+                <p className="mt-1 text-sm font-medium italic text-green-600">
+                  Não somos intermediários. Somos estrutura.
+                </p>
 
                 {/* Descrição */}
                 <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-                  A <strong className="text-foreground">Greens</strong> é nossa parceira
-                  estratégica no fornecimento de produtos canabinóides de alta qualidade.
-                  Com rigoroso controle de qualidade e certificações internacionais,
-                  garantimos que nossos pacientes tenham acesso aos melhores produtos
-                  disponíveis no mercado.
+                  A <strong className="text-foreground">Greens Pharmaceutical</strong> é uma indústria
+                  internacional dedicada ao desenvolvimento e entrega de terapias de alta complexidade,
+                  com excelência técnica, governança estruturada e visão de longo prazo. Atuam
+                  na interseção entre ciência, regulação e sustentabilidade — assegurando que
+                  a inovação terapêutica chegue ao país com responsabilidade institucional e
+                  consistência técnica.
                 </p>
 
                 {/* Grid de diferenciais */}
@@ -164,16 +168,16 @@ export default function ParceirosPage() {
                   </div>
 
                   <h3 className="mt-6 font-display text-2xl font-bold text-white">
-                    Greens
+                    Greens Pharmaceutical
                   </h3>
                   <p className="mt-2 text-sm text-white/60">
-                    Produtos canabinóides de excelência
+                    Ciência, inovação e alcance global em terapias
                   </p>
 
                   {/* Selo */}
                   <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur-sm transition-colors duration-300 group-hover:bg-white/15">
                     <ShieldCheck size={14} />
-                    Certificação internacional
+                    Swiss GMP · Regulatório Global
                   </div>
 
                   {/* Link externo */}

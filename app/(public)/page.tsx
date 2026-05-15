@@ -376,21 +376,28 @@ export default function HomePage() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-100">
                   <Leaf size={22} className="text-green-600" />
                 </div>
-                <h3 className="font-display text-lg font-bold">Greens</h3>
+                <h3 className="font-display text-lg font-bold">Greens Pharmaceutical</h3>
+                <p className="mt-1 text-xs font-medium italic text-green-600">
+                  Não somos intermediários. Somos estrutura.
+                </p>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  <strong className="text-foreground">Produção e distribuição</strong> de produtos
-                  de Medicina Endocanabinóide com qualidade e segurança.{' '}
-                  <strong className="text-foreground">Educação médica</strong> para promover o uso
-                  consciente da terapia canabinóide.
+                  Indústria internacional dedicada ao{' '}
+                  <strong className="text-foreground">desenvolvimento e entrega de terapias de alta complexidade</strong>{' '}
+                  com excelência técnica, governança estruturada e visão de longo prazo. Atuam na
+                  interseção entre ciência, regulação e sustentabilidade.
                 </p>
                 <ul className="mt-4 space-y-2">
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
-                    Investimento em pesquisa e inovação
+                    Certificação internacional Swiss GMP
                   </li>
                   <li className="flex items-start gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
-                    Padrões internacionais de cultivo e extração
+                    Rigorosa conformidade e integração regulatória
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
+                    Maturidade científica e governança de longo prazo
                   </li>
                 </ul>
               </CardContent>
