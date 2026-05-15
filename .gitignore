@@ -82,3 +82,8 @@ Thumbs.db
 
 # Uploads locais de desenvolvimento (em produção usa Vercel Blob)
 /public/uploads/
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+.env*.local
