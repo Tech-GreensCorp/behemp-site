@@ -15,6 +15,7 @@ import {
   Bell,
   User,
   ShoppingCart,
+  Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Meu Perfil', href: '/paciente/perfil', icon: User },
   { label: 'Medicamentos', href: '/paciente/medicamentos', icon: Pill },
   { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart },
+  { label: 'Calculadora', href: '/paciente/calculadora', icon: Calculator },
   { label: 'Chat', href: '/paciente/chat', icon: MessageSquare },
   { label: 'Notificações', href: '/paciente/notificacoes', icon: Bell },
   { label: 'Configurações', href: '/paciente/configuracoes', icon: Settings },

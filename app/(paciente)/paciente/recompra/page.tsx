@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,29 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { solicitarRecompraManual, listarMinhasRecompras } from '@/app/_actions/recompras';
+import { obterPerfilContato } from '@/app/_actions/perfil-paciente';
 import { toast } from 'sonner';
 import {
-  Calendar,
   Loader2,
-  Pill,
   CheckCircle2,
-  Clock,
-  Droplets,
-  FlaskConical,
   Phone,
-  MessageCircle,
   Mail,
   History,
   Send,
+  ShoppingCart,
+  MessageCircle,
+  Info,
 } from 'lucide-react';
 
-/** Número fixo do WhatsApp da Be4Hope — configurável via env */
+/** Número fixo do WhatsApp da Be4Hope */
 const WHATSAPP_BEHEMP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
 
-/**
- * Página de recompra de medicamento — Paciente.
- * Formulário manual + cálculo em tempo real + histórico de pedidos.
- */
+const STATUS_LABELS: Record<string, { label: string; cor: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  agendada: { label: 'Agendada', cor: 'outline' },
+  pedida: { label: 'Pedido enviado', cor: 'default' },
+  entregue: { label: 'Entregue', cor: 'secondary' },
+};
 
 interface RecompraHistorico {
   id: string;
@@ -46,76 +45,43 @@ interface RecompraHistorico {
   solicitanteNome: string;
 }
 
-const STATUS_LABELS: Record<string, { label: string; cor: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  agendada: { label: 'Agendada', cor: 'outline' },
-  pedida: { label: 'Pedido enviado', cor: 'default' },
-  entregue: { label: 'Entregue', cor: 'secondary' },
-};
-
 export default function RecompraPage() {
-  // Formulário
-  const [medicamentoNome, setMedicamentoNome] = useState('');
-  const [mlFrasco, setMlFrasco] = useState('');
-  const [gotasPorDia, setGotasPorDia] = useState('');
-  const [dataInicioUso, setDataInicioUso] = useState('');
+  // Contato (pré-preenchido)
   const [contatoTelefone, setContatoTelefone] = useState('');
   const [contatoEmail, setContatoEmail] = useState('');
   const [observacoes, setObservacoes] = useState('');
 
   // UI
+  const [carregandoPerfil, setCarregandoPerfil] = useState(true);
   const [enviando, setEnviando] = useState(false);
-  const [sucesso, setSucesso] = useState<{
-    dataTermino: string;
-    diasDuracao: number;
-    medicamentoNome: string;
-    mlFrasco: string;
-    gotasPorDia: string;
-    dataInicioUso: string;
-    contatoTelefone: string;
-    contatoEmail: string;
-    observacoes: string;
-  } | null>(null);
+  const [sucesso, setSucesso] = useState(false);
   const [historico, setHistorico] = useState<RecompraHistorico[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(true);
 
-  // Cálculo em tempo real
-  const calculo = useMemo(() => {
-    const ml = Number(mlFrasco);
-    const gotas = Number(gotasPorDia);
-    if (!ml || !gotas || !dataInicioUso) return null;
-
-    const GOTAS_POR_ML = 20;
-    const gotasTotais = ml * GOTAS_POR_ML;
-    const diasDuracao = Math.floor(gotasTotais / gotas);
-    const inicio = new Date(dataInicioUso);
-    const termino = new Date(inicio);
-    termino.setDate(termino.getDate() + diasDuracao);
-
-    const hoje = new Date();
-    const diasRestantes = Math.ceil((termino.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-
-    return { gotasTotais, diasDuracao, dataTermino: termino, diasRestantes };
-  }, [mlFrasco, gotasPorDia, dataInicioUso]);
-
   useEffect(() => {
-    carregarHistorico();
+    // Carrega perfil e histórico em paralelo
+    Promise.all([carregarPerfil(), carregarHistorico()]);
   }, []);
+
+  async function carregarPerfil() {
+    setCarregandoPerfil(true);
+    const res = await obterPerfilContato();
+    if (res.sucesso && res.dados) {
+      setContatoTelefone(res.dados.telefone ?? '');
+      setContatoEmail(res.dados.email ?? '');
+    }
+    setCarregandoPerfil(false);
+  }
 
   async function carregarHistorico() {
     setCarregandoHistorico(true);
     const res = await listarMinhasRecompras();
-    if (res.sucesso && res.dados) {
-      setHistorico(res.dados);
-    }
+    if (res.sucesso && res.dados) setHistorico(res.dados);
     setCarregandoHistorico(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!medicamentoNome || !mlFrasco || !gotasPorDia || !dataInicioUso) {
-      toast.error('Preencha todos os campos obrigatórios');
-      return;
-    }
     if (!contatoTelefone && !contatoEmail) {
       toast.error('Informe pelo menos um contato (telefone ou e-mail)');
       return;
@@ -123,28 +89,19 @@ export default function RecompraPage() {
 
     setEnviando(true);
     const resultado = await solicitarRecompraManual({
-      medicamentoNome,
-      mlFrasco: Number(mlFrasco),
-      gotasPorDia: Number(gotasPorDia),
-      dataInicioUso,
+      // Campos obrigatórios — usamos valores mínimos pois o foco agora é só o contato
+      medicamentoNome: 'Recompra via plataforma',
+      mlFrasco: 1,
+      gotasPorDia: 1,
+      dataInicioUso: new Date().toISOString().split('T')[0],
       contatoTelefone: contatoTelefone || undefined,
       contatoEmail: contatoEmail || undefined,
       observacoes: observacoes || undefined,
     });
     setEnviando(false);
 
-    if (resultado.sucesso && resultado.dados) {
-      setSucesso({
-        dataTermino: resultado.dados.dataTermino,
-        diasDuracao: resultado.dados.diasDuracao,
-        medicamentoNome,
-        mlFrasco,
-        gotasPorDia,
-        dataInicioUso,
-        contatoTelefone,
-        contatoEmail,
-        observacoes,
-      });
+    if (resultado.sucesso) {
+      setSucesso(true);
       toast.success('Pedido de recompra enviado com sucesso!');
       carregarHistorico();
     } else {
@@ -152,228 +109,150 @@ export default function RecompraPage() {
     }
   }
 
-  function handleNovoPedido() {
-    setSucesso(null);
-    setMedicamentoNome('');
-    setMlFrasco('');
-    setGotasPorDia('');
-    setDataInicioUso('');
-    setContatoTelefone('');
-    setContatoEmail('');
-    setObservacoes('');
-  }
-
-  // ── Estado de Sucesso ──────────────────────────────────────
+  // ── Estado de Sucesso ────────────────────────────────────────
   if (sucesso) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Solicite a recompra do seu medicamento
+            Solicitação enviada para nossa equipe
           </p>
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border/40 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 size={40} className="text-emerald-600" />
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+              <CheckCircle2 size={40} className="text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-emerald-700">
+            <h2 className="mb-2 text-xl font-bold text-emerald-700 dark:text-emerald-400">
               Pedido Encaminhado!
             </h2>
-            <p className="mb-1 text-center text-sm text-muted-foreground">
-              Sua solicitação de recompra foi enviada para nossa equipe.
+            <p className="mb-1 max-w-sm text-center text-sm text-muted-foreground">
+              Sua solicitação foi enviada para a equipe Be4Hope.
             </p>
-            <p className="mb-6 text-center text-sm text-muted-foreground">
-              Entraremos em contato em breve para dar andamento ao seu pedido.
+            <p className="mb-8 max-w-sm text-center text-sm text-muted-foreground">
+              Entraremos em contato em breve pelo canal informado.
             </p>
 
-            <div className="mb-6 flex items-center gap-3 rounded-xl bg-primary/5 px-6 py-4">
-              <Calendar size={20} className="text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground">Previsão de término do medicamento</p>
-                <p className="text-lg font-bold text-primary">
-                  {new Date(sucesso.dataTermino).toLocaleDateString('pt-BR')}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  ({sucesso.diasDuracao} dias de duração)
-                </p>
-              </div>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <a
+                href={`https://wa.me/${WHATSAPP_BEHEMP}?text=${encodeURIComponent(
+                  `Olá Be4Hope! Acabei de solicitar uma recompra pelo sistema.\n` +
+                  (contatoTelefone ? `📞 Meu telefone: ${contatoTelefone}\n` : '') +
+                  (contatoEmail ? `✉️ Meu e-mail: ${contatoEmail}\n` : '') +
+                  (observacoes ? `📝 Obs: ${observacoes}\n` : '') +
+                  `\nAguardo o retorno. Obrigado(a)!`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white shadow transition-all hover:bg-[#1da851]"
+              >
+                <MessageCircle size={18} />
+                Falar no WhatsApp
+              </a>
+
+              <Button
+                onClick={() => { setSucesso(false); setObservacoes(''); }}
+                variant="outline"
+                className="gap-2 rounded-xl"
+              >
+                <Send size={16} />
+                Novo pedido
+              </Button>
             </div>
-
-            {/* Botão WhatsApp — número fixo da Be4Hope com mensagem pré-preenchida */}
-            <a
-              href={`https://wa.me/${WHATSAPP_BEHEMP}?text=${encodeURIComponent(
-                `Olá, Be4Hope! Acabei de fazer uma solicitação de recompra pelo sistema e gostaria de confirmar:\n\n` +
-                `📦 *Medicamento:* ${sucesso.medicamentoNome}\n` +
-                `💊 *Dosagem:* ${sucesso.mlFrasco}ml — ${sucesso.gotasPorDia} gotas/dia\n` +
-                `📅 *Início do uso:* ${new Date(sucesso.dataInicioUso).toLocaleDateString('pt-BR')}\n` +
-                `⏳ *Previsão de término:* ${new Date(sucesso.dataTermino).toLocaleDateString('pt-BR')} (${sucesso.diasDuracao} dias)\n` +
-                (sucesso.contatoTelefone ? `📞 *Meu telefone:* ${sucesso.contatoTelefone}\n` : '') +
-                (sucesso.contatoEmail ? `✉️ *Meu e-mail:* ${sucesso.contatoEmail}\n` : '') +
-                (sucesso.observacoes ? `📝 *Observações:* ${sucesso.observacoes}\n` : '') +
-                `\nAguardo o retorno. Obrigado(a)!`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#1da851] hover:shadow-lg"
-            >
-              <MessageCircle size={18} />
-              Falar no WhatsApp
-            </a>
-
-            <Button onClick={handleNovoPedido} variant="outline" className="gap-2">
-              <Send size={16} />
-              Novo pedido
-            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // ── Formulário + Histórico ────────────────────────────────
+  // ── Formulário ───────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Solicite a recompra do seu medicamento informando os dados abaixo
+          Solicite a recompra do seu medicamento
         </p>
       </div>
 
-      {/* Card explicativo */}
-      <Card className="border-0 bg-primary/5 shadow-sm">
-        <CardContent className="flex items-start gap-4 p-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Pill size={20} className="text-primary" />
+      {/* Banner informativo */}
+      <Card className="border-primary/20 bg-primary/5 shadow-sm">
+        <CardContent className="flex items-start gap-4 p-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Info size={18} className="text-primary" />
           </div>
           <div>
-            <p className="font-medium">Como funciona?</p>
+            <p className="text-sm font-medium">Como funciona?</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Informe o medicamento, a quantidade do frasco (ml), quantas gotas você toma por dia e
-              quando começou a usar. O sistema calcula automaticamente quando o medicamento vai terminar
-              e notifica nossa equipe para providenciar a recompra.
+              Confirme seus dados de contato abaixo e clique em{' '}
+              <strong className="text-foreground">Solicitar Recompra</strong>. Nossa equipe
+              receberá sua solicitação e entrará em contato para dar andamento ao pedido.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* Formulário */}
-        <Card className="border-0 shadow-sm lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-base">Dados do Medicamento</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Formulário */}
+      <Card className="border-border/40 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShoppingCart size={16} className="text-primary" />
+            Dados para Contato
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {carregandoPerfil ? (
+            <div className="flex justify-center py-10">
+              <Loader2 size={24} className="animate-spin text-primary" />
+            </div>
+          ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Medicamento */}
-              <div className="space-y-2">
-                <Label htmlFor="medicamento">Nome do Medicamento *</Label>
-                <div className="relative">
-                  <Pill size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="medicamento"
-                    placeholder="Ex: Canabidiol 200mg/ml"
-                    value={medicamentoNome}
-                    onChange={(e) => setMedicamentoNome(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* ML + Gotas */}
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="ml">Quantidade do Frasco (ml) *</Label>
-                  <div className="relative">
-                    <FlaskConical size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="ml"
-                      type="number"
-                      min={1}
-                      placeholder="Ex: 30"
-                      value={mlFrasco}
-                      onChange={(e) => setMlFrasco(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gotas">Gotas por Dia *</Label>
-                  <div className="relative">
-                    <Droplets size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="gotas"
-                      type="number"
-                      min={1}
-                      placeholder="Ex: 10"
-                      value={gotasPorDia}
-                      onChange={(e) => setGotasPorDia(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Data início */}
-              <div className="space-y-2">
-                <Label htmlFor="dataInicio">Data do Primeiro Uso *</Label>
-                <div className="relative">
-                  <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={dataInicioUso}
-                    onChange={(e) => setDataInicioUso(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t pt-4">
-                <p className="mb-3 text-sm font-medium">Dados para Contato *</p>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Informe pelo menos um meio de contato para que possamos entrar em contato sobre seu pedido.
-                </p>
-              </div>
-
-              {/* Contato */}
-              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Telefone */}
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone / WhatsApp</Label>
                   <div className="relative">
-                    <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Phone
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
                     <Input
                       id="telefone"
                       type="tel"
                       placeholder="(11) 99999-9999"
                       value={contatoTelefone}
                       onChange={(e) => setContatoTelefone(e.target.value)}
-                      className="pl-10"
+                      className="pl-9"
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pré-preenchido com seu perfil. Altere se necessário.
+                  </p>
                 </div>
+
+                {/* E-mail */}
                 <div className="space-y-2">
                   <Label htmlFor="emailContato">E-mail para Contato</Label>
                   <div className="relative">
-                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Mail
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
                     <Input
                       id="emailContato"
                       type="email"
                       placeholder="seu@email.com"
                       value={contatoEmail}
                       onChange={(e) => setContatoEmail(e.target.value)}
-                      className="pl-10"
+                      className="pl-9"
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pré-preenchido com seu perfil. Altere se necessário.
+                  </p>
                 </div>
               </div>
 
@@ -386,11 +265,15 @@ export default function RecompraPage() {
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   rows={3}
+                  className="resize-none"
                 />
               </div>
 
-              {/* Botão */}
-              <Button type="submit" disabled={enviando} className="w-full gap-2">
+              <Button
+                type="submit"
+                disabled={enviando || (!contatoTelefone && !contatoEmail)}
+                className="w-full gap-2 rounded-xl"
+              >
                 {enviando ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
@@ -399,77 +282,12 @@ export default function RecompraPage() {
                 Solicitar Recompra
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Preview calculado em tempo real */}
-        <div className="space-y-4 lg:col-span-2">
-          <Card className="sticky top-6 border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock size={16} className="text-primary" />
-                Previsão
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {calculo ? (
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-primary/5 p-4 text-center">
-                    <p className="text-xs text-muted-foreground">O medicamento vai durar</p>
-                    <p className="text-3xl font-bold text-primary">{calculo.diasDuracao} dias</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Gotas totais no frasco</span>
-                      <span className="font-medium">{calculo.gotasTotais}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Data de término</span>
-                      <span className="font-semibold text-primary">
-                        {calculo.dataTermino.toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Dias restantes</span>
-                      <Badge variant={calculo.diasRestantes <= 7 ? 'destructive' : calculo.diasRestantes <= 14 ? 'secondary' : 'outline'}>
-                        {calculo.diasRestantes <= 0 ? 'Terminado' : `${calculo.diasRestantes} dias`}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Barra de progresso */}
-                  <div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          calculo.diasRestantes <= 7 ? 'bg-destructive' : calculo.diasRestantes <= 14 ? 'bg-amber-500' : 'bg-primary'
-                        }`}
-                        style={{
-                          width: `${Math.max(0, Math.min(100, ((calculo.diasDuracao - calculo.diasRestantes) / calculo.diasDuracao) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <p className="mt-1 text-right text-[10px] text-muted-foreground">
-                      Progresso do uso
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <FlaskConical size={32} className="mb-3 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">
-                    Preencha os campos ao lado para visualizar a previsão de término.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Histórico */}
-      <Card className="border-0 shadow-sm">
+      {/* Histórico de Pedidos */}
+      <Card className="border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <History size={16} />
@@ -491,13 +309,18 @@ export default function RecompraPage() {
               {historico.map((item) => {
                 const st = STATUS_LABELS[item.status] ?? { label: item.status, cor: 'outline' as const };
                 return (
-                  <div key={item.id} className="flex items-center justify-between rounded-xl border p-4">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">{item.medicamentoNome ?? 'Medicamento'}</p>
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-xl border border-border/50 p-4"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">Recompra solicitada</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.mlFrasco}ml • {item.gotasPorDia} gotas/dia • Término: {new Date(item.dataPrevista).toLocaleDateString('pt-BR')}
+                        {item.contatoTelefone && `📞 ${item.contatoTelefone}`}
+                        {item.contatoTelefone && item.contatoEmail && ' · '}
+                        {item.contatoEmail && `✉️ ${item.contatoEmail}`}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[11px] text-muted-foreground">
                         Solicitado em {new Date(item.criadoEm).toLocaleDateString('pt-BR')}
                       </p>
                     </div>

@@ -145,51 +145,18 @@ export async function solicitarRecompraManual(
       console.warn('[Recompra] Inngest não disponível — lembretes futuros não agendados:', inngestError);
     }
 
-    // ── Notificações in-app: admins + médico vinculado (ou todos) ──
-    // 1) Todos os admins
+    // ── Notificações in-app: apenas admins ──────────────────────
     const adminsIds = await db
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.role, 'admin'), isNull(users.deletedAt)));
 
-    // 2) Médico vinculado ao paciente, ou todos os médicos se não houver
-    let medicosIds: { id: string }[] = [];
-
-    if (pacienteIdFinal) {
-      const medicoVinculadoId = await db.execute(sql`
-        SELECT u.id
-        FROM pacientes p
-        INNER JOIN medicos m ON m.id = p.medico_id
-        INNER JOIN users u   ON u.id = m.user_id
-        WHERE p.id = ${pacienteIdFinal}
-          AND p.deleted_at IS NULL
-        LIMIT 1
-      `);
-
-      if (medicoVinculadoId.rows.length > 0) {
-        medicosIds = medicoVinculadoId.rows as { id: string }[];
-      } else {
-        medicosIds = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
-      }
-    } else {
-      medicosIds = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
-    }
-
-    // Combinar sem duplicatas
-    const idsUnicos = new Set([...adminsIds.map((d) => d.id), ...medicosIds.map((d) => d.id)]);
-
-    if (idsUnicos.size > 0) {
-      const notificacoesData = Array.from(idsUnicos).map((userId) => ({
-        userId,
+    if (adminsIds.length > 0) {
+      const notificacoesData = adminsIds.map((d) => ({
+        userId: d.id,
         tipo: 'recompra_medicamento' as const,
         titulo: 'Nova solicitação de recompra',
-        mensagem: `${solicitante.nome} solicitou recompra de ${parsed.data.medicamentoNome}. Previsão de término: ${new Date(dataTerminoStr).toLocaleDateString('pt-BR')}.`,
+        mensagem: `${solicitante.nome} solicitou recompra. Entre em contato: ${parsed.data.contatoEmail ?? parsed.data.contatoTelefone ?? 'sem contato informado'}.`,
         lida: false,
         linkAcao: '/admin/recompras',
       }));
@@ -216,46 +183,13 @@ export async function solicitarRecompraManual(
         }
       }
 
-      // 1) Sempre: todos os admins
+      // 1) Todos os admins
       const adminsEmails = await db
         .select({ email: users.email, nome: users.nome })
         .from(users)
         .where(and(eq(users.role, 'admin'), isNull(users.deletedAt)));
 
-      // 2) Médico: só o vinculado ao paciente; se não houver, todos os médicos
-      let medicosEmails: { email: string; nome: string }[] = [];
-
-      if (pacienteIdFinal) {
-        // Buscar o médico vinculado ao paciente
-        const medicoVinculado = await db.execute(sql`
-          SELECT u.email, u.nome
-          FROM pacientes p
-          INNER JOIN medicos m ON m.id = p.medico_id
-          INNER JOIN users u   ON u.id = m.user_id
-          WHERE p.id = ${pacienteIdFinal}
-            AND p.deleted_at IS NULL
-          LIMIT 1
-        `);
-
-        if (medicoVinculado.rows.length > 0) {
-          // Só o médico vinculado
-          medicosEmails = medicoVinculado.rows as { email: string; nome: string }[];
-        } else {
-          // Sem médico vinculado → todos os médicos
-          medicosEmails = await db
-            .select({ email: users.email, nome: users.nome })
-            .from(users)
-            .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
-        }
-      } else {
-        // Pedido sem pacienteId vinculado → todos os médicos
-        medicosEmails = await db
-          .select({ email: users.email, nome: users.nome })
-          .from(users)
-          .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
-      }
-
-      // 3) Sempre: e-mails financeiros ativos
+      // 2) E-mails financeiros ativos
       const financeiroEmails = await db
         .select({ email: emailsNotificacao.email, nome: emailsNotificacao.nome })
         .from(emailsNotificacao)
@@ -263,7 +197,7 @@ export async function solicitarRecompraManual(
 
       // Montar lista sem duplicatas (por e-mail)
       const todosMap = new Map<string, { email: string; nome: string }>();
-      for (const d of [...adminsEmails, ...medicosEmails, ...financeiroEmails]) {
+      for (const d of [...adminsEmails, ...financeiroEmails]) {
         if (d.email) todosMap.set(d.email.toLowerCase(), { email: d.email, nome: d.nome });
       }
       const todosDestinatarios = Array.from(todosMap.values());
@@ -289,6 +223,7 @@ export async function solicitarRecompraManual(
       } else {
         console.warn('[Recompra] Nenhum destinatário encontrado para envio de e-mail');
       }
+
     } catch (emailError) {
       console.error('[Recompra] Erro ao enviar e-mails (pedido salvo):', emailError);
     }
