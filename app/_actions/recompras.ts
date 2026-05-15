@@ -183,17 +183,21 @@ export async function solicitarRecompraManual(
         }
       }
 
-      // 1) Todos os admins
+      // 1) Todos os admins (sem filtro de deletedAt para garantir inclusão)
       const adminsEmails = await db
         .select({ email: users.email, nome: users.nome })
         .from(users)
-        .where(and(eq(users.role, 'admin'), isNull(users.deletedAt)));
+        .where(eq(users.role, 'admin'));
+
+      console.info('[Recompra] Admins encontrados:', adminsEmails.length, adminsEmails.map((a) => a.email));
 
       // 2) E-mails financeiros ativos
       const financeiroEmails = await db
         .select({ email: emailsNotificacao.email, nome: emailsNotificacao.nome })
         .from(emailsNotificacao)
         .where(and(eq(emailsNotificacao.ativo, true), eq(emailsNotificacao.categoria, 'financeiro')));
+
+      console.info('[Recompra] Financeiro encontrados:', financeiroEmails.length, financeiroEmails.map((f) => f.email));
 
       // Montar lista sem duplicatas (por e-mail)
       const todosMap = new Map<string, { email: string; nome: string }>();
@@ -202,7 +206,7 @@ export async function solicitarRecompraManual(
       }
       const todosDestinatarios = Array.from(todosMap.values());
 
-      console.info('[Recompra] Destinatários do e-mail:', todosDestinatarios.map((d) => d.email));
+      console.info('[Recompra] Total destinatários:', todosDestinatarios.length, todosDestinatarios.map((d) => d.email));
 
       if (todosDestinatarios.length > 0) {
         const { enviarEmailRecompraCompletoEquipe } = await import('@/lib/email/notificacoes');
@@ -219,13 +223,17 @@ export async function solicitarRecompraManual(
           dataInicioUso: parsed.data.dataInicioUso,
           dataTermino: dataTerminoStr,
         });
-        console.info('[Recompra] E-mails enviados com sucesso para', todosDestinatarios.length, 'destinatário(s)');
+        console.info('[Recompra] ✅ E-mails enviados para', todosDestinatarios.length, 'destinatário(s)');
       } else {
-        console.warn('[Recompra] Nenhum destinatário encontrado para envio de e-mail');
+        console.warn('[Recompra] ⚠️ Nenhum destinatário encontrado — verifique se existem usuários com role=admin no banco');
       }
 
-    } catch (emailError) {
-      console.error('[Recompra] Erro ao enviar e-mails (pedido salvo):', emailError);
+    } catch (emailError: any) {
+      console.error('[Recompra] ❌ Erro ao enviar e-mails (pedido salvo):', {
+        message: emailError?.message,
+        status: emailError?.status ?? emailError?.statusCode,
+        body: emailError?.body ?? emailError?.response?.body,
+      });
     }
 
 
