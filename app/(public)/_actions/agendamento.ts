@@ -246,6 +246,8 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
   nome: string;
   especialidade: string;
   bio: string | null;
+  avatarUrl: string | null;
+  valorConsulta: number | null;
   googleConectado: boolean;
 }>>> {
   try {
@@ -255,6 +257,8 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
         nome: users.nome,
         especialidade: medicos.especialidade,
         bio: medicos.bio,
+        avatarUrl: users.avatarUrl,
+        valorConsulta: medicos.valorConsulta,
         googleRefreshToken: medicos.googleRefreshToken,
       })
       .from(medicos)
@@ -265,6 +269,8 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
       nome: m.nome,
       especialidade: m.especialidade,
       bio: m.bio,
+      avatarUrl: m.avatarUrl,
+      valorConsulta: m.valorConsulta !== null ? Number(m.valorConsulta) : null,
       googleConectado: !!m.googleRefreshToken,
     }));
 

@@ -10,21 +10,22 @@ import {
   Calendar,
   Stethoscope,
   MessageCircle,
-  AlertTriangle,
   CheckCircle2,
   Clock,
-  TrendingUp,
+  Route,
   ShieldCheck,
   Droplets,
   HeartPulse,
   BookOpen,
   ChevronRight,
-  Star,
   Loader2,
   UserX,
+  Video,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
@@ -53,6 +54,35 @@ const DICAS = [
   },
 ];
 
+// ── Legendas humanas para enums de jornada/status ────────────
+
+const LABEL_JORNADA: Record<string, string> = {
+  acolhimento: 'Acolhimento',
+  avaliacao_medica: 'Avaliação Médica',
+  burocracia_anvisa: 'Burocracia ANVISA',
+  logistica: 'Logística',
+  acompanhamento_continuo: 'Acompanhamento Contínuo',
+};
+
+const LABEL_STATUS: Record<string, string> = {
+  aguardando_consulta: 'Aguardando consulta',
+  em_tratamento: 'Em tratamento',
+  concluido: 'Concluído',
+  arquivado: 'Arquivado',
+};
+
+const LABEL_TIPO_CANABINOIDE: Record<string, string> = {
+  cbd: 'CBD',
+  thc: 'THC',
+  cbd_thc: 'CBD + THC',
+  full_spectrum: 'Full Spectrum',
+  isolado: 'Isolado',
+};
+
+function formatarTipoCanabinoide(tipo: string): string {
+  return LABEL_TIPO_CANABINOIDE[tipo] ?? tipo.toUpperCase();
+}
+
 export default function PacienteDashboardPage() {
   const { user } = useUser();
   const primeiroNome = user?.firstName ?? user?.username ?? 'Paciente';
@@ -71,13 +101,13 @@ export default function PacienteDashboardPage() {
 
   // ── Próximos passos dinâmicos baseados em dados reais ───────
   const proximosPassos = dados ? [
-    dados.medicamentoAtivo && dados.medicamentoAtivo.diasRestantes <= 15
+    !dados.proximaConsulta && !dados.medicamentoAtivo
       ? {
           id: 1,
-          titulo: 'Solicitar recompra',
-          descricao: `Seu medicamento acaba em ${dados.medicamentoAtivo.diasRestantes} dias`,
-          href: '/paciente/recompra',
-          urgente: dados.medicamentoAtivo.diasRestantes <= 7,
+          titulo: 'Agendar primeira consulta',
+          descricao: 'Você ainda não tem consulta marcada',
+          href: '/agendamento',
+          urgente: true,
         }
       : null,
     dados.totalDocumentos === 0
@@ -110,6 +140,9 @@ export default function PacienteDashboardPage() {
   ].filter(Boolean) : [];
 
   const med = dados?.medicamentoAtivo;
+  const consulta = dados?.proximaConsulta;
+  const jornadaLabel = dados ? (LABEL_JORNADA[dados.jornada.fase] ?? dados.jornada.fase) : '';
+  const statusLabel = dados ? (LABEL_STATUS[dados.jornada.status] ?? dados.jornada.status) : '';
 
   return (
     <div className="space-y-8">
@@ -154,9 +187,9 @@ export default function PacienteDashboardPage() {
                   <Pill className="h-5 w-5 text-violet-600" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Medicamento ativo</p>
+                  <p className="text-xs text-muted-foreground">Medicamento</p>
                   <p className="truncate text-sm font-medium">
-                    {med ? med.nome : (
+                    {med ? formatarTipoCanabinoide(med.tipoCanabinoide) : (
                       <span className="text-muted-foreground italic">Nenhum prescrito</span>
                     )}
                   </p>
@@ -200,18 +233,18 @@ export default function PacienteDashboardPage() {
             </Card>
           </div>
 
-          {/* ── Grid: Medicamento + Próximos passos ─────────────── */}
+          {/* ── Grid: Medicamento + Próxima consulta ────────────── */}
           <div className="grid gap-6 lg:grid-cols-2">
 
-            {/* Medicamento ativo */}
+            {/* Medicamento atual */}
             <Card className="border-border/40 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Pill className="h-5 w-5 text-primary" />
-                  Medicamento Ativo
+                  Medicamento Atual
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-4">
                 {!med ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
@@ -224,66 +257,163 @@ export default function PacienteDashboardPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold">{med.nome}</p>
-                        <p className="text-sm text-muted-foreground">{med.gotasPorDia} gotas/dia — {med.mlFrasco}ml</p>
-                      </div>
-                      {med.diasRestantes <= 15 && (
-                        <Badge variant="secondary" className="shrink-0">
-                          <AlertTriangle className="mr-1 h-3 w-3" />
-                          Recompra em breve
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Barra de consumo */}
                     <div>
-                      <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Consumo do frasco</span>
-                        <span className={cn(med.percentualConsumo >= 75 ? 'font-medium text-amber-600' : '')}>
-                          {med.percentualConsumo}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn(
-                            'h-full rounded-full transition-all duration-700',
-                            med.percentualConsumo >= 75
-                              ? 'bg-gradient-to-r from-amber-500 to-red-500'
-                              : 'bg-gradient-to-r from-primary to-primary/70',
-                          )}
-                          style={{ width: `${med.percentualConsumo}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {med.diasRestantes} dias restantes de medicamento
-                      </p>
+                      <p className="text-lg font-semibold">{formatarTipoCanabinoide(med.tipoCanabinoide)}</p>
+                      <p className="text-sm text-muted-foreground">{med.novaDosagem} — {med.frequencia}</p>
                     </div>
 
-                    {/* Dias em tratamento */}
-                    <div className="rounded-xl bg-primary/5 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <HeartPulse className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium text-primary">
-                            Dias em tratamento
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {med.concentracaoTHC && (
+                        <div className="rounded-xl bg-muted/50 px-3 py-2">
+                          <p className="text-muted-foreground">Concentração THC</p>
+                          <p className="font-semibold">{med.concentracaoTHC}</p>
+                        </div>
+                      )}
+                      {med.concentracaoCBD && (
+                        <div className="rounded-xl bg-muted/50 px-3 py-2">
+                          <p className="text-muted-foreground">Concentração CBD</p>
+                          <p className="font-semibold">{med.concentracaoCBD}</p>
+                        </div>
+                      )}
+                      {med.viaAdministracao && (
+                        <div className="rounded-xl bg-muted/50 px-3 py-2">
+                          <p className="text-muted-foreground">Via</p>
+                          <p className="font-semibold">{med.viaAdministracao}</p>
+                        </div>
+                      )}
+                      <div className="rounded-xl bg-muted/50 px-3 py-2">
+                        <p className="text-muted-foreground">Último ajuste</p>
+                        <p className="font-semibold">
+                          {format(new Date(med.dataAjuste + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {med.proximaRevisao && (
+                      <div className="rounded-xl bg-primary/5 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium text-primary">Próxima revisão</span>
+                          </div>
+                          <span className="text-sm font-bold text-primary">
+                            {format(new Date(med.proximaRevisao + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-primary">
-                          {med.diasEmTratamento} dias
-                        </span>
                       </div>
-                    </div>
+                    )}
 
                     <Link
-                      href="/paciente/recompra"
+                      href="/paciente/medicamentos"
                       className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
                     >
-                      Solicitar recompra
+                      Ver todos meus medicamentos
                       <ChevronRight className="h-4 w-4" />
                     </Link>
                   </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Próxima consulta */}
+            <Card className="border-border/40 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Próxima Consulta
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!consulta ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                      <Calendar className="h-6 w-6 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-sm font-medium">Nenhuma consulta agendada</p>
+                    <Link
+                      href="/agendamento"
+                      className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      Agendar agora
+                      <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-lg font-semibold capitalize">
+                        {format(new Date(consulta.dataHora), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        às {format(new Date(consulta.dataHora), "HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/50 px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Stethoscope className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">com</span>
+                        <span className="font-medium">{consulta.medicoNome}</span>
+                      </div>
+                    </div>
+
+                    {consulta.meetLink ? (
+                      <a
+                        href={consulta.meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        <Video className="h-4 w-4" />
+                        Acessar Google Meet
+                      </a>
+                    ) : (
+                      <Badge variant="secondary" className="w-full justify-center py-1.5">
+                        Link do Meet em breve
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── Grid: Jornada + Próximos passos ─────────────────── */}
+          <div className="grid gap-6 lg:grid-cols-2">
+
+            {/* Jornada / Status */}
+            <Card className="border-border/40 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Route className="h-5 w-5 text-primary" />
+                  Sua Jornada
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl bg-primary/5 px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Fase atual</p>
+                  <p className="mt-1 text-lg font-bold text-primary">{jornadaLabel}</p>
+                </div>
+
+                <div className="rounded-xl bg-muted/50 px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="mt-1 text-sm font-semibold">{statusLabel}</p>
+                </div>
+
+                {dados?.medicoNome ? (
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                      Seu tratamento está sendo acompanhado por {dados.medicoNome}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                    <UserX className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Nenhum médico responsável atribuído ainda. Entre em contato com a equipe.
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -336,104 +466,33 @@ export default function PacienteDashboardPage() {
             </Card>
           </div>
 
-          {/* ── Status do tratamento ─────────────────────────────── */}
-          <div className="grid gap-6 lg:grid-cols-2">
-
-            {/* Visão geral */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Status do Tratamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {med ? (
-                  <>
-                    <div className="flex items-center gap-4 rounded-xl bg-primary/5 px-4 py-3">
-                      <Star className="h-5 w-5 text-primary" />
+          {/* ── Dicas de saúde ─────────────────────────────────── */}
+          <Card className="border-border/40 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <HeartPulse className="h-5 w-5 text-primary" />
+                Dicas para o seu Tratamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {DICAS.map((dica, index) => {
+                  const Icon = dica.icone;
+                  return (
+                    <div key={index} className="flex gap-3">
+                      <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dica.bg)}>
+                        <Icon className={cn('h-4 w-4', dica.cor)} />
+                      </div>
                       <div>
-                        <p className="text-sm font-semibold">{med.diasEmTratamento} dias em tratamento</p>
-                        <p className="text-xs text-muted-foreground">Continue assim!</p>
+                        <p className="text-sm font-medium">{dica.titulo}</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{dica.texto}</p>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-                        <p className="text-2xl font-bold text-primary">{med.diasEmTratamento}</p>
-                        <p className="text-xs text-muted-foreground">dias ativos</p>
-                      </div>
-                      <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-                        <p className="text-2xl font-bold text-amber-600">{med.diasRestantes}</p>
-                        <p className="text-xs text-muted-foreground">dias de med.</p>
-                      </div>
-                      <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-                        <p className="text-2xl font-bold text-emerald-600">{dados?.totalDocumentos}</p>
-                        <p className="text-xs text-muted-foreground">documentos</p>
-                      </div>
-                      <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-                        <p className="text-2xl font-bold text-violet-600">{dados?.mensagensNaoLidas ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">msg. não lidas</p>
-                      </div>
-                    </div>
-
-                    {dados?.medicoNome && (
-                      <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                        <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                          Seu tratamento está ativo e sendo acompanhado por {dados.medicoNome}.
-                        </p>
-                      </div>
-                    )}
-                    {!dados?.medicoNome && (
-                      <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                        <UserX className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        <p className="text-xs text-amber-700 dark:text-amber-400">
-                          Nenhum médico responsável atribuído ainda. Entre em contato com a equipe.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/30" />
-                    <p className="text-sm font-medium">Tratamento não iniciado</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Os dados aparecerão aqui quando seu médico prescrever o medicamento.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Dicas de saúde */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <HeartPulse className="h-5 w-5 text-primary" />
-                  Dicas para o seu Tratamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {DICAS.map((dica, index) => {
-                    const Icon = dica.icone;
-                    return (
-                      <div key={index} className="flex gap-3">
-                        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dica.bg)}>
-                          <Icon className={cn('h-4 w-4', dica.cor)} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{dica.titulo}</p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{dica.texto}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

@@ -8,19 +8,33 @@ import { contarMensagensNaoLidas } from '@/app/_actions/chat';
 /**
  * Carrega todos os dados necessários para o dashboard do paciente
  * em uma única chamada, evitando waterfalls.
+ *
+ * Fontes de dados:
+ * - Medicamento: itens_ajuste_dosagem + ajustes_dosagem (mesma fonte de /paciente/medicamentos)
+ * - Jornada: pacientes.jornada_fase + pacientes.status
+ * - Próxima consulta: consultas (futuras, status agendada/confirmada)
  */
 export interface DadosDashboard {
   medicoNome: string | null;
   medicamentoAtivo: {
-    nome: string;
-    gotasPorDia: number;
-    mlFrasco: number;
-    dataInicio: string;
-    dataFimPrevista: string;
-    diasRestantes: number;
-    diasTotais: number;
-    percentualConsumo: number;
-    diasEmTratamento: number;
+    tipoCanabinoide: string;
+    novaDosagem: string;
+    frequencia: string;
+    concentracaoTHC: string | null;
+    concentracaoCBD: string | null;
+    viaAdministracao: string | null;
+    dataAjuste: string;
+    proximaRevisao: string | null;
+  } | null;
+  jornada: {
+    fase: string;
+    status: string;
+  };
+  proximaConsulta: {
+    dataHora: string;
+    meetLink: string | null;
+    medicoNome: string;
+    status: string;
   } | null;
   totalDocumentos: number;
   mensagensNaoLidas: number;
@@ -38,7 +52,7 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, documentosRes, mensagensRes] = await Promise.all([
+    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -51,26 +65,61 @@ export async function obterDadosDashboard(): Promise<{
         LIMIT 1
       `),
 
-      // 2. Medicamento ativo (dosagem mais recente ativa)
+      // 2. Medicamento atual — item do ajuste mais recente
       db.execute(sql`
         SELECT
-          med.nome              AS "nome",
-          d.gotas_por_dia       AS "gotasPorDia",
-          d.ml_frasco           AS "mlFrasco",
-          d.data_inicio         AS "dataInicio",
-          d.data_fim_prevista   AS "dataFimPrevista"
-        FROM dosagens d
-        INNER JOIN medicamentos med ON med.id = d.medicamento_id
-        INNER JOIN pacientes p      ON p.id = d.paciente_id
-        INNER JOIN users u          ON u.id = p.user_id
+          iad.tipo_canabinoide   AS "tipoCanabinoide",
+          iad.nova_dosagem       AS "novaDosagem",
+          iad.frequencia,
+          iad.concentracao_thc   AS "concentracaoTHC",
+          iad.concentracao_cbd   AS "concentracaoCBD",
+          iad.via_administracao  AS "viaAdministracao",
+          ad.data_ajuste         AS "dataAjuste",
+          ad.proxima_revisao     AS "proximaRevisao"
+        FROM itens_ajuste_dosagem iad
+        INNER JOIN ajustes_dosagem ad ON ad.id = iad.ajuste_id
+        INNER JOIN pacientes p        ON p.id  = ad.paciente_id
+        INNER JOIN users u            ON u.id  = p.user_id
         WHERE u.clerk_id = ${auth.clerkId}
-          AND d.ativa = true
           AND p.deleted_at IS NULL
-        ORDER BY d.created_at DESC
+          AND ad.deleted_at IS NULL
+        ORDER BY ad.data_ajuste DESC, iad.created_at DESC
         LIMIT 1
       `),
 
-      // 3. Total de documentos do paciente
+      // 3. Jornada e status do paciente
+      db.execute(sql`
+        SELECT
+          p.jornada_fase AS "fase",
+          p.status
+        FROM pacientes p
+        INNER JOIN users u ON u.id = p.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND p.deleted_at IS NULL
+        LIMIT 1
+      `),
+
+      // 4. Próxima consulta agendada
+      db.execute(sql`
+        SELECT
+          c.data_hora           AS "dataHora",
+          c.google_meet_link    AS "meetLink",
+          c.status,
+          um.nome               AS "medicoNome"
+        FROM consultas c
+        INNER JOIN pacientes p ON p.id = c.paciente_id
+        INNER JOIN users u     ON u.id = p.user_id
+        INNER JOIN medicos m   ON m.id = c.medico_id
+        INNER JOIN users um    ON um.id = m.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND c.deleted_at IS NULL
+          AND c.data_hora >= NOW()
+          AND c.status IN ('agendada', 'confirmada')
+        ORDER BY c.data_hora ASC
+        LIMIT 1
+      `),
+
+      // 5. Total de documentos do paciente
       db.execute(sql`
         SELECT COUNT(*) AS total
         FROM documentos d
@@ -80,7 +129,7 @@ export async function obterDadosDashboard(): Promise<{
           AND d.deleted_at IS NULL
       `),
 
-      // 4. Mensagens não lidas
+      // 6. Mensagens não lidas
       contarMensagensNaoLidas(),
     ]);
 
@@ -93,27 +142,34 @@ export async function obterDadosDashboard(): Promise<{
     let medicamentoAtivo: DadosDashboard['medicamentoAtivo'] = null;
     if (medicamentoRes.rows.length > 0) {
       const row = medicamentoRes.rows[0] as any;
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const inicio = new Date(row.dataInicio + 'T00:00:00');
-      const fim = new Date(row.dataFimPrevista + 'T00:00:00');
-
-      const diasTotais = Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / 86400000));
-      const diasRestantes = Math.max(0, Math.round((fim.getTime() - hoje.getTime()) / 86400000));
-      const diasConsumidos = diasTotais - diasRestantes;
-      const percentualConsumo = Math.min(100, Math.max(0, Math.round((diasConsumidos / diasTotais) * 100)));
-      const diasEmTratamento = Math.max(0, Math.round((hoje.getTime() - inicio.getTime()) / 86400000));
-
       medicamentoAtivo = {
-        nome: row.nome,
-        gotasPorDia: Number(row.gotasPorDia),
-        mlFrasco: Number(row.mlFrasco),
-        dataInicio: row.dataInicio,
-        dataFimPrevista: row.dataFimPrevista,
-        diasRestantes,
-        diasTotais,
-        percentualConsumo,
-        diasEmTratamento,
+        tipoCanabinoide: row.tipoCanabinoide,
+        novaDosagem: row.novaDosagem,
+        frequencia: row.frequencia,
+        concentracaoTHC: row.concentracaoTHC ?? null,
+        concentracaoCBD: row.concentracaoCBD ?? null,
+        viaAdministracao: row.viaAdministracao ?? null,
+        dataAjuste: row.dataAjuste,
+        proximaRevisao: row.proximaRevisao ?? null,
+      };
+    }
+
+    // Processar jornada
+    const jornadaRow = jornadaRes.rows[0] as any;
+    const jornada = {
+      fase: (jornadaRow?.fase ?? 'acolhimento') as string,
+      status: (jornadaRow?.status ?? 'aguardando_consulta') as string,
+    };
+
+    // Processar próxima consulta
+    let proximaConsulta: DadosDashboard['proximaConsulta'] = null;
+    if (consultaRes.rows.length > 0) {
+      const row = consultaRes.rows[0] as any;
+      proximaConsulta = {
+        dataHora: row.dataHora instanceof Date ? row.dataHora.toISOString() : String(row.dataHora),
+        meetLink: row.meetLink ?? null,
+        medicoNome: row.medicoNome,
+        status: row.status,
       };
     }
 
@@ -128,6 +184,8 @@ export async function obterDadosDashboard(): Promise<{
       dados: {
         medicoNome,
         medicamentoAtivo,
+        jornada,
+        proximaConsulta,
         totalDocumentos,
         mensagensNaoLidas,
       },

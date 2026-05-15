@@ -44,7 +44,13 @@ interface Medico {
   nome: string;
   especialidade: string;
   bio: string | null;
+  avatarUrl: string | null;
+  valorConsulta: number | null;
   googleConectado: boolean;
+}
+
+function formatarValor(v: number): string {
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 const STEPS = [
@@ -302,28 +308,58 @@ export function AgendamentoWizard() {
                 <Loader2 size={32} className="animate-spin text-primary" />
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4">
                 {medicos.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="flex items-start gap-4 rounded-xl border border-border/50 p-5 text-left transition-all hover:border-[#C08E3A]/50 hover:shadow-md"
+                    className="group flex w-full items-stretch gap-6 rounded-2xl border border-border/50 p-6 text-left transition-all hover:border-[#C08E3A]/50 hover:shadow-md"
                   >
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Stethoscope size={24} className="text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{m.nome}</p>
-                      <p className="text-sm text-muted-foreground">{m.especialidade}</p>
-                      {m.bio && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{m.bio}</p>}
-                      {m.googleConectado && (
-                        <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
-                          <Video size={10} />
-                          Google Meet
-                        </Badge>
+                    {/* Foto */}
+                    <div className="shrink-0">
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt={m.nome}
+                          className="h-40 w-40 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-primary/10">
+                          <Stethoscope size={48} className="text-primary/60" />
+                        </div>
                       )}
                     </div>
-                    <ChevronRight size={16} className="mt-1 shrink-0 text-muted-foreground" />
+
+                    {/* Informações */}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <h3 className="text-xl font-bold leading-tight">{m.nome}</h3>
+                      <p className="mt-1 text-sm font-semibold text-[#C08E3A]">{m.especialidade}</p>
+
+                      {m.bio && (
+                        <p className="mt-3 text-sm leading-relaxed text-justify text-muted-foreground line-clamp-6">
+                          {m.bio}
+                        </p>
+                      )}
+
+                      <div className="mt-auto pt-3 space-y-1">
+                        {m.valorConsulta !== null && (
+                          <p className="text-sm">
+                            <strong>Valor:</strong> {formatarValor(m.valorConsulta)}
+                          </p>
+                        )}
+                        <p className="text-sm font-semibold text-emerald-600">
+                          Médico parceiro da associação
+                        </p>
+                        {m.googleConectado && (
+                          <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
+                            <Video size={10} />
+                            Google Meet
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <ChevronRight size={18} className="shrink-0 self-center text-muted-foreground transition-transform group-hover:translate-x-1" />
                   </button>
                 ))}
               </div>
