@@ -16,7 +16,6 @@ import {
   Menu,
   MessageSquare,
   Calendar,
-  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -28,8 +27,7 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route },
   { label: 'Pacientes', href: '/medico/pacientes', icon: Users },
   { label: 'Triagem', href: '/medico/triagem', icon: FileCheck },
-  { label: 'Agenda', href: '/medico/agenda', icon: Calendar },
-  { label: 'Recompra', href: '/medico/recompra', icon: RefreshCw },
+  { label: 'Agendamento', href: '/medico/agenda', icon: Calendar },
   { label: 'Chat', href: '/medico/chat', icon: MessageSquare },
   { label: 'Notificações', href: '/medico/notificacoes', icon: Bell },
   { label: 'Configurações', href: '/medico/configuracoes', icon: Settings },
