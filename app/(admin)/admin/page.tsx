@@ -1,12 +1,13 @@
 import { obterKpisAdmin, obterAtividadeRecente } from '@/app/_actions/admin';
 import { listarTriagens } from '@/app/(public)/_actions/triagem';
+import { listarMedicosAdmin } from '@/app/_actions/admin-medicos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle2,
-  Clock,
+  ChevronRight,
   FileCheck,
   RefreshCw,
   ShieldCheck,
@@ -19,16 +20,18 @@ import type { LucideIcon } from 'lucide-react';
  * Dashboard administrativo — Server Component com dados reais do banco.
  */
 export default async function AdminDashboardPage() {
-  const [kpisResult, atividadeResult, triagensResult] = await Promise.all([
+  const [kpisResult, atividadeResult, triagensResult, medicosResult] = await Promise.all([
     obterKpisAdmin(),
     obterAtividadeRecente(),
     listarTriagens(),
+    listarMedicosAdmin(),
   ]);
 
   const kpis = kpisResult.dados;
   const atividades = atividadeResult.dados ?? [];
   const triagens = triagensResult.dados ?? [];
   const triagensPendentes = triagens.filter((t) => t.statusVisualizacao === 'pendente');
+  const medicos = medicosResult.dados ?? [];
 
   const cards: { label: string; valor: number; icon: LucideIcon; cor: string; urgente?: boolean }[] = [
     {
@@ -207,6 +210,56 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Médicos cadastrados ────────────────────────────── */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Médicos cadastrados</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Clique em um médico para ver pacientes, triagens, agenda e jornada
+            </p>
+          </div>
+          <Badge variant="secondary">{medicos.length}</Badge>
+        </CardHeader>
+        <CardContent>
+          {medicos.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum médico cadastrado.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {medicos.map((m) => (
+                <Link
+                  key={m.medicoId}
+                  href={`/admin/medicos/${m.medicoId}`}
+                  className="group flex items-center gap-3 rounded-xl border border-border/50 p-4 transition-all hover:border-primary/50 hover:bg-accent/30"
+                >
+                  {m.avatarUrl ? (
+                    <img
+                      src={m.avatarUrl}
+                      alt={m.nome}
+                      className="h-12 w-12 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <Stethoscope size={20} className="text-primary" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{m.nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {m.totalPacientes} paciente{m.totalPacientes !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

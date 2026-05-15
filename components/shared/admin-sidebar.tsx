@@ -9,7 +9,6 @@ import {
   Users,
   FileCheck,
   Shield,
-  Settings,
   LogOut,
   ChevronLeft,
   Menu,
@@ -33,7 +32,6 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
   { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
   { label: 'Auditoria', href: '/admin/auditoria', icon: Shield },
-  { label: 'Configurações', href: '/admin/configuracoes', icon: Settings },
 ];
 
 export function AdminSidebar() {

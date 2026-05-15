@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { users, pacientes, medicos } from '@/db/schema';
 import { eq, isNull, sql } from 'drizzle-orm';
 import { verificarAdmin } from '@/lib/auth';
+import { criarNotificacao } from '@/app/(medico)/_actions/notificacoes';
+import { enviarEmailMedicoNovoPaciente } from '@/lib/email/notificacoes';
 
 /**
  * Server Actions para atribuição de médicos a pacientes (Admin).
@@ -139,6 +141,48 @@ export async function atribuirMedicoAoPaciente(
       .update(pacientes)
       .set({ medicoId })
       .where(eq(pacientes.id, pacienteId));
+
+    // ── Notificar médico (email + in-app) — não bloqueia em caso de falha
+    try {
+      const dadosRes = await db.execute(sql`
+        SELECT
+          um.id       AS "medicoUserId",
+          um.nome     AS "medicoNome",
+          um.email    AS "medicoEmail",
+          up.nome     AS "pacienteNome",
+          up.email    AS "pacienteEmail",
+          up.telefone AS "pacienteTelefone"
+        FROM medicos m
+        INNER JOIN users um ON um.id = m.user_id
+        INNER JOIN pacientes p ON p.id = ${pacienteId}
+        INNER JOIN users up ON up.id = p.user_id
+        WHERE m.id = ${medicoId}
+        LIMIT 1
+      `);
+
+      const dados = dadosRes.rows[0] as any;
+      if (dados) {
+        // In-app + Pusher realtime
+        await criarNotificacao({
+          userId: dados.medicoUserId,
+          tipo: 'geral',
+          titulo: 'Novo paciente atribuído',
+          mensagem: `${dados.pacienteNome} foi atribuído a você.`,
+          linkAcao: '/medico/pacientes',
+        });
+
+        // Email (já tem try/catch interno, mas envolvido aqui também por segurança)
+        await enviarEmailMedicoNovoPaciente({
+          emailMedico: dados.medicoEmail,
+          nomeMedico: dados.medicoNome,
+          pacienteNome: dados.pacienteNome,
+          pacienteEmail: dados.pacienteEmail,
+          pacienteTelefone: dados.pacienteTelefone ?? null,
+        });
+      }
+    } catch (notifError) {
+      console.error('[Admin] Falha ao notificar médico (atribuição salva):', notifError);
+    }
 
     return { sucesso: true };
   } catch (error) {

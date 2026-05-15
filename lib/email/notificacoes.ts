@@ -442,3 +442,71 @@ export async function enviarEmailRecompraCompletoEquipe(params: {
     }
   }
 }
+
+// ── E-mail: Novo Paciente Atribuído ao Médico ────────────────
+
+/**
+ * Notifica o médico quando o admin atribui um novo paciente a ele.
+ * Enviado em paralelo com a notificação in-app via Pusher.
+ */
+export async function enviarEmailMedicoNovoPaciente(params: {
+  emailMedico: string;
+  nomeMedico: string;
+  pacienteNome: string;
+  pacienteEmail: string;
+  pacienteTelefone: string | null;
+}): Promise<void> {
+  const contatoTelefone = params.pacienteTelefone
+    ? `<p style="margin:2px 0 0;font-size:14px;color:${CORES.textPrimary};">📞 ${escapeHtml(params.pacienteTelefone)}</p>`
+    : '';
+
+  const corpo = `
+    <p style="margin:0 0 24px;font-size:14px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Olá, <strong style="color:${CORES.textPrimary};">${escapeHtml(params.nomeMedico)}</strong>!
+      Um novo paciente foi atribuído a você.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr><td style="background:${CORES.greenBg};border-radius:12px;padding:20px 24px;border-left:3px solid ${CORES.green};">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:6px 0;border-bottom:1px solid ${CORES.divider};">
+            <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;color:${CORES.textMuted};">Paciente</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:${CORES.textPrimary};">${escapeHtml(params.pacienteNome)}</p>
+          </td></tr>
+          <tr><td style="padding:12px 0 0;">
+            <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;color:${CORES.textMuted};">Contato</p>
+            <p style="margin:4px 0 0;font-size:14px;color:${CORES.textPrimary};">${escapeHtml(params.pacienteEmail)}</p>
+            ${contatoTelefone}
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 24px;font-size:13px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Acesse o painel para revisar o perfil do paciente e iniciar o acompanhamento.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+      <a href="${APP_URL()}/medico/pacientes" style="display:inline-block;background:${CORES.green};color:#fff;font-size:13px;font-weight:600;padding:12px 28px;border-radius:50px;text-decoration:none;">👤 Ver pacientes</a>
+    </td></tr></table>`;
+
+  const html = templateBase({
+    emoji: '👤',
+    badgeCor: CORES.greenBg,
+    titulo: 'Novo paciente atribuído',
+    corpo,
+  });
+
+  const client = criarClienteBrevo();
+  try {
+    await client.transactionalEmails.sendTransacEmail({
+      subject: `👤 Novo paciente atribuído — ${params.pacienteNome}`,
+      htmlContent: html,
+      sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+      to: [{ email: params.emailMedico, name: params.nomeMedico }],
+    });
+  } catch (err: any) {
+    console.error(`[Email] Erro ao enviar atribuição para ${params.emailMedico}:`, {
+      message: err?.message,
+      status: err?.status ?? err?.statusCode,
+      body: err?.body ?? err?.response?.body,
+    });
+  }
+}
