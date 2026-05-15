@@ -60,9 +60,9 @@ const CANAIS = [
   {
     icon: Mail,
     titulo: 'E-mail',
-    info: 'contato@be4hope.org',
+    info: 'hello@be4hope.org',
     detalhe: 'Resposta em até 24h',
-    href: 'mailto:contato@be4hope.org',
+    href: 'mailto:hello@be4hope.org',
   },
   {
     icon: MapPin,
