@@ -145,15 +145,48 @@ export async function solicitarRecompraManual(
       console.warn('[Recompra] Inngest não disponível — lembretes futuros não agendados:', inngestError);
     }
 
-    // ── Notificações in-app para admins e médicos ──────────────
-    const destinatarios = await db
+    // ── Notificações in-app: admins + médico vinculado (ou todos) ──
+    // 1) Todos os admins
+    const adminsIds = await db
       .select({ id: users.id })
       .from(users)
-      .where(or(eq(users.role, 'admin'), eq(users.role, 'medico')));
+      .where(and(eq(users.role, 'admin'), isNull(users.deletedAt)));
 
-    if (destinatarios.length > 0) {
-      const notificacoesData = destinatarios.map((d) => ({
-        userId: d.id,
+    // 2) Médico vinculado ao paciente, ou todos os médicos se não houver
+    let medicosIds: { id: string }[] = [];
+
+    if (pacienteIdFinal) {
+      const medicoVinculadoId = await db.execute(sql`
+        SELECT u.id
+        FROM pacientes p
+        INNER JOIN medicos m ON m.id = p.medico_id
+        INNER JOIN users u   ON u.id = m.user_id
+        WHERE p.id = ${pacienteIdFinal}
+          AND p.deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      if (medicoVinculadoId.rows.length > 0) {
+        medicosIds = medicoVinculadoId.rows as { id: string }[];
+      } else {
+        medicosIds = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
+      }
+    } else {
+      medicosIds = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.role, 'medico'), isNull(users.deletedAt)));
+    }
+
+    // Combinar sem duplicatas
+    const idsUnicos = new Set([...adminsIds.map((d) => d.id), ...medicosIds.map((d) => d.id)]);
+
+    if (idsUnicos.size > 0) {
+      const notificacoesData = Array.from(idsUnicos).map((userId) => ({
+        userId,
         tipo: 'recompra_medicamento' as const,
         titulo: 'Nova solicitação de recompra',
         mensagem: `${solicitante.nome} solicitou recompra de ${parsed.data.medicamentoNome}. Previsão de término: ${new Date(dataTerminoStr).toLocaleDateString('pt-BR')}.`,
