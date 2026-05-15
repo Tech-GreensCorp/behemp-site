@@ -49,15 +49,17 @@ export default function ParceirosPage() {
         {/* Header */}
         <div className="mx-auto max-w-2xl text-center animate-fade-up">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
-            Ecossistema
+            Ecossistema · Collab Be4Hope
           </p>
           <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             Nossos{' '}
             <span className="text-accent-italic">parceiros.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-            Trabalhamos junto com empresas comprometidas em levar
-            tratamentos de qualidade para quem mais precisa.
+            A Be4Hope é uma <strong className="text-foreground">collaboration (collab)</strong>{' '}
+            formada por empresas e instituições que promovem um modelo inovador de saúde —
+            mais humano, acessível e centrado no paciente, utilizando a Medicina Endocanabinóide
+            como terapia, sempre com base científica e responsabilidade.
           </p>
         </div>
 
@@ -94,12 +96,13 @@ export default function ParceirosPage() {
 
                 {/* Descrição */}
                 <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-                  A <strong className="text-foreground">Greens Pharmaceutical</strong> é uma indústria
-                  internacional dedicada ao desenvolvimento e entrega de terapias de alta complexidade,
-                  com excelência técnica, governança estruturada e visão de longo prazo. Atuam
-                  na interseção entre ciência, regulação e sustentabilidade — assegurando que
-                  a inovação terapêutica chegue ao país com responsabilidade institucional e
-                  consistência técnica.
+                  Indústria internacional dedicada ao{' '}
+                  <strong className="text-foreground">desenvolvimento e entrega de terapias de alta complexidade</strong>{' '}
+                  com excelência técnica, governança estruturada e visão de longo prazo.
+                  Atuam na interseção entre ciência, regulação e sustentabilidade —
+                  assegurando que a inovação terapêutica chegue ao país com
+                  <strong className="text-foreground"> responsabilidade institucional</strong>,
+                  consistência técnica e estabilidade operacional.
                 </p>
 
                 {/* Grid de diferenciais */}
