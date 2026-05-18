@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { consultas, medicos, pacientes, users } from '@/db/schema';
-import { eq, and, gte, lte, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, isNull, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
@@ -262,7 +262,9 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
         googleRefreshToken: medicos.googleRefreshToken,
       })
       .from(medicos)
-      .innerJoin(users, eq(medicos.userId, users.id));
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(isNull(users.deletedAt))
+      .orderBy(asc(medicos.ordem), asc(medicos.createdAt));
 
     const lista = resultado.map((m) => ({
       id: m.id,
