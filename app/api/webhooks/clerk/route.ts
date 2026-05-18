@@ -128,10 +128,11 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
 
     if (userExistente) {
       // Atualizar o clerkId se ainda não estava vinculado
+      // Não sobrescrever o role — o DB é a fonte de verdade para médicos/admins criados manualmente
       if (!userExistente.clerkId) {
         await db
           .update(users)
-          .set({ clerkId, role: role as 'admin' | 'medico' | 'paciente' })
+          .set({ clerkId })
           .where(eq(users.id, userExistente.id));
       }
       userId = userExistente.id;
