@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,9 +31,11 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
+import { obterPerfilContato, atualizarTelefonePaciente } from '@/app/_actions/perfil-paciente';
 
 export default function PerfilPacientePage() {
   const { user, isLoaded } = useUser();
+  const { openUserProfile } = useClerk();
 
   /* ── Edição de nome ───────────────────────────────────────── */
   const [editandoNome, setEditandoNome] = useState(false);
@@ -45,6 +47,12 @@ export default function PerfilPacientePage() {
   const [uploadandoAvatar, setUploadandoAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /* ── Edição de telefone ───────────────────────────────────── */
+  const [telefoneDb, setTelefoneDb] = useState<string | null>(null);
+  const [editandoTelefone, setEditandoTelefone] = useState(false);
+  const [telefoneInput, setTelefoneInput] = useState('');
+  const [salvandoTelefone, setSalvandoTelefone] = useState(false);
+
   /* ── Documentos reais ─────────────────────────────────────── */
   const [docs, setDocs] = useState<any[]>([]);
   const [carregandoDocs, setCarregandoDocs] = useState(true);
@@ -55,6 +63,28 @@ export default function PerfilPacientePage() {
     if (res.sucesso && res.dados) setDocs(res.dados as any[]);
     setCarregandoDocs(false);
   }, []);
+
+  // Carrega telefone do banco (independente do Clerk)
+  useEffect(() => {
+    obterPerfilContato().then((res) => {
+      if (res.sucesso && res.dados) {
+        setTelefoneDb(res.dados.telefone);
+      }
+    });
+  }, []);
+
+  async function salvarTelefone() {
+    setSalvandoTelefone(true);
+    const res = await atualizarTelefonePaciente(telefoneInput.trim());
+    setSalvandoTelefone(false);
+    if (res.sucesso) {
+      setTelefoneDb(telefoneInput.trim() || null);
+      setEditandoTelefone(false);
+      toast.success('Telefone atualizado!');
+    } else {
+      toast.error(res.erro || 'Erro ao salvar telefone');
+    }
+  }
 
   useEffect(() => { carregarDocs(); }, [carregarDocs]);
 
@@ -103,7 +133,8 @@ export default function PerfilPacientePage() {
 
   const nomeCompleto = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Paciente';
   const email = user?.emailAddresses[0]?.emailAddress || 'Não informado';
-  const telefone = user?.phoneNumbers?.[0]?.phoneNumber;
+  // Telefone vem do banco (users.telefone), não do Clerk
+  const telefone = telefoneDb;
   const dataCriacao = user?.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : null;
   const docsPendentes = docs.filter((d) => d.dataValidade && new Date(d.dataValidade) < new Date()).length;
 
@@ -235,17 +266,57 @@ export default function PerfilPacientePage() {
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/15 to-violet-500/5">
                 <Smartphone size={20} className="text-violet-600" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Telefone</p>
-                <p className="mt-0.5 truncate text-sm font-medium">
-                  {telefone || <span className="text-muted-foreground">Não informado</span>}
-                </p>
+                {editandoTelefone ? (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <Input
+                      value={telefoneInput}
+                      onChange={(e) => setTelefoneInput(e.target.value)}
+                      placeholder="(11) 99999-9999"
+                      className="h-8 w-full max-w-[180px] text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') salvarTelefone();
+                        if (e.key === 'Escape') setEditandoTelefone(false);
+                      }}
+                    />
+                    <button
+                      onClick={salvarTelefone}
+                      disabled={salvandoTelefone}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50"
+                      aria-label="Salvar"
+                    >
+                      {salvandoTelefone ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                    </button>
+                    <button
+                      onClick={() => setEditandoTelefone(false)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-all hover:bg-accent"
+                      aria-label="Cancelar"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="mt-0.5 truncate text-sm font-medium">
+                      {telefone || <span className="text-muted-foreground">Não informado</span>}
+                    </p>
+                    <button
+                      onClick={() => { setTelefoneInput(telefone ?? ''); setEditandoTelefone(true); }}
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                      aria-label="Editar telefone"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
         <p className="mt-2.5 text-xs text-muted-foreground">
-          Para alterar e-mail ou telefone, use <button onClick={() => window.open('https://accounts.clerk.dev/user', '_blank')} className="font-medium text-primary underline-offset-2 hover:underline">Gerenciar conta</button>
+          Para alterar o e-mail, use <button onClick={() => openUserProfile()} className="font-medium text-primary underline-offset-2 hover:underline">Gerenciar conta</button>. O telefone pode ser editado diretamente acima.
         </p>
       </section>
 
@@ -382,8 +453,8 @@ export default function PerfilPacientePage() {
           AÇÃO — Gerenciar conta
           ═══════════════════════════════════════════════════════ */}
       <div className="animate-fade-up delay-400 pb-4">
-        <Button variant="outline" onClick={() => window.open('https://accounts.clerk.dev/user', '_blank')} className="gap-2 rounded-xl">
-          <User className="h-4 w-4" /> Gerenciar conta no Clerk
+        <Button variant="outline" onClick={() => openUserProfile()} className="gap-2 rounded-xl">
+          <User className="h-4 w-4" /> Gerenciar conta
         </Button>
       </div>
     </div>

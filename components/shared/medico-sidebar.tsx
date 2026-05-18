@@ -16,6 +16,7 @@ import {
   Menu,
   MessageSquare,
   Calendar,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -23,14 +24,15 @@ import type { LucideIcon } from 'lucide-react';
 import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: 'Dashboard', href: '/medico', icon: LayoutDashboard },
-  { label: 'Jornada do Paciente', href: '/medico/jornada', icon: Route },
-  { label: 'Pacientes', href: '/medico/pacientes', icon: Users },
-  { label: 'Triagem', href: '/medico/triagem', icon: FileCheck },
-  { label: 'Agendamento', href: '/medico/agenda', icon: Calendar },
-  { label: 'Chat', href: '/medico/chat', icon: MessageSquare },
-  { label: 'Notificações', href: '/medico/notificacoes', icon: Bell },
-  { label: 'Configurações', href: '/medico/configuracoes', icon: Settings },
+  { label: 'Dashboard',           href: '/medico',                icon: LayoutDashboard },
+  { label: 'Jornada do Paciente', href: '/medico/jornada',        icon: Route },
+  { label: 'Pacientes',           href: '/medico/pacientes',      icon: Users },
+  { label: 'Triagem',             href: '/medico/triagem',        icon: FileCheck },
+  { label: 'Agendamento',         href: '/medico/agenda',         icon: Calendar },
+  { label: 'Chat',                href: '/medico/chat',           icon: MessageSquare },
+  { label: 'Notificações',        href: '/medico/notificacoes',   icon: Bell },
+  { label: 'Configurações',        href: '/medico/configuracoes',  icon: Settings },
+  { label: 'Meu Perfil',          href: '/medico/perfil',         icon: User },
 ];
 
 export function MedicoSidebar() {

@@ -16,6 +16,8 @@ import {
   UserPlus,
   Receipt,
   ShoppingCart,
+  User,
+  Settings2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -24,14 +26,16 @@ import { contarContatosNaoLidos } from '@/app/(public)/_actions/contato';
 import { contarPacientesSemMedico } from '@/app/_actions/admin-atribuicao';
 
 const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: 'Visão Geral', href: '/admin', icon: LayoutDashboard },
-  { label: 'Usuários', href: '/admin/usuarios', icon: Users },
-  { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
-  { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
-  { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
-  { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
-  { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
-  { label: 'Auditoria', href: '/admin/auditoria', icon: Shield },
+  { label: 'Visão Geral',        href: '/admin',                 icon: LayoutDashboard },
+  { label: 'Usuários',            href: '/admin/usuarios',        icon: Users },
+  { label: 'Gerenciar Contas',   href: '/admin/gerenciar-contas', icon: Settings2 },
+  { label: 'Atribuir Médico',    href: '/admin/atribuir-medico', icon: UserPlus },
+  { label: 'Triagens',           href: '/admin/triagens',        icon: FileCheck },
+  { label: 'Mensagens',          href: '/admin/mensagens',       icon: MessageSquare },
+  { label: 'Invoices',           href: '/admin/invoices',        icon: Receipt },
+  { label: 'Recompras',          href: '/admin/recompras',       icon: ShoppingCart },
+  { label: 'Auditoria',          href: '/admin/auditoria',       icon: Shield },
+  { label: 'Meu Perfil',         href: '/admin/perfil',          icon: User },
 ];
 
 export function AdminSidebar() {
