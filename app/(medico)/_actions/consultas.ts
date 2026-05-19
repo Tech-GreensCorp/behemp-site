@@ -349,3 +349,27 @@ export async function listarTodosHorariosMedico(params: {
     return { sucesso: false, erro: 'Erro ao listar horários' };
   }
 }
+
+// ── Obter configuração da agenda do médico logado ─────────────
+
+export async function obterConfigAgendaMedicoLogado(): Promise<ActionResult<{ medicoId: string; configAgenda: any }>> {
+  try {
+    const auth = await verificarMedico();
+    if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
+    
+    const medicoId = await resolverMedicoId(auth.clerkId);
+    if (!medicoId) return { sucesso: false, erro: 'Médico não encontrado' };
+
+    const [medico] = await db
+      .select({ configAgenda: medicos.configAgenda })
+      .from(medicos)
+      .where(eq(medicos.id, medicoId));
+
+    if (!medico) return { sucesso: false, erro: 'Médico não encontrado' };
+
+    return { sucesso: true, dados: { medicoId, configAgenda: medico.configAgenda } };
+  } catch (error) {
+    console.error('[Consultas] Erro ao obter config de agenda:', error);
+    return { sucesso: false, erro: 'Erro ao obter configuração da agenda' };
+  }
+}

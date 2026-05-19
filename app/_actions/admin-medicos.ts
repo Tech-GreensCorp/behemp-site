@@ -2,7 +2,9 @@
 
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
-import { verificarAdmin } from '@/lib/auth';
+import { verificarAdmin, verificarMedicoOuAdmin } from '@/lib/auth/permissions';
+import { eq } from 'drizzle-orm';
+import { medicos } from '@/db/schema';
 
 /**
  * Server Actions para visualização de médicos pelo admin.
@@ -71,6 +73,7 @@ export interface MedicoDetalhe {
     bio: string | null;
     avatarUrl: string | null;
     valorConsulta: number | null;
+    configAgenda: any | null;
   };
   pacientes: PacienteDoMedico[];
   triagens: TriagemDoMedico[];
@@ -140,7 +143,7 @@ export async function obterMedicoDetalhe(medicoId: string): Promise<ActionResult
         SELECT
           m.id, u.nome, u.email, u.telefone, u.avatar_url AS "avatarUrl",
           m.crm, m.especialidade, m.bio, m.valor_consulta AS "valorConsulta",
-          u.clerk_id AS "clerkId"
+          u.clerk_id AS "clerkId", m.config_agenda AS "configAgenda"
         FROM medicos m
         INNER JOIN users u ON u.id = m.user_id
         WHERE m.id = ${medicoId}
@@ -228,6 +231,7 @@ export async function obterMedicoDetalhe(medicoId: string): Promise<ActionResult
         bio: medicoRow.bio ?? null,
         avatarUrl: medicoRow.avatarUrl ?? null,
         valorConsulta: medicoRow.valorConsulta !== null ? Number(medicoRow.valorConsulta) : null,
+        configAgenda: medicoRow.configAgenda ?? null,
       },
       pacientes: pacientesRes.rows.map((row: any) => ({
         pacienteId: row.pacienteId,
@@ -263,5 +267,38 @@ export async function obterMedicoDetalhe(medicoId: string): Promise<ActionResult
   } catch (error) {
     console.error('[Admin] Erro ao obter detalhe do médico:', error);
     return { sucesso: false, erro: 'Erro ao carregar detalhes do médico' };
+  }
+}
+
+/**
+ * Atualiza a configuração de agenda do médico.
+ * Pode ser chamado pelo Admin ou pelo próprio Médico.
+ */
+export async function atualizarConfigAgenda(medicoId: string, configAgenda: any): Promise<ActionResult> {
+  try {
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    // Se for médico, garantir que só altera a si mesmo
+    if (auth.role === 'medico') {
+      const medicoLogado = await db.query.medicos.findFirst({
+        with: { users: true },
+        where: eq(medicos.id, medicoId),
+      });
+
+      if (!medicoLogado || medicoLogado.users.clerkId !== auth.clerkId) {
+        return { sucesso: false, erro: 'Acesso negado: você só pode alterar sua própria agenda' };
+      }
+    }
+
+    await db
+      .update(medicos)
+      .set({ configAgenda })
+      .where(eq(medicos.id, medicoId));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao atualizar configuração de agenda:', error);
+    return { sucesso: false, erro: 'Erro interno ao salvar configurações' };
   }
 }
