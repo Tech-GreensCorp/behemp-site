@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { users, pacientes, notificacoes } from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { enviarNotificacaoRealtime } from '@/lib/integrations/pusher';
+import { clerkClient } from '@clerk/nextjs/server';
 
 /**
  * Webhook do Clerk — processa eventos de usuário.
@@ -178,6 +179,20 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
         })
         .returning({ id: users.id });
       userId = novoUser.id;
+    }
+
+    // Sincronizar publicMetadata.role no Clerk para que o JWT reflita o role correto
+    // Isso é essencial para usuários criados via OAuth (Google, etc.) onde o publicMetadata
+    // não é definido automaticamente pelo Clerk.
+    try {
+      const client = await clerkClient();
+      await client.users.updateUserMetadata(clerkId, {
+        publicMetadata: { role },
+      });
+      console.log(`[Webhook Clerk] ✅ publicMetadata.role='${role}' sincronizado no Clerk: ${clerkId}`);
+    } catch (clerkError) {
+      // Não é crítico: o banco já tem o role correto. A página /redirect usa o banco como fallback.
+      console.warn('[Webhook Clerk] ⚠️ Falha ao sincronizar role no Clerk (banco OK):', clerkError);
     }
 
     // 2. Se for paciente, criar registro de paciente (sem médico — admin atribuirá)
