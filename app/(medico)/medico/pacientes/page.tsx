@@ -96,7 +96,7 @@ export default function PacientesPage() {
     return () => clearTimeout(timer);
   }, [carregarPacientes]);
 
-  // ── Importar CSV ──────────────────────────────────────────────
+  // ── Importar CSV / XLSX ───────────────────────────────────────
   async function handleImportar(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -104,7 +104,25 @@ export default function PacientesPage() {
     setImportando(true);
 
     try {
-      const conteudo = await file.text();
+      const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+        || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        || file.type === 'application/vnd.ms-excel';
+
+      let conteudo: string;
+
+      if (isXlsx) {
+        // Ler XLSX no cliente e converter para CSV com separador ;
+        const XLSX = await import('xlsx');
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const primeiraAba = workbook.SheetNames[0];
+        const planilha = workbook.Sheets[primeiraAba];
+        // csv_para_csv_sep: usa ; para compatibilidade com parseCsvLinhas do backend
+        conteudo = XLSX.utils.sheet_to_csv(planilha, { FS: ';' });
+      } else {
+        conteudo = await file.text();
+      }
+
       const resultado = await importarPacientesCSV(conteudo);
 
       if (resultado.sucesso && resultado.dados) {
@@ -126,16 +144,14 @@ export default function PacientesPage() {
           });
         }
 
-        // Recarregar lista
         await carregarPacientes();
       } else {
-        toast.error(resultado.erro || 'Erro ao importar CSV');
+        toast.error(resultado.erro || 'Erro ao importar arquivo');
       }
     } catch {
-      toast.error('Erro ao ler o arquivo CSV');
+      toast.error('Erro ao ler o arquivo. Verifique se é um CSV ou XLSX válido.');
     } finally {
       setImportando(false);
-      // Limpar input para permitir reimport do mesmo arquivo
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -191,7 +207,7 @@ export default function PacientesPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             className="hidden"
             onChange={handleImportar}
           />
@@ -207,7 +223,7 @@ export default function PacientesPage() {
             ) : (
               <Upload size={14} />
             )}
-            {importando ? 'Importando...' : 'Importar CSV'}
+            {importando ? 'Importando...' : 'Importar CSV / XLSX'}
           </Button>
           <Button
             variant="outline"
@@ -330,7 +346,7 @@ export default function PacientesPage() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload size={14} />
-                  Importar CSV
+                  Importar CSV / XLSX
                 </Button>
                 <Link href="/medico/pacientes/novo">
                   <Button size="sm" className="gap-2" nativeButton={false}>
