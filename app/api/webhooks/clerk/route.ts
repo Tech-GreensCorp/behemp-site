@@ -155,17 +155,29 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
       .limit(1);
 
     let userId: string;
+    let roleEfetivo: string = role; // role do payload (default 'paciente')
 
     if (userExistente) {
-      // Atualizar o clerkId se ainda não estava vinculado
-      // Não sobrescrever o role — o DB é a fonte de verdade para médicos/admins criados manualmente
-      if (!userExistente.clerkId) {
-        await db
-          .update(users)
-          .set({ clerkId })
-          .where(eq(users.id, userExistente.id));
-      }
+      // Sempre atualizar o clerkId — o usuário pode ter recriado a conta (ex: Google OAuth)
+      // e o clerkId antigo precisa ser substituído pelo novo para que as buscas por clerkId funcionem.
+      await db
+        .update(users)
+        .set({ clerkId })
+        .where(eq(users.id, userExistente.id));
+
       userId = userExistente.id;
+
+      // Preservar o role que já existe no banco (fonte de verdade para médicos/admins criados manualmente).
+      // Buscar o role atual para sincronizar corretamente com o Clerk.
+      const [userComRole] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userExistente.id))
+        .limit(1);
+
+      if (userComRole?.role) {
+        roleEfetivo = userComRole.role;
+      }
     } else {
       // Criar user no banco
       const [novoUser] = await db
@@ -181,22 +193,23 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
       userId = novoUser.id;
     }
 
-    // Sincronizar publicMetadata.role no Clerk para que o JWT reflita o role correto
+    // Sincronizar publicMetadata.role no Clerk usando o role EFETIVO do banco.
     // Isso é essencial para usuários criados via OAuth (Google, etc.) onde o publicMetadata
     // não é definido automaticamente pelo Clerk.
     try {
       const client = await clerkClient();
       await client.users.updateUserMetadata(clerkId, {
-        publicMetadata: { role },
+        publicMetadata: { role: roleEfetivo },
       });
-      console.log(`[Webhook Clerk] ✅ publicMetadata.role='${role}' sincronizado no Clerk: ${clerkId}`);
+      console.log(`[Webhook Clerk] ✅ publicMetadata.role='${roleEfetivo}' sincronizado no Clerk: ${clerkId}`);
     } catch (clerkError) {
       // Não é crítico: o banco já tem o role correto. A página /redirect usa o banco como fallback.
       console.warn('[Webhook Clerk] ⚠️ Falha ao sincronizar role no Clerk (banco OK):', clerkError);
     }
 
-    // 2. Se for paciente, criar registro de paciente (sem médico — admin atribuirá)
-    if (role === 'paciente') {
+
+    // 2. Se for paciente (role efetivo), criar registro de paciente (sem médico — admin atribuirá)
+    if (roleEfetivo === 'paciente') {
       // Verificar se já existe registro de paciente
       const [pacienteExistente] = await db
         .select({ id: pacientes.id })
