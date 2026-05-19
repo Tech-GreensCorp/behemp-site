@@ -33,6 +33,7 @@ interface ClerkUserCreatedData {
   phone_numbers: Array<{
     phone_number: string;
   }>;
+  image_url: string | null;
   public_metadata: Record<string, unknown>;
   created_at: number;
 }
@@ -95,9 +96,37 @@ export async function POST(req: Request) {
 
   if (eventType === 'user.created') {
     await processarNovoUsuario(evt.data);
+  } else if (eventType === 'user.updated') {
+    await sincronizarPerfilUsuario(evt.data);
   }
 
   return NextResponse.json({ received: true }, { status: 200 });
+}
+
+// ── Processar user.updated ──────────────────────────────────────
+
+async function sincronizarPerfilUsuario(data: ClerkUserCreatedData) {
+  const clerkId = data.id;
+  const email = data.email_addresses?.[0]?.email_address;
+  const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || undefined;
+  const avatarUrl = data.image_url ?? null;
+
+  if (!email && !nome && !avatarUrl) return;
+
+  try {
+    await db
+      .update(users)
+      .set({
+        ...(email && { email }),
+        ...(nome && { nome }),
+        avatarUrl,
+      })
+      .where(eq(users.clerkId, clerkId));
+
+    console.log(`[Webhook Clerk] ✅ Perfil atualizado: ${clerkId}`);
+  } catch (error) {
+    console.error('[Webhook Clerk] ❌ Erro ao atualizar perfil:', error);
+  }
 }
 
 // ── Processar user.created ──────────────────────────────────────
