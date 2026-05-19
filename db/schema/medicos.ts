@@ -1,6 +1,12 @@
-import { pgTable, text, numeric, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, numeric, integer, jsonb } from 'drizzle-orm/pg-core';
 import { baseColumns } from './_helpers';
 import { users } from './users';
+
+export type ConfigAgendaDia = {
+  diaSemana: number; // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  ativo: boolean;
+  horarios: string[]; // Ex: ["08:00", "09:00"]
+};
 
 /**
  * Tabela de médicos — perfil profissional vinculado a um usuário.
@@ -19,4 +25,5 @@ export const medicos = pgTable('medicos', {
   ordem: integer('ordem'),
   googleCalendarId: text('google_calendar_id'),
   googleRefreshToken: text('google_refresh_token'), // Criptografado em produção
+  configAgenda: jsonb('config_agenda').$type<ConfigAgendaDia[]>(),
 });
