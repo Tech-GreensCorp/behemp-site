@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { consultas, medicos, pacientes, users } from '@/db/schema';
 import { eq, and, gte, lte, desc, isNull, asc } from 'drizzle-orm';
 import { z } from 'zod';
+import { auth } from '@clerk/nextjs/server';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
 import { format } from 'date-fns';
@@ -18,6 +19,7 @@ import { format } from 'date-fns';
 // ── Schemas de validação ──────────────────────────────────────
 
 const agendarConsultaSchema = z.object({
+  // 'auto' = resolver pelo usuario autenticado; ou UUID explícito (uso interno)
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
   medicoId: z.string().min(1, 'ID do médico é obrigatório'),
   dataHora: z.string().datetime('Data/hora inválida'),
@@ -56,7 +58,45 @@ export async function agendarConsulta(
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const { pacienteId, medicoId, dataHora, observacoes } = parsed.data;
+    let { pacienteId, medicoId, dataHora, observacoes } = parsed.data;
+
+    // Resolver pacienteId automaticamente quando o wizard passa 'auto'
+    if (pacienteId === 'auto') {
+      const { userId: clerkId } = await auth();
+      if (!clerkId) {
+        return { sucesso: false, erro: 'Autenticação necessária para agendar' };
+      }
+
+      // Buscar user interno pelo clerkId
+      const [userInterno] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .limit(1);
+
+      if (!userInterno) {
+        return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+      }
+
+      // Buscar paciente vinculado a esse user
+      const [pacienteAuto] = await db
+        .select({ id: pacientes.id })
+        .from(pacientes)
+        .where(and(
+          eq(pacientes.userId, userInterno.id),
+          isNull(pacientes.deletedAt),
+        ))
+        .limit(1);
+
+      if (!pacienteAuto) {
+        return {
+          sucesso: false,
+          erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+        };
+      }
+
+      pacienteId = pacienteAuto.id;
+    }
 
     // Buscar dados do médico
     const [medico] = await db
