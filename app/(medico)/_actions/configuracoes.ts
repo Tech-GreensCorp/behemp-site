@@ -5,6 +5,7 @@ import { users, medicos } from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
 import { gerarUrlAutorizacaoGoogle } from '@/lib/integrations/google-calendar';
+import { z } from 'zod';
 
 /**
  * Server Actions de configurações do médico.
@@ -68,6 +69,55 @@ export async function obterPerfilMedico(): Promise<ActionResult<{
   } catch (error) {
     console.error('[Action] Erro ao obter perfil do médico:', error);
     return { sucesso: false, erro: 'Erro ao obter perfil' };
+  }
+}
+
+// ── Schema de validação ───────────────────────────────────────
+
+const atualizarPerfilSchema = z.object({
+  crm: z.string().min(1, 'CRM é obrigatório'),
+  especialidade: z.string().min(1, 'Especialidade é obrigatória'),
+  bio: z.string().max(2000, 'Máximo de 2000 caracteres').optional().nullable(),
+});
+
+/**
+ * Atualiza CRM, especialidade e bio do médico autenticado.
+ * Nome e e-mail são gerenciados pelo Clerk e não podem ser alterados aqui.
+ */
+export async function atualizarPerfilMedico(
+  dados: z.infer<typeof atualizarPerfilSchema>,
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const parsed = atualizarPerfilSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    // Resolver o userId interno pelo clerkId autenticado
+    const [userInterno] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId!))
+      .limit(1);
+
+    if (!userInterno) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    await db
+      .update(medicos)
+      .set({
+        crm: parsed.data.crm,
+        especialidade: parsed.data.especialidade,
+        bio: parsed.data.bio ?? null,
+      })
+      .where(eq(medicos.userId, userInterno.id));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao atualizar perfil do médico:', error);
+    return { sucesso: false, erro: 'Erro ao salvar perfil' };
   }
 }
 
