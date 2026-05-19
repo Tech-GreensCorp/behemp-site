@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,13 +10,11 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
   obterPerfilMedico,
-  obterUrlGoogleCalendar,
   atualizarPerfilMedico,
 } from '@/app/(medico)/_actions/configuracoes';
 import {
   Calendar,
   CheckCircle2,
-  ExternalLink,
   Loader2,
   Pencil,
   Save,
@@ -32,7 +29,6 @@ import {
  * Exibe e permite editar o perfil profissional + integração Google Calendar.
  */
 export default function ConfiguracoesPage() {
-  const searchParams = useSearchParams();
   const [perfil, setPerfil] = useState<{
     nome: string;
     email: string;
@@ -43,7 +39,6 @@ export default function ConfiguracoesPage() {
     medicoId: string;
   } | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [conectandoGoogle, setConectandoGoogle] = useState(false);
 
   // Estado de edição do perfil
   const [editando, setEditando] = useState(false);
@@ -66,41 +61,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Verificar resultado do OAuth do Google Calendar
-  useEffect(() => {
-    const googleParam = searchParams.get('google');
-    if (googleParam === 'sucesso') {
-      toast.success('Google Calendar conectado com sucesso!');
-      carregar();
-    } else if (googleParam === 'erro') {
-      const motivo = searchParams.get('motivo');
-      const mensagens: Record<string, string> = {
-        negado: 'Você negou a autorização do Google Calendar.',
-        parametros: 'Parâmetros inválidos no callback.',
-        token: 'Erro ao obter token de acesso do Google.',
-      };
-      toast.error(mensagens[motivo ?? ''] ?? 'Erro ao conectar Google Calendar.');
-    }
-  }, [searchParams, carregar]);
-
-  async function handleConectarGoogle() {
-    if (!perfil) return;
-    setConectandoGoogle(true);
-    try {
-      const res = await obterUrlGoogleCalendar(perfil.medicoId);
-      if (res.sucesso && res.dados?.url) {
-        window.location.href = res.dados.url;
-      } else {
-        toast.error(res.erro ?? 'Erro ao gerar URL de autorização.');
-        setConectandoGoogle(false);
-      }
-    } catch {
-      toast.error('Erro ao conectar com o Google.');
-      setConectandoGoogle(false);
-    }
-  }
-
-  function handleIniciarEdicao() {
+  async function handleIniciarEdicao() {
     setForm({
       crm: perfil?.crm ?? '',
       especialidade: perfil?.especialidade ?? '',
@@ -263,59 +224,6 @@ export default function ConfiguracoesPage() {
           </CardContent>
         </Card>
 
-        {/* Google Calendar */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
-                <Calendar size={20} className="text-violet-600" />
-              </div>
-              <CardTitle className="text-base">Google Calendar</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Status</span>
-              {perfil?.googleConectado ? (
-                <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
-                  <CheckCircle2 size={12} />
-                  Conectado
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-amber-600">
-                  Não conectado
-                </Badge>
-              )}
-            </div>
-
-            {perfil?.googleConectado ? (
-              <p className="text-xs text-muted-foreground">
-                Seu Google Calendar está integrado. As consultas agendadas criarão eventos automaticamente com link do Google Meet.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  Conecte seu Google Calendar para agendar consultas automaticamente
-                  com link do Google Meet.
-                </p>
-                <Button
-                  onClick={handleConectarGoogle}
-                  disabled={conectandoGoogle}
-                  className="w-full gap-2"
-                  variant="outline"
-                >
-                  {conectandoGoogle ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <ExternalLink size={16} />
-                  )}
-                  {conectandoGoogle ? 'Redirecionando...' : 'Conectar Google Calendar'}
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Preferências */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -335,6 +243,32 @@ export default function ConfiguracoesPage() {
               <span className="text-muted-foreground">Fuso horário</span>
               <span className="font-medium">America/Sao_Paulo</span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Google Calendar */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+                <Calendar size={20} className="text-violet-600" />
+              </div>
+              <CardTitle className="text-base">Google Meet & Calendar</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+                <CheckCircle2 size={12} />
+                Ativo via plataforma
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O Google Meet é gerado automaticamente a cada consulta agendada pela plataforma.
+              Médico e paciente recebem o link de acesso por e-mail — sem necessidade de
+              configuração individual.
+            </p>
           </CardContent>
         </Card>
 
