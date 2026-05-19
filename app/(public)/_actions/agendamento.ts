@@ -295,14 +295,28 @@ export async function listarHorariosLivres(params: {
   try {
     const { medicoId, data } = params;
 
-    // Gerar todos os slots possíveis (08:00–17:00 = início, cada slot dura 1h)
-    const HORARIOS_POSSIVEIS = [
-      '08:00', '09:00', '10:00', '11:00',
-      '13:00', '14:00', '15:00', '16:00', '17:00',
-    ];
-
     const inicioData = new Date(`${data}T00:00:00`);
     const fimData = new Date(`${data}T23:59:59`);
+    const diaSemana = inicioData.getDay(); // 0 = Domingo, 1 = Segunda...
+
+    // Buscar configurações do médico
+    const [medicoConfig] = await db
+      .select({ configAgenda: medicos.configAgenda })
+      .from(medicos)
+      .where(eq(medicos.id, medicoId))
+      .limit(1);
+
+    const configAgenda = medicoConfig?.configAgenda as { diaSemana: number; ativo: boolean; horarios: string[] }[] | null;
+    
+    // Encontrar configuração para o dia da semana atual
+    const configDoDia = configAgenda?.find((c) => c.diaSemana === diaSemana);
+
+    // Se não tem configuração, ou o dia não está ativo, retorna vazio (indisponível)
+    if (!configDoDia || !configDoDia.ativo || !configDoDia.horarios || configDoDia.horarios.length === 0) {
+      return { sucesso: true, dados: [] };
+    }
+
+    const HORARIOS_POSSIVEIS = configDoDia.horarios;
 
     // Buscar consultas existentes neste dia para este médico
     const consultasExistentes = await db
@@ -346,18 +360,22 @@ export async function listarTodosHorariosDia(params: {
   try {
     const { medicoId, data } = params;
 
-    // Gerar todos os slots de 30 em 30 min — 00:00 a 23:30
-    const TODOS_SLOTS: string[] = [];
-    for (let h = 0; h < 24; h++) {
-      for (const m of [0, 30]) {
-        TODOS_SLOTS.push(
-          `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-        );
-      }
-    }
-
     const inicioData = new Date(`${data}T00:00:00`);
     const fimData = new Date(`${data}T23:59:59`);
+    const diaSemana = inicioData.getDay();
+
+    // Buscar configurações do médico
+    const [medicoConfig] = await db
+      .select({ configAgenda: medicos.configAgenda })
+      .from(medicos)
+      .where(eq(medicos.id, medicoId))
+      .limit(1);
+
+    const configAgenda = medicoConfig?.configAgenda as { diaSemana: number; ativo: boolean; horarios: string[] }[] | null;
+    const configDoDia = configAgenda?.find((c) => c.diaSemana === diaSemana);
+    
+    // Usar horários da configuração ou vazio se inativo
+    const TODOS_SLOTS = (configDoDia?.ativo && configDoDia?.horarios) ? configDoDia.horarios : [];
 
     // Buscar consultas existentes neste dia para este médico
     const consultasExistentes = await db
