@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   listarConsultasMedico, listarPacientesMedico,
   criarConsultaMedico, remarcarConsulta, cancelarConsultaMedico,
-  listarTodosHorariosMedico,
+  listarTodosHorariosMedico, obterConfigAgendaMedicoLogado,
 } from '@/app/(medico)/_actions/consultas';
+import { FormConfigAgenda, ConfigAgendaDia } from '@/components/medicos/form-config-agenda';
 
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -47,6 +48,9 @@ export default function AgendaPage() {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [carregando, setCarregando] = useState(true);
+  
+  const [medicoId, setMedicoId] = useState<string | null>(null);
+  const [configAgenda, setConfigAgenda] = useState<ConfigAgendaDia[] | null>(null);
 
   // Nova consulta
   const [pacienteSel, setPacienteSel] = useState<string>('');
@@ -73,9 +77,17 @@ export default function AgendaPage() {
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    const [cRes, pRes] = await Promise.all([listarConsultasMedico(), listarPacientesMedico()]);
+    const [cRes, pRes, confRes] = await Promise.all([
+      listarConsultasMedico(), 
+      listarPacientesMedico(),
+      obterConfigAgendaMedicoLogado()
+    ]);
     if (cRes.sucesso && cRes.dados) setConsultas(cRes.dados as Consulta[]);
     if (pRes.sucesso && pRes.dados) setPacientes(pRes.dados);
+    if (confRes.sucesso && confRes.dados) {
+      setMedicoId(confRes.dados.medicoId);
+      setConfigAgenda(confRes.dados.configAgenda);
+    }
     setCarregando(false);
   }, []);
 
@@ -154,10 +166,11 @@ export default function AgendaPage() {
       </div>
 
       <Tabs defaultValue="consultas">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
           <TabsTrigger value="nova">Nova Consulta</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
+          <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
         </TabsList>
 
         {/* ── TAB: CONSULTAS ATIVAS ── */}
@@ -426,6 +439,21 @@ export default function AgendaPage() {
               </Card>
             );
           })}
+        </TabsContent>
+
+        {/* ── TAB: CONFIGURAÇÕES ── */}
+        <TabsContent value="configuracoes" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              {medicoId ? (
+                <FormConfigAgenda medicoId={medicoId} configAtual={configAgenda} />
+              ) : (
+                <div className="flex justify-center py-12">
+                  <Loader2 size={32} className="animate-spin text-primary" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

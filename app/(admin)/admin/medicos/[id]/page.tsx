@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { obterMedicoDetalhe } from '@/app/_actions/admin-medicos';
+import { FormConfigAgenda } from '@/components/medicos/form-config-agenda';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -161,11 +162,12 @@ export default async function MedicoDetalhePage({ params }: Props) {
 
       {/* Tabs */}
       <Tabs defaultValue="pacientes" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="pacientes">Pacientes</TabsTrigger>
           <TabsTrigger value="triagens">Triagens</TabsTrigger>
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="jornada">Jornada</TabsTrigger>
+          <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
         </TabsList>
 
         {/* Pacientes */}
@@ -312,6 +314,15 @@ export default async function MedicoDetalhePage({ params }: Props) {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Configurações */}
+        <TabsContent value="configuracoes" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-6">
+              <FormConfigAgenda medicoId={medico.id} configAtual={medico.configAgenda} />
             </CardContent>
           </Card>
         </TabsContent>
