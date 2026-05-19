@@ -24,16 +24,6 @@ export interface CriarEventoParams {
   calendarId?: string;
 }
 
-/** Parâmetros para criação de evento via Service Account (sem OAuth por médico). */
-export interface CriarEventoServiceAccountParams {
-  titulo: string;
-  descricao?: string;
-  dataInicio: Date;
-  dataFim: Date;
-  emailPaciente: string;
-  emailMedico: string;
-}
-
 export interface EventoCriado {
   eventId: string;
   meetLink: string;
@@ -46,7 +36,7 @@ export interface EventoResult {
   erro?: string;
 }
 
-// ── Helper: cliente OAuth2 por médico (refresh token) ──────────────────
+// ── Helper: criar cliente OAuth2 ──────────────────────────────
 
 function criarOAuth2Client(refreshToken?: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -71,44 +61,11 @@ function criarOAuth2Client(refreshToken?: string) {
   return oauth2Client;
 }
 
-// ── Helper: cliente Service Account ────────────────────────────────────────
-
-/**
- * Cria um cliente autenticado via Service Account.
- * Variáveis necessárias:
- *   GOOGLE_SERVICE_ACCOUNT_EMAIL
- *   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY  (valor com \\n literais da Vercel)
- */
-function criarClienteServiceAccount() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
-
-  if (!email || !rawKey) {
-    throw new Error(
-      '[Google] GOOGLE_SERVICE_ACCOUNT_EMAIL e GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY não configuradas.',
-    );
-  }
-
-  // A Vercel armazena \n como literal; precisamos converter para quebra real
-  const privateKey = rawKey.replace(/\\n/g, '\n');
-
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: email,
-      private_key: privateKey,
-    },
-    scopes: [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-    ],
-  });
-}
-
-// ── Gerar URL de autorização (OAuth por médico — fluxo legado) ───────────────
+// ── Gerar URL de autorização ──────────────────────────────────
 
 /**
  * Gera a URL para o médico autorizar acesso ao Google Calendar.
- * Mantido para compatibilidade; o fluxo principal agora usa service account.
+ * Deve ser chamada no onboarding do médico.
  */
 export function gerarUrlAutorizacaoGoogle(medicoId: string): string {
   const oauth2Client = criarOAuth2Client();
@@ -120,81 +77,11 @@ export function gerarUrlAutorizacaoGoogle(medicoId: string): string {
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
     ],
-    state: medicoId,
+    state: medicoId, // Para vincular o callback ao médico
   });
 }
 
-// ── Criar evento via Service Account (fluxo principal) ────────────────────
-
-/**
- * Cria um evento de consulta no Google Calendar usando a Service Account.
- * Não depende de OAuth individual do médico.
- * O médico e o paciente são convidados como attendees e recebem o convite por e-mail.
- */
-export async function criarConsultaServiceAccount(
-  params: CriarEventoServiceAccountParams,
-): Promise<EventoResult> {
-  try {
-    const auth = criarClienteServiceAccount();
-    const calendar = google.calendar({ version: 'v3', auth });
-
-    const evento = await calendar.events.insert({
-      calendarId: 'primary',
-      conferenceDataVersion: 1,
-      sendUpdates: 'all', // convite por e-mail para médico e paciente
-      requestBody: {
-        summary: params.titulo,
-        description: params.descricao || 'Consulta Be4Hope — Medicina Endocanabinoíde',
-        start: {
-          dateTime: params.dataInicio.toISOString(),
-          timeZone: 'America/Sao_Paulo',
-        },
-        end: {
-          dateTime: params.dataFim.toISOString(),
-          timeZone: 'America/Sao_Paulo',
-        },
-        attendees: [
-          { email: params.emailMedico },
-          { email: params.emailPaciente },
-        ],
-        conferenceData: {
-          createRequest: {
-            // requestId único por evento para evitar duplicatas
-            requestId: `be4hope-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            conferenceSolutionKey: { type: 'hangoutsMeet' },
-          },
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 60 },
-            { method: 'popup', minutes: 15 },
-          ],
-        },
-      },
-    });
-
-    const meetLink =
-      evento.data.conferenceData?.entryPoints?.find(
-        (ep) => ep.entryPointType === 'video',
-      )?.uri || '';
-
-    return {
-      sucesso: true,
-      dados: {
-        eventId: evento.data.id || '',
-        meetLink,
-        htmlLink: evento.data.htmlLink || '',
-      },
-    };
-  } catch (error) {
-    const mensagem = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error('[Google Calendar] Erro ao criar evento via service account:', mensagem);
-    return { sucesso: false, erro: mensagem };
-  }
-}
-
-// ── Trocar código por tokens (OAuth legado) ────────────────────────────────
+// ── Trocar código por tokens ──────────────────────────────────
 
 /**
  * Troca o authorization code por tokens de acesso.

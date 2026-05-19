@@ -5,7 +5,7 @@ import { consultas, medicos, pacientes, users } from '@/db/schema';
 import { eq, and, gte, lte, desc, isNull, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
-import { criarConsultaServiceAccount, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
+import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
 import { format } from 'date-fns';
 
@@ -125,25 +125,31 @@ export async function agendarConsulta(
     const dataConsulta = new Date(dataHora);
     const dataFim = new Date(dataConsulta.getTime() + 60 * 60 * 1000); // +1 hora
 
-    // Criar evento no Google Calendar via Service Account
+    // Tentar criar evento no Google Calendar
     let googleEventId: string | null = null;
     let meetLink: string | null = null;
 
-    const resultadoGoogle = await criarConsultaServiceAccount({
-      titulo: `Consulta Be4Hope — ${paciente.users.nome}`,
-      descricao: observacoes || 'Consulta de medicina endocanabinoíde',
-      dataInicio: dataConsulta,
-      dataFim,
-      emailPaciente: paciente.users.email,
-      emailMedico: medico.users.email,
-    });
+    if (medico.medicos.googleRefreshToken) {
+      const resultadoGoogle = await criarConsultaGoogleCalendar({
+        titulo: `Consulta Be4Hope — ${paciente.users.nome}`,
+        descricao: observacoes || 'Consulta de medicina endocanabinóide',
+        dataInicio: dataConsulta,
+        dataFim,
+        emailPaciente: paciente.users.email,
+        emailMedico: medico.users.email,
+        refreshToken: medico.medicos.googleRefreshToken,
+        calendarId: medico.medicos.googleCalendarId || undefined,
+      });
 
-    if (resultadoGoogle.sucesso && resultadoGoogle.dados) {
-      googleEventId = resultadoGoogle.dados.eventId;
-      meetLink = resultadoGoogle.dados.meetLink;
-    } else {
-      // Log do erro mas não bloqueia o agendamento
-      console.warn('[Agendamento] Google Calendar não disponível:', resultadoGoogle.erro);
+      if (!resultadoGoogle.sucesso) {
+        return {
+          sucesso: false,
+          erro: `Falha ao criar evento no Google Calendar: ${resultadoGoogle.erro}`,
+        };
+      }
+
+      googleEventId = resultadoGoogle.dados?.eventId || null;
+      meetLink = resultadoGoogle.dados?.meetLink || null;
     }
 
     // Salvar consulta no banco
@@ -153,7 +159,7 @@ export async function agendarConsulta(
         pacienteId,
         medicoId,
         dataHora: dataConsulta,
-        status: 'confirmada',
+        status: medico.medicos.googleRefreshToken ? 'confirmada' : 'agendada',
         googleEventId,
         googleMeetLink: meetLink,
         observacoes,
