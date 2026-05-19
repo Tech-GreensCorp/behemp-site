@@ -58,7 +58,7 @@ async function main() {
 
     // Contagem total
     const countResult = await db.execute(sql`SELECT COUNT(*)::int as total FROM users`);
-    const total = (countResult.rows?.[0] as any)?.total ?? countResult?.[0]?.total ?? '?';
+    const total = (countResult.rows?.[0] as any)?.total ?? '?';
     console.log(`\n📊 Total de usuários no banco: ${total}`);
     
     // Listar os 5 mais recentes
