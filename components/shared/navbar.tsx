@@ -20,7 +20,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth, UserButton, ClerkLoaded } from '@clerk/nextjs';
+import { useAuth, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -43,7 +43,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -94,8 +94,8 @@ export function Navbar() {
 
         {/* ── Desktop: zona de CTAs (direita) ── */}
         <div className="hidden items-center gap-2.5 lg:flex">
-          <ClerkLoaded>
-            {isSignedIn ? (
+          {isLoaded && (
+            isSignedIn ? (
               /* Logado: painel discreto + avatar */
               <div className="flex items-center gap-2.5">
                 <Link href="/medico">
@@ -143,8 +143,8 @@ export function Navbar() {
                   </Button>
                 </Link>
               </div>
-            )}
-          </ClerkLoaded>
+            )
+          )}
 
           {/* Agendar Consulta — outline moss */}
           <Link href="/agendamento">
@@ -179,13 +179,11 @@ export function Navbar() {
         {/* ── Mobile: hamburger ── */}
         <div className="flex items-center gap-2 lg:hidden">
           {/* Avatar pequeno acessível sem abrir o menu */}
-          <ClerkLoaded>
-            {isSignedIn && (
-              <UserButton
-                appearance={{ elements: { avatarBox: 'h-7 w-7' } }}
-              />
-            )}
-          </ClerkLoaded>
+          {isLoaded && isSignedIn && (
+            <UserButton
+              appearance={{ elements: { avatarBox: 'h-7 w-7' } }}
+            />
+          )}
 
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
@@ -234,8 +232,8 @@ export function Navbar() {
 
                 {/* CTAs mobile */}
                 <div className="flex flex-col gap-2.5">
-                  <ClerkLoaded>
-                    {isSignedIn ? (
+                  {isLoaded && (
+                    isSignedIn ? (
                       <>
                         <Link href="/medico" onClick={() => setMobileOpen(false)}>
                           <Button
@@ -277,8 +275,8 @@ export function Navbar() {
                           </Button>
                         </Link>
                       </>
-                    )}
-                  </ClerkLoaded>
+                    )
+                  )}
 
                   <Link href="/agendamento" onClick={() => setMobileOpen(false)}>
                     <Button
