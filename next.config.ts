@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/_clerk/:path*',
+        source: '/__clerk/:path*',
         destination: 'https://frontend-api.clerk.services/:path*',
       },
     ];
