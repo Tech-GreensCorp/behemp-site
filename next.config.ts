@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
   },
 
 
+  // Proxy do Clerk: encaminha /_clerk/* para os servidores reais do Clerk
+  // Necessário porque o domínio primário (behemp-site.vercel.app) usa proxy
+  // em vez de CNAME clerk.behemp-site.vercel.app → frontend-api.clerk.services
+  async rewrites() {
+    return [
+      {
+        source: '/_clerk/:path*',
+        destination: 'https://frontend-api.clerk.services/:path*',
+      },
+    ];
+  },
+
   // Headers de segurança
   async headers() {
     return [
