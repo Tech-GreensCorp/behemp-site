@@ -282,11 +282,11 @@ export async function atualizarConfigAgenda(medicoId: string, configAgenda: any)
     // Se for médico, garantir que só altera a si mesmo
     if (auth.role === 'medico') {
       const medicoLogado = await db.query.medicos.findFirst({
-        with: { users: true },
+        with: { user: true },
         where: eq(medicos.id, medicoId),
       });
 
-      if (!medicoLogado || medicoLogado.users.clerkId !== auth.clerkId) {
+      if (!medicoLogado || medicoLogado.user?.clerkId !== auth.clerkId) {
         return { sucesso: false, erro: 'Acesso negado: você só pode alterar sua própria agenda' };
       }
     }
