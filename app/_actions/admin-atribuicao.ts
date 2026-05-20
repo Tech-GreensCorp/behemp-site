@@ -211,3 +211,86 @@ export async function contarPacientesSemMedico(): Promise<ActionResult<number>> 
     return { sucesso: false, erro: 'Erro ao contar pacientes sem médico' };
   }
 }
+
+/**
+ * Reatribui múltiplos pacientes para um único médico de uma vez.
+ *
+ * @param medicoDestinoId - ID do médico que receberá os pacientes
+ * @param medicoOrigemId  - (Opcional) Se informado, reatribui apenas os pacientes
+ *                          desse médico específico. Se null/undefined, reatribui TODOS
+ *                          os pacientes (com ou sem médico).
+ */
+export async function reatribuirTodosPacientes(
+  medicoDestinoId: string,
+  medicoOrigemId?: string | null,
+): Promise<ActionResult<{ total: number }>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    if (!medicoDestinoId) {
+      return { sucesso: false, erro: 'ID do médico de destino é obrigatório' };
+    }
+
+    // Verificar se o médico destino existe
+    const [medicoDestino] = await db
+      .select({ id: medicos.id })
+      .from(medicos)
+      .where(eq(medicos.id, medicoDestinoId))
+      .limit(1);
+
+    if (!medicoDestino) {
+      return { sucesso: false, erro: 'Médico de destino não encontrado' };
+    }
+
+    // Montar condição: todos os pacientes OU apenas os de um médico específico
+    let resultado;
+
+    if (medicoOrigemId) {
+      // Reatribuir apenas pacientes de um médico específico
+      resultado = await db
+        .update(pacientes)
+        .set({ medicoId: medicoDestinoId })
+        .where(eq(pacientes.medicoId, medicoOrigemId))
+        .returning({ id: pacientes.id });
+    } else {
+      // Reatribuir TODOS os pacientes (inclusive sem médico)
+      resultado = await db
+        .update(pacientes)
+        .set({ medicoId: medicoDestinoId })
+        .returning({ id: pacientes.id });
+    }
+
+    const total = resultado.length;
+
+    // Notificar o médico destino (fire-and-forget)
+    try {
+      const [medicoUser] = await db.execute(sql`
+        SELECT u.id AS "userId", u.nome, u.email
+        FROM medicos m
+        INNER JOIN users u ON u.id = m.user_id
+        WHERE m.id = ${medicoDestinoId}
+        LIMIT 1
+      `).then((r) => r.rows);
+
+      if (medicoUser) {
+        const dados = medicoUser as any;
+        await criarNotificacao({
+          userId: dados.userId,
+          tipo: 'geral',
+          titulo: 'Pacientes reatribuídos em lote',
+          mensagem: `${total} paciente(s) foram atribuídos a você pelo administrador.`,
+          linkAcao: '/medico/pacientes',
+        });
+      }
+    } catch (notifError) {
+      console.error('[Admin] Falha ao notificar médico na reatribuição em lote:', notifError);
+    }
+
+    return { sucesso: true, dados: { total } };
+  } catch (error) {
+    console.error('[Admin] Erro ao reatribuir pacientes em lote:', error);
+    return { sucesso: false, erro: 'Erro ao reatribuir pacientes' };
+  }
+}
+

@@ -12,18 +12,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   Loader2,
   UserPlus,
   UserCheck,
   Stethoscope,
   AlertCircle,
   Search,
+  Users,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   listarPacientesComMedico,
   listarMedicosDisponiveis,
   atribuirMedicoAoPaciente,
+  reatribuirTodosPacientes,
 } from '@/app/_actions/admin-atribuicao';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -52,6 +63,11 @@ export default function AtribuirMedicoPage() {
   const [salvando, setSalvando] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
 
+  // Estado do dialog de reatribuição em lote
+  const [dialogAberto, setDialogAberto] = useState(false);
+  const [medicoDestinoLote, setMedicoDestinoLote] = useState<string>('');
+  const [salvandoLote, setSalvandoLote] = useState(false);
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     const [resPacientes, resMedicos] = await Promise.all([
@@ -77,6 +93,26 @@ export default function AtribuirMedicoPage() {
       toast.error(res.erro || 'Erro ao atribuir médico');
     }
     setSalvando(null);
+  }
+
+  async function handleReatribuirTodos() {
+    if (!medicoDestinoLote) {
+      toast.error('Selecione o médico de destino');
+      return;
+    }
+
+    setSalvandoLote(true);
+    const res = await reatribuirTodosPacientes(medicoDestinoLote);
+    if (res.sucesso && res.dados) {
+      toast.success(`${res.dados.total} paciente(s) reatribuídos com sucesso!`);
+      window.dispatchEvent(new CustomEvent('paciente-atribuido'));
+      setDialogAberto(false);
+      setMedicoDestinoLote('');
+      await carregar();
+    } else {
+      toast.error(res.erro || 'Erro ao reatribuir pacientes');
+    }
+    setSalvandoLote(false);
   }
 
   const semMedico = pacientes.filter((p) => !p.medicoId);
@@ -122,6 +158,91 @@ export default function AtribuirMedicoPage() {
             <UserCheck className="h-3 w-3 text-emerald-500" />
             {comMedico.length} atribuídos
           </Badge>
+
+          {/* Botão Reatribuir Todos com Dialog de confirmação */}
+          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
+              >
+                <Users className="h-3.5 w-3.5" />
+                Reatribuir todos
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Reatribuir todos os pacientes</DialogTitle>
+                <DialogDescription>
+                  Todos os <strong>{pacientes.length}</strong> pacientes serão
+                  reatribuídos para o médico selecionado abaixo. Essa ação
+                  substitui qualquer atribuição anterior.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Médico de destino</label>
+                  <Select
+                    value={medicoDestinoLote}
+                    onValueChange={setMedicoDestinoLote}
+                    disabled={salvandoLote}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecionar médico" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medicos.map((m) => (
+                        <SelectItem key={m.medicoId} value={m.medicoId}>
+                          <div className="flex items-center gap-2">
+                            <Stethoscope className="h-3 w-3 text-muted-foreground" />
+                            {m.nome}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs text-amber-800">
+                    <strong>Atenção:</strong> essa ação afetará{' '}
+                    <strong>{pacientes.length}</strong> paciente(s) e não pode
+                    ser desfeita em lote. Verifique se o médico selecionado
+                    está correto.
+                  </p>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogAberto(false)}
+                  disabled={salvandoLote}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleReatribuirTodos}
+                  disabled={!medicoDestinoLote || salvandoLote}
+                  className="gap-1.5"
+                >
+                  {salvandoLote ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Reatribuindo...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-4 w-4" />
+                      Confirmar reatribuição
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
