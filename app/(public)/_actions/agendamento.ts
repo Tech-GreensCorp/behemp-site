@@ -6,7 +6,7 @@ import { eq, and, gte, lte, desc, isNull, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
-import { enviarEmailConsultaAgendada } from '@/lib/email/consultas';
+import { enviarEmailConsultaAgendada, enviarEmailConsultaMedico } from '@/lib/email/consultas';
 import { format } from 'date-fns';
 
 /**
@@ -176,7 +176,22 @@ export async function agendarConsulta(
         meetLink,
       });
     } catch (emailError) {
-      console.error('[Action] Erro ao enviar e-mail de confirmação:', emailError);
+      console.error('[Action] Erro ao enviar e-mail de confirmação ao paciente:', emailError);
+      // Não falha a action — consulta já foi criada
+    }
+
+    // Enviar e-mail de notificação ao médico via Brevo
+    try {
+      await enviarEmailConsultaMedico({
+        medicoNome: medico.users.nome,
+        medicoEmail: medico.users.email,
+        pacienteNome: paciente.users.nome,
+        pacienteEmail: paciente.users.email,
+        dataHora: dataConsulta,
+        meetLink,
+      });
+    } catch (emailMedicoError) {
+      console.error('[Action] Erro ao enviar e-mail de notificação ao médico:', emailMedicoError);
       // Não falha a action — consulta já foi criada
     }
 
