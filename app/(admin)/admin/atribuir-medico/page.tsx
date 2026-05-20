@@ -161,15 +161,17 @@ export default function AtribuirMedicoPage() {
 
           {/* Botão Reatribuir Todos com Dialog de confirmação */}
           <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
-              >
-                <Users className="h-3.5 w-3.5" />
-                Reatribuir todos
-              </Button>
+            <DialogTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
+                />
+              }
+            >
+              <Users className="h-3.5 w-3.5" />
+              Reatribuir todos
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
