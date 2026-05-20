@@ -22,6 +22,23 @@ const nextConfig: NextConfig = {
   },
 
 
+  // Proxy do Clerk — rewrite INTERNO para o Route Handler em /api/clerk-proxy
+  //
+  // O Clerk Dashboard está configurado com proxy URL:
+  //   https://behemp-site.vercel.app/__clerk
+  //
+  // Pastas com prefixo __ não criam rotas em Next.js. Por isso usamos um
+  // rewrite interno que mapeia /__clerk/* → /api/clerk-proxy/* e o Route
+  // Handler em app/api/clerk-proxy/[...path]/route.ts faz o proxy real.
+  async rewrites() {
+    return [
+      {
+        source: '/__clerk/:path*',
+        destination: '/api/clerk-proxy/:path*',
+      },
+    ];
+  },
+
   // Headers de segurança
   async headers() {
     return [
