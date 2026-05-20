@@ -187,12 +187,18 @@ export default function AtribuirMedicoPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Médico de destino</label>
                   <Select
-                    value={medicoDestinoLote}
                     onValueChange={(val) => setMedicoDestinoLote(val ?? '')}
                     disabled={salvandoLote}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecionar médico" />
+                      {medicoDestinoLote ? (
+                        <span className="flex items-center gap-2">
+                          <Stethoscope className="h-3 w-3 text-muted-foreground" />
+                          {medicos.find((m) => m.medicoId === medicoDestinoLote)?.nome}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Selecionar médico</span>
+                      )}
                     </SelectTrigger>
                     <SelectContent>
                       {medicos.map((m) => (
