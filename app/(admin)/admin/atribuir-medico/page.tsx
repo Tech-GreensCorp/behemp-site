@@ -187,7 +187,7 @@ export default function AtribuirMedicoPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Médico de destino</label>
                   <Select
-                    onValueChange={(val) => setMedicoDestinoLote(val ?? '')}
+                    onValueChange={(val: string | null) => setMedicoDestinoLote(val ?? '')}
                     disabled={salvandoLote}
                   >
                     <SelectTrigger className="w-full">
