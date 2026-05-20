@@ -28,7 +28,6 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks(.*)',
   '/api/cron(.*)',
   '/api/inngest(.*)',
-  '/api/debug-auth',
   '/api/auth/callback',
 ]);
 
