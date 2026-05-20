@@ -98,7 +98,7 @@ export function Navbar() {
             isSignedIn ? (
               /* Logado: painel discreto + avatar */
               <div className="flex items-center gap-2.5">
-                <Link href="/medico">
+                <Link href="/redirect">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -235,7 +235,7 @@ export function Navbar() {
                   {isLoaded && (
                     isSignedIn ? (
                       <>
-                        <Link href="/medico" onClick={() => setMobileOpen(false)}>
+                        <Link href="/redirect" onClick={() => setMobileOpen(false)}>
                           <Button
                             variant="outline"
                             className="h-11 w-full gap-2 rounded-full border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
