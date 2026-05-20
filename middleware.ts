@@ -26,7 +26,6 @@ const isPublicRoute = createRouteMatcher([
   '/termos',
   '/redirect',
   // Rotas de sistema e integrações
-  '/__clerk(.*)',
   '/api/webhooks(.*)',
   '/api/cron(.*)',
   '/api/inngest(.*)',
