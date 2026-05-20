@@ -4,6 +4,7 @@
 export {
   obterUsuarioAtual,
   obterDadosUsuario,
+  obterRoleComFallback,
   verificarRole,
   verificarAdmin,
   verificarMedico,

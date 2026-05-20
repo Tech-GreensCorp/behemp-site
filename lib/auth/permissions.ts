@@ -11,6 +11,7 @@
  */
 
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
 
 export type Role = 'admin' | 'medico' | 'paciente';
 
@@ -151,3 +152,86 @@ export async function verificarUsuarioAutenticado(): Promise<{ clerkId: string; 
   if (!usuario.autorizado || !usuario.clerkId) return null;
   return { clerkId: usuario.clerkId, role: usuario.role ?? 'paciente' };
 }
+
+/**
+ * Obtém o role do usuário com fallback robusto.
+ *
+ * Estratégia (em ordem de prioridade):
+ * 1. publicMetadata.role do Clerk (caso nominal)
+ * 2. Banco de dados (fallback para quando webhook não disparou)
+ * 3. Default 'paciente' (toda conta nova é paciente)
+ *
+ * Quando o fallback 2 ou 3 é usado, tenta sincronizar o role de volta
+ * no publicMetadata do Clerk para que da próxima vez funcione direto.
+ *
+ * Uso em layouts protegidos:
+ * ```ts
+ * const { user, role } = await obterRoleComFallback();
+ * if (!user || role !== 'paciente') redirect('/');
+ * ```
+ */
+export async function obterRoleComFallback(): Promise<{
+  user: Awaited<ReturnType<typeof currentUser>>;
+  role: Role;
+}> {
+  const user = await currentUser();
+
+  if (!user) {
+    return { user: null, role: 'paciente' };
+  }
+
+  // Estratégia 1: publicMetadata.role do Clerk
+  const clerkRole = user.publicMetadata?.role as Role | undefined;
+  if (clerkRole) {
+    return { user, role: clerkRole };
+  }
+
+  // Estratégia 2: buscar no banco de dados
+  let roleEfetivo: Role = 'paciente'; // default
+  let precisaSincronizar = true;
+
+  try {
+    const { db } = await import('@/lib/db');
+    const { users } = await import('@/db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    const [registro] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.clerkId, user.id))
+      .limit(1);
+
+    if (registro?.role) {
+      roleEfetivo = registro.role as Role;
+      console.log(
+        `[Auth] Role via banco para clerkId ${user.id}: ${roleEfetivo}`,
+      );
+    } else {
+      console.warn(
+        `[Auth] Nenhum registro no banco para clerkId ${user.id} — usando default 'paciente'`,
+      );
+    }
+  } catch (dbError) {
+    console.error('[Auth] Erro ao buscar role no banco:', dbError);
+    precisaSincronizar = false; // não sincronizar se o banco falhou
+  }
+
+  // Sincronizar o role no publicMetadata do Clerk (fire-and-forget)
+  if (precisaSincronizar) {
+    try {
+      const client = await clerkClient();
+      await client.users.updateUserMetadata(user.id, {
+        publicMetadata: { role: roleEfetivo },
+      });
+      console.log(
+        `[Auth] ✅ publicMetadata.role='${roleEfetivo}' sincronizado para clerkId ${user.id}`,
+      );
+    } catch (clerkError) {
+      // Não é bloqueante — o banco é a fonte de verdade
+      console.warn('[Auth] ⚠️ Falha ao sincronizar role no Clerk:', clerkError);
+    }
+  }
+
+  return { user, role: roleEfetivo };
+}
+
