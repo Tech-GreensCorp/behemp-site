@@ -168,46 +168,33 @@ export function AgendamentoWizard() {
   // ── Gate: exigir login ──────────────────────────────────────
   if (!isSignedIn) {
     return (
-      <div className="space-y-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => {
-            const CardIcon = card.icon;
-            return (
-            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
-              <CardContent className="p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <CardIcon size={24} className="text-foreground" />
-                </div>
-                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
-              </CardContent>
-            </Card>
-          ); })}
-        </div>
-        <Card className="border-0 shadow-xl">
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
-              <CalendarDays size={40} className="text-[#C08E3A]" />
-            </div>
-            <h2 className="text-2xl font-bold">Entre para agendar</h2>
-            <p className="mt-3 max-w-md text-muted-foreground">
-              Para agendar sua consulta, faça login ou crie sua conta. É rápido e gratuito.
-            </p>
-            <div className="mt-6 flex gap-3">
-              <Link href="/sign-in?redirect_url=/agendamento">
-                <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
-                  Entrar para agendar
-                </Button>
-              </Link>
-              <Link href="/sign-up?redirect_url=/agendamento">
-                <Button variant="outline" className="gap-2 px-8">
-                  Criar conta grátis
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-0 shadow-xl">
+        <CardContent className="flex flex-col items-center py-16 text-center">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
+            <CalendarDays size={40} className="text-[#C08E3A]" />
+          </div>
+          <h2 className="text-2xl font-bold">Pronto para agendar?</h2>
+          <p className="mt-3 max-w-md text-muted-foreground">
+            Crie sua conta ou faça login para confirmar o agendamento.{' '}
+            <strong className="text-foreground">A primeira consulta é gratuita</strong> — sem cartão de crédito, sem compromisso.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link href="/sign-in?redirect_url=/agendamento">
+              <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
+                Entrar para agendar
+              </Button>
+            </Link>
+            <Link href="/sign-up?redirect_url=/agendamento">
+              <Button variant="outline" className="gap-2 px-8">
+                Criar conta grátis
+              </Button>
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Cadastro rápido · Sem custo · Cancele quando quiser
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 

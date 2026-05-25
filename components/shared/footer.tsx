@@ -101,7 +101,7 @@ export function Footer() {
             © {new Date().getFullYear()} Be4Hope. Todos os direitos reservados.
           </p>
           <p className="text-xs text-muted-foreground">
-            Acolhimento desde 2004
+            Acolhimento desde 2002
           </p>
         </div>
       </div>

@@ -339,6 +339,39 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
 }
 
 /**
+ * Lista médicos para exibição pública na página de agendamento.
+ * NÃO requer autenticação. Retorna apenas dados de apresentação:
+ * nome, especialidade, bio e foto. Sem valor da consulta.
+ */
+export async function listarMedicosPublico(): Promise<ActionResult<Array<{
+  id: string;
+  nome: string;
+  especialidade: string;
+  bio: string | null;
+  avatarUrl: string | null;
+}>>> {
+  try {
+    const resultado = await db
+      .select({
+        id: medicos.id,
+        nome: users.nome,
+        especialidade: medicos.especialidade,
+        bio: medicos.bio,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(isNull(users.deletedAt))
+      .orderBy(asc(medicos.ordem), asc(medicos.createdAt));
+
+    return { sucesso: true, dados: resultado };
+  } catch (error) {
+    console.error('[Action] Erro ao listar médicos públicos:', error);
+    return { sucesso: false, erro: 'Erro ao listar médicos' };
+  }
+}
+
+/**
  * Lista horários livres de um médico em uma data específica.
  * Slots de 1h, das 08:00 às 18:00 (horário comercial).
  * Exclui horários com consultas já agendadas ou confirmadas.

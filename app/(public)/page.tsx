@@ -12,10 +12,11 @@ import {
   CheckCircle2,
   ChevronRight,
   FileCheck,
+  HeartHandshake,
   HeartPulse,
   Leaf,
+  Network,
   Package,
-  Search,
   Shield,
   Stethoscope,
   Users,
@@ -29,12 +30,11 @@ export const metadata: Metadata = {
 /* ── Dados ──────────────────────────────────────────── */
 
 const STATS = [
-  { valor: '21', label: 'anos de história' },
+  { valor: '24', label: 'anos de história' },
   { valor: 'ONG', label: 'sem fins lucrativos' },
   { valor: '26', label: 'estados atendidos' },
-  { valor: 'Anvisa', label: 'regulamentado RDC 660' },
+  { valor: '8.000+', label: 'Pacientes atendidos' },
 ];
-
 
 const ESPECIALIDADES = [
   {
@@ -83,7 +83,8 @@ const COMO_FUNCIONA = [
 const HISTORIAS = [
   {
     titulo: 'Medicina Endocanabinóide e qualidade de vida: o que a evidência mostra',
-    subtitulo: 'Como o uso terapêutico responsável tem transformado o dia a dia de quem convive com condições crônicas.',
+    subtitulo:
+      'Como o uso terapêutico responsável tem transformado o dia a dia de quem convive com condições crônicas.',
     categoria: 'Bem-estar',
     imagem: '/images/home/historia-familia-sofa.jpg',
     alt: 'Família reunida em momento de leveza e bem-estar',
@@ -96,7 +97,7 @@ const HISTORIAS = [
     alt: 'Família feliz reunida em casa — acolhimento e bem-estar',
   },
   {
-    titulo: 'Be4Hope completa 21 anos e os próximos ciclos',
+    titulo: 'Be4Hope completa 24 anos e os próximos ciclos',
     subtitulo: 'Duas décadas de acolhimento, resiliência e cuidado.',
     categoria: 'Institucional',
     imagem: '/images/home/historia-familia-ar-livre.jpg',
@@ -115,11 +116,11 @@ export default function HomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             {/* Texto */}
             <div className="animate-fade-up">
-              <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+              <p className="text-muted-foreground mb-6 text-xs font-semibold tracking-[0.25em] uppercase">
                 Acolhimento · Medicina Endocanabinóide
               </p>
 
-              <h1 className="font-display text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
+              <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 Cuidar de quem
                 <br />
                 cuida é nosso
@@ -127,16 +128,16 @@ export default function HomePage() {
                 <span className="text-accent-italic">ato de amor.</span>
               </h1>
 
-              <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
-                Há mais de duas décadas conectando pessoas ao cuidado com
-                Medicina Endocanabinóide. Sem pressa, sem julgamento, sem custo.
+              <p className="text-muted-foreground mt-6 max-w-lg text-base leading-relaxed sm:text-lg">
+                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide.
+                Sem pressa, sem julgamento, sem custo.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
                     nativeButton={false}
                   >
                     Iniciar triagem
@@ -147,7 +148,7 @@ export default function HomePage() {
                   <Button
                     variant="outline"
                     size="lg"
-                    className="btn-pill gap-2 border-foreground/20 px-8"
+                    className="btn-pill border-foreground/20 gap-2 px-8"
                     nativeButton={false}
                   >
                     Conhecer a Be4Hope
@@ -178,15 +179,15 @@ export default function HomePage() {
       </section>
 
       {/* ── Stats Bar ────────────────────────────────────── */}
-      <section className="border-y border-border bg-background">
+      <section className="border-border bg-background border-y">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
+          <div className="divide-border grid grid-cols-2 divide-x sm:grid-cols-4">
             {STATS.map((stat) => (
               <div key={stat.label} className="px-6 py-8 text-center">
-                <p className="font-display text-3xl font-bold text-primary sm:text-4xl">
+                <p className="font-display text-primary text-3xl font-bold sm:text-4xl">
                   {stat.valor}
                 </p>
-                <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-xs font-medium tracking-[0.15em] uppercase">
                   {stat.label}
                 </p>
               </div>
@@ -205,29 +206,30 @@ export default function HomePage() {
           <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
             {/* Texto principal */}
             <div>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
-                Desde 2004
+              <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
+                Desde 2002
               </p>
-              <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-                Há duas décadas{' '}
-                <span className="text-accent-italic">cuidando</span> de quem
+              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+                Há mais de duas décadas <span className="text-accent-italic">cuidando</span> de quem
                 mais precisa.
               </h2>
-              <div className="mt-8 space-y-5 text-base leading-relaxed text-muted-foreground">
+              <div className="text-muted-foreground mt-8 space-y-5 text-base leading-relaxed">
                 <p className="drop-cap">
                   A <strong className="text-foreground">Be4Hope</strong> é uma{' '}
-                  <strong className="text-foreground">organização filantrópica sem fins lucrativos</strong>{' '}
-                  que, desde 2004, acolhe e apoia famílias e indivíduos com condições neurológicas,
-                  patologias e doenças crônicas. Nosso trabalho é cuidar de quem precisa,
-                  oferecendo apoio humano, acesso a{' '}
-                  <strong className="text-foreground">tratamentos seguros</strong> e informações de confiança.
+                  <strong className="text-foreground">
+                    organização filantrópica sem fins lucrativos
+                  </strong>{' '}
+                  que, desde 2002, acolhe e apoia famílias e indivíduos com condições neurológicas,
+                  patologias e doenças crônicas. Nosso trabalho é cuidar de quem precisa, oferecendo
+                  apoio humano, acesso a{' '}
+                  <strong className="text-foreground">tratamentos seguros</strong> e informações de
+                  confiança.
                 </p>
                 <p>
                   Acreditamos que{' '}
-                  <strong className="text-foreground">saúde é um direito de todos</strong>{' '}
-                  — não importa onde você mora ou qual é a sua condição financeira.
-                  Por isso, atuamos para garantir que{' '}
-                  <strong className="text-foreground">medicamentos essenciais</strong>{' '}
+                  <strong className="text-foreground">saúde é um direito de todos</strong> — não
+                  importa onde você mora ou qual é a sua condição financeira. Por isso, atuamos para
+                  garantir que <strong className="text-foreground">medicamentos essenciais</strong>{' '}
                   cheguem de forma justa e legal até quem realmente precisa.
                 </p>
                 <p>
@@ -237,9 +239,25 @@ export default function HomePage() {
                   <strong className="text-foreground">pesquisa científica</strong>, porque
                   acreditamos no poder da informação e da inovação para mudar realidades.
                 </p>
-                <p className="text-base font-medium text-foreground">
+                <p className="text-foreground text-base font-medium">
                   Somos uma rede de cuidado, esperança e transformação. Somos a Be4Hope.
                 </p>
+              </div>
+
+              {/* Flores decorativas — mix-blend-mode dissolve o fundo branco do PNG */}
+              <div className="mt-8 flex justify-center">
+                <Image
+                  src="/images/home/flores.png"
+                  alt="Ilustração de flores — símbolo de florescimento e cuidado da Be4Hope"
+                  width={520}
+                  height={220}
+                  className="h-auto w-full max-w-[430px] select-none"
+                  style={{
+                    mixBlendMode: 'multiply',
+                    display: 'block',
+                  }}
+                  draggable={false}
+                />
               </div>
             </div>
 
@@ -258,22 +276,25 @@ export default function HomePage() {
 
               {/* Cards de especialidade */}
               <div className="grid gap-4 sm:grid-cols-2">
-              {ESPECIALIDADES.map((esp) => (
-                <Card
-                  key={esp.titulo}
-                  className="group border-0 bg-card shadow-sm transition-all hover:shadow-md"
-                >
-                  <CardContent className="p-6">
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-muted transition-colors group-hover:bg-primary/10">
-                      {(() => { const DynIcon = esp.icon; return <DynIcon size={20} />; })()}
-                    </div>
-                    <h3 className="text-sm font-semibold">{esp.titulo}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      {esp.descricao}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+                {ESPECIALIDADES.map((esp) => (
+                  <Card
+                    key={esp.titulo}
+                    className="group bg-card border-0 shadow-sm transition-all hover:shadow-md"
+                  >
+                    <CardContent className="p-6">
+                      <div className="bg-muted group-hover:bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-xl transition-colors">
+                        {(() => {
+                          const DynIcon = esp.icon;
+                          return <DynIcon size={20} />;
+                        })()}
+                      </div>
+                      <h3 className="text-sm font-semibold">{esp.titulo}</h3>
+                      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                        {esp.descricao}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           </div>
@@ -281,20 +302,19 @@ export default function HomePage() {
       </section>
 
       {/* ── 2. Por que Be4Hope? ────────────────────────────── */}
-      <section className="border-y border-border bg-muted/30 py-20 lg:py-28">
+      <section className="border-border bg-muted/30 border-y py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+            <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
               Nossa missão
             </p>
-            <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-              Por que{' '}
-              <span className="text-accent-italic">Be4Hope?</span>
+            <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Por que <span className="text-accent-italic">Be4Hope?</span>
             </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              A Be4Hope é muito mais do que uma ONG. Somos uma rede de acolhimento,
-              cuidado e transformação, que conecta pacientes a tratamentos seguros,
-              eficazes e acessíveis com Medicina Endocanabinóide.
+            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
+              A Be4Hope é muito mais do que uma ONG. Somos uma rede de acolhimento, cuidado e
+              transformação, que conecta pacientes a tratamentos seguros, eficazes e acessíveis com
+              Medicina Endocanabinóide.
             </p>
           </div>
 
@@ -313,10 +333,10 @@ export default function HomePage() {
                   'Temos parcerias com fabricantes internacionais renomados, garantindo um portfólio diversificado que atende às necessidades de diferentes perfis de pacientes.',
               },
               {
-                icon: Search,
-                titulo: 'Transparência nos preços',
+                icon: HeartHandshake,
+                titulo: 'Acompanhamento contínuo',
                 descricao:
-                  'Promovemos a transparência nos preços dos medicamentos, negociando ativamente com fornecedores para garantir custos acessíveis e justos.',
+                  'Oferecemos suporte contínuo aos pacientes, com acompanhamento médico regular, orientações personalizadas e monitoramento da evolução do tratamento.',
               },
               {
                 icon: Award,
@@ -327,14 +347,17 @@ export default function HomePage() {
             ].map((item) => (
               <Card
                 key={item.titulo}
-                className="group border-0 bg-background shadow-sm transition-all hover:shadow-md"
+                className="group bg-background border-0 shadow-sm transition-all hover:shadow-md"
               >
                 <CardContent className="p-6">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 transition-colors group-hover:bg-primary/20">
-                    {(() => { const DynIcon = item.icon; return <DynIcon size={22} />; })()}
+                  <div className="bg-primary/10 group-hover:bg-primary/20 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors">
+                    {(() => {
+                      const DynIcon = item.icon;
+                      return <DynIcon size={22} />;
+                    })()}
                   </div>
                   <h3 className="text-sm font-semibold">{item.titulo}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
                     {item.descricao}
                   </p>
                 </CardContent>
@@ -342,9 +365,8 @@ export default function HomePage() {
             ))}
           </div>
 
-          <p className="mt-12 text-center text-base font-medium text-foreground">
-            Somos a Be4Hope:{' '}
-            <span className="text-primary">cuidado, acesso, transformação.</span>
+          <p className="text-foreground mt-12 text-center text-base font-medium">
+            Somos a Be4Hope: <span className="text-primary">cuidado, acesso, transformação.</span>
           </p>
         </div>
       </section>
@@ -353,83 +375,91 @@ export default function HomePage() {
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+            <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
               Ecossistema
             </p>
-            <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-              Collab Be4Hope:{' '}
+            <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Rede de Apoio Be4Hope:{' '}
               <span className="text-accent-italic">conectando pessoas e soluções</span>
             </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              A Be4Hope é uma <strong className="text-foreground">collaboration (collab)</strong>{' '}
-              formada por empresas e instituições que promovem um modelo inovador de saúde — mais
-              humano, acessível e centrado no paciente, utilizando a Medicina Endocanabinóide como terapia,
+            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
+              A Be4Hope é uma <strong className="text-foreground">rede de apoio</strong> formada por
+              empresas e instituições que promovem um modelo inovador de saúde — mais humano,
+              acessível e centrado no paciente, utilizando a Medicina Endocanabinóide como terapia,
               sempre com base científica e responsabilidade.
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:max-w-4xl lg:mx-auto">
-            {/* Greens */}
-            <Card className="group relative overflow-hidden border-0 bg-card shadow-sm transition-all hover:shadow-lg">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-500 to-green-400" />
+          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:mx-auto lg:max-w-4xl">
+            {/* Be 4Hope */}
+            <Card className="group bg-card relative overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
+              <div className="from-primary to-primary/70 absolute inset-x-0 top-0 h-1 bg-gradient-to-r" />
               <CardContent className="p-8">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-100">
-                  <Leaf size={22} className="text-green-600" />
+                <div className="bg-primary/10 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl">
+                  <HeartPulse size={22} className="text-primary" />
                 </div>
-                <h3 className="font-display text-lg font-bold">Greens Pharmaceutical</h3>
-                <p className="mt-1 text-xs font-medium italic text-green-600">
-                  Não somos intermediários. Somos estrutura.
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Indústria internacional dedicada ao{' '}
-                  <strong className="text-foreground">desenvolvimento e entrega de terapias de alta complexidade</strong>{' '}
-                  com excelência técnica, governança estruturada e visão de longo prazo. Atuam na
-                  interseção entre ciência, regulação e sustentabilidade.
+                <h3 className="font-display text-lg font-bold">Be 4Hope</h3>
+                <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                  Atua como{' '}
+                  <strong className="text-foreground">
+                    ponte entre pacientes, familiares e o ecossistema
+                  </strong>{' '}
+                  da Medicina Endocanabinóide. Trabalha em rede com parceiros para criar soluções
+                  personalizadas.
                 </p>
                 <ul className="mt-4 space-y-2">
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
-                    Certificação internacional Swiss GMP
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
+                    Ponte entre pacientes e tratamentos
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
-                    Rigorosa conformidade e integração regulatória
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
+                    Soluções personalizadas em rede
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500" />
-                    Maturidade científica e governança de longo prazo
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
+                    Missão: colaboração salva vidas
                   </li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Be 4Hope */}
-            <Card className="group relative overflow-hidden border-0 bg-card shadow-sm transition-all hover:shadow-lg">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-primary/70" />
+            {/* Nossos Parceiros */}
+            <Card className="group bg-card relative overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
               <CardContent className="p-8">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                  <HeartPulse size={22} className="text-primary" />
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
+                  <Network size={22} className="text-amber-600" />
                 </div>
-                <h3 className="font-display text-lg font-bold">Be 4Hope</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Atua como <strong className="text-foreground">ponte entre pacientes, familiares e o
-                  ecossistema</strong> da Medicina Endocanabinóide. Trabalha em rede com parceiros para criar
-                  soluções personalizadas.
+                <h3 className="font-display text-lg font-bold">Parceiros Estratégicos</h3>
+                <p className="mt-1 text-xs font-medium text-amber-600 italic">
+                  Juntos por uma saúde mais acessível.
+                </p>
+                <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                  Trabalhamos com parceiros de excelência comprometidos com inovação, regulação e
+                  acesso à Medicina Endocanabinóide.
                 </p>
                 <ul className="mt-4 space-y-2">
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
-                    Ponte entre pacientes e tratamentos
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
+                    Greens Pharmaceutical — Swiss GMP
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
-                    Soluções personalizadas em rede
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
+                    Cannect — Ecossistema digital de saúde
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
-                    Missão: colaboração salva vidas
+                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
+                    Rede multidisciplinar de especialistas
                   </li>
                 </ul>
+                <Link
+                  href="/parceiros"
+                  className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-600 transition-colors hover:text-amber-700"
+                >
+                  Conhecer parceiros
+                  <ChevronRight size={14} />
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -441,35 +471,34 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
             <div>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+              <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
                 Ciência e cuidado
               </p>
-              <h2 className="font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
-                Medicina{' '}
-                <span className="text-accent-italic">Endocanabinóide</span>
+              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
+                Medicina <span className="text-accent-italic">Endocanabinóide</span>
               </h2>
               <div className="mt-6 space-y-4 text-base leading-relaxed text-white/70">
                 <p>
-                  A Medicina Endocanabinóide tem se mostrado eficaz no tratamento de diversas doenças
-                  raras e crônicas, desde dores crônicas até distúrbios neurológicos.
+                  A Medicina Endocanabinóide tem se mostrado eficaz no tratamento de diversas
+                  doenças raras e crônicas, desde dores crônicas até distúrbios neurológicos.
                 </p>
                 <p>
                   Seu uso no Brasil é regulamentado pela{' '}
-                  <strong className="text-white">RDC 660 da Anvisa</strong>, garantindo
-                  segurança e controle. A Be4Hope atua com responsabilidade dentro desse cenário,
-                  sempre buscando as melhores soluções para os pacientes.
+                  <strong className="text-white">RDC 660 da Anvisa</strong>, garantindo segurança e
+                  controle. A Be4Hope atua com responsabilidade dentro desse cenário, sempre
+                  buscando as melhores soluções para os pacientes.
                 </p>
                 <p>
-                  Seus principais componentes ativos — o{' '}
-                  <strong className="text-white">CBD</strong> (canabidiol) e o{' '}
-                  <strong className="text-white">THC</strong> (tetra-hidrocanabinol) — demonstraram
-                  propriedades analgésicas, anti-inflamatórias, ansiolíticas e neuroprotetoras.
+                  Seus principais componentes ativos — o <strong className="text-white">CBD</strong>{' '}
+                  (canabidiol) e o <strong className="text-white">THC</strong>{' '}
+                  (tetra-hidrocanabinol) — demonstraram propriedades analgésicas,
+                  anti-inflamatórias, ansiolíticas e neuroprotetoras.
                 </p>
               </div>
               <Link href="/mundo-endocanabinoide" className="mt-8 inline-flex">
                 <Button
                   size="lg"
-                  className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                  className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
                   nativeButton={false}
                 >
                   Quero saber mais
@@ -498,16 +527,15 @@ export default function HomePage() {
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+            <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
               Jornada do paciente
             </p>
-            <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-              Do zero até{' '}
-              <span className="text-accent-italic">a sua casa</span>
+            <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Do zero até <span className="text-accent-italic">a sua casa</span>
             </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
-              Entenda o passo a passo para acessar seu tratamento com Medicina Endocanabinóide de forma
-              segura e legalizada.
+            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
+              Entenda o passo a passo para acessar seu tratamento com Medicina Endocanabinóide de
+              forma segura e legalizada.
             </p>
           </div>
 
@@ -545,15 +573,18 @@ export default function HomePage() {
               <div key={item.passo} className="group relative text-center">
                 {/* Número do passo */}
                 <div className="relative mx-auto mb-6">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 transition-all group-hover:bg-primary/20 group-hover:shadow-md">
-                    {(() => { const DynIcon = item.icon; return <DynIcon size={28} />; })()}
+                  <div className="bg-primary/10 group-hover:bg-primary/20 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl transition-all group-hover:shadow-md">
+                    {(() => {
+                      const DynIcon = item.icon;
+                      return <DynIcon size={28} />;
+                    })()}
                   </div>
-                  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                  <span className="bg-primary absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white">
                     {item.passo}
                   </span>
                 </div>
                 <h3 className="text-base font-semibold">{item.titulo}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
                   {item.descricao}
                 </p>
               </div>
@@ -564,7 +595,7 @@ export default function HomePage() {
             <Link href="/triagem">
               <Button
                 size="lg"
-                className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
                 nativeButton={false}
               >
                 Iniciar minha jornada
@@ -579,12 +610,11 @@ export default function HomePage() {
       <section className="overflow-hidden py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
-
             {/* Coluna esquerda — Imagem com detalhe de profundidade */}
             <div className="relative">
               {/* Quadrado decorativo de fundo */}
               <div
-                className="absolute -left-4 -top-4 h-full w-full rounded-3xl bg-primary/6 lg:-left-6 lg:-top-6"
+                className="bg-primary/6 absolute -top-4 -left-4 h-full w-full rounded-3xl lg:-top-6 lg:-left-6"
                 aria-hidden="true"
               />
               <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-2xl">
@@ -601,14 +631,16 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
                 {/* Badge flutuante de credibilidade */}
-                <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-white/90 px-5 py-4 shadow-lg backdrop-blur-sm">
+                <div className="absolute right-6 bottom-6 left-6 rounded-2xl bg-white/90 px-5 py-4 shadow-lg backdrop-blur-sm">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                       <HeartPulse size={20} className="text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Cuidado humanizado</p>
-                      <p className="text-xs text-muted-foreground">Mais de 21 anos de acolhimento real</p>
+                      <p className="text-foreground text-sm font-semibold">Cuidado humanizado</p>
+                      <p className="text-muted-foreground text-xs">
+                        Mais de 24 anos de acolhimento real
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -617,14 +649,13 @@ export default function HomePage() {
 
             {/* Coluna direita — Texto emocional + diferenciais */}
             <div>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+              <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
                 Nossa essência
               </p>
-              <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-                Cuidado humano{' '}
-                <span className="text-accent-italic">que transforma.</span>
+              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+                Cuidado humano <span className="text-accent-italic">que transforma.</span>
               </h2>
-              <p className="mt-6 text-base leading-relaxed text-muted-foreground">
+              <p className="text-muted-foreground mt-6 text-base leading-relaxed">
                 Por trás de cada paciente existe uma história de luta, esperança e amor. A Be4Hope
                 nasceu justamente para que ninguém precise enfrentar esse caminho sozinho — com
                 acolhimento genuíno, orientação especializada e acesso real ao tratamento.
@@ -654,12 +685,12 @@ export default function HomePage() {
                   const DynIcon = item.icon;
                   return (
                     <div key={item.titulo} className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 transition-colors hover:bg-primary/20">
+                      <div className="bg-primary/10 hover:bg-primary/20 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors">
                         <DynIcon size={20} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">{item.titulo}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                        <p className="text-foreground text-sm font-semibold">{item.titulo}</p>
+                        <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
                           {item.descricao}
                         </p>
                       </div>
@@ -672,7 +703,7 @@ export default function HomePage() {
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
                     nativeButton={false}
                   >
                     Quero ser acolhido
@@ -681,7 +712,6 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -691,19 +721,18 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div>
-              <h2 className="font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
-                Estamos prontos{' '}
-                <span className="text-accent-italic">para te ajudar.</span>
+              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
+                Estamos prontos <span className="text-accent-italic">para te ajudar.</span>
               </h2>
               <p className="mt-6 max-w-lg text-base leading-relaxed text-white/70">
-                Esse formulário é o primeiro passo para entender sua história e
-                te conectar com o cuidado certo. Sem pressa, sem julgamento, sem custo.
+                Esse formulário é o primeiro passo para entender sua história e te conectar com o
+                cuidado certo. Sem pressa, sem julgamento, sem custo.
               </p>
 
               <ul className="mt-8 space-y-4">
                 {COMO_FUNCIONA.map((item) => (
                   <li key={item.passo} className="flex items-start gap-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                    <span className="bg-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">
                       {item.passo}
                     </span>
                     <div>
@@ -716,40 +745,40 @@ export default function HomePage() {
             </div>
 
             {/* Card de triagem simplificado */}
-            <Card className="border-0 bg-card shadow-xl">
+            <Card className="bg-card border-0 shadow-xl">
               <CardContent className="p-8">
                 <h3 className="font-display text-lg font-semibold">Iniciar triagem</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Preencha algumas informações básicas para que nossa equipe
-                  possa avaliar o seu caso.
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Preencha algumas informações básicas para que nossa equipe possa avaliar o seu
+                  caso.
                 </p>
 
                 <div className="mt-6 space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium tracking-wider uppercase">
                       Nome completo
                     </label>
                     <input
                       type="text"
                       placeholder="Seu nome"
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-1 focus:ring-primary"
+                      className="border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-1"
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium tracking-wider uppercase">
                       WhatsApp
                     </label>
                     <input
                       type="tel"
                       placeholder="(11) 98123-4567"
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-1 focus:ring-primary"
+                      className="border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-1"
                     />
                   </div>
                 </div>
 
                 <Link href="/triagem" className="mt-6 block">
                   <Button
-                    className="btn-pill w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 w-full gap-2"
                     nativeButton={false}
                   >
                     Preencher formulário
@@ -767,12 +796,11 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between">
             <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Histórias que{' '}
-              <span className="text-accent-italic">importam.</span>
+              Histórias que <span className="text-accent-italic">importam.</span>
             </h2>
             <Link
               href="/mundo-endocanabinoide"
-              className="hidden text-sm font-medium text-primary hover:underline sm:inline-flex sm:items-center sm:gap-1"
+              className="text-primary hidden text-sm font-medium hover:underline sm:inline-flex sm:items-center sm:gap-1"
             >
               Ver todas as histórias
               <ChevronRight size={14} />
@@ -795,15 +823,13 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent" />
                 </div>
                 <div className="mt-4">
-                  <span className="inline-block rounded-full bg-muted px-3 py-0.5 text-xs font-medium text-muted-foreground">
+                  <span className="bg-muted text-muted-foreground inline-block rounded-full px-3 py-0.5 text-xs font-medium">
                     {historia.categoria}
                   </span>
-                  <h3 className="mt-2 font-display text-base font-semibold leading-snug">
+                  <h3 className="font-display mt-2 text-base leading-snug font-semibold">
                     {historia.titulo}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {historia.subtitulo}
-                  </p>
+                  <p className="text-muted-foreground mt-1 text-sm">{historia.subtitulo}</p>
                 </div>
               </article>
             ))}
@@ -812,7 +838,7 @@ export default function HomePage() {
           <div className="mt-8 text-center sm:hidden">
             <Link
               href="/mundo-endocanabinoide"
-              className="text-sm font-medium text-primary hover:underline"
+              className="text-primary text-sm font-medium hover:underline"
             >
               Ver todas as histórias →
             </Link>
@@ -821,22 +847,17 @@ export default function HomePage() {
       </section>
 
       {/* ── CTA Final — Vamos conversar? ─────────────────── */}
-      <section className="border-t border-border py-20 lg:py-28">
+      <section className="border-border border-t py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-8 sm:flex-row">
             <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Vamos{' '}
-              <span className="text-accent-italic">conversar?</span>
+              Vamos <span className="text-accent-italic">conversar?</span>
             </h2>
             <div className="flex items-center gap-4">
-              <Link
-                href="https://wa.me/5511932047360"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
                 <Button
                   size="lg"
-                  className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+                  className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
                   nativeButton={false}
                 >
                   WhatsApp
@@ -844,12 +865,7 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link href="/entre-em-contato">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="btn-pill px-8"
-                  nativeButton={false}
-                >
+                <Button variant="outline" size="lg" className="btn-pill px-8" nativeButton={false}>
                   Outras formas
                 </Button>
               </Link>

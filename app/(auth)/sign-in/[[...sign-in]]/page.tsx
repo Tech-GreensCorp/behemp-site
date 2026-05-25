@@ -9,11 +9,12 @@ import {
   CalendarDays,
   HeartPulse,
   MapPinned,
+  Users,
 } from 'lucide-react';
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
   {
-    num: 21,
+    num: 24,
     suffix: '',
     label: 'Anos de história',
     icon: CalendarDays,
@@ -36,10 +37,10 @@ const STATS = [
   },
   {
     num: null,
-    text: 'Anvisa',
+    text: '8.000+',
     suffix: '',
-    label: 'Regulamentado RDC 660',
-    icon: BadgeCheck,
+    label: 'Pacientes atendidos',
+    icon: Users,
     color: '#E63946',
   },
 ];

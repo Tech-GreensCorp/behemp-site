@@ -1,36 +1,178 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
+import {
+  Video,
+  Clock,
+  CheckCircle2,
+  Stethoscope,
+  Gift,
+  CalendarCheck,
+  ChevronRight,
+  UserCheck,
+} from 'lucide-react';
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
+import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 
 export const metadata: Metadata = {
   title: 'Agendar Consulta | Be4Hope',
   description:
-    'Agende sua consulta com médicos especialistas em medicina endocanabinóide. Atendimento online via Google Meet.',
+    'A primeira consulta com especialistas em Medicina Endocanabinóide é gratuita. Atendimento 100% online via Google Meet. Agende agora.',
 };
 
+const beneficios = [
+  {
+    icon: Video,
+    titulo: '100% Online',
+    descricao: 'Consulta por videoconferência via Google Meet',
+  },
+  {
+    icon: Clock,
+    titulo: 'Duração: ~60 min',
+    descricao: 'Avaliação completa e orientação personalizada',
+  },
+  {
+    icon: UserCheck,
+    titulo: 'Confirmação Imediata',
+    descricao: 'Receba o link do Meet por e-mail na hora',
+  },
+];
+
 /**
- * Página pública de agendamento — renderiza o wizard multi-step client.
- * O usuário precisa estar autenticado para concluir o agendamento.
+ * Página pública de agendamento.
+ * Exibe banner de primeira consulta gratuita, lista todos os médicos
+ * cadastrados para visualização, e delega o agendamento ao wizard (que exige login).
  */
-export default function AgendamentoPage() {
+export default async function AgendamentoPage() {
+  /* Busca médicos para exibição pública — sem valor da consulta */
+  const { dados: medicos = [] } = await listarMedicosPublico();
+
   return (
     <div className="min-h-screen pt-24 pb-16">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+
+        {/* ── Header ───────────────────────────────────────── */}
         <div className="mx-auto max-w-2xl text-center">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+            Agendamento
+          </p>
           <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             Agende sua{' '}
             <span className="text-accent-italic">consulta.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-            Escolha o melhor horário para sua consulta online com nossos
-            especialistas em medicina endocanabinóide.
+            Conecte-se com médicos especializados em Medicina Endocanabinóide.
+            Avaliação completa, prescrição segura e acompanhamento contínuo.
           </p>
         </div>
 
-        {/* Wizard Multi-Step */}
-        <div className="mt-12">
+        {/* ── Banner — Primeira consulta gratuita ──────────── */}
+        <div className="mt-10 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center sm:p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-4">
+            <Gift className="h-7 w-7 text-primary" />
+          </div>
+          <h2 className="font-display text-xl font-bold text-foreground sm:text-2xl">
+            Primeira consulta{' '}
+            <span className="text-primary">100% gratuita</span>
+          </h2>
+          <p className="mt-3 text-base text-muted-foreground max-w-lg mx-auto">
+            Na Be4Hope, a sua primeira consulta com nossos especialistas é{' '}
+            <strong className="text-foreground">completamente gratuita</strong>.
+            Acreditamos que o cuidado não pode ter barreira financeira.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              Sem custo na 1ª consulta
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              Sem cartão de crédito
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              Cancele a qualquer momento
+            </span>
+          </div>
+        </div>
+
+        {/* ── Benefícios ───────────────────────────────────── */}
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          {beneficios.map((b) => (
+            <div
+              key={b.titulo}
+              className="rounded-2xl border border-border/40 bg-card p-6 text-center"
+            >
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                <b.icon className="h-5 w-5 text-foreground" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground">{b.titulo}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{b.descricao}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Nossos especialistas (exibição pública) ───────── */}
+        {medicos.length > 0 && (
+          <section className="mt-16">
+            <div className="mb-8 text-center">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+                Nosso time
+              </p>
+              <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
+                Conheça nossos{' '}
+                <span className="text-accent-italic">especialistas</span>
+              </h2>
+              <p className="mt-3 text-base text-muted-foreground">
+                Médicos especializados em Medicina Endocanabinóide, prontos para
+                cuidar de você.
+              </p>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {medicos.map((medico) => (
+                <div
+                  key={medico.id}
+                  className="group rounded-2xl border border-border/40 bg-card p-6 transition-all hover:shadow-md hover:border-primary/20"
+                >
+                  {/* Foto */}
+                  <div className="mx-auto mb-4 h-24 w-24 overflow-hidden rounded-2xl bg-muted flex items-center justify-center">
+                    {medico.avatarUrl ? (
+                      <Image
+                        src={medico.avatarUrl}
+                        alt={`Dr. ${medico.nome}`}
+                        width={96}
+                        height={96}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Stethoscope className="h-10 w-10 text-muted-foreground/50" />
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="text-center">
+                    <h3 className="font-semibold text-foreground">{medico.nome}</h3>
+                    <p className="mt-1 text-xs font-medium text-primary">
+                      {medico.especialidade}
+                    </p>
+                    {medico.bio && (
+                      <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">
+                        {medico.bio}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── CTA — Agendar (wizard com login) ─────────────── */}
+        <div className="mt-16">
           <AgendamentoWizard />
         </div>
+
       </div>
     </div>
   );
