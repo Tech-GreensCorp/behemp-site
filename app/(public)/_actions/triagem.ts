@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { triagens } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 /**
@@ -83,7 +83,6 @@ export async function criarTriagem(
   }
 }
 
-
 /**
  * Lista todas as triagens (admin only).
  */
@@ -124,9 +123,8 @@ export async function listarTriagensMedico(medicoClerkId?: string): Promise<
     }
 
     // Médico vê apenas as próprias, admin pode ver de qualquer médico
-    const clerkIdFiltro = auth.role === 'admin' && medicoClerkId
-      ? medicoClerkId
-      : auth.clerkId;
+    const clerkIdFiltro =
+      auth.role === 'admin' && medicoClerkId ? medicoClerkId : auth.clerkId;
 
     if (!clerkIdFiltro) {
       return { sucesso: false, erro: 'Não foi possível identificar o médico' };
@@ -166,5 +164,58 @@ export async function atualizarStatusTriagem(
   } catch (error) {
     console.error('[Action] Erro ao atualizar triagem:', error);
     return { sucesso: false, erro: 'Erro ao atualizar triagem' };
+  }
+}
+
+/**
+ * Exclui uma triagem permanentemente (admin only).
+ * Operação irreversível — triagens não possuem dado clínico vinculado.
+ */
+export async function excluirTriagem(triagemId: string): Promise<ActionResult> {
+  try {
+    const { verificarAdmin } = await import('@/lib/auth');
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: auth.erro };
+    }
+
+    if (!triagemId || typeof triagemId !== 'string') {
+      return { sucesso: false, erro: 'ID da triagem inválido' };
+    }
+
+    await db.delete(triagens).where(eq(triagens.id, triagemId));
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao excluir triagem:', error);
+    return { sucesso: false, erro: 'Erro ao excluir triagem' };
+  }
+}
+
+/**
+ * Exclui múltiplas triagens em lote (admin only).
+ * Máximo de 100 por chamada para segurança.
+ */
+export async function excluirTriagensEmLote(
+  ids: string[],
+): Promise<ActionResult<{ excluidos: number }>> {
+  try {
+    const { verificarAdmin } = await import('@/lib/auth');
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: auth.erro };
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { sucesso: false, erro: 'Nenhum ID fornecido' };
+    }
+
+    const idsLimitados = ids.slice(0, 100);
+    await db.delete(triagens).where(inArray(triagens.id, idsLimitados));
+
+    return { sucesso: true, dados: { excluidos: idsLimitados.length } };
+  } catch (error) {
+    console.error('[Action] Erro ao excluir triagens em lote:', error);
+    return { sucesso: false, erro: 'Erro ao excluir triagens' };
   }
 }
