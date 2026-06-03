@@ -52,6 +52,7 @@ interface Triagem {
 /* ── Mapeamento de campos para labels legíveis ─────── */
 
 const LABEL_MAP: Record<string, string> = {
+  // ── Chaves internas (formulário novo) ─────────────────────────────────
   nome_paciente: 'Nome completo do Paciente',
   cpf: 'CPF',
   data_nascimento: 'Data de nascimento',
@@ -85,6 +86,70 @@ const LABEL_MAP: Record<string, string> = {
   convenio_qual: 'Qual convênio',
   condicao_moradia: 'Condições de moradia',
   despesas_medicas: 'Despesas médicas mensais',
+  // ── Chaves vindas dos CSVs Elementor (importação histórica) ──────────
+  'Nome do paciente': 'Nome do Paciente',
+  'Nome completo do Paciente:': 'Nome Completo',
+  'CPF:': 'CPF',
+  'Data de nascimento:': 'Data de Nascimento',
+  'Peso e Altura do Paciente': 'Peso e Altura',
+  'Nome Completo do Responsável:': 'Nome do Responsável',
+  'CPF do Responsável:': 'CPF do Responsável',
+  'E-mail': 'E-mail',
+  'E-mail:': 'E-mail',
+  'Telefone para contato com DDD': 'Telefone',
+  'Telefone:': 'Telefone',
+  'CEP:': 'CEP',
+  'Endereço completo: ': 'Endereço',
+  'Endereço completo': 'Endereço',
+  'Estado:': 'Estado',
+  'Cidade:': 'Cidade',
+  'Como chegou até nós ?': 'Como nos encontrou',
+  'Diagnóstico principal: ': 'Diagnóstico Principal',
+  Patologia: 'Patologia / Diagnóstico',
+  'Patologia do paciente': 'Patologia / Diagnóstico',
+  'Tratamento:': 'Nível de Urgência',
+  'Histórico de tratamentos anteriores:': 'Histórico de Tratamentos',
+  'Medicamentos atuais:': 'Medicamentos Atuais',
+  'Relatório médico ou prescrição:': 'Relatório / Prescrição',
+  'Número total de pessoas na residência:': 'Pessoas na Residência',
+  'Número de crianças (0-17anos)': 'Crianças (0-17)',
+  'Número de idosos (60+ anos)': 'Idosos (60+)',
+  'Número de pessoas com deficiência ': 'Pessoas c/ Deficiência',
+  'Você é o principal responsavel financeiro ?': 'Responsável Financeiro',
+  'Se não, quem seria ?': 'Quem é o Responsável',
+  'Renda total mensal da família:': 'Renda Familiar',
+  'Renda Familiar Bruta': 'Renda Familiar',
+  'Principais fontes de renda familiar:': 'Fontes de Renda',
+  'Sua situação atual de trabalho:': 'Situação de Trabalho',
+  'Profissão:': 'Profissão',
+  'Se desempregado, há quanto tempo ?': 'Tempo Desempregado',
+  'Pariticipa de programas sociais ?': 'Programas Sociais',
+  'Recebe algum benefício? ': 'Benefícios Sociais',
+  'Possuí convênio médico?': 'Convênio Médico',
+  'Possui plano de saúde? Se sim, qual?': 'Plano de Saúde',
+  'Se sim, qual?': 'Qual Convênio',
+  'Condições de Moradia': 'Condições de Moradia',
+  'Despesas médicas mensais atuais': 'Despesas Médicas Mensais',
+  'Você já possui receita médica para o canabidiol?': 'Possui Receita Médica',
+  ' Se possui, pode nos encaminhar?': 'URL da Receita Médica',
+  'Já fez uso de medicamentos derivados de Canabidiol ?': 'Já usou Canabidiol',
+  'Se sim, de qual medicamento fez uso?': 'Qual Medicamento CBD',
+  'Como conheceu a Behemp?': 'Como nos conheceu',
+  'Nome do responsável': 'Nome do Responsável',
+  'Grau de parentesco': 'Grau de Parentesco',
+  'Peso em Kilos': 'Peso (kg)',
+  'Altura em Cm': 'Altura (cm)',
+  'Quantas pessoas residem na casa?': 'Pessoas na Residência',
+  'Caso se sinta a vontade, nos conte um pouco sobre sua história pessoal e familiar':
+    'História Pessoal e Familiar',
+  'Relate o seu caso': 'Relato do Caso',
+  CUPOM: 'Cupom',
+  // Campos de rastreabilidade (internos)
+  _formulario: 'Formulário de Origem',
+  _origem: 'Origem dos Dados',
+  _ip_origem: 'IP de Origem',
+  _referencia: 'URL de Referência',
+  id_envio_elementor: 'ID Elementor',
 };
 
 /* ── Agrupamento de seções com ícones ─────────────── */
@@ -395,11 +460,27 @@ export default function TriagensAdminPage() {
                   {/* Quick stats */}
                   {(() => {
                     const dados = triagemSelecionada.dados as Record<string, string>;
+                    // Detecta campos tanto do formulário novo quanto dos CSVs importados
+                    const diagnostico =
+                      dados.diagnostico_principal ||
+                      dados['Diagnóstico principal: '] ||
+                      dados['Patologia do paciente'] ||
+                      dados['Patologia'] || '';
+                    const urgencia =
+                      dados.nivel_tratamento ||
+                      dados['Tratamento:'] || '';
+                    const estadoPaciente =
+                      dados.estado ||
+                      dados['Estado:'] ||
+                      dados['Estado'] || '';
+                    const moradia =
+                      dados.condicao_moradia ||
+                      dados['Condições de Moradia'] || '';
                     const stats = [
-                      { label: 'Diagnóstico', valor: dados.diagnostico_principal },
-                      { label: 'Tratamento', valor: dados.nivel_tratamento },
-                      { label: 'Estado', valor: dados.estado },
-                      { label: 'Moradia', valor: dados.condicao_moradia },
+                      { label: 'Diagnóstico', valor: diagnostico },
+                      { label: 'Urgência', valor: urgencia },
+                      { label: 'Estado', valor: estadoPaciente },
+                      { label: 'Moradia', valor: moradia },
                     ].filter((s) => s.valor);
 
                     if (stats.length === 0) return null;
