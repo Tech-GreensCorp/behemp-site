@@ -126,7 +126,7 @@ export function PatologiasPicker() {
 
       {/* Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogContent className="p-5 sm:max-w-md sm:p-7" showCloseButton={false}>
           <DialogTitle className="sr-only">Iniciar jornada com a Be4Hope</DialogTitle>
 
           {/* Banner topo */}
@@ -198,14 +198,14 @@ export function PatologiasPicker() {
               size="lg"
               disabled={!podeEnviar}
               onClick={falarComMedico}
-              className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+              className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
             >
               <MessageCircle size={16} />
               Falar com médico
             </Button>
             <DialogClose
               render={
-                <Button type="button" variant="outline" size="lg" className="btn-pill px-8" />
+                <Button type="button" variant="outline" size="lg" className="btn-pill border-primary text-secondary px-8" />
               }
             >
               Voltar a página inicial

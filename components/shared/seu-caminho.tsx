@@ -103,11 +103,18 @@ export function SeuCaminho() {
                   {etapa.tituloBase}
                 </h3>
 
-                {aberto && (
-                  <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-                    {etapa.descricao}
-                  </p>
-                )}
+                <div
+                  className={cn(
+                    'grid transition-all duration-300 ease-in-out',
+                    aberto ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                      {etapa.descricao}
+                    </p>
+                  </div>
+                </div>
 
                 <button
                   type="button"
@@ -133,9 +140,7 @@ export function SeuCaminho() {
               rel="noopener noreferrer"
             >
               <Button
-                className={cn(
-                  'btn-pill bg-white text-primary hover:bg-white/90 gap-2 px-6',
-                )}
+                className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-6"
                 nativeButton={false}
               >
                 Iniciar jornada

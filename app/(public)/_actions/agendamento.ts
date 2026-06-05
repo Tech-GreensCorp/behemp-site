@@ -349,6 +349,7 @@ export async function listarMedicosPublico(): Promise<ActionResult<Array<{
   especialidade: string;
   bio: string | null;
   avatarUrl: string | null;
+  crm: string | null;
 }>>> {
   try {
     const resultado = await db
@@ -358,6 +359,7 @@ export async function listarMedicosPublico(): Promise<ActionResult<Array<{
         especialidade: medicos.especialidade,
         bio: medicos.bio,
         avatarUrl: users.avatarUrl,
+        crm: medicos.crm,
       })
       .from(medicos)
       .innerJoin(users, eq(medicos.userId, users.id))

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/accordion';
 import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
+import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
   ChevronRight,
@@ -89,26 +90,6 @@ const TESTEMUNHOS = [
   },
 ];
 
-const MEDICOS = [
-  {
-    inicial: 'Dr',
-    nome: 'Dr. [Nome]',
-    especialidade: 'Neurologia',
-    registro: 'CRM/SP 000000',
-  },
-  {
-    inicial: 'Dr',
-    nome: 'Dra. [Nome]',
-    especialidade: 'Psiquiatria',
-    registro: 'CRM/SP 000000',
-  },
-  {
-    inicial: 'Ph',
-    nome: '[Nome]',
-    especialidade: 'Farmacêutico responsável',
-    registro: 'CRF 00000',
-  },
-];
 
 const FAQ = [
   {
@@ -155,7 +136,10 @@ const FAQ = [
 
 /* ── Componente ─────────────────────────────────────── */
 
-export default function HomePage() {
+export default async function HomePage() {
+  const medicosResult = await listarMedicosPublico();
+  const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
+
   return (
     <>
       {/* ── Hero — Editorial Caloroso ────────────────────── */}
@@ -185,7 +169,7 @@ export default function HomePage() {
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
                     nativeButton={false}
                   >
                     Iniciar triagem
@@ -196,7 +180,7 @@ export default function HomePage() {
                   <Button
                     variant="outline"
                     size="lg"
-                    className="btn-pill border-foreground/20 gap-2 px-8"
+                    className="btn-pill border-primary text-secondary hover:bg-secondary/10 gap-2 px-8"
                     nativeButton={false}
                   >
                     Conhecer a Be4Hope
@@ -300,7 +284,7 @@ export default function HomePage() {
                 <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
                   <Button
                     size="lg"
-                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
                     nativeButton={false}
                   >
                     <MessageCircle size={16} />
@@ -383,8 +367,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {[
+          {(() => {
+            const CARDS = [
               {
                 icon: Users,
                 titulo: 'Centenas de vidas',
@@ -415,7 +399,8 @@ export default function HomePage() {
                 descricao:
                   'Começar não tem custo: a triagem é gratuita e sem compromisso. Como associação sem fins lucrativos, você sabe cada valor antes de decidir — e há apoio para casos de maior vulnerabilidade.',
               },
-            ].map((item) => (
+            ];
+            const renderCard = (item: (typeof CARDS)[number]) => (
               <Card
                 key={item.titulo}
                 className="group bg-background border-0 shadow-sm transition-all hover:shadow-md"
@@ -433,8 +418,20 @@ export default function HomePage() {
                   </p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            );
+            return (
+              <>
+                {/* Linha superior — 3 cards */}
+                <div className="mt-16 grid gap-8 sm:grid-cols-3">
+                  {CARDS.slice(0, 3).map(renderCard)}
+                </div>
+                {/* Linha inferior — 2 cards centrados (pirâmide invertida) */}
+                <div className="mt-8 mx-auto grid w-full max-w-2xl gap-8 sm:grid-cols-2">
+                  {CARDS.slice(3).map(renderCard)}
+                </div>
+              </>
+            );
+          })()}
 
           <p className="text-foreground mt-12 text-center text-base font-medium">
             Somos a Be4Hope: <span className="text-primary">cuidado, acesso, transformação.</span>
@@ -477,7 +474,7 @@ export default function HomePage() {
               <Link href="/mundo-endocanabinoide" className="mt-8 inline-flex">
                 <Button
                   size="lg"
-                  className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                  className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
                   nativeButton={false}
                 >
                   Quero saber mais
@@ -563,22 +560,44 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-3 lg:mx-auto lg:max-w-4xl">
-            {MEDICOS.map((m) => (
-              <Card key={m.especialidade} className="bg-card border-0 shadow-sm">
-                <CardContent className="flex flex-col items-center p-8 text-center">
-                  <div className="gradient-moss flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold text-white">
-                    {m.inicial}
-                  </div>
-                  <h3 className="mt-5 text-base font-semibold">{m.nome}</h3>
-                  <p className="text-muted-foreground mt-1 text-sm">{m.especialidade}</p>
-                  <p className="text-primary mt-3 text-sm font-semibold tracking-wide">
-                    {m.registro}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {medicosData.length > 0 && (
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:mx-auto lg:max-w-4xl">
+              {medicosData.map((m) => {
+                const iniciais = m.nome
+                  .split(' ')
+                  .filter(Boolean)
+                  .map((w) => w[0].toUpperCase())
+                  .slice(0, 2)
+                  .join('');
+                return (
+                  <Card key={m.id} className="bg-card border-0 shadow-sm">
+                    <CardContent className="flex flex-col items-center p-8 text-center">
+                      {m.avatarUrl ? (
+                        <Image
+                          src={m.avatarUrl}
+                          alt={m.nome}
+                          width={80}
+                          height={80}
+                          className="h-20 w-20 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="gradient-moss flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold text-white">
+                          {iniciais}
+                        </div>
+                      )}
+                      <h3 className="mt-5 text-base font-semibold">{m.nome}</h3>
+                      <p className="text-muted-foreground mt-1 text-sm">{m.especialidade}</p>
+                      {m.crm && (
+                        <p className="text-primary mt-3 text-sm font-semibold tracking-wide">
+                          CRM {m.crm}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -679,7 +698,7 @@ export default function HomePage() {
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
                     nativeButton={false}
                   >
                     Quero ser acolhido
@@ -726,7 +745,7 @@ export default function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="gradient-moss relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:px-12">
+          <div className="bg-primary relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:px-12">
             <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               No seu tempo, sem compromisso
             </span>
@@ -741,7 +760,7 @@ export default function HomePage() {
               <Link href="/triagem">
                 <Button
                   size="lg"
-                  className="btn-pill gap-2 bg-amber-400 px-8 text-amber-950 hover:bg-amber-300"
+                  className="btn-pill bg-secondary text-white border border-white hover:bg-secondary/90 gap-2 px-8"
                   nativeButton={false}
                 >
                   Iniciar minha triagem gratuita
