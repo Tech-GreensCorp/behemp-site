@@ -4,20 +4,23 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  Award,
-  BadgeCheck,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { PatologiasPicker } from '@/components/shared/patologias-picker';
+import { SeuCaminho } from '@/components/shared/seu-caminho';
+import {
   Brain,
-  Calendar,
-  CalendarDays,
-  CheckCircle2,
   ChevronRight,
-  FileCheck,
+  Heart,
   HeartHandshake,
   HeartPulse,
-  Leaf,
-  Network,
-  Package,
+  MessageCircle,
+  Scale,
   Shield,
+  Star,
   Stethoscope,
   Users,
 } from 'lucide-react';
@@ -59,49 +62,94 @@ const ESPECIALIDADES = [
   },
 ];
 
-const COMO_FUNCIONA = [
+const TESTEMUNHOS = [
   {
-    icon: FileCheck,
-    passo: '1',
-    titulo: 'Você preenche o formulário',
-    descricao: 'Leva cerca de 5 minutos. Pode pausar e retomar quando quiser.',
+    inicial: 'M',
+    nome: 'Maria S., 47',
+    local: 'Campinas',
+    sobre: 'sobre o acolhimento',
+    texto:
+      'Eu tinha medo de que fosse complicado ou ilegal. O que mais me marcou foi não ter ninguém me empurrando nada — só me explicando, no meu tempo. Me senti acolhida.',
   },
   {
-    icon: Users,
-    passo: '2',
-    titulo: 'Equipe analisa em até 48h',
-    descricao: 'Profissionais multidisciplinares avaliam o melhor caminho.',
+    inicial: 'R',
+    nome: 'Rita L., 39',
+    local: 'Curitiba',
+    sobre: 'sobre o atendimento',
+    texto:
+      'A equipe me explicou cada passo com paciência, sem pressa e sem pressão de venda. Pela primeira vez me senti cuidada, não vendida.',
   },
   {
-    icon: CalendarDays,
-    passo: '3',
-    titulo: 'Plano personalizado por WhatsApp',
-    descricao: 'Você recebe orientação clara dos próximos passos.',
+    inicial: 'J',
+    nome: 'João P., 52',
+    local: 'São Paulo',
+    sobre: 'sobre a jornada',
+    texto:
+      'Achei que ia ser burocrático e frio. Foi o contrário: humano do começo ao fim, com gente de verdade me acompanhando.',
   },
 ];
 
-const HISTORIAS = [
+const MEDICOS = [
   {
-    titulo: 'Medicina Endocanabinóide e qualidade de vida: o que a evidência mostra',
-    subtitulo:
-      'Como o uso terapêutico responsável tem transformado o dia a dia de quem convive com condições crônicas.',
-    categoria: 'Bem-estar',
-    imagem: '/images/home/historia-familia-sofa.jpg',
-    alt: 'Família reunida em momento de leveza e bem-estar',
+    inicial: 'Dr',
+    nome: 'Dr. [Nome]',
+    especialidade: 'Neurologia',
+    registro: 'CRM/SP 000000',
   },
   {
-    titulo: 'O que a ciência diz sobre cuidado integrativo em 2026',
-    subtitulo: 'Novos estudos apresentam tratamentos inovadores.',
-    categoria: 'Ciência',
-    imagem: '/images/home/historia-familia-sofa2.jpg',
-    alt: 'Família feliz reunida em casa — acolhimento e bem-estar',
+    inicial: 'Dr',
+    nome: 'Dra. [Nome]',
+    especialidade: 'Psiquiatria',
+    registro: 'CRM/SP 000000',
   },
   {
-    titulo: 'Be4Hope completa 24 anos e os próximos ciclos',
-    subtitulo: 'Duas décadas de acolhimento, resiliência e cuidado.',
-    categoria: 'Institucional',
-    imagem: '/images/home/historia-familia-ar-livre.jpg',
-    alt: 'Família celebrando ao ar livre — esperança e alegria',
+    inicial: 'Ph',
+    nome: '[Nome]',
+    especialidade: 'Farmacêutico responsável',
+    registro: 'CRF 00000',
+  },
+];
+
+const FAQ = [
+  {
+    pergunta: 'É legal usar cannabis medicinal no Brasil?',
+    resposta:
+      'Sim. O acesso é regulamentado pela ANVISA (RDC 1015 e RDC 660), com receita médica e autorização oficial de importação.',
+  },
+  {
+    pergunta: 'Preciso de laudo ou diagnóstico pronto antes?',
+    resposta:
+      'Não necessariamente. A triagem é o primeiro passo: você conta o que sente e o médico avalia, na consulta, o que faz sentido para você.',
+  },
+  {
+    pergunta: 'Quanto custa o processo?',
+    resposta:
+      'Começar é gratuito — a triagem não tem custo nem compromisso. Como associação sem fins lucrativos, os valores de consulta e autorização são apresentados com transparência antes de qualquer decisão.',
+  },
+  {
+    pergunta: 'E se o médico não indicar?',
+    resposta:
+      'Então o processo para por aí — você não paga por produto que não foi prescrito. Quem decide é sempre o médico.',
+  },
+  {
+    pergunta: 'Nunca usei antes. É seguro?',
+    resposta:
+      'A avaliação é individual e feita por médico habilitado. A indicação e a posologia são definidas exclusivamente por ele, com acompanhamento em cada etapa.',
+  },
+  {
+    pergunta: 'Minha família ou empresa fica sabendo?',
+    resposta:
+      'Não. Seus dados são tratados com sigilo e conforme a LGPD. O cuidado é seu, no seu tempo.',
+  },
+  {
+    pergunta: 'Quanto tempo até chegar em casa?',
+    resposta:
+      'Após a consulta e a autorização da ANVISA, o produto é entregue na sua casa, com acompanhamento da nossa equipe.',
+  },
+  {
+    pergunta: 'Vocês me acompanham depois?',
+    resposta:
+      'Sim. O acolhimento continua depois do início — você não fica sozinho.',
   },
 ];
 
@@ -196,6 +244,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Seletor de patologias ─────────────────────────── */}
+      <PatologiasPicker />
+
       {/* ══════════════════════════════════════════════════════════
           QUEM SOMOS — Seção institucional completa
       ══════════════════════════════════════════════════════════ */}
@@ -242,6 +293,20 @@ export default function HomePage() {
                 <p className="text-foreground text-base font-medium">
                   Somos uma rede de cuidado, esperança e transformação. Somos a Be4Hope.
                 </p>
+              </div>
+
+              {/* CTA — Falar com especialista */}
+              <div className="mt-8">
+                <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
+                  <Button
+                    size="lg"
+                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                    nativeButton={false}
+                  >
+                    <MessageCircle size={16} />
+                    Falar com um especialista
+                  </Button>
+                </Link>
               </div>
 
               {/* Flores decorativas — mix-blend-mode dissolve o fundo branco do PNG */}
@@ -318,7 +383,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 icon: Users,
@@ -339,10 +404,16 @@ export default function HomePage() {
                   'Oferecemos suporte contínuo aos pacientes, com acompanhamento médico regular, orientações personalizadas e monitoramento da evolução do tratamento.',
               },
               {
-                icon: Award,
-                titulo: 'Educação e conscientização',
+                icon: Scale,
+                titulo: 'É legal?',
                 descricao:
-                  'Investimos em educação sobre o uso adequado dos medicamentos, promovendo a saúde preventiva e a importância do acompanhamento médico regular.',
+                  'Sim. O acesso é regulamentado pela ANVISA (RDC 660 e RDC 1015), com receita médica e autorização oficial. Tudo dentro da lei, do começo ao fim.',
+              },
+              {
+                icon: Heart,
+                titulo: 'Quanto custa?',
+                descricao:
+                  'Começar não tem custo: a triagem é gratuita e sem compromisso. Como associação sem fins lucrativos, você sabe cada valor antes de decidir — e há apoio para casos de maior vulnerabilidade.',
               },
             ].map((item) => (
               <Card
@@ -371,102 +442,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 3. Collab Be4Hope ─────────────────────────────── */}
-      <section className="py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-              Ecossistema
-            </p>
-            <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
-              Rede de Apoio Be4Hope:{' '}
-              <span className="text-accent-italic">conectando pessoas e soluções</span>
-            </h2>
-            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
-              A Be4Hope é uma <strong className="text-foreground">rede de apoio</strong> formada por
-              empresas e instituições que promovem um modelo inovador de saúde — mais humano,
-              acessível e centrado no paciente, utilizando a Medicina Endocanabinóide como terapia,
-              sempre com base científica e responsabilidade.
-            </p>
-          </div>
+      {/* ── Seu caminho, em 4 passos simples ──────────────── */}
+      <SeuCaminho />
 
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:mx-auto lg:max-w-4xl">
-            {/* Be 4Hope */}
-            <Card className="group bg-card relative overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
-              <div className="from-primary to-primary/70 absolute inset-x-0 top-0 h-1 bg-gradient-to-r" />
-              <CardContent className="p-8">
-                <div className="bg-primary/10 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl">
-                  <HeartPulse size={22} className="text-primary" />
-                </div>
-                <h3 className="font-display text-lg font-bold">Be 4Hope</h3>
-                <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-                  Atua como{' '}
-                  <strong className="text-foreground">
-                    ponte entre pacientes, familiares e o ecossistema
-                  </strong>{' '}
-                  da Medicina Endocanabinóide. Trabalha em rede com parceiros para criar soluções
-                  personalizadas.
-                </p>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
-                    Ponte entre pacientes e tratamentos
-                  </li>
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
-                    Soluções personalizadas em rede
-                  </li>
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="text-primary mt-0.5 shrink-0" />
-                    Missão: colaboração salva vidas
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Nossos Parceiros */}
-            <Card className="group bg-card relative overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
-              <CardContent className="p-8">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
-                  <Network size={22} className="text-amber-600" />
-                </div>
-                <h3 className="font-display text-lg font-bold">Parceiros Estratégicos</h3>
-                <p className="mt-1 text-xs font-medium text-amber-600 italic">
-                  Juntos por uma saúde mais acessível.
-                </p>
-                <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-                  Trabalhamos com parceiros de excelência comprometidos com inovação, regulação e
-                  acesso à Medicina Endocanabinóide.
-                </p>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
-                    Greens Pharmaceutical — Swiss GMP
-                  </li>
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
-                    Cannect — Ecossistema digital de saúde
-                  </li>
-                  <li className="text-muted-foreground flex items-start gap-2 text-sm">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-amber-500" />
-                    Rede multidisciplinar de especialistas
-                  </li>
-                </ul>
-                <Link
-                  href="/parceiros"
-                  className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-600 transition-colors hover:text-amber-700"
-                >
-                  Conhecer parceiros
-                  <ChevronRight size={14} />
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 4. Medicina Endocanabinóide — CTA educativo ───── */}
+      {/* ── Medicina Endocanabinóide — CTA educativo ───── */}
       <section className="section-dark py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
@@ -523,85 +502,82 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── 5. Do Zero Até Sua Casa — Jornada do paciente ─── */}
+      {/* ── Testemunhos — Pessoas reais ───────────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-              Jornada do paciente
-            </p>
-            <h2 className="font-display text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
-              Do zero até <span className="text-accent-italic">a sua casa</span>
+            <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
+              Histórias reais
+            </span>
+            <h2 className="font-display mt-4 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Pessoas reais, <span className="text-accent-italic">acompanhadas de verdade</span>
             </h2>
-            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
-              Entenda o passo a passo para acessar seu tratamento com Medicina Endocanabinóide de
-              forma segura e legalizada.
-            </p>
           </div>
 
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Stethoscope,
-                passo: '1',
-                titulo: 'Consulta Médica',
-                descricao:
-                  'O primeiro passo é ter um diagnóstico médico. Se ainda não tem, te ajudamos a encontrar um profissional. Se já possui, é só nos enviar para continuar o processo.',
-              },
-              {
-                icon: BadgeCheck,
-                passo: '2',
-                titulo: 'Autorização',
-                descricao:
-                  'Para importar a medicação, será necessário solicitar uma autorização da Anvisa. A Be4Hope te ajuda nesse processo.',
-              },
-              {
-                icon: FileCheck,
-                passo: '3',
-                titulo: 'Receita',
-                descricao:
-                  'Feito diagnóstico e com a prescrição em mãos você pode efetuar o pedido do seu produto.',
-              },
-              {
-                icon: Package,
-                passo: '4',
-                titulo: 'Pedido Aprovado',
-                descricao:
-                  'O paciente pode importar e receber seu medicamento diretamente em sua residência.',
-              },
-            ].map((item) => (
-              <div key={item.passo} className="group relative text-center">
-                {/* Número do passo */}
-                <div className="relative mx-auto mb-6">
-                  <div className="bg-primary/10 group-hover:bg-primary/20 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl transition-all group-hover:shadow-md">
-                    {(() => {
-                      const DynIcon = item.icon;
-                      return <DynIcon size={28} />;
-                    })()}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {TESTEMUNHOS.map((t) => (
+              <Card key={t.nome} className="bg-card border-0 shadow-sm">
+                <CardContent className="flex h-full flex-col p-6">
+                  <div className="flex gap-0.5 text-amber-400">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} size={16} className="fill-amber-400" />
+                    ))}
                   </div>
-                  <span className="bg-primary absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white">
-                    {item.passo}
-                  </span>
-                </div>
-                <h3 className="text-base font-semibold">{item.titulo}</h3>
-                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                  {item.descricao}
-                </p>
-              </div>
+                  <p className="text-muted-foreground mt-4 flex-1 text-sm leading-relaxed italic">
+                    “{t.texto}”
+                  </p>
+                  <div className="mt-6 flex items-center gap-3">
+                    <div className="gradient-moss flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">
+                      {t.inicial}
+                    </div>
+                    <div>
+                      <p className="text-foreground text-sm font-semibold">{t.nome}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {t.local} · {t.sobre}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-12 text-center">
-            <Link href="/triagem">
-              <Button
-                size="lg"
-                className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
-                nativeButton={false}
-              >
-                Iniciar minha jornada
-                <ChevronRight size={16} />
-              </Button>
-            </Link>
+      {/* ── Médicos — Quem vai te acompanhar ──────────────── */}
+      <section className="border-border bg-muted/30 border-y py-20 lg:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
+              Confiança com rosto
+            </span>
+            <h2 className="font-display mt-4 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Quem vai te <span className="text-accent-italic">acompanhar</span>
+            </h2>
+            <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
+              Triagem e prescrição feitas por{' '}
+              <strong className="text-foreground">
+                médicos parceiros habilitados — independentes, sem remuneração por venda de produto
+              </strong>
+              . Aqui o médico não ganha pra te empurrar nada.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-6 sm:grid-cols-3 lg:mx-auto lg:max-w-4xl">
+            {MEDICOS.map((m) => (
+              <Card key={m.especialidade} className="bg-card border-0 shadow-sm">
+                <CardContent className="flex flex-col items-center p-8 text-center">
+                  <div className="gradient-moss flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold text-white">
+                    {m.inicial}
+                  </div>
+                  <h3 className="mt-5 text-base font-semibold">{m.nome}</h3>
+                  <p className="text-muted-foreground mt-1 text-sm">{m.especialidade}</p>
+                  <p className="text-primary mt-3 text-sm font-semibold tracking-wide">
+                    {m.registro}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
@@ -716,160 +692,67 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CTA — Seção Escura ────────────────────────────── */}
-      <section className="section-dark py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
-                Estamos prontos <span className="text-accent-italic">para te ajudar.</span>
-              </h2>
-              <p className="mt-6 max-w-lg text-base leading-relaxed text-white/70">
-                Esse formulário é o primeiro passo para entender sua história e te conectar com o
-                cuidado certo. Sem pressa, sem julgamento, sem custo.
-              </p>
-
-              <ul className="mt-8 space-y-4">
-                {COMO_FUNCIONA.map((item) => (
-                  <li key={item.passo} className="flex items-start gap-4">
-                    <span className="bg-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white">
-                      {item.passo}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{item.titulo}</p>
-                      <p className="mt-0.5 text-sm text-white/60">{item.descricao}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Card de triagem simplificado */}
-            <Card className="bg-card border-0 shadow-xl">
-              <CardContent className="p-8">
-                <h3 className="font-display text-lg font-semibold">Iniciar triagem</h3>
-                <p className="text-muted-foreground mt-2 text-sm">
-                  Preencha algumas informações básicas para que nossa equipe possa avaliar o seu
-                  caso.
-                </p>
-
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium tracking-wider uppercase">
-                      Nome completo
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Seu nome"
-                      className="border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium tracking-wider uppercase">
-                      WhatsApp
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="(11) 98123-4567"
-                      className="border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-primary w-full rounded-lg border px-4 py-2.5 text-sm focus:ring-1"
-                    />
-                  </div>
-                </div>
-
-                <Link href="/triagem" className="mt-6 block">
-                  <Button
-                    className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 w-full gap-2"
-                    nativeButton={false}
-                  >
-                    Preencher formulário
-                    <ChevronRight size={16} />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+      {/* ── FAQ — Antes de começar ────────────────────────── */}
+      <section className="py-20 lg:py-28">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
+              Dúvidas frequentes
+            </span>
+            <h2 className="font-display mt-4 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+              Antes de <span className="text-accent-italic">começar</span>
+            </h2>
           </div>
+
+          <Accordion type="single" collapsible className="mt-12 space-y-3">
+            {FAQ.map((item, index) => (
+              <AccordionItem
+                key={index}
+                value={`faq-${index}`}
+                className="rounded-xl border-0 bg-card px-6 shadow-sm"
+              >
+                <AccordionTrigger className="text-left text-sm font-medium hover:no-underline">
+                  {item.pergunta}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground text-sm leading-relaxed">
+                  {item.resposta}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </section>
 
-      {/* ── Histórias que importam ────────────────────────── */}
+      {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between">
-            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Histórias que <span className="text-accent-italic">importam.</span>
+          <div className="gradient-moss relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:px-12">
+            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+              No seu tempo, sem compromisso
+            </span>
+            <h2 className="font-display mx-auto mt-5 max-w-2xl text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
+              Dê o primeiro passo do seu cuidado
             </h2>
-            <Link
-              href="/mundo-endocanabinoide"
-              className="text-primary hidden text-sm font-medium hover:underline sm:inline-flex sm:items-center sm:gap-1"
-            >
-              Ver todas as histórias
-              <ChevronRight size={14} />
-            </Link>
-          </div>
-
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {HISTORIAS.map((historia) => (
-              <article key={historia.titulo} className="group">
-                {/* Imagem real */}
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
-                  <Image
-                    src={historia.imagem}
-                    alt={historia.alt}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    quality={80}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent" />
-                </div>
-                <div className="mt-4">
-                  <span className="bg-muted text-muted-foreground inline-block rounded-full px-3 py-0.5 text-xs font-medium">
-                    {historia.categoria}
-                  </span>
-                  <h3 className="font-display mt-2 text-base leading-snug font-semibold">
-                    {historia.titulo}
-                  </h3>
-                  <p className="text-muted-foreground mt-1 text-sm">{historia.subtitulo}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center sm:hidden">
-            <Link
-              href="/mundo-endocanabinoide"
-              className="text-primary text-sm font-medium hover:underline"
-            >
-              Ver todas as histórias →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA Final — Vamos conversar? ─────────────────── */}
-      <section className="border-border border-t py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-8 sm:flex-row">
-            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Vamos <span className="text-accent-italic">conversar?</span>
-            </h2>
-            <div className="flex items-center gap-4">
-              <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/70">
+              A triagem leva poucos minutos e quem te atende é gente de verdade. Sem pressão, sem
+              julgamento.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Link href="/triagem">
                 <Button
                   size="lg"
-                  className="btn-pill bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8"
+                  className="btn-pill gap-2 bg-amber-400 px-8 text-amber-950 hover:bg-amber-300"
                   nativeButton={false}
                 >
-                  WhatsApp
+                  Iniciar minha triagem gratuita
                   <ChevronRight size={16} />
                 </Button>
               </Link>
-              <Link href="/entre-em-contato">
-                <Button variant="outline" size="lg" className="btn-pill px-8" nativeButton={false}>
-                  Outras formas
-                </Button>
-              </Link>
             </div>
+            <p className="mx-auto mt-8 max-w-2xl text-xs leading-relaxed text-white/50">
+              Conteúdo informativo. A indicação de uso e a posologia são definidas exclusivamente
+              pelo médico após avaliação. Não prometemos cura nem resultado.
+            </p>
           </div>
         </div>
       </section>
