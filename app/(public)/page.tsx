@@ -745,14 +745,14 @@ export default async function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#9B1520] to-[#E87070] px-6 py-16 text-center sm:px-12">
-            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#C86070] to-[#F5C5CA] px-6 py-16 text-center sm:px-12">
+            <span className="inline-block rounded-full bg-[#5C1825]/15 px-3 py-1 text-xs font-semibold text-[#5C1825]">
               No seu tempo, sem compromisso
             </span>
-            <h2 className="font-display mx-auto mt-5 max-w-2xl text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
+            <h2 className="font-display mx-auto mt-5 max-w-2xl text-3xl leading-tight font-bold tracking-tight text-[#3D0F17] sm:text-4xl">
               Dê o primeiro passo do seu cuidado
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/70">
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-[#3D0F17]/75">
               A triagem leva poucos minutos e quem te atende é gente de verdade. Sem pressão, sem
               julgamento.
             </p>
@@ -760,7 +760,7 @@ export default async function HomePage() {
               <Link href="/triagem">
                 <Button
                   size="lg"
-                  className="btn-pill bg-secondary text-white border border-white hover:bg-secondary/90 gap-2 px-8"
+                  className="btn-pill bg-secondary text-white border border-secondary/30 hover:bg-secondary/90 gap-2 px-8"
                   nativeButton={false}
                 >
                   Iniciar minha triagem gratuita
@@ -768,7 +768,7 @@ export default async function HomePage() {
                 </Button>
               </Link>
             </div>
-            <p className="mx-auto mt-8 max-w-2xl text-xs leading-relaxed text-white/50">
+            <p className="mx-auto mt-8 max-w-2xl text-xs leading-relaxed text-[#3D0F17]/55">
               Conteúdo informativo. A indicação de uso e a posologia são definidas exclusivamente
               pelo médico após avaliação. Não prometemos cura nem resultado.
             </p>
