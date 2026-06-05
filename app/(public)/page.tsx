@@ -422,11 +422,11 @@ export default async function HomePage() {
             return (
               <>
                 {/* Linha superior — 3 cards */}
-                <div className="mt-16 grid gap-8 sm:grid-cols-3">
+                <div className="mt-16 grid gap-4 sm:gap-8 sm:grid-cols-3">
                   {CARDS.slice(0, 3).map(renderCard)}
                 </div>
                 {/* Linha inferior — 2 cards centrados (pirâmide invertida) */}
-                <div className="mt-8 mx-auto grid w-full max-w-2xl gap-8 sm:grid-cols-2">
+                <div className="mt-4 sm:mt-8 mx-auto grid w-full max-w-2xl gap-4 sm:gap-8 sm:grid-cols-2">
                   {CARDS.slice(3).map(renderCard)}
                 </div>
               </>
@@ -745,7 +745,7 @@ export default async function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="bg-primary relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:px-12">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#9B1520] to-[#E87070] px-6 py-16 text-center sm:px-12">
             <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               No seu tempo, sem compromisso
             </span>

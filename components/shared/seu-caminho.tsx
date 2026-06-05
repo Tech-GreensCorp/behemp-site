@@ -130,7 +130,7 @@ export function SeuCaminho() {
           })}
 
           {/* Card CTA — Iniciar jornada */}
-          <div className="bg-primary text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center">
+          <div className="bg-primary text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center sm:col-span-2 lg:col-span-1">
             <p className="font-display text-lg leading-snug font-bold">
               Uma jornada de sucesso com quem entende!
             </p>
