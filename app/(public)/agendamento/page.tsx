@@ -1,17 +1,16 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   Video,
   Clock,
   CheckCircle2,
-  Stethoscope,
   Gift,
   CalendarCheck,
   ChevronRight,
   UserCheck,
 } from 'lucide-react';
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
+import { MedicoCardHover } from '@/components/shared/medico-card-hover';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 
 export const metadata: Metadata = {
@@ -131,38 +130,14 @@ export default async function AgendamentoPage() {
 
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {medicos.map((medico) => (
-                <div
+                <MedicoCardHover
                   key={medico.id}
-                  className="group rounded-2xl border border-border/40 bg-card p-6 transition-all hover:shadow-md hover:border-primary/20"
-                >
-                  {/* Foto */}
-                  <div className="mx-auto mb-4 h-24 w-24 overflow-hidden rounded-2xl bg-muted flex items-center justify-center">
-                    {medico.avatarUrl ? (
-                      <Image
-                        src={medico.avatarUrl}
-                        alt={`Dr. ${medico.nome}`}
-                        width={96}
-                        height={96}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Stethoscope className="h-10 w-10 text-muted-foreground/50" />
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="text-center">
-                    <h3 className="font-semibold text-foreground">{medico.nome}</h3>
-                    <p className="mt-1 text-xs font-medium text-primary">
-                      {medico.especialidade}
-                    </p>
-                    {medico.bio && (
-                      <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">
-                        {medico.bio}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                  id={medico.id}
+                  nome={medico.nome}
+                  especialidade={medico.especialidade}
+                  bio={medico.bio}
+                  avatarUrl={medico.avatarUrl}
+                />
               ))}
             </div>
           </section>
