@@ -126,7 +126,7 @@ export function PatologiasPicker() {
 
       {/* Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="p-5 sm:max-w-md sm:p-7" showCloseButton={false}>
+        <DialogContent className="p-5 sm:max-w-2xl sm:p-7" showCloseButton={false}>
           <DialogTitle className="sr-only">Iniciar jornada com a Be4Hope</DialogTitle>
 
           {/* Banner topo */}
