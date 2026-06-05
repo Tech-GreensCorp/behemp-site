@@ -745,7 +745,7 @@ export default async function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#C86070] to-[#F5C5CA] px-6 py-16 text-center sm:px-12">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#F5C5CA] to-[#C86070] px-6 py-16 text-center sm:px-12">
             <span className="inline-block rounded-full bg-[#5C1825]/15 px-3 py-1 text-xs font-semibold text-[#5C1825]">
               No seu tempo, sem compromisso
             </span>
