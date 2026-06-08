@@ -326,13 +326,14 @@ export default async function HomePage() {
             <div className="flex flex-col gap-6">
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
                 <video
-                  src="/images/home/shutterstock_1076126774.mov"
                   autoPlay
                   loop
                   muted
                   playsInline
                   className="absolute inset-0 h-full w-full object-cover"
-                />
+                >
+                  <source src="/images/home/shutterstock_1076126774.mp4" type="video/mp4" />
+                </video>
               </div>
 
               {/* Cards de especialidade */}
@@ -499,13 +500,14 @@ export default async function HomePage() {
             {/* Vídeo — Medicina Endocanabinóide */}
             <div className="relative aspect-[4/3] overflow-hidden rounded-2xl shadow-lg">
               <video
-                src="/images/home/shutterstock_1090570595.mov"
                 autoPlay
                 loop
                 muted
                 playsInline
                 className="absolute inset-0 h-full w-full object-cover"
-              />
+              >
+                <source src="/images/home/shutterstock_1090570595.mp4" type="video/mp4" />
+              </video>
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
             </div>
           </div>
