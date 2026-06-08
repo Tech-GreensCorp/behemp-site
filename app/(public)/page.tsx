@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/accordion';
 import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
+import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
@@ -292,17 +293,14 @@ export default async function HomePage() {
 
               {/* CTA — Falar com especialista */}
               <div className="mt-8 flex justify-center">
-                <Link href="/#condicoes">
-                  <Button
-                    size="lg"
-                    className="btn-pill text-white border border-primary gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34' }}
-                    nativeButton={false}
-                  >
-                    Falar com um especialista
-                    <ChevronDown size={16} />
-                  </Button>
-                </Link>
+                <ScrollToSection
+                  targetId="condicoes"
+                  className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
+                  style={{ backgroundColor: '#54ab34' }}
+                >
+                  Falar com um especialista
+                  <ChevronDown size={16} />
+                </ScrollToSection>
               </div>
 
               {/* Flores decorativas — mix-blend-mode dissolve o fundo branco do PNG */}
@@ -710,17 +708,14 @@ export default async function HomePage() {
               </div>
 
               <div className="mt-10">
-                <Link href="/#condicoes">
-                  <Button
-                    size="lg"
-                    className="btn-pill text-white border border-primary gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34' }}
-                    nativeButton={false}
-                  >
-                    Quero ser acolhido
-                    <ChevronRight size={16} />
-                  </Button>
-                </Link>
+                <ScrollToSection
+                  targetId="condicoes"
+                  className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
+                  style={{ backgroundColor: '#54ab34' }}
+                >
+                  Quero ser acolhido
+                  <ChevronRight size={16} />
+                </ScrollToSection>
               </div>
             </div>
           </div>
@@ -773,17 +768,14 @@ export default async function HomePage() {
               julgamento.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link href="/#condicoes">
-                <Button
-                  size="lg"
-                  className="btn-pill text-white border border-primary gap-2 px-8"
-                  style={{ backgroundColor: '#54ab34' }}
-                  nativeButton={false}
-                >
-                  Iniciar minha triagem gratuita
-                  <ChevronRight size={16} />
-                </Button>
-              </Link>
+              <ScrollToSection
+                targetId="condicoes"
+                className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
+                style={{ backgroundColor: '#54ab34' }}
+              >
+                Iniciar minha triagem gratuita
+                <ChevronRight size={16} />
+              </ScrollToSection>
             </div>
             <p className="mx-auto mt-8 max-w-2xl text-xs leading-relaxed text-black/55">
               Conteúdo informativo. A indicação de uso e a posologia são definidas exclusivamente

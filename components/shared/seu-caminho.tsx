@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import {
   BadgeCheck,
   ClipboardList,
@@ -134,18 +135,14 @@ export function SeuCaminho() {
             <p className="font-display text-lg leading-snug font-bold">
               Uma jornada de sucesso com quem entende!
             </p>
-            <Link
-              href="/#condicoes"
+            <ScrollToSection
+              targetId="condicoes"
+              className="btn-pill inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
+              style={{ backgroundColor: '#54ab34' }}
             >
-              <Button
-                className="btn-pill text-white border border-primary gap-2 px-6"
-                style={{ backgroundColor: '#54ab34' }}
-                nativeButton={false}
-              >
-                Iniciar jornada
-                <MessageCircle size={16} />
-              </Button>
-            </Link>
+              Iniciar jornada
+              <MessageCircle size={16} />
+            </ScrollToSection>
           </div>
         </div>
       </div>
