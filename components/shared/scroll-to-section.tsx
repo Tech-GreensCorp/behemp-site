@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface ScrollToSectionProps {
@@ -9,6 +9,7 @@ interface ScrollToSectionProps {
   /** Conteúdo do botão/link */
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }
 
 /**
@@ -21,7 +22,7 @@ interface ScrollToSectionProps {
  * - Se estiver em outra página: navega para / e aguarda o elemento
  *   existir no DOM antes de fazer o scroll.
  */
-export function ScrollToSection({ targetId, children, className }: ScrollToSectionProps) {
+export function ScrollToSection({ targetId, children, className, style }: ScrollToSectionProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -57,7 +58,7 @@ export function ScrollToSection({ targetId, children, className }: ScrollToSecti
   }
 
   return (
-    <button onClick={handleClick} className={className} type="button">
+    <button onClick={handleClick} className={className} style={style} type="button">
       {children}
     </button>
   );
