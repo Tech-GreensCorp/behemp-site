@@ -369,7 +369,7 @@ export function AgendamentoWizard() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Consulta com <strong>{medicoSelecionado.nome}</strong> — {medicoSelecionado.especialidade}
+              Consulta com <strong>{medicoSelecionado.nome}</strong>, {medicoSelecionado.especialidade}
             </p>
           </CardHeader>
           <CardContent>

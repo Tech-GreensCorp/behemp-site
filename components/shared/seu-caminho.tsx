@@ -33,7 +33,7 @@ const ETAPAS: Etapa[] = [
     tituloTopo: 'Consulta',
     tituloBase: 'Médica',
     descricao:
-      'O primeiro passo é a consulta com um médico parceiro habilitado, que avalia seu caso e indica o melhor caminho — sem pressa e sem julgamento.',
+      'O primeiro passo é a consulta com um médico parceiro habilitado, que avalia seu caso e indica o melhor caminho, sem pressa e sem julgamento.',
   },
   {
     passo: '2',

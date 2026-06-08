@@ -559,7 +559,7 @@ export default async function HomePage() {
             <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-base leading-relaxed">
               Triagem e prescrição feitas por{' '}
               <strong className="text-foreground">
-                médicos parceiros habilitados — independentes, sem remuneração por venda de produto
+                médicos parceiros habilitados, independentes, sem remuneração por venda de produto
               </strong>
               . Aqui o médico não ganha pra te empurrar nada.
             </p>
@@ -657,7 +657,7 @@ export default async function HomePage() {
               </h2>
               <p className="text-muted-foreground mt-6 text-base leading-relaxed">
                 Por trás de cada paciente existe uma história de luta, esperança e amor. A Be4Hope
-                nasceu justamente para que ninguém precise enfrentar esse caminho sozinho — com
+                nasceu justamente para que ninguém precise enfrentar esse caminho sozinho, com
                 acolhimento genuíno, orientação especializada e acesso real ao tratamento.
               </p>
 
