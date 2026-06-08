@@ -65,7 +65,7 @@ export function SeuCaminho() {
   const [expanded, setExpanded] = React.useState<number | null>(null);
 
   return (
-    <section className="py-20 lg:py-28">
+    <section className="py-10 lg:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Cabeçalho */}
         <div className="grid items-end gap-6 lg:grid-cols-2 lg:gap-16">
