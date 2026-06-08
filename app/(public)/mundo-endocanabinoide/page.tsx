@@ -114,7 +114,7 @@ export default function MundoEndocanabinoidePage() {
             <span className="text-accent-italic">indicado</span> para o seu caso?
           </h2>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/triagem">
+            <Link href="/#condicoes">
               <Button
                 size="lg"
                 className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"

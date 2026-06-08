@@ -49,7 +49,7 @@ const ETAPAS: Etapa[] = [
     tituloTopo: 'Autorização da',
     tituloBase: 'Anvisa',
     descricao:
-      'Solicitamos a autorização de importação junto à ANVISA (RDC 660 e RDC 1015). A Be4Hope te acompanha em todo o processo.',
+      'Solicitamos a autorização de importação junto à ANVISA (RDC 660). A Be4Hope te acompanha em todo o processo.',
   },
   {
     passo: '4',
@@ -135,9 +135,7 @@ export function SeuCaminho() {
               Uma jornada de sucesso com quem entende!
             </p>
             <Link
-              href={`https://wa.me/${WHATSAPP}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/#condicoes"
             >
               <Button
                 className="btn-pill text-white border border-primary gap-2 px-6"

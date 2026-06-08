@@ -15,11 +15,11 @@ import { SeuCaminho } from '@/components/shared/seu-caminho';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
+  ChevronDown,
   ChevronRight,
   Heart,
   HeartHandshake,
   HeartPulse,
-  MessageCircle,
   Scale,
   Shield,
   Star,
@@ -96,7 +96,7 @@ const FAQ = [
   {
     pergunta: 'É legal usar cannabis medicinal no Brasil?',
     resposta:
-      'Sim. O acesso é regulamentado pela ANVISA (RDC 1015 e RDC 660), com receita médica e autorização oficial de importação.',
+      'Sim. O acesso é regulamentado pela ANVISA (RDC 660), com receita médica e autorização oficial de importação.',
   },
   {
     pergunta: 'Preciso de laudo ou diagnóstico pronto antes?',
@@ -284,15 +284,15 @@ export default async function HomePage() {
 
               {/* CTA — Falar com especialista */}
               <div className="mt-8 flex justify-center">
-                <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
+                <Link href="/#condicoes">
                   <Button
                     size="lg"
                     className="btn-pill text-white border border-primary gap-2 px-8"
                     style={{ backgroundColor: '#54ab34' }}
                     nativeButton={false}
                   >
-                    <MessageCircle size={16} />
                     Falar com um especialista
+                    <ChevronDown size={16} />
                   </Button>
                 </Link>
               </div>
@@ -395,7 +395,7 @@ export default async function HomePage() {
                 icon: Scale,
                 titulo: 'É legal?',
                 descricao:
-                  'Sim. O acesso é regulamentado pela ANVISA (RDC 660 e RDC 1015), com receita médica e autorização oficial. Tudo dentro da lei, do começo ao fim.',
+                  'Sim. O acesso é regulamentado pela ANVISA (RDC 660), com receita médica e autorização oficial. Tudo dentro da lei, do começo ao fim.',
               },
               {
                 icon: Heart,
@@ -700,7 +700,7 @@ export default async function HomePage() {
               </div>
 
               <div className="mt-10">
-                <Link href="/triagem">
+                <Link href="/#condicoes">
                   <Button
                     size="lg"
                     className="btn-pill text-white border border-primary gap-2 px-8"
@@ -763,7 +763,7 @@ export default async function HomePage() {
               julgamento.
             </p>
             <div className="mt-8 flex justify-center">
-              <Link href="/triagem">
+              <Link href="/#condicoes">
                 <Button
                   size="lg"
                   className="btn-pill text-white border border-primary gap-2 px-8"
