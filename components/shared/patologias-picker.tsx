@@ -34,6 +34,7 @@ const PATOLOGIAS = [
   'Tabagismo',
   'TDAH',
   'Parkinson',
+  'Outro(a)',
 ] as const;
 
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
@@ -76,7 +77,7 @@ export function PatologiasPicker() {
   const selecionadas = PATOLOGIAS.filter((p) => selected.has(p));
 
   return (
-    <section className="py-20 lg:py-28">
+    <section id="condicoes" className="py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Cabeçalho — pergunta à esquerda, badge + subtítulo à direita */}
         <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
@@ -198,7 +199,8 @@ export function PatologiasPicker() {
               size="lg"
               disabled={!podeEnviar}
               onClick={falarComMedico}
-              className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
+              className="btn-pill text-white gap-2 px-8"
+              style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
             >
               <MessageCircle size={16} />
               Falar com médico
