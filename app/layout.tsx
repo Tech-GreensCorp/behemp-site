@@ -38,7 +38,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
+    // Homepage define seu próprio título. Outras páginas usam: "Título da Página | Be4Hope"
+    default: 'Be4Hope — Medicina Endocanabinóide com acolhimento',
     template: '%s | Be4Hope',
   },
   description:
@@ -58,7 +59,8 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
     url: 'https://be4hope.org',
     siteName: 'Be4Hope',
-    title: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
+    // og:title alinhado com o título padrão — será sobrescrito por cada página
+    title: 'Be4Hope — Medicina Endocanabinóide com acolhimento',
     description:
       'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide.',
   },

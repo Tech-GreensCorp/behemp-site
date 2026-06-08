@@ -25,6 +25,11 @@ const isPublicRoute = createRouteMatcher([
   '/privacidade',
   '/termos',
   '/redirect',
+  // Arquivos de SEO — NUNCA devem ser interceptados pelo auth
+  '/robots.txt',
+  '/sitemap.xml',
+  '/sitemap(.*).xml',
+  '/favicon.ico',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',

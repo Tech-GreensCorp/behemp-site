@@ -27,9 +27,17 @@ import {
   Users,
 } from 'lucide-react';
 export const metadata: Metadata = {
-  title: 'Be4Hope — Você não precisa enfrentar isso sozinho',
+  // O template do layout adiciona "| Be4Hope" automaticamente.
+  // title resultante: "Você não precisa enfrentar isso sozinho | Be4Hope"
+  title: 'Você não precisa enfrentar isso sozinho',
   description:
     'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, com responsabilidade, acolhimento e do seu lado em cada etapa.',
+  openGraph: {
+    title: 'Você não precisa enfrentar isso sozinho | Be4Hope',
+    description:
+      'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, com responsabilidade, acolhimento e do seu lado em cada etapa.',
+    url: 'https://be4hope.org',
+  },
 };
 
 /* ── Dados ──────────────────────────────────────────── */
