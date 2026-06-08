@@ -166,16 +166,17 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Link href="/triagem">
+                <a href="#condicoes">
                   <Button
                     size="lg"
-                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
+                    className="btn-pill text-white gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     Iniciar triagem
                     <ChevronRight size={16} />
                   </Button>
-                </Link>
+                </a>
                 <Link href="/#quem-somos">
                   <Button
                     variant="outline"
@@ -280,11 +281,12 @@ export default async function HomePage() {
               </div>
 
               {/* CTA — Falar com especialista */}
-              <div className="mt-8">
+              <div className="mt-8 flex justify-center">
                 <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
                   <Button
                     size="lg"
-                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
+                    className="btn-pill text-white gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     <MessageCircle size={16} />
@@ -474,7 +476,8 @@ export default async function HomePage() {
               <Link href="/mundo-endocanabinoide" className="mt-8 inline-flex">
                 <Button
                   size="lg"
-                  className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
+                  className="btn-pill text-white gap-2 px-8"
+                  style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
                   nativeButton={false}
                 >
                   Quero saber mais
@@ -698,7 +701,8 @@ export default async function HomePage() {
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-8"
+                    className="btn-pill text-white gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     Quero ser acolhido
@@ -760,7 +764,8 @@ export default async function HomePage() {
               <Link href="/triagem">
                 <Button
                   size="lg"
-                  className="btn-pill bg-secondary text-white border border-secondary/30 hover:bg-secondary/90 gap-2 px-8"
+                  className="btn-pill text-white gap-2 px-8"
+                  style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
                   nativeButton={false}
                 >
                   Iniciar minha triagem gratuita
