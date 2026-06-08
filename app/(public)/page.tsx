@@ -564,7 +564,7 @@ export default async function HomePage() {
           </div>
 
           {medicosData.length > 0 && (
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:mx-auto lg:max-w-4xl">
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {medicosData.map((m) => {
                 const iniciais = m.nome
                   .split(' ')
