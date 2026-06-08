@@ -4,7 +4,9 @@ import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 import { verificarAdmin, verificarMedicoOuAdmin } from '@/lib/auth/permissions';
 import { eq } from 'drizzle-orm';
-import { medicos } from '@/db/schema';
+import { medicos, users } from '@/db/schema';
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Server Actions para visualização de médicos pelo admin.
@@ -300,5 +302,131 @@ export async function atualizarConfigAgenda(medicoId: string, configAgenda: any)
   } catch (error) {
     console.error('[Action] Erro ao atualizar configuração de agenda:', error);
     return { sucesso: false, erro: 'Erro interno ao salvar configurações' };
+  }
+}
+
+// ── Schema de validação ────────────────────────────────────────
+
+const criarMedicoSchema = z.object({
+  email: z.string().email('E-mail inválido'),
+  especialidade: z.string().min(2, 'Especialidade obrigatória'),
+  crm: z.string().optional(),
+  bio: z.string().optional(),
+  ordem: z.number().int().optional(),
+});
+
+const atualizarMedicoSchema = z.object({
+  medicoId: z.string().min(1),
+  especialidade: z.string().min(2, 'Especialidade obrigatória'),
+  crm: z.string().optional(),
+  bio: z.string().optional(),
+  ordem: z.number().int().optional(),
+});
+
+/**
+ * Cria perfil médico para um usuário já existente no sistema.
+ * Busca pelo e-mail, valida que não há duplicata e insere na tabela medicos.
+ */
+export async function criarMedico(
+  dados: z.infer<typeof criarMedicoSchema>,
+): Promise<ActionResult<{ medicoId: string }>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const parsed = criarMedicoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const { email, especialidade, crm, bio, ordem } = parsed.data;
+
+    // Buscar usuário pelo e-mail
+    const [user] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (!user) {
+      return {
+        sucesso: false,
+        erro: 'Usuário não encontrado. O médico precisa ter uma conta criada no sistema antes.',
+      };
+    }
+
+    // Verificar se já tem perfil médico
+    const [perfilExistente] = await db
+      .select({ id: medicos.id })
+      .from(medicos)
+      .where(eq(medicos.userId, user.id))
+      .limit(1);
+
+    if (perfilExistente) {
+      return { sucesso: false, erro: 'Este usuário já possui um perfil de médico cadastrado.' };
+    }
+
+    // Atualizar role para medico (caso ainda seja paciente)
+    if (user.role !== 'medico') {
+      await db.update(users).set({ role: 'medico' }).where(eq(users.id, user.id));
+    }
+
+    // Inserir na tabela medicos
+    const [novoMedico] = await db
+      .insert(medicos)
+      .values({
+        userId: user.id,
+        especialidade,
+        crm: crm || null,
+        bio: bio || null,
+        ordem: ordem ?? null,
+      })
+      .returning({ id: medicos.id });
+
+    revalidatePath('/admin');
+    revalidatePath('/');
+
+    return { sucesso: true, dados: { medicoId: novoMedico.id } };
+  } catch (error) {
+    console.error('[Admin] Erro ao criar médico:', error);
+    return { sucesso: false, erro: 'Erro interno ao criar médico' };
+  }
+}
+
+/**
+ * Atualiza dados do perfil profissional de um médico.
+ */
+export async function atualizarDadosMedico(
+  dados: z.infer<typeof atualizarMedicoSchema>,
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const parsed = atualizarMedicoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const { medicoId, especialidade, crm, bio, ordem } = parsed.data;
+
+    await db
+      .update(medicos)
+      .set({
+        especialidade,
+        crm: crm || null,
+        bio: bio || null,
+        ordem: ordem ?? null,
+      })
+      .where(eq(medicos.id, medicoId));
+
+    revalidatePath('/admin');
+    revalidatePath(`/admin/medicos/${medicoId}`);
+    revalidatePath('/');
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Admin] Erro ao atualizar médico:', error);
+    return { sucesso: false, erro: 'Erro interno ao atualizar médico' };
   }
 }
