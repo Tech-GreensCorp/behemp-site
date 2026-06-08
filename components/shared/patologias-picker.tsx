@@ -16,9 +16,8 @@ import {
 } from '@/components/ui/dialog';
 
 const PATOLOGIAS = [
-  'Alcoolismo',
   'Alzheimer',
-  'Perda de peso',
+  'Diabetes',
   'Obesidade',
   'Anorexia',
   'Ansiedade',
