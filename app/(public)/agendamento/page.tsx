@@ -1,14 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  Video,
-  Clock,
-  ChevronRight,
-  UserCheck,
-} from 'lucide-react';
+import { Video, Clock, UserCheck } from 'lucide-react';
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
-import { MedicoCardHover } from '@/components/shared/medico-card-hover';
-import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 
 export const metadata: Metadata = {
   title: 'Agendar Consulta | Be4Hope',
@@ -40,8 +33,6 @@ const beneficios = [
  * e delega o agendamento ao wizard (que exige login).
  */
 export default async function AgendamentoPage() {
-  /* Busca médicos para exibição pública — sem valor da consulta */
-  const { dados: medicos = [] } = await listarMedicosPublico();
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -78,37 +69,6 @@ export default async function AgendamentoPage() {
           ))}
         </div>
 
-        {/* ── Nossos especialistas (exibição pública) ───────── */}
-        {medicos.length > 0 && (
-          <section className="mt-16">
-            <div className="mb-8 text-center">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
-                Nosso time
-              </p>
-              <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
-                Conheça nossos{' '}
-                <span className="text-accent-italic">especialistas</span>
-              </h2>
-              <p className="mt-3 text-base text-muted-foreground">
-                Médicos especializados em Medicina Endocanabinóide, prontos para
-                cuidar de você.
-              </p>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {medicos.map((medico) => (
-                <MedicoCardHover
-                  key={medico.id}
-                  id={medico.id}
-                  nome={medico.nome}
-                  especialidade={medico.especialidade}
-                  bio={medico.bio}
-                  avatarUrl={medico.avatarUrl}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* ── CTA — Agendar (wizard com login) ─────────────── */}
         <div className="mt-16">
