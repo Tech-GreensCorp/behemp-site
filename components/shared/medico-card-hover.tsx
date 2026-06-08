@@ -56,11 +56,6 @@ export function MedicoCardHover({
       <div className="text-center">
         <h3 className="font-semibold text-foreground">{nome}</h3>
         <p className="mt-1 text-xs font-medium text-primary">{especialidade}</p>
-        {bio && (
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">
-            {bio}
-          </p>
-        )}
       </div>
 
       {/* Popover expandido */}
