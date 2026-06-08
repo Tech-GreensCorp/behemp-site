@@ -77,7 +77,7 @@ export function PatologiasPicker() {
   const selecionadas = PATOLOGIAS.filter((p) => selected.has(p));
 
   return (
-    <section id="condicoes" className="py-10 lg:py-14">
+    <section id="condicoes" className="py-10 lg:py-14 scroll-mt-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Cabeçalho — pergunta à esquerda, badge + subtítulo à direita */}
         <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
