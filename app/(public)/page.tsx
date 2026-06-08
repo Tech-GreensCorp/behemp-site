@@ -27,9 +27,9 @@ import {
   Users,
 } from 'lucide-react';
 export const metadata: Metadata = {
-  title: 'Be4Hope — Cuidar de quem cuida é nosso ato de amor',
+  title: 'Be4Hope — Você não precisa enfrentar isso sozinho',
   description:
-    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide. Acolhimento humanizado, sem julgamento, sem custo.',
+    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, com responsabilidade, acolhimento e do seu lado em cada etapa.',
 };
 
 /* ── Dados ──────────────────────────────────────────── */
@@ -155,16 +155,16 @@ export default async function HomePage() {
               </p>
 
               <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                Cuidar de quem
+                <span className="text-primary">Você</span> não precisa{' '}
                 <br />
-                cuida é nosso
+                enfrentar isso{' '}
                 <br />
-                <span className="text-accent-italic">ato de amor.</span>
+                sozinho.
               </h1>
 
               <p className="text-muted-foreground mt-6 max-w-lg text-base leading-relaxed sm:text-lg">
-                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide.
-                Sem pressa, sem julgamento, sem custo.
+                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide,
+                com responsabilidade, acolhimento e do seu lado em cada etapa.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -239,7 +239,7 @@ export default async function HomePage() {
       ══════════════════════════════════════════════════════════ */}
 
       {/* ── 1. Quem Somos — Introdução ──────────────────────── */}
-      <section id="quem-somos" className="py-20 lg:py-28">
+      <section id="quem-somos" className="py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
             {/* Texto principal */}
@@ -355,7 +355,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── 2. Por que Be4Hope? ────────────────────────────── */}
-      <section className="border-border bg-muted/30 border-y py-20 lg:py-28">
+      <section className="border-border bg-muted/30 border-y py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
@@ -447,7 +447,7 @@ export default async function HomePage() {
       <SeuCaminho />
 
       {/* ── Medicina Endocanabinóide — CTA educativo ───── */}
-      <section className="section-dark py-20 lg:py-28">
+      <section className="section-dark py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
             <div>
@@ -505,7 +505,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Testemunhos — Pessoas reais ───────────────────── */}
-      <section className="py-20 lg:py-28">
+      <section className="py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
@@ -547,7 +547,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Médicos — Quem vai te acompanhar ──────────────── */}
-      <section className="border-border bg-muted/30 border-y py-20 lg:py-28">
+      <section className="border-border bg-muted/30 border-y py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
@@ -607,7 +607,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Seção Humana — Imagem + Diferenciais ─────────── */}
-      <section className="overflow-hidden py-20 lg:py-28">
+      <section className="overflow-hidden py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
             {/* Coluna esquerda — Imagem com detalhe de profundidade */}
@@ -718,7 +718,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── FAQ — Antes de começar ────────────────────────── */}
-      <section className="py-20 lg:py-28">
+      <section className="py-10 lg:py-14">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
@@ -749,7 +749,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
-      <section className="py-20 lg:py-28">
+      <section className="py-10 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#EF8888] from-40% to-[#C83333] px-6 py-16 text-center sm:px-12">
             <span className="inline-block rounded-full bg-[#3D0A0A]/15 px-3 py-1 text-xs font-semibold text-black">
