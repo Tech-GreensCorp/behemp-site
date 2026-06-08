@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,7 @@ const FAQ = [
 /* ── Componente ─────────────────────────────────────── */
 
 export default async function HomePage() {
+  noStore();
   const medicosResult = await listarMedicosPublico();
   const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
 
