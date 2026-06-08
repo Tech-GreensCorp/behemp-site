@@ -169,8 +169,8 @@ export default async function HomePage() {
                 <a href="#condicoes">
                   <Button
                     size="lg"
-                    className="btn-pill text-white gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+                    className="btn-pill text-white border border-primary gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     Iniciar triagem
@@ -285,8 +285,8 @@ export default async function HomePage() {
                 <Link href="https://wa.me/5511932047360" target="_blank" rel="noopener noreferrer">
                   <Button
                     size="lg"
-                    className="btn-pill text-white gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+                    className="btn-pill text-white border border-primary gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     <MessageCircle size={16} />
@@ -476,8 +476,8 @@ export default async function HomePage() {
               <Link href="/mundo-endocanabinoide" className="mt-8 inline-flex">
                 <Button
                   size="lg"
-                  className="btn-pill text-white gap-2 px-8"
-                  style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+                  className="btn-pill text-white border border-primary gap-2 px-8"
+                  style={{ backgroundColor: '#54ab34' }}
                   nativeButton={false}
                 >
                   Quero saber mais
@@ -701,8 +701,8 @@ export default async function HomePage() {
                 <Link href="/triagem">
                   <Button
                     size="lg"
-                    className="btn-pill text-white gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+                    className="btn-pill text-white border border-primary gap-2 px-8"
+                    style={{ backgroundColor: '#54ab34' }}
                     nativeButton={false}
                   >
                     Quero ser acolhido
@@ -764,8 +764,8 @@ export default async function HomePage() {
               <Link href="/triagem">
                 <Button
                   size="lg"
-                  className="btn-pill text-white gap-2 px-8"
-                  style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+                  className="btn-pill text-white border border-primary gap-2 px-8"
+                  style={{ backgroundColor: '#54ab34' }}
                   nativeButton={false}
                 >
                   Iniciar minha triagem gratuita

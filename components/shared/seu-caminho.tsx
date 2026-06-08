@@ -140,7 +140,8 @@ export function SeuCaminho() {
               rel="noopener noreferrer"
             >
               <Button
-                className="btn-pill bg-secondary text-white border border-primary hover:bg-secondary/90 gap-2 px-6"
+                className="btn-pill text-white border border-primary gap-2 px-6"
+                style={{ backgroundColor: '#54ab34' }}
                 nativeButton={false}
               >
                 Iniciar jornada

@@ -199,8 +199,8 @@ export function PatologiasPicker() {
               size="lg"
               disabled={!podeEnviar}
               onClick={falarComMedico}
-              className="btn-pill text-white gap-2 px-8"
-              style={{ backgroundColor: '#54ab34', borderColor: '#54ab34' }}
+              className="btn-pill text-white border border-primary gap-2 px-8"
+              style={{ backgroundColor: '#54ab34' }}
             >
               <MessageCircle size={16} />
               Falar com médico
