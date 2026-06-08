@@ -175,8 +175,7 @@ export function AgendamentoWizard() {
           </div>
           <h2 className="text-2xl font-bold">Pronto para agendar?</h2>
           <p className="mt-3 max-w-md text-muted-foreground">
-            Crie sua conta ou faça login para confirmar o agendamento.{' '}
-            <strong className="text-foreground">A primeira consulta é gratuita</strong> — sem cartão de crédito, sem compromisso.
+            Crie sua conta ou faça login para confirmar o agendamento e garantir seu horário com um dos nossos especialistas.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link href="/sign-in?redirect_url=/agendamento">
@@ -191,7 +190,7 @@ export function AgendamentoWizard() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            Cadastro rápido · Sem custo · Cancele quando quiser
+            Cadastro rápido · Atendimento humanizado
           </p>
         </CardContent>
       </Card>

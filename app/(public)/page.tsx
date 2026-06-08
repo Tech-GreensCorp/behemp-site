@@ -145,8 +145,8 @@ export default async function HomePage() {
   return (
     <>
       {/* ── Hero — Editorial Caloroso ────────────────────── */}
-      <section className="relative min-h-[85vh] overflow-hidden pt-16">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section className="relative overflow-hidden pt-8">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
             {/* Texto */}
             <div className="animate-fade-up">

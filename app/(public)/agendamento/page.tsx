@@ -3,9 +3,6 @@ import Link from 'next/link';
 import {
   Video,
   Clock,
-  CheckCircle2,
-  Gift,
-  CalendarCheck,
   ChevronRight,
   UserCheck,
 } from 'lucide-react';
@@ -16,7 +13,7 @@ import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 export const metadata: Metadata = {
   title: 'Agendar Consulta | Be4Hope',
   description:
-    'A primeira consulta com especialistas em Medicina Endocanabinóide é gratuita. Atendimento 100% online via Google Meet. Agende agora.',
+    'Agende sua consulta com especialistas em Medicina Endocanabinóide. Atendimento 100% online via Google Meet. Avaliação completa e acompanhamento contínuo.',
 };
 
 const beneficios = [
@@ -39,8 +36,8 @@ const beneficios = [
 
 /**
  * Página pública de agendamento.
- * Exibe banner de primeira consulta gratuita, lista todos os médicos
- * cadastrados para visualização, e delega o agendamento ao wizard (que exige login).
+ * Lista todos os médicos cadastrados para visualização,
+ * e delega o agendamento ao wizard (que exige login).
  */
 export default async function AgendamentoPage() {
   /* Busca médicos para exibição pública — sem valor da consulta */
@@ -63,36 +60,6 @@ export default async function AgendamentoPage() {
             Conecte-se com médicos especializados em Medicina Endocanabinóide.
             Avaliação completa, prescrição segura e acompanhamento contínuo.
           </p>
-        </div>
-
-        {/* ── Banner — Primeira consulta gratuita ──────────── */}
-        <div className="mt-10 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center sm:p-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-4">
-            <Gift className="h-7 w-7 text-primary" />
-          </div>
-          <h2 className="font-display text-xl font-bold text-foreground sm:text-2xl">
-            Primeira consulta{' '}
-            <span className="text-primary">100% gratuita</span>
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground max-w-lg mx-auto">
-            Na Be4Hope, a sua primeira consulta com nossos especialistas é{' '}
-            <strong className="text-foreground">completamente gratuita</strong>.
-            Acreditamos que o cuidado não pode ter barreira financeira.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Sem custo na 1ª consulta
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Sem cartão de crédito
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Cancele a qualquer momento
-            </span>
-          </div>
         </div>
 
         {/* ── Benefícios ───────────────────────────────────── */}
