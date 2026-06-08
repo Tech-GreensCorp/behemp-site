@@ -77,11 +77,20 @@ const STEPS: Step[] = [
         halfWidth: true,
       },
       {
-        id: 'peso_altura',
-        label: 'Peso e Altura do Paciente',
+        id: 'peso',
+        label: 'Peso do Paciente (kg)',
         tipo: 'input',
-        placeholder: 'Ex: 70kg / 1,72m',
+        placeholder: 'Ex: 70',
         obrigatorio: true,
+        halfWidth: true,
+      },
+      {
+        id: 'altura',
+        label: 'Altura do Paciente (cm)',
+        tipo: 'input',
+        placeholder: 'Ex: 172',
+        obrigatorio: true,
+        halfWidth: true,
       },
       {
         id: 'nome_responsavel',

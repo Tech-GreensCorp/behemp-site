@@ -231,24 +231,6 @@ export function AgendamentoWizard() {
 
   return (
     <div className="space-y-8">
-      {/* Info Cards no topo */}
-      {step === 0 && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => {
-            const CardIcon = card.icon;
-            return (
-            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
-              <CardContent className="p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <CardIcon size={24} className="text-foreground" />
-                </div>
-                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
-              </CardContent>
-            </Card>
-          ); })}
-        </div>
-      )}
 
       {/* Step indicator */}
       {step < 3 && (
@@ -299,7 +281,8 @@ export function AgendamentoWizard() {
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="group flex w-full items-stretch gap-6 rounded-2xl border border-border/50 p-6 text-left transition-all hover:border-[#C08E3A]/50 hover:shadow-md"
+                    className="group flex w-full items-stretch gap-6 rounded-2xl border border-border/50 p-6 text-left transition-all duration-300 hover:border-[#C08E3A]/60 hover:shadow-xl hover:scale-[1.01]"
+                    style={{ transformOrigin: 'top center' }}
                   >
                     {/* Foto */}
                     <div className="shrink-0">
@@ -307,11 +290,11 @@ export function AgendamentoWizard() {
                         <img
                           src={m.avatarUrl}
                           alt={m.nome}
-                          className="h-40 w-40 rounded-xl object-cover"
+                          className="h-28 w-28 rounded-xl object-cover transition-all duration-300 group-hover:h-32 group-hover:w-32"
                         />
                       ) : (
-                        <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-primary/10">
-                          <Stethoscope size={48} className="text-primary/60" />
+                        <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:h-32 group-hover:w-32">
+                          <Stethoscope size={40} className="text-primary/60" />
                         </div>
                       )}
                     </div>
@@ -322,7 +305,7 @@ export function AgendamentoWizard() {
                       <p className="mt-1 text-sm font-semibold text-[#C08E3A]">{m.especialidade}</p>
 
                       {m.bio && (
-                        <p className="mt-3 text-sm leading-relaxed text-justify text-muted-foreground line-clamp-6">
+                        <p className="mt-3 text-sm leading-relaxed text-justify text-muted-foreground transition-all duration-300 line-clamp-3 group-hover:line-clamp-none">
                           {m.bio}
                         </p>
                       )}
@@ -345,7 +328,7 @@ export function AgendamentoWizard() {
                       </div>
                     </div>
 
-                    <ChevronRight size={18} className="shrink-0 self-center text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    <ChevronRight size={18} className="shrink-0 self-center text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-[#C08E3A]" />
                   </button>
                 ))}
               </div>
