@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import {
   BadgeCheck,
@@ -15,9 +14,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-
-const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
+import { WhatsApp } from '@/components/shared/icons';
 
 type Etapa = {
   passo: string;
@@ -66,7 +63,7 @@ export function SeuCaminho() {
   const [expanded, setExpanded] = React.useState<number | null>(null);
 
   return (
-    <section className="py-10 lg:py-14">
+    <section className="py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Cabeçalho */}
         <div className="grid items-end gap-6 lg:grid-cols-2 lg:gap-16">
@@ -124,24 +121,23 @@ export function SeuCaminho() {
                   aria-expanded={aberto}
                 >
                   {aberto ? <Minus size={16} /> : <Plus size={16} />}
-                  Mais informações
+                  {aberto ? 'Menos informações' : 'Mais informações'}
                 </button>
               </div>
             );
           })}
 
           {/* Card CTA — Iniciar jornada */}
-          <div className="bg-primary text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center sm:col-span-2 lg:col-span-1">
-            <p className="font-display text-lg leading-snug font-bold">
-              Uma jornada de sucesso com quem entende!
+          <div className="bg-[#16a34a] text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center sm:col-span-2 lg:col-span-1">
+            <p className="font-display text-lg leading-snug font-bold text-white">
+              Uma jornada de sucesso 100% humanizada com quem entende!
             </p>
             <ScrollToSection
               targetId="condicoes"
-              className="btn-pill inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
-              style={{ backgroundColor: '#54ab34' }}
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-secondary bg-white rounded-full cursor-pointer transition-colors hover:bg-white/90"
             >
               Iniciar jornada
-              <MessageCircle size={16} />
+              <WhatsApp size={16} />
             </ScrollToSection>
           </div>
         </div>

@@ -16,25 +16,201 @@ import {
 } from '@/components/ui/dialog';
 
 const PATOLOGIAS = [
+  'Autismo',
+  'Epilepsia',
+  'Parkinson',
   'Alzheimer',
-  'Diabetes',
-  'Obesidade',
+  'Fibromialgia',
+  'Tabagismo',
   'Anorexia',
   'Ansiedade',
-  'Autismo',
   'Crohn',
   'Depressão',
+  'Diabetes',
   'Dores',
-  'Epilepsia',
   'Enxaqueca',
-  'Fibromialgia',
   'Insônia',
   'Intestino irritável',
-  'Tabagismo',
+  'Obesidade',
   'TDAH',
-  'Parkinson',
   'Outro(a)',
 ] as const;
+
+const PATOLOGIA_CORES: Record<
+  string,
+  {
+    bg: string;
+    border: string;
+    text: string;
+    dotBg: string;
+    bgAtivo: string;
+    borderAtivo: string;
+    dotBorderAtivo: string;
+  }
+> = {
+  'Autismo': {
+    bg: 'bg-blue-50/30 hover:bg-blue-50/60',
+    border: 'border-blue-200/50 hover:border-blue-300',
+    text: 'text-blue-700',
+    dotBg: 'bg-blue-100/30 border-blue-200/50',
+    bgAtivo: 'bg-blue-50 border-blue-400 ring-blue-300/20',
+    borderAtivo: 'border-blue-400',
+    dotBorderAtivo: 'border-blue-500 bg-blue-600',
+  },
+  'Epilepsia': {
+    bg: 'bg-violet-50/30 hover:bg-violet-50/60',
+    border: 'border-violet-200/50 hover:border-violet-300',
+    text: 'text-violet-700',
+    dotBg: 'bg-violet-100/30 border-violet-200/50',
+    bgAtivo: 'bg-violet-50 border-violet-400 ring-violet-300/20',
+    borderAtivo: 'border-violet-400',
+    dotBorderAtivo: 'border-violet-500 bg-violet-600',
+  },
+  'Parkinson': {
+    bg: 'bg-emerald-50/30 hover:bg-emerald-50/60',
+    border: 'border-emerald-200/50 hover:border-emerald-300',
+    text: 'text-emerald-700',
+    dotBg: 'bg-emerald-100/30 border-emerald-200/50',
+    bgAtivo: 'bg-emerald-50 border-emerald-400 ring-emerald-300/20',
+    borderAtivo: 'border-emerald-400',
+    dotBorderAtivo: 'border-emerald-500 bg-emerald-600',
+  },
+  'Alzheimer': {
+    bg: 'bg-amber-50/30 hover:bg-amber-50/60',
+    border: 'border-amber-200/50 hover:border-amber-300',
+    text: 'text-amber-700',
+    dotBg: 'bg-amber-100/30 border-amber-200/50',
+    bgAtivo: 'bg-amber-50 border-amber-400 ring-amber-300/20',
+    borderAtivo: 'border-amber-400',
+    dotBorderAtivo: 'border-amber-500 bg-amber-600',
+  },
+  'Fibromialgia': {
+    bg: 'bg-rose-50/30 hover:bg-rose-50/60',
+    border: 'border-rose-200/50 hover:border-rose-300',
+    text: 'text-rose-700',
+    dotBg: 'bg-rose-100/30 border-rose-200/50',
+    bgAtivo: 'bg-rose-50 border-rose-400 ring-rose-300/20',
+    borderAtivo: 'border-rose-400',
+    dotBorderAtivo: 'border-rose-500 bg-rose-600',
+  },
+  'Tabagismo': {
+    bg: 'bg-stone-50/30 hover:bg-stone-50/60',
+    border: 'border-stone-200/50 hover:border-stone-300',
+    text: 'text-stone-700',
+    dotBg: 'bg-stone-100/30 border-stone-200/50',
+    bgAtivo: 'bg-stone-50 border-stone-400 ring-stone-300/20',
+    borderAtivo: 'border-stone-400',
+    dotBorderAtivo: 'border-stone-500 bg-stone-600',
+  },
+  'Anorexia': {
+    bg: 'bg-teal-50/30 hover:bg-teal-50/60',
+    border: 'border-teal-200/50 hover:border-teal-300',
+    text: 'text-teal-700',
+    dotBg: 'bg-teal-100/30 border-teal-200/50',
+    bgAtivo: 'bg-teal-50 border-teal-400 ring-teal-300/20',
+    borderAtivo: 'border-teal-400',
+    dotBorderAtivo: 'border-teal-500 bg-teal-600',
+  },
+  'Ansiedade': {
+    bg: 'bg-sky-50/30 hover:bg-sky-50/60',
+    border: 'border-sky-200/50 hover:border-sky-300',
+    text: 'text-sky-700',
+    dotBg: 'bg-sky-100/30 border-sky-200/50',
+    bgAtivo: 'bg-sky-50 border-sky-400 ring-sky-300/20',
+    borderAtivo: 'border-sky-400',
+    dotBorderAtivo: 'border-sky-500 bg-sky-600',
+  },
+  'Crohn': {
+    bg: 'bg-orange-50/30 hover:bg-orange-50/60',
+    border: 'border-orange-200/50 hover:border-orange-300',
+    text: 'text-orange-700',
+    dotBg: 'bg-orange-100/30 border-orange-200/50',
+    bgAtivo: 'bg-orange-50 border-orange-400 ring-orange-300/20',
+    borderAtivo: 'border-orange-400',
+    dotBorderAtivo: 'border-orange-500 bg-orange-600',
+  },
+  'Depressão': {
+    bg: 'bg-cyan-50/30 hover:bg-cyan-50/60',
+    border: 'border-cyan-200/50 hover:border-cyan-300',
+    text: 'text-cyan-700',
+    dotBg: 'bg-cyan-100/30 border-cyan-200/50',
+    bgAtivo: 'bg-cyan-50 border-cyan-400 ring-cyan-300/20',
+    borderAtivo: 'border-cyan-400',
+    dotBorderAtivo: 'border-cyan-500 bg-cyan-600',
+  },
+  'Diabetes': {
+    bg: 'bg-red-50/30 hover:bg-red-50/60',
+    border: 'border-red-200/50 hover:border-red-300',
+    text: 'text-red-700',
+    dotBg: 'bg-red-100/30 border-red-200/50',
+    bgAtivo: 'bg-red-50 border-red-400 ring-red-300/20',
+    borderAtivo: 'border-red-400',
+    dotBorderAtivo: 'border-red-500 bg-red-600',
+  },
+  'Dores': {
+    bg: 'bg-fuchsia-50/30 hover:bg-fuchsia-50/60',
+    border: 'border-fuchsia-200/50 hover:border-fuchsia-300',
+    text: 'text-fuchsia-700',
+    dotBg: 'bg-fuchsia-100/30 border-fuchsia-200/50',
+    bgAtivo: 'bg-fuchsia-50 border-fuchsia-400 ring-fuchsia-300/20',
+    borderAtivo: 'border-fuchsia-400',
+    dotBorderAtivo: 'border-fuchsia-500 bg-fuchsia-600',
+  },
+  'Enxaqueca': {
+    bg: 'bg-slate-50/30 hover:bg-slate-50/60',
+    border: 'border-slate-200/50 hover:border-slate-300',
+    text: 'text-slate-700',
+    dotBg: 'bg-slate-100/30 border-slate-200/50',
+    bgAtivo: 'bg-slate-50 border-slate-400 ring-slate-300/20',
+    borderAtivo: 'border-slate-400',
+    dotBorderAtivo: 'border-slate-500 bg-slate-600',
+  },
+  'Insônia': {
+    bg: 'bg-indigo-50/30 hover:bg-indigo-50/60',
+    border: 'border-indigo-200/50 hover:border-indigo-300',
+    text: 'text-indigo-700',
+    dotBg: 'bg-indigo-100/30 border-indigo-200/50',
+    bgAtivo: 'bg-indigo-50 border-indigo-400 ring-indigo-300/20',
+    borderAtivo: 'border-indigo-400',
+    dotBorderAtivo: 'border-indigo-500 bg-indigo-600',
+  },
+  'Intestino irritável': {
+    bg: 'bg-lime-50/30 hover:bg-lime-50/60',
+    border: 'border-lime-200/50 hover:border-lime-300',
+    text: 'text-lime-700',
+    dotBg: 'bg-lime-100/30 border-lime-200/50',
+    bgAtivo: 'bg-lime-50 border-lime-400 ring-lime-300/20',
+    borderAtivo: 'border-lime-400',
+    dotBorderAtivo: 'border-lime-500 bg-lime-600',
+  },
+  'Obesidade': {
+    bg: 'bg-zinc-50/30 hover:bg-zinc-50/60',
+    border: 'border-zinc-200/50 hover:border-zinc-300',
+    text: 'text-zinc-700',
+    dotBg: 'bg-zinc-100/30 border-zinc-200/50',
+    bgAtivo: 'bg-zinc-50 border-zinc-400 ring-zinc-300/20',
+    borderAtivo: 'border-zinc-400',
+    dotBorderAtivo: 'border-zinc-500 bg-zinc-600',
+  },
+  'TDAH': {
+    bg: 'bg-purple-50/30 hover:bg-purple-50/60',
+    border: 'border-purple-200/50 hover:border-purple-300',
+    text: 'text-purple-700',
+    dotBg: 'bg-purple-100/30 border-purple-200/50',
+    bgAtivo: 'bg-purple-50 border-purple-400 ring-purple-300/20',
+    borderAtivo: 'border-purple-400',
+    dotBorderAtivo: 'border-purple-500 bg-purple-600',
+  },
+  'Outro(a)': {
+    bg: 'bg-gray-50/30 hover:bg-gray-100/60',
+    border: 'border-gray-200/70 hover:border-gray-300',
+    text: 'text-gray-700',
+    dotBg: 'bg-gray-100/40 border-gray-200',
+    bgAtivo: 'bg-gray-100 border-gray-400 ring-gray-300/20',
+    borderAtivo: 'border-gray-400',
+    dotBorderAtivo: 'border-gray-500 bg-gray-600',
+  },
+};
 
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
 
@@ -76,7 +252,7 @@ export function PatologiasPicker() {
   const selecionadas = PATOLOGIAS.filter((p) => selected.has(p));
 
   return (
-    <section id="condicoes" className="py-10 lg:py-14 scroll-mt-24">
+    <section id="condicoes" className="py-16 lg:py-24 scroll-mt-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Cabeçalho — pergunta à esquerda, badge + subtítulo à direita */}
         <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
@@ -98,26 +274,30 @@ export function PatologiasPicker() {
         <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {PATOLOGIAS.map((patologia) => {
             const ativo = selected.has(patologia);
+            const cores = PATOLOGIA_CORES[patologia] || PATOLOGIA_CORES['Outro(a)'];
             return (
               <button
                 key={patologia}
                 type="button"
                 onClick={() => handleChip(patologia)}
                 className={cn(
-                  'group flex items-center gap-3 rounded-full border bg-card px-4 py-3 text-left text-sm font-medium shadow-sm transition-all hover:shadow-md',
-                  ativo ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/40',
+                  'group flex items-center gap-3 rounded-full border px-4 py-3 text-left text-sm font-semibold shadow-sm transition-all duration-300 ease-in-out hover:shadow-md hover:-translate-y-0.5 cursor-pointer',
+                  cores.text,
+                  ativo
+                    ? cn(cores.bgAtivo, 'ring-1')
+                    : cn(cores.bg, cores.border),
                 )}
               >
                 <span
                   className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
-                    ativo ? 'border-primary bg-primary' : 'border-muted-foreground/40',
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-300 ease-in-out',
+                    ativo ? cores.dotBorderAtivo : cores.dotBg,
                   )}
                   aria-hidden="true"
                 >
-                  {ativo && <span className="h-2 w-2 rounded-full bg-white" />}
+                  {ativo && <span className="h-2 w-2 rounded-full bg-white scale-100 transition-transform duration-300" />}
                 </span>
-                <span className="leading-tight">{patologia}</span>
+                <span className="leading-tight font-medium">{patologia}</span>
               </button>
             );
           })}
@@ -193,6 +373,13 @@ export function PatologiasPicker() {
 
           {/* Ações */}
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <DialogClose
+              render={
+                <Button type="button" variant="outline" size="lg" className="btn-pill border-primary text-secondary px-8" />
+              }
+            >
+              Voltar a página inicial
+            </DialogClose>
             <Button
               type="button"
               size="lg"
@@ -204,13 +391,6 @@ export function PatologiasPicker() {
               <MessageCircle size={16} />
               Falar com médico
             </Button>
-            <DialogClose
-              render={
-                <Button type="button" variant="outline" size="lg" className="btn-pill border-primary text-secondary px-8" />
-              }
-            >
-              Voltar a página inicial
-            </DialogClose>
           </div>
         </DialogContent>
       </Dialog>

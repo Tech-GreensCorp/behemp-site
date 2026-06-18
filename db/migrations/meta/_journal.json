@@ -57,6 +57,13 @@
       "when": 1779194053293,
       "tag": "0007_wet_sharon_ventura",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781807876964,
+      "tag": "0008_strong_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }

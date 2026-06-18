@@ -20,7 +20,7 @@ export async function GET() {
 
   // Não autenticado — volta para sign-in
   if (!userId) {
-    redirect('/sign-in');
+    redirect('/entrar');
   }
 
   // 1. Tenta ler o role do JWT (se o session token está configurado)
