@@ -404,8 +404,246 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
   const totalSteps = STEPS.length;
   const currentStep = STEPS[step];
 
+  const aplicarMascara = (id: string, value: string): string => {
+    const clean = value.replace(/\D/g, '');
+    
+    if (id === 'cpf' || id === 'cpf_responsavel') {
+      return clean.slice(0, 11).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, (_, p1, p2, p3, p4) => {
+        let res = '';
+        if (p1) res += p1;
+        if (p2) res += `.${p2}`;
+        if (p3) res += `.${p3}`;
+        if (p4) res += `-${p4}`;
+        return res;
+      }).replace(/(\d{3})(\d{3})(\d{0,3})/, (_, p1, p2, p3) => {
+        if (!p3) return p2 ? `${p1}.${p2}` : p1;
+        return `${p1}.${p2}.${p3}`;
+      });
+    }
+
+    if (id === 'data_nascimento') {
+      return clean.slice(0, 8).replace(/(\d{2})(\d{2})(\d{4})/, (_, p1, p2, p3) => {
+        let res = '';
+        if (p1) res += p1;
+        if (p2) res += `/${p2}`;
+        if (p3) res += `/${p3}`;
+        return res;
+      }).replace(/(\d{2})(\d{0,2})/, (_, p1, p2) => {
+        if (!p2) return p1;
+        return `${p1}/${p2}`;
+      });
+    }
+
+    if (id === 'telefone') {
+      if (clean.length <= 10) {
+        return clean.replace(/(\d{2})(\d{4})(\d{0,4})/, (_, p1, p2, p3) => {
+          let res = '';
+          if (p1) res += `(${p1}`;
+          if (p2) res += `) ${p2}`;
+          if (p3) res += `-${p3}`;
+          return res;
+        });
+      } else {
+        return clean.slice(0, 11).replace(/(\d{2})(\d{5})(\d{0,4})/, (_, p1, p2, p3) => {
+          let res = '';
+          if (p1) res += `(${p1}`;
+          if (p2) res += `) ${p2}`;
+          if (p3) res += `-${p3}`;
+          return res;
+        });
+      }
+    }
+
+    if (id === 'cep') {
+      return clean.slice(0, 8).replace(/(\d{5})(\d{0,3})/, (_, p1, p2) => {
+        if (!p2) return p1;
+        return `${p1}-${p2}`;
+      });
+    }
+
+    if (id === 'peso' || id === 'altura' || id === 'total_residencia' || id === 'num_criancas' || id === 'num_idosos' || id === 'num_deficiencia') {
+      return clean;
+    }
+
+    if (id === 'renda_total' || id === 'despesas_medicas') {
+      if (!clean) return '';
+      const floatVal = parseFloat(clean) / 100;
+      return floatVal.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    return value;
+  };
+
+  function validarCPF(cpf: string): boolean {
+    if (/^(\d)\1+$/.test(cpf)) return false;
+    
+    let soma = 0;
+    let resto;
+    
+    for (let i = 1; i <= 9; i++) {
+      soma += parseInt(cpf.substring(i - 1, i), 10) * (11 - i);
+    }
+    
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10), 10)) return false;
+    
+    soma = 0;
+    for (let i = 1; i <= 10; i++) {
+      soma += parseInt(cpf.substring(i - 1, i), 10) * (12 - i);
+    }
+    
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(10, 11), 10)) return false;
+    
+    return true;
+  }
+
+  function validarPassoAtual(): boolean {
+    const campos = currentStep.campos.filter(campoVisivel);
+    
+    for (const campo of campos) {
+      if (campo.obrigatorio) {
+        if (campo.tipo === 'checkbox-group') {
+          const vals = checkboxes[campo.id] || [];
+          if (vals.length === 0) {
+            toast.error(`O campo "${campo.label}" é obrigatório.`);
+            return false;
+          }
+        } else if (campo.tipo === 'file') {
+          if (!arquivo) {
+            toast.error(`O anexo "${campo.label}" é obrigatório.`);
+            return false;
+          }
+        } else {
+          const val = dados[campo.id] || '';
+          if (!val.trim()) {
+            toast.error(`O campo "${campo.label}" é obrigatório.`);
+            return false;
+          }
+        }
+      }
+      
+      const val = dados[campo.id] || '';
+      if (val.trim()) {
+        if (campo.id === 'email') {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(val)) {
+            toast.error('O e-mail informado é inválido. Por favor, digite um formato válido (ex: nome@email.com).');
+            return false;
+          }
+        }
+        
+        if (campo.id === 'cpf' || campo.id === 'cpf_responsavel') {
+          const cleanCpf = val.replace(/\D/g, '');
+          if (cleanCpf.length !== 11) {
+            toast.error(`O ${campo.label} deve conter 11 dígitos.`);
+            return false;
+          }
+          if (!validarCPF(cleanCpf)) {
+            toast.error(`${campo.label} inválido. Por favor, verifique os dígitos informados.`);
+            return false;
+          }
+        }
+        
+        if (campo.id === 'telefone') {
+          const cleanTel = val.replace(/\D/g, '');
+          if (cleanTel.length < 10 || cleanTel.length > 11) {
+            toast.error(`O ${campo.label} deve conter 10 ou 11 dígitos (com DDD).`);
+            return false;
+          }
+        }
+        
+        if (campo.id === 'data_nascimento') {
+          const cleanDate = val.replace(/\D/g, '');
+          if (cleanDate.length !== 8) {
+            toast.error(`A ${campo.label} deve estar no formato DD/MM/AAAA.`);
+            return false;
+          }
+          
+          const dia = parseInt(cleanDate.substring(0, 2), 10);
+          const mes = parseInt(cleanDate.substring(2, 4), 10);
+          const ano = parseInt(cleanDate.substring(4, 8), 10);
+          
+          const dateObj = new Date(ano, mes - 1, dia);
+          const hoje = new Date();
+          if (
+            dateObj.getFullYear() !== ano ||
+            dateObj.getMonth() !== mes - 1 ||
+            dateObj.getDate() !== dia ||
+            ano < 1900 ||
+            dateObj > hoje
+          ) {
+            toast.error(`${campo.label} inválida ou no futuro.`);
+            return false;
+          }
+        }
+
+        if (campo.id === 'cep') {
+          const cleanCep = val.replace(/\D/g, '');
+          if (cleanCep.length !== 8) {
+            toast.error(`O ${campo.label} deve conter 8 dígitos.`);
+            return false;
+          }
+        }
+
+        if (campo.id === 'peso') {
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) {
+            toast.error('Por favor, informe um peso válido maior que 0.');
+            return false;
+          }
+        }
+
+        if (campo.id === 'altura') {
+          const num = parseInt(val, 10);
+          if (isNaN(num) || num <= 0) {
+            toast.error('Por favor, informe uma altura válida maior que 0.');
+            return false;
+          }
+        }
+
+        if (campo.id === 'total_residencia') {
+          const num = parseInt(val, 10);
+          if (isNaN(num) || num <= 0) {
+            toast.error('O número total de pessoas na residência deve ser maior que 0.');
+            return false;
+          }
+        }
+
+        if (campo.id === 'num_criancas' || campo.id === 'num_idosos' || campo.id === 'num_deficiencia') {
+          const num = parseInt(val, 10);
+          if (isNaN(num) || num < 0) {
+            toast.error(`O campo "${campo.label}" não pode conter valor negativo.`);
+            return false;
+          }
+        }
+      }
+    }
+
+    if (step === 2) {
+      const total = parseInt(dados['total_residencia'] || '0', 10);
+      const criancas = parseInt(dados['num_criancas'] || '0', 10);
+      const idosos = parseInt(dados['num_idosos'] || '0', 10);
+      
+      if (!isNaN(total) && !isNaN(criancas) && !isNaN(idosos)) {
+        if (criancas + idosos > total) {
+          toast.error('A soma de crianças e idosos não pode ser maior que o total de pessoas na residência.');
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  }
+
   function updateField(id: string, value: string) {
-    setDados((prev) => ({ ...prev, [id]: value }));
+    const valueComMascara = aplicarMascara(id, value);
+    setDados((prev) => ({ ...prev, [id]: valueComMascara }));
   }
 
   function toggleCheckbox(id: string, opcao: string) {
@@ -434,6 +672,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
   }
 
   async function handleSubmit() {
+    if (!validarPassoAtual()) return;
     setEnviando(true);
 
     /* Monta os dados consolidados (texto + checkboxes) */
@@ -762,7 +1001,11 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                 {step < totalSteps - 1 ? (
                   <Button
                     type="button"
-                    onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))}
+                    onClick={() => {
+                      if (validarPassoAtual()) {
+                        setStep((s) => Math.min(totalSteps - 1, s + 1));
+                      }
+                    }}
                     className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
                   >
                     Continuar
@@ -771,7 +1014,11 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                 ) : (
                   <Button
                     type="button"
-                    onClick={handleSubmit}
+                    onClick={() => {
+                      if (validarPassoAtual()) {
+                        handleSubmit();
+                      }
+                    }}
                     disabled={enviando}
                     className="btn-pill gap-2 bg-primary px-8 text-primary-foreground hover:bg-primary/90"
                   >
