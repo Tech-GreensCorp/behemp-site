@@ -182,7 +182,7 @@ export default async function HomePage() {
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-breathe"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Iniciar acolhimento
                   <ChevronRight size={16} />
@@ -688,7 +688,7 @@ export default async function HomePage() {
               <div className="mt-10">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-breathe"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Quero iniciar acolhimento
                   <ChevronRight size={16} />
@@ -765,7 +765,7 @@ export default async function HomePage() {
                 <div className="mt-8 flex flex-wrap gap-4">
                   <ScrollToSection
                     targetId="condicoes"
-                    className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-breathe"
+                    className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                   >
                     Iniciar acolhimento
                     <ChevronRight size={16} />
