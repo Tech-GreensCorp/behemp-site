@@ -476,7 +476,7 @@ export default function PrivacidadePage() {
                 </div>
               </div>
               <div className="mt-6">
-                <Link href="/entre-em-contato">
+                <Link href="/contato">
                   <Button
                     className="btn-pill gap-2 bg-white px-8 text-primary hover:bg-white/90"
                     nativeButton={false}

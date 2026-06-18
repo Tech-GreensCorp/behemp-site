@@ -15,15 +15,16 @@ import { NextResponse } from 'next/server';
 
 const isPublicRoute = createRouteMatcher([
   '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/mundo-endocanabinoide',
+  '/entrar(.*)',
+  '/registrar-se(.*)',
+  '/historias',
+  '/ebooks',
   '/agendamento',
   '/parceiros',
-  '/entre-em-contato',
+  '/contato',
   '/triagem',
-  '/privacidade',
-  '/termos',
+  '/politica-de-privacidade',
+  '/termos-de-uso',
   '/redirect',
   // Arquivos de SEO — NUNCA devem ser interceptados pelo auth
   '/robots.txt',

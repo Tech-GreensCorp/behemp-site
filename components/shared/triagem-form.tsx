@@ -500,7 +500,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
   /* ── Formulário multi-steps ──────────────────────── */
   return (
     <div className={cn(compact ? '' : 'min-h-screen pb-16 pt-24')}>
-      <div className={cn(compact ? '' : 'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8')}>
+      <div className={cn(compact ? '' : 'mx-auto max-w-[80rem] px-4 sm:px-6 lg:px-8')}>
 
         {/* Breadcrumb — apenas na versão pública */}
         {!compact && (

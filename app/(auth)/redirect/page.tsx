@@ -33,7 +33,7 @@ export default async function AuthRedirectPage() {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[Redirect] Nenhuma sessão via auth(), redirecionando para sign-in');
     }
-    redirect('/sign-in');
+    redirect('/entrar');
   }
 
   // Estratégia 2: publicMetadata via currentUser() — mais atualizado que o JWT

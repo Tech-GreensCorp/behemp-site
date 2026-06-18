@@ -254,7 +254,7 @@ const SECOES: Secao[] = [
       <div className="space-y-4">
         <p>
           O tratamento de seus dados pessoais é regido pela nossa{' '}
-          <Link href="/privacidade" className="font-medium text-primary underline underline-offset-4 hover:no-underline">
+          <Link href="/politica-de-privacidade" className="font-medium text-primary underline underline-offset-4 hover:no-underline">
             Política de Privacidade
           </Link>
           , elaborada em conformidade com a{' '}
@@ -374,7 +374,7 @@ const SECOES: Secao[] = [
             { titulo: 'Suporte geral', desc: 'tech@be4hope.org', icon: Mail },
             { titulo: 'Privacidade e LGPD', desc: 'privacidade@be4hope.org', icon: Shield },
             { titulo: 'WhatsApp', desc: '+55 (11) 93204-7360', icon: Smartphone },
-            { titulo: 'Formulário online', desc: 'be4hope.org/entre-em-contato', icon: Globe },
+            { titulo: 'Formulário online', desc: 'be4hope.org/contato', icon: Globe },
           ].map((item) => (
             <div key={item.titulo} className="rounded-xl bg-muted/40 p-4">
               <div className="mb-1 flex items-center gap-2">
@@ -417,7 +417,7 @@ export default function TermosPage() {
             <p className="text-sm text-muted-foreground">
               <strong className="text-foreground">Última atualização:</strong>{' '}
               12 de maio de 2026 &nbsp;·&nbsp;
-              <Link href="/privacidade" className="text-primary hover:underline">
+              <Link href="/politica-de-privacidade" className="text-primary hover:underline">
                 Ver Política de Privacidade →
               </Link>
             </p>
@@ -498,7 +498,7 @@ export default function TermosPage() {
                 </div>
               </div>
               <div className="mt-6">
-                <Link href="/entre-em-contato">
+                <Link href="/contato">
                   <Button
                     className="btn-pill gap-2 bg-white px-8 text-primary hover:bg-white/90"
                     nativeButton={false}

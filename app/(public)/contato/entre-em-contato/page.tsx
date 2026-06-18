@@ -76,7 +76,7 @@ const CANAIS = [
 export default function ContatoPage() {
   return (
     <div className="min-h-screen pt-24 pb-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-16">
           <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">

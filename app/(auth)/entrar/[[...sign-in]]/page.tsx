@@ -1,37 +1,38 @@
 'use client';
 
-import { SignUp } from '@clerk/nextjs';
+import { SignIn, useAuth } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  BadgeCheck,
-  Calendar,
   CalendarDays,
   HeartPulse,
   MapPinned,
-  UserPlus,
   Users,
 } from 'lucide-react';
+
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
   {
     num: 24,
     suffix: '',
-    label: 'Anos de história',
+    label: 'anos de histórias reais',
     icon: CalendarDays,
+    color: '#EA5429',
   },
   {
     num: null,
     text: 'ONG',
     suffix: '',
-    label: 'Sem fins lucrativos',
+    label: 'sem fins lucrativos',
     icon: HeartPulse,
+    color: '#EA5429',
   },
   {
     num: 26,
     suffix: '',
-    label: 'Estados atendidos',
+    label: 'estados atendidos',
     icon: MapPinned,
+    color: '#EA5429',
   },
   {
     num: null,
@@ -39,6 +40,7 @@ const STATS = [
     suffix: '',
     label: 'Pacientes atendidos',
     icon: Users,
+    color: '#EA5429',
   },
 ];
 
@@ -54,7 +56,7 @@ interface Particle {
 }
 
 /* ── Contador animado ────────────────────────────── */
-function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
+function AnimatedCounter({ target, duration = 4000 }: { target: number; duration?: number }) {
   const [count, setCount] = useState(0);
   const [started, setStarted] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -62,7 +64,9 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !started) setStarted(true);
+        if (entry.isIntersecting && !started) {
+          setStarted(true);
+        }
       },
       { threshold: 0.1 }
     );
@@ -87,14 +91,24 @@ function AnimatedCounter({ target, duration = 2000 }: { target: number; duration
 }
 
 /* ── Componente principal ────────────────────────── */
-export default function SignUpPage() {
+export default function SignInPage() {
   const [mounted, setMounted] = useState(false);
   const [particles, setParticles] = useState<Particle[]>([]);
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect_url') || '/redirect';
 
+  // Se o usuário já está logado, redireciona para /redirect
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.replace('/redirect');
+    }
+  }, [isLoaded, isSignedIn, router]);
+
   useEffect(() => {
     setMounted(true);
+    // Gera partículas aleatórias apenas no cliente
     setParticles(
       Array.from({ length: 18 }, (_, i) => ({
         id: i,
@@ -109,14 +123,14 @@ export default function SignUpPage() {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="mt-24 flex h-[calc(100vh-6rem)] overflow-hidden">
       {/* ════════════════════════════════════
           LADO ESQUERDO — BRANDING PREMIUM
           ════════════════════════════════════ */}
-      <div
-        className="relative hidden w-[55%] overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-12"
-        style={{ background: 'linear-gradient(145deg, #ffffff 0%, #fff5f5 50%, #fff0f0 100%)' }}
+      <div className="relative hidden w-[55%] overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-12"
+        style={{ background: 'linear-gradient(145deg, #ffffff 0%, #fffbf9 50%, #fff7f4 100%)' }}
       >
+
         {/* ── Partículas flutuantes ── */}
         {particles.map((p) => (
           <div
@@ -127,7 +141,7 @@ export default function SignUpPage() {
               top: `${p.y}%`,
               width: p.size,
               height: p.size,
-              background: '#E63946',
+              background: '#EA5429',
               opacity: p.opacity,
               animation: `particle-float ${p.duration}s ease-in-out ${p.delay}s infinite`,
             }}
@@ -140,12 +154,13 @@ export default function SignUpPage() {
           style={{
             width: 520,
             height: 520,
-            background: 'radial-gradient(circle, rgba(230,57,70,0.07) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(234,84,41,0.07) 0%, transparent 70%)',
             animation: 'spin-slow 30s linear infinite',
           }}
         />
+        {/* Anel externo */}
         <div
-          className="absolute -top-32 -right-32 rounded-full border border-red-100 pointer-events-none"
+          className="absolute -top-32 -right-32 rounded-full border border-orange-100 pointer-events-none"
           style={{
             width: 520,
             height: 520,
@@ -153,7 +168,7 @@ export default function SignUpPage() {
           }}
         />
         <div
-          className="absolute -top-32 -right-32 rounded-full border border-red-50 pointer-events-none"
+          className="absolute -top-32 -right-32 rounded-full border border-orange-50 pointer-events-none"
           style={{
             width: 420,
             height: 420,
@@ -162,57 +177,50 @@ export default function SignUpPage() {
           }}
         />
 
-        {/* ── Gradiente inferior esquerdo ── */}
+        {/* ── Gradiente de canto inferior esquerdo ── */}
         <div
           className="absolute -bottom-40 -left-40 rounded-full pointer-events-none"
           style={{
             width: 480,
             height: 480,
-            background: 'radial-gradient(circle, rgba(230,57,70,0.06) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(234,84,41,0.06) 0%, transparent 70%)',
             animation: 'particle-float 12s ease-in-out infinite reverse',
           }}
         />
 
-        {/* ── Barra lateral vermelha ── */}
+        {/* ── Barra lateral laranja ── */}
         <div
           className="absolute left-0 top-0 w-1.5 h-full pointer-events-none"
           style={{
-            background:
-              'linear-gradient(to bottom, transparent 5%, #E63946 30%, #E63946 70%, transparent 95%)',
+            background: 'linear-gradient(to bottom, transparent 5%, #EA5429 30%, #EA5429 70%, transparent 95%)',
           }}
         />
 
-        {/* ── Padrão de pontos ── */}
+        {/* ── Padrão de pontos (grid dots) ── */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: 'radial-gradient(circle, rgba(230,57,70,0.08) 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(circle, rgba(234,84,41,0.08) 1px, transparent 1px)',
             backgroundSize: '32px 32px',
-            maskImage:
-              'radial-gradient(ellipse at 80% 20%, rgba(0,0,0,0.15) 0%, transparent 60%)',
+            maskImage: 'radial-gradient(ellipse at 80% 20%, rgba(0,0,0,0.15) 0%, transparent 60%)',
           }}
         />
 
-        {/* ── Logo ── */}
+        {/* ── Logo (escondido pois o header já possui a logo) ── */}
         <div
-          className="relative z-10"
+          className="relative z-10 invisible"
           style={{
             opacity: mounted ? 1 : 0,
             transform: mounted ? 'translateY(0)' : 'translateY(-24px)',
             transition: 'opacity 0.7s ease-out, transform 0.7s ease-out',
           }}
         >
-          <a href="/" className="inline-flex items-center group">
-            <img
-              src="/logo.png"
-              alt="Be4Hope"
-              className="h-14 w-auto transition-transform duration-300 group-hover:scale-105"
-            />
-          </a>
+          <div className="h-14 w-auto" />
         </div>
 
         {/* ── Conteúdo central ── */}
         <div className="relative z-10 space-y-10">
+
           {/* Texto principal */}
           <div
             className="space-y-5"
@@ -222,12 +230,9 @@ export default function SignUpPage() {
               transition: 'opacity 0.8s ease-out 0.15s, transform 0.8s ease-out 0.15s',
             }}
           >
-            <div className="flex items-center gap-2">
-              <div className="h-px w-8" style={{ background: '#E63946' }} />
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.3em]"
-                style={{ color: '#E63946' }}
-              >
+            <div className="flex items-center gap-2 -mt-20">
+              <div className="h-px w-8" style={{ background: '#EA5429' }} />
+              <p className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: '#EA5429' }}>
                 Plataforma Médica
               </p>
             </div>
@@ -238,10 +243,11 @@ export default function SignUpPage() {
               é nosso{' '}
               <span className="text-accent-italic relative">
                 ato de amor.
+                {/* Sublinhado decorativo */}
                 <span
                   className="absolute -bottom-1 left-0 h-0.5 w-full rounded-full"
                   style={{
-                    background: 'linear-gradient(90deg, #E63946, transparent)',
+                    background: 'linear-gradient(90deg, #EA5429, transparent)',
                     opacity: 0.4,
                   }}
                 />
@@ -249,8 +255,8 @@ export default function SignUpPage() {
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
-              Crie sua conta e acesse tratamentos com Medicina Endocanabinóide de forma
-              segura, humanizada e sem custo.
+              Bem-vindo de volta. Acesse sua conta para gerenciar pacientes,
+              consultas e tratamentos.
             </p>
           </div>
 
@@ -266,29 +272,35 @@ export default function SignUpPage() {
             {STATS.map((stat, i) => (
               <div
                 key={stat.label}
-                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/70 p-4 backdrop-blur-sm transition-all duration-400 hover:-translate-y-1 hover:border-red-200 hover:bg-white hover:shadow-lg hover:shadow-red-100/50"
-                style={{ transitionDelay: `${i * 60}ms` }}
+                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/70 p-4 backdrop-blur-sm transition-all duration-400 hover:-translate-y-1 hover:border-orange-200 hover:bg-white hover:shadow-lg hover:shadow-orange-100/50"
+                style={{
+                  transitionDelay: `${i * 60}ms`,
+                }}
               >
+                {/* Brilho no hover */}
                 <div
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none rounded-2xl"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(230,57,70,0.04) 0%, transparent 60%)',
+                    background: 'linear-gradient(135deg, rgba(234,84,41,0.04) 0%, transparent 60%)',
                   }}
                 />
+
                 <div className="flex items-start gap-3">
+                  {/* Ícone */}
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
-                    style={{ background: 'rgba(230,57,70,0.08)' }}
+                    style={{ background: 'rgba(234,84,41,0.08)' }}
                   >
                     {(() => { const DynIcon = stat.icon; return <DynIcon size={18} />; })()}
                   </div>
+
                   <div>
                     <p
                       className="text-[1.6rem] font-bold leading-none tracking-tight"
-                      style={{ color: '#E63946' }}
+                      style={{ color: '#EA5429' }}
                     >
                       {stat.num !== null ? (
-                        <AnimatedCounter target={stat.num} duration={1800} />
+                        <AnimatedCounter target={stat.num} duration={4000} />
                       ) : (
                         stat.text
                       )}
@@ -302,7 +314,7 @@ export default function SignUpPage() {
             ))}
           </div>
 
-          {/* ── Selo de confiança ── */}
+          {/* ── Depoimento / selo de confiança ── */}
           <div
             className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/60 px-4 py-3 backdrop-blur-sm"
             style={{
@@ -312,7 +324,7 @@ export default function SignUpPage() {
             }}
           >
             <div className="flex -space-x-2">
-              {['#E63946', '#c8956c', '#2D4F3C'].map((color, i) => (
+              {['#EA5429', '#c8956c', '#2D4F3C'].map((color, i) => (
                 <div
                   key={i}
                   className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white"
@@ -323,12 +335,12 @@ export default function SignUpPage() {
               ))}
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-700">Junte-se à nossa rede</p>
+              <p className="text-xs font-semibold text-gray-700">Equipe multidisciplinar</p>
               <p className="text-[0.68rem] text-gray-400">Médicos · Pacientes · Administração</p>
             </div>
             <div className="ml-auto flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((s) => (
-                <svg key={s} className="h-3 w-3" viewBox="0 0 12 12" fill="#E63946">
+                <svg key={s} className="h-3 w-3" viewBox="0 0 12 12" fill="#EA5429">
                   <path d="M6 1l1.39 2.82L10.5 4.23l-2.25 2.19.53 3.08L6 7.82l-2.78 1.48.53-3.08L1.5 4.23l3.11-.41z" />
                 </svg>
               ))}
@@ -347,13 +359,9 @@ export default function SignUpPage() {
           <p className="text-xs text-gray-400">
             © {new Date().getFullYear()} Be4Hope · Medicina Endocanabinóide com Ciência e Cuidado
           </p>
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[0.65rem] text-gray-400">Cadastros abertos</span>
-          </div>
         </div>
 
-        {/* ── Onda decorativa ── */}
+        {/* ── Onda SVG decorativa no canto direito ── */}
         <svg
           className="absolute right-0 top-1/2 -translate-y-1/2 h-full opacity-[0.04] pointer-events-none"
           viewBox="0 0 80 600"
@@ -363,7 +371,7 @@ export default function SignUpPage() {
           <path
             d="M80 0 C40 100, 80 150, 40 200 C0 250, 80 300, 40 350 C0 400, 80 450, 40 500 C0 550, 80 580, 80 600"
             fill="none"
-            stroke="#E63946"
+            stroke="#EA5429"
             strokeWidth="60"
           />
         </svg>
@@ -373,29 +381,30 @@ export default function SignUpPage() {
           LADO DIREITO — FORMULÁRIO
           ════════════════════════════════════ */}
       <div className="relative flex w-full flex-col items-center justify-center bg-[#F5F2ED] px-6 py-12 lg:w-[45%]">
+
+        {/* Gradiente decorativo topo */}
         <div
           className="absolute top-0 right-0 h-72 w-72 pointer-events-none"
           style={{
-            background:
-              'radial-gradient(circle at top right, rgba(230,57,70,0.06) 0%, transparent 70%)',
+            background: 'radial-gradient(circle at top right, rgba(234,84,41,0.06) 0%, transparent 70%)',
           }}
         />
+        {/* Gradiente decorativo fundo */}
         <div
           className="absolute bottom-0 left-0 h-56 w-56 pointer-events-none"
           style={{
-            background:
-              'radial-gradient(circle at bottom left, rgba(230,57,70,0.05) 0%, transparent 70%)',
+            background: 'radial-gradient(circle at bottom left, rgba(234,84,41,0.05) 0%, transparent 70%)',
           }}
         />
 
-        {/* Logo mobile */}
-        <div className="mb-8 lg:hidden">
+        {/* ── Logo mobile (escondido pois o header já possui a logo) ── */}
+        <div className="mb-8 lg:hidden hidden">
           <a href="/">
             <img src="/logo.png" alt="Be4Hope" className="h-14 w-auto" />
           </a>
         </div>
 
-        {/* Formulário */}
+        {/* ── Formulário ── */}
         <div
           className="relative z-10 w-full max-w-sm"
           style={{
@@ -404,44 +413,28 @@ export default function SignUpPage() {
             transition: 'opacity 0.8s ease-out 0.25s, transform 0.8s ease-out 0.25s',
           }}
         >
-          {/* Cabeçalho — contexto inequívoco de REGISTRO */}
-          <div className="mb-7 space-y-1.5">
-            {/* Badge de contexto */}
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-semibold" style={{ color: '#16a34a' }}>Nova conta</span>
-            </div>
-
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="h-9 w-9 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(34,197,94,0.1)' }}
-              >
-                <UserPlus size={18} style={{ color: '#16a34a' }} />
-              </div>
-              <div>
-                <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-                  Criar sua conta
-                </h2>
-                <p className="text-sm text-gray-500">Preencha os dados para começar</p>
-              </div>
-            </div>
+          {/* Cabeçalho — contexto de LOGIN */}
+          <div className="mb-8 space-y-1">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
+              Bem-vindo de volta.
+            </h2>
+            <p className="text-sm text-gray-400">Entre com suas credenciais para continuar.</p>
           </div>
 
-          <SignUp
+          <SignIn
             forceRedirectUrl={redirectUrl}
             appearance={{
-              layout: {
+              options: {
                 logoPlacement: 'none',
                 socialButtonsVariant: 'iconButton',
               },
               variables: {
-                colorPrimary: '#E63946',
+                colorPrimary: '#EA5429',
                 colorBackground: '#ffffff',
-                colorInputBackground: '#ffffff',
-                colorText: '#1A1612',
-                colorTextSecondary: '#8A7F73',
-                colorInputText: '#1A1612',
+                colorInput: '#ffffff',
+                colorForeground: '#1A1612',
+                colorMutedForeground: '#8A7F73',
+                colorInputForeground: '#1A1612',
                 borderRadius: '0.75rem',
                 fontFamily: 'inherit',
               },
@@ -452,10 +445,10 @@ export default function SignUpPage() {
                 socialButtonsBlockButton:
                   'border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 hover:shadow-sm hover:border-gray-300',
                 formButtonPrimary:
-                  'bg-[#E63946] hover:bg-[#cf2d3a] text-white font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-300/40 hover:-translate-y-0.5 active:translate-y-0',
+                  'bg-[#EA5429] hover:bg-[#D64319] text-white font-semibold rounded-full px-8 tracking-wide transition-colors duration-200',
                 formFieldInput:
-                  'border-gray-200 focus:border-[#E63946] focus:ring-2 focus:ring-[#E63946]/20 bg-white rounded-xl transition-all duration-200',
-                footerActionLink: 'text-[#E63946] hover:text-[#cf2d3a] font-semibold',
+                  'h-12 border-gray-200 focus:border-[#EA5429] focus:ring-2 focus:ring-[#EA5429]/20 bg-white rounded-xl transition-colors duration-200',
+                footerActionLink: 'text-[#EA5429] hover:text-[#D64319] font-semibold',
                 dividerLine: 'bg-gray-200',
                 dividerText: 'text-gray-400 text-xs',
                 footer: 'rounded-b-2xl',
@@ -466,7 +459,7 @@ export default function SignUpPage() {
         </div>
       </div>
 
-      {/* ── Keyframes ── */}
+      {/* ── Keyframes globais ── */}
       <style>{`
         @keyframes particle-float {
           0%, 100% { transform: translateY(0px) scale(1); }

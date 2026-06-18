@@ -13,15 +13,14 @@ import {
 import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
 import { ScrollToSection } from '@/components/shared/scroll-to-section';
+import { Counter } from '@/components/shared/counter';
+import { MedicoCard } from '@/components/shared/medico-card';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
-  ChevronDown,
   ChevronRight,
-  Heart,
   HeartHandshake,
   HeartPulse,
-  Scale,
   Shield,
   Star,
   Stethoscope,
@@ -44,10 +43,10 @@ export const metadata: Metadata = {
 /* ── Dados ──────────────────────────────────────────── */
 
 const STATS = [
-  { valor: '24', label: 'anos de história' },
-  { valor: 'ONG', label: 'sem fins lucrativos' },
-  { valor: '26', label: 'estados atendidos' },
-  { valor: '8.000+', label: 'Pacientes atendidos' },
+  { valor: '24', numeric: 24, suffix: '', label: 'anos de histórias reais' },
+  { valor: 'ONG', numeric: null, suffix: '', label: 'sem fins lucrativos' },
+  { valor: '26', numeric: 26, suffix: '', label: 'estados atendidos' },
+  { valor: '8.000+', numeric: 8000, suffix: '+', label: 'Pacientes atendidos' },
 ];
 
 const ESPECIALIDADES = [
@@ -150,6 +149,8 @@ export default async function HomePage() {
   noStore();
   const medicosResult = await listarMedicosPublico();
   const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
+  const sidarta = medicosData.find((m) => m.nome.toLowerCase().includes('sidarta'));
+  const outrosMedicos = medicosData.filter((m) => !m.nome.toLowerCase().includes('sidarta'));
 
   return (
     <>
@@ -177,26 +178,18 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <a href="#condicoes">
-                  <Button
-                    size="lg"
-                    className="btn-pill text-white border border-primary gap-2 px-8"
-                    style={{ backgroundColor: '#54ab34' }}
-                    nativeButton={false}
-                  >
-                    Iniciar triagem
-                    <ChevronRight size={16} />
-                  </Button>
-                </a>
-                <Link href="/#quem-somos">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="btn-pill border-primary text-secondary hover:bg-secondary/10 gap-2 px-8"
-                    nativeButton={false}
-                  >
-                    Conhecer a Be4Hope
-                  </Button>
+                <ScrollToSection
+                  targetId="condicoes"
+                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                >
+                  Iniciar acolhimento
+                  <ChevronRight size={16} />
+                </ScrollToSection>
+                <Link
+                  href="/#quem-somos"
+                  className="border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                >
+                  Conhecer a Be4Hope
                 </Link>
               </div>
             </div>
@@ -229,7 +222,11 @@ export default async function HomePage() {
             {STATS.map((stat) => (
               <div key={stat.label} className="px-6 py-8 text-center">
                 <p className="font-display text-primary text-3xl font-bold sm:text-4xl">
-                  {stat.valor}
+                  {stat.numeric !== null ? (
+                    <Counter target={stat.numeric} suffix={stat.suffix} />
+                  ) : (
+                    stat.valor
+                  )}
                 </p>
                 <p className="text-muted-foreground mt-1 text-xs font-medium tracking-[0.15em] uppercase">
                   {stat.label}
@@ -248,7 +245,7 @@ export default async function HomePage() {
       ══════════════════════════════════════════════════════════ */}
 
       {/* ── 1. Quem Somos — Introdução ──────────────────────── */}
-      <section id="quem-somos" className="py-10 lg:py-14">
+      <section id="quem-somos" className="py-16 lg:py-24 scroll-mt-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
             {/* Texto principal */}
@@ -295,29 +292,13 @@ export default async function HomePage() {
               <div className="mt-8 flex justify-center">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
-                  style={{ backgroundColor: '#54ab34' }}
+                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 >
-                  Falar com um especialista
-                  <ChevronDown size={16} />
+                  Iniciar acolhimento com especialista
+                  <ChevronRight size={16} />
                 </ScrollToSection>
               </div>
 
-              {/* Flores decorativas — mix-blend-mode dissolve o fundo branco do PNG */}
-              <div className="mt-8 flex justify-center">
-                <Image
-                  src="/images/home/flores.png"
-                  alt="Ilustração de flores — símbolo de florescimento e cuidado da Be4Hope"
-                  width={520}
-                  height={220}
-                  className="h-auto w-full max-w-[430px] select-none"
-                  style={{
-                    mixBlendMode: 'multiply',
-                    display: 'block',
-                  }}
-                  draggable={false}
-                />
-              </div>
             </div>
 
             {/* Vídeo — Quem Somos */}
@@ -362,7 +343,8 @@ export default async function HomePage() {
       </section>
 
       {/* ── 2. Por que Be4Hope? ────────────────────────────── */}
-      <section className="border-border bg-muted/30 border-y py-10 lg:py-14">
+      {/* ── 2. Por que Be4Hope? — faixa verde musgo suave ─── */}
+      <section className="border-y border-[#2D4F3C]/10 bg-[#2D4F3C]/[0.06] py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
@@ -398,49 +380,29 @@ export default async function HomePage() {
                 descricao:
                   'Oferecemos suporte contínuo aos pacientes, com acompanhamento médico regular, orientações personalizadas e monitoramento da evolução do tratamento.',
               },
-              {
-                icon: Scale,
-                titulo: 'É legal?',
-                descricao:
-                  'Sim. O acesso é regulamentado pela ANVISA (RDC 660), com receita médica e autorização oficial. Tudo dentro da lei, do começo ao fim.',
-              },
-              {
-                icon: Heart,
-                titulo: 'Quanto custa?',
-                descricao:
-                  'Começar não tem custo: a triagem é gratuita e sem compromisso. Como associação sem fins lucrativos, você sabe cada valor antes de decidir — e há apoio para casos de maior vulnerabilidade.',
-              },
             ];
-            const renderCard = (item: (typeof CARDS)[number]) => (
-              <Card
-                key={item.titulo}
-                className="group bg-background border-0 shadow-sm transition-all hover:shadow-md"
-              >
-                <CardContent className="p-6">
-                  <div className="bg-primary/10 group-hover:bg-primary/20 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors">
-                    {(() => {
-                      const DynIcon = item.icon;
-                      return <DynIcon size={22} />;
-                    })()}
-                  </div>
-                  <h3 className="text-sm font-semibold">{item.titulo}</h3>
-                  <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                    {item.descricao}
-                  </p>
-                </CardContent>
-              </Card>
-            );
             return (
-              <>
-                {/* Linha superior — 3 cards */}
-                <div className="mt-16 grid gap-4 sm:gap-8 sm:grid-cols-3">
-                  {CARDS.slice(0, 3).map(renderCard)}
-                </div>
-                {/* Linha inferior — 2 cards centrados (pirâmide invertida) */}
-                <div className="mt-4 sm:mt-8 mx-auto grid w-full max-w-2xl gap-4 sm:gap-8 sm:grid-cols-2">
-                  {CARDS.slice(3).map(renderCard)}
-                </div>
-              </>
+              <div className="mt-16 grid gap-4 sm:gap-8 sm:grid-cols-3">
+                {CARDS.map((item) => (
+                  <Card
+                    key={item.titulo}
+                    className="group bg-background border-0 shadow-sm transition-all hover:shadow-md"
+                  >
+                    <CardContent className="p-6">
+                      <div className="bg-primary/10 group-hover:bg-primary/20 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors">
+                        {(() => {
+                          const DynIcon = item.icon;
+                          return <DynIcon size={22} />;
+                        })()}
+                      </div>
+                      <h3 className="text-sm font-semibold">{item.titulo}</h3>
+                      <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                        {item.descricao}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             );
           })()}
 
@@ -454,44 +416,41 @@ export default async function HomePage() {
       <SeuCaminho />
 
       {/* ── Medicina Endocanabinóide — CTA educativo ───── */}
-      <section className="section-dark py-10 lg:py-14">
+      {/* ── Medicina Endocanabinóide — faixa terracota quente ─ */}
+      <section className="border-y border-[#C34C32]/10 bg-[#C34C32]/[0.05] py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
             <div>
               <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
                 Ciência e cuidado
               </p>
-              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl">
+              <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-foreground sm:text-4xl">
                 Medicina <span className="text-accent-italic">Endocanabinóide</span>
               </h2>
-              <div className="mt-6 space-y-4 text-base leading-relaxed text-white/70">
+              <div className="mt-6 space-y-4 text-base leading-relaxed text-muted-foreground">
                 <p>
                   A Medicina Endocanabinóide tem se mostrado eficaz no tratamento de diversas
                   doenças raras e crônicas, desde dores crônicas até distúrbios neurológicos.
                 </p>
                 <p>
                   Seu uso no Brasil é regulamentado pela{' '}
-                  <strong className="text-white">RDC 660 da Anvisa</strong>, garantindo segurança e
+                  <strong className="text-foreground">RDC 660 da Anvisa</strong>, garantindo segurança e
                   controle. A Be4Hope atua com responsabilidade dentro desse cenário, sempre
                   buscando as melhores soluções para os pacientes.
                 </p>
                 <p>
-                  Seus principais componentes ativos — o <strong className="text-white">CBD</strong>{' '}
-                  (canabidiol) e o <strong className="text-white">THC</strong>{' '}
+                  Seus principais componentes ativos — o <strong className="text-foreground">CBD</strong>{' '}
+                  (canabidiol) e o <strong className="text-foreground">THC</strong>{' '}
                   (tetra-hidrocanabinol) — demonstraram propriedades analgésicas,
                   anti-inflamatórias, ansiolíticas e neuroprotetoras.
                 </p>
               </div>
-              <Link href="/mundo-endocanabinoide" className="mt-8 inline-flex">
-                <Button
-                  size="lg"
-                  className="btn-pill text-white border border-primary gap-2 px-8"
-                  style={{ backgroundColor: '#54ab34' }}
-                  nativeButton={false}
-                >
-                  Quero saber mais
-                  <ChevronRight size={16} />
-                </Button>
+              <Link
+                href="/historias"
+                className="mt-8 inline-flex bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+              >
+                Quero saber mais
+                <ChevronRight size={16} />
               </Link>
             </div>
 
@@ -513,7 +472,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Testemunhos — Pessoas reais ───────────────────── */}
-      <section className="py-10 lg:py-14">
+      <section className="py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
@@ -555,8 +514,9 @@ export default async function HomePage() {
       </section>
 
       {/* ── Médicos — Quem vai te acompanhar ──────────────── */}
-      <section className="border-border bg-muted/30 border-y py-10 lg:py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* ── Médicos — faixa musgo mais densa ────────────────── */}
+      <section className="border-t border-[#2D4F3C]/12 py-16 lg:py-24">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
               Confiança com rosto
@@ -573,49 +533,43 @@ export default async function HomePage() {
             </p>
           </div>
 
-          {medicosData.length > 0 && (
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {medicosData.map((m) => {
-                const iniciais = m.nome
-                  .split(' ')
-                  .filter(Boolean)
-                  .map((w) => w[0].toUpperCase())
-                  .slice(0, 2)
-                  .join('');
-                return (
-                  <Card key={m.id} className="bg-card border-0 shadow-sm">
-                    <CardContent className="flex flex-col items-center p-8 text-center">
-                      {m.avatarUrl ? (
-                        <Image
-                          src={m.avatarUrl}
-                          alt={m.nome}
-                          width={80}
-                          height={80}
-                          className="h-20 w-20 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="gradient-moss flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold text-white">
-                          {iniciais}
-                        </div>
-                      )}
-                      <h3 className="mt-5 text-base font-semibold">{m.nome}</h3>
-                      <p className="text-muted-foreground mt-1 text-sm">{m.especialidade}</p>
-                      {m.crm && (
-                        <p className="text-primary mt-3 text-sm font-semibold tracking-wide">
-                          CRM {m.crm}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+            {/* 1. Dr. Sidarta (se cadastrado no banco) */}
+            {sidarta && (
+              <MedicoCard
+                key={sidarta.id}
+                nome={sidarta.nome}
+                avatarUrl={sidarta.avatarUrl}
+                especialidade={sidarta.especialidade}
+                crm="CRM/SP 88877"
+              />
+            )}
+
+            {/* 2. Dra. Cynthia De Carlo (Padronizada, sem botão/currículo, com CRM/SP 000000) */}
+            <MedicoCard
+              nome="Dra. Cynthia De Carlo"
+              avatarUrl="/images/home/cynthia.jpeg"
+              especialidade="Clínica Geral - Dor"
+              crm="CRM/SP 000000"
+              destaque={false}
+            />
+
+            {/* 3. Outros médicos (banco de dados) */}
+            {outrosMedicos.map((m) => (
+              <MedicoCard
+                key={m.id}
+                nome={m.nome}
+                avatarUrl={m.avatarUrl}
+                especialidade={m.especialidade}
+                crm={m.crm}
+              />
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── Seção Humana — Imagem + Diferenciais ─────────── */}
-      <section className="overflow-hidden py-10 lg:py-14">
+      <section className="overflow-hidden py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
             {/* Coluna esquerda — Imagem com detalhe de profundidade */}
@@ -626,15 +580,15 @@ export default async function HomePage() {
                 aria-hidden="true"
               />
               <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-2xl">
-                <Image
-                  src="/images/home/shutterstock_2203716633.jpg"
-                  alt="Paciente idoso sendo acolhido com cuidado e atenção por profissional de saúde"
-                  fill
-                  className="object-cover"
-                  style={{ objectPosition: 'center 35%' }}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  quality={85}
-                />
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                >
+                  <source src="/images/home/shutterstock_1085515565.mp4" type="video/mp4" />
+                </video>
                 {/* Overlay sutil de gradiente */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
@@ -710,10 +664,9 @@ export default async function HomePage() {
               <div className="mt-10">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
-                  style={{ backgroundColor: '#54ab34' }}
+                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 >
-                  Quero ser acolhido
+                  Quero iniciar acolhimento
                   <ChevronRight size={16} />
                 </ScrollToSection>
               </div>
@@ -723,7 +676,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── FAQ — Antes de começar ────────────────────────── */}
-      <section className="py-10 lg:py-14">
+      <section className="py-16 lg:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <span className="bg-secondary/10 text-secondary inline-block rounded-full px-3 py-1 text-xs font-semibold">
@@ -754,33 +707,84 @@ export default async function HomePage() {
       </section>
 
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
-      <section className="py-10 lg:py-14">
+      <section className="py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#EF8888] from-40% to-[#C83333] px-6 py-16 text-center sm:px-12">
-            <span className="inline-block rounded-full bg-[#3D0A0A]/15 px-3 py-1 text-xs font-semibold text-black">
-              No seu tempo, sem compromisso
-            </span>
-            <h2 className="font-display mx-auto mt-5 max-w-2xl text-3xl leading-tight font-bold tracking-tight text-black sm:text-4xl">
-              Dê o primeiro passo do seu cuidado
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-black/75">
-              A triagem leva poucos minutos e quem te atende é gente de verdade. Sem pressão, sem
-              julgamento.
-            </p>
-            <div className="mt-8 flex justify-center">
-              <ScrollToSection
-                targetId="condicoes"
-                className="btn-pill inline-flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white border border-primary rounded-full cursor-pointer"
-                style={{ backgroundColor: '#54ab34' }}
-              >
-                Iniciar minha triagem gratuita
-                <ChevronRight size={16} />
-              </ScrollToSection>
+          <div className="relative overflow-hidden rounded-3xl bg-[#2D4F3C] px-8 py-14 sm:px-14 lg:py-20">
+
+            {/* Círculos decorativos de profundidade */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/[0.04]"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-white/[0.03]"
+            />
+
+            <div className="relative grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
+              {/* Coluna esquerda — Texto + CTA */}
+              <div>
+                <span className="inline-block rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold text-white/80 tracking-widest uppercase mb-6">
+                  No seu tempo, sem compromisso
+                </span>
+
+                <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                  Dê o primeiro{' '}
+                  <span className="text-[#D4A388] italic">passo</span>{' '}
+                  do seu cuidado.
+                </h2>
+
+                <p className="mt-6 text-base leading-relaxed text-white/70 max-w-md">
+                  A triagem leva poucos minutos e quem te atende é gente de verdade. Sem pressão, sem julgamento.
+                </p>
+
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <ScrollToSection
+                    targetId="condicoes"
+                    className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  >
+                    Iniciar acolhimento gratuito
+                    <ChevronRight size={16} />
+                  </ScrollToSection>
+                </div>
+
+                <p className="mt-8 text-xs leading-relaxed text-white/35 max-w-sm">
+                  Conteúdo informativo. A indicação de uso e a posologia são definidas exclusivamente
+                  pelo médico após avaliação. Não prometemos cura nem resultado.
+                </p>
+              </div>
+
+              {/* Coluna direita — Sinais de confiança */}
+              <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-1">
+                {[
+                  {
+                    valor: 'Gratuito',
+                    desc: 'A triagem não tem custo e não gera nenhum compromisso de compra.',
+                  },
+                  {
+                    valor: 'Legal e regulamentado',
+                    desc: 'Atuamos dentro da ANVISA RDC 660 — do início ao fim, tudo dentro da lei.',
+                  },
+                  {
+                    valor: 'Você não fica sozinho',
+                    desc: 'Nossa equipe acompanha cada etapa, da triagem à recompra do produto.',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.valor}
+                    className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-5 backdrop-blur-sm"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#D4A388]/20">
+                      <HeartPulse size={16} className="text-[#D4A388]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.valor}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-white/55">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="mx-auto mt-8 max-w-2xl text-xs leading-relaxed text-black/55">
-              Conteúdo informativo. A indicação de uso e a posologia são definidas exclusivamente
-              pelo médico após avaliação. Não prometemos cura nem resultado.
-            </p>
           </div>
         </div>
       </section>

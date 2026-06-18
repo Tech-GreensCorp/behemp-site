@@ -73,7 +73,7 @@ const DIFERENCIAIS_CANNECT = [
 export default function ParceirosPage() {
   return (
     <div className="min-h-screen pt-24 pb-16">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mx-auto max-w-2xl text-center animate-fade-up">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary">
@@ -97,9 +97,9 @@ export default function ParceirosPage() {
             {/* Barra superior com gradiente animada */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-green-500 via-emerald-400 to-green-600 transition-all duration-500 group-hover:h-2" />
 
-            <div className="grid md:grid-cols-5">
+            <div className="grid md:grid-cols-3">
               {/* Coluna esquerda — Informações */}
-              <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-12 md:col-span-3">
+              <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-12 md:col-span-2">
                 {/* Badge + Ícone */}
                 <div className="flex items-center gap-3">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-green-100 to-emerald-50 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
@@ -173,7 +173,7 @@ export default function ParceirosPage() {
               </div>
 
               {/* Coluna direita — Visual card */}
-              <div className="relative md:col-span-2 min-h-[300px] overflow-hidden">
+              <div className="relative md:col-span-1 min-h-[300px] overflow-hidden">
                 {/* Gradiente de fundo */}
                 <div className="absolute inset-0 bg-gradient-to-br from-green-600 via-emerald-600 to-green-800 transition-all duration-700 group-hover:from-green-500 group-hover:via-emerald-500 group-hover:to-green-700" />
 
@@ -233,9 +233,9 @@ export default function ParceirosPage() {
             {/* Barra superior verde musgo */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#6B7B3C] via-[#7a8f45] to-[#5a6833] transition-all duration-500 group-hover:h-2" />
 
-            <div className="grid md:grid-cols-5">
+            <div className="grid md:grid-cols-3">
               {/* Coluna esquerda — Informações */}
-              <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-12 md:col-span-3">
+              <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-12 md:col-span-2">
                 {/* Badge + Ícone */}
                 <div className="flex items-center gap-3">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" style={{ background: 'linear-gradient(135deg, rgba(107,123,60,0.15) 0%, rgba(107,123,60,0.05) 100%)' }}>
@@ -308,7 +308,7 @@ export default function ParceirosPage() {
               </div>
 
               {/* Coluna direita — Visual card */}
-              <div className="relative md:col-span-2 min-h-[300px] overflow-hidden">
+              <div className="relative md:col-span-1 min-h-[300px] overflow-hidden">
                 {/* Gradiente de fundo verde musgo */}
                 <div className="absolute inset-0 transition-all duration-700" style={{ background: 'linear-gradient(135deg, #6B7B3C 0%, #5a6833 50%, #3d4d22 100%)' }} />
 
@@ -381,7 +381,7 @@ export default function ParceirosPage() {
                 à medicina endocanabinóide no Brasil.
               </p>
               <div className="mt-8">
-                <Link href="/entre-em-contato">
+                <Link href="/contato">
                   <Button
                     className="btn-pill gap-2 bg-white px-8 text-primary shadow-lg hover:bg-white/90 hover:shadow-xl"
                     nativeButton={false}

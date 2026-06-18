@@ -178,12 +178,12 @@ export function AgendamentoWizard() {
             Crie sua conta ou faça login para confirmar o agendamento e garantir seu horário com um dos nossos especialistas.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/sign-in?redirect_url=/agendamento">
+            <Link href="/entrar?redirect_url=/agendamento">
               <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
                 Entrar para agendar
               </Button>
             </Link>
-            <Link href="/sign-up?redirect_url=/agendamento">
+            <Link href="/registrar-se?redirect_url=/agendamento">
               <Button variant="outline" className="gap-2 px-8">
                 Criar conta grátis
               </Button>

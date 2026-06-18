@@ -1,18 +1,19 @@
 import Link from 'next/link';
 import { Mail, Smartphone, MapPin } from 'lucide-react';
+import { Instagram } from '@/components/shared/icons';
 
 const LINKS_RAPIDOS = [
   { label: 'Início', href: '/' },
   { label: 'Quem Somos', href: '/#quem-somos' },
   { label: 'Triagem', href: '/triagem' },
-  { label: 'Histórias', href: '/mundo-endocanabinoide' },
+  { label: 'Histórias', href: '/historias' },
 ];
 
 const LINKS_SUPORTE = [
   { label: 'Parceiros', href: '/parceiros' },
-  { label: 'Contato', href: '/entre-em-contato' },
-  { label: 'Política de Privacidade', href: '/privacidade' },
-  { label: 'Termos de Uso', href: '/termos' },
+  { label: 'Contato', href: '/contato' },
+  { label: 'Política de Privacidade', href: '/politica-de-privacidade' },
+  { label: 'Termos de Uso', href: '/termos-de-uso' },
 ];
 
 export function Footer() {
@@ -86,6 +87,17 @@ export function Footer() {
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Smartphone size={16} className="shrink-0 text-primary" />
                 +55 (11) 93204-7360
+              </li>
+              <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Instagram size={16} className="shrink-0 text-primary" />
+                <a
+                  href="https://instagram.com/be_4hope"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors"
+                >
+                  @be_4hope
+                </a>
               </li>
               <li className="flex items-start gap-2 text-sm text-muted-foreground">
                 <MapPin size={16} className="mt-0.5 shrink-0 text-primary" />
