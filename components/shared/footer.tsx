@@ -27,8 +27,7 @@ export function Footer() {
               <img src="/logo.png" alt="Be4Hope" className="h-14 w-auto" />
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Há mais de duas décadas conectando pessoas ao cuidado com Medicina
-              Endocanabinóide. Acolhimento humanizado, sem julgamento, sem custo.
+             Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
             </p>
           </div>
 

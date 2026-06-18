@@ -178,7 +178,7 @@ export function Navbar() {
         {/* ── Desktop: zona de CTAs (direita) ── */}
         <div className="hidden items-center gap-2.5 lg:flex">
           {/* Agendar Consulta — outline moss */}
-          <Link href="/agendamento">
+          {/* <Link href="/agendamento">
             <Button
               size="sm"
               variant="outline"
@@ -188,7 +188,7 @@ export function Navbar() {
               <Calendar size={14} />
               Agendar Consulta
             </Button>
-          </Link>
+          </Link> */}
 
           {isLoaded && (
             isSignedIn ? (
@@ -369,7 +369,7 @@ export function Navbar() {
                     )
                   )}
 
-                  <Link href="/agendamento" onClick={() => setMobileOpen(false)}>
+                  {/* <Link href="/agendamento" onClick={() => setMobileOpen(false)}>
                     <Button
                       variant="outline"
                       className="h-11 w-full gap-2 rounded-full border-[#2D4F3C]/40 text-[#2D4F3C] hover:border-[#2D4F3C] hover:bg-[#2D4F3C]/5"
@@ -378,7 +378,7 @@ export function Navbar() {
                       <Calendar size={16} />
                       Agendar Consulta
                     </Button>
-                  </Link>
+                  </Link> */}
                 </div>
               </div>
             </SheetContent>

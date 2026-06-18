@@ -527,7 +527,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
               </h1>
               <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
                 Este formulário é o primeiro passo para entender sua história
-                e conectá-la ao cuidado certo. Sem pressa, sem julgamento, sem custo.
+                e conectá-la ao cuidado certo.
               </p>
 
               {/* Progresso dos steps */}

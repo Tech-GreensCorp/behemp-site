@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { WhatsApp } from '@/components/shared/icons';
 
 type Etapa = {
   passo: string;
@@ -127,16 +128,16 @@ export function SeuCaminho() {
           })}
 
           {/* Card CTA — Iniciar jornada */}
-          <div className="bg-secondary text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center sm:col-span-2 lg:col-span-1">
+          <div className="bg-[#16a34a] text-primary-foreground flex flex-col items-center justify-center gap-5 rounded-2xl p-6 text-center sm:col-span-2 lg:col-span-1">
             <p className="font-display text-lg leading-snug font-bold text-white">
-              Uma jornada de sucesso com quem entende!
+              Uma jornada de sucesso 100% humanizada com quem entende!
             </p>
             <ScrollToSection
               targetId="condicoes"
               className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-secondary bg-white rounded-full cursor-pointer transition-colors hover:bg-white/90"
             >
               Iniciar jornada
-              <MessageCircle size={16} />
+              <WhatsApp size={16} />
             </ScrollToSection>
           </div>
         </div>

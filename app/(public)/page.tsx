@@ -31,11 +31,11 @@ export const metadata: Metadata = {
   // title resultante: "Você não precisa enfrentar isso sozinho | Be4Hope"
   title: 'Você não precisa enfrentar isso sozinho',
   description:
-    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, com responsabilidade, acolhimento e do seu lado em cada etapa.',
+    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.',
   openGraph: {
     title: 'Você não precisa enfrentar isso sozinho | Be4Hope',
     description:
-      'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, com responsabilidade, acolhimento e do seu lado em cada etapa.',
+      'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.',
     url: 'https://be4hope.org',
   },
 };
@@ -79,7 +79,7 @@ const TESTEMUNHOS = [
     local: 'Campinas',
     sobre: 'sobre o acolhimento',
     texto:
-      'Eu tinha medo de que fosse complicado ou ilegal. O que mais me marcou foi não ter ninguém me empurrando nada — só me explicando, no meu tempo. Me senti acolhida.',
+      'Eu tinha medo de que fosse complicado ou ilegal. O que mais me marcou foi não ter ninguém me empurrando nada, só me explicando, no meu tempo. Me senti acolhida.',
   },
   {
     inicial: 'R',
@@ -114,12 +114,12 @@ const FAQ = [
   {
     pergunta: 'Quanto custa o processo?',
     resposta:
-      'Começar é gratuito — a triagem não tem custo nem compromisso. Como associação sem fins lucrativos, os valores de consulta e autorização são apresentados com transparência antes de qualquer decisão.',
+      'Começar é gratuito, a triagem não tem custo nem compromisso. Como associação sem fins lucrativos, os valores de consulta e autorização são apresentados com transparência antes de qualquer decisão.',
   },
   {
     pergunta: 'E se o médico não indicar?',
     resposta:
-      'Então o processo para por aí — você não paga por produto que não foi prescrito. Quem decide é sempre o médico.',
+      'Então o processo para por aí, você não paga por produto que não foi prescrito. Quem decide é sempre o médico.',
   },
   {
     pergunta: 'Nunca usei antes. É seguro?',
@@ -139,7 +139,7 @@ const FAQ = [
   {
     pergunta: 'Vocês me acompanham depois?',
     resposta:
-      'Sim. O acolhimento continua depois do início — você não fica sozinho.',
+      'Sim. O acolhimento continua depois do início, você não fica sozinho.',
   },
 ];
 
@@ -151,6 +151,9 @@ export default async function HomePage() {
   const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
   const sidarta = medicosData.find((m) => m.nome.toLowerCase().includes('sidarta'));
   const outrosMedicos = medicosData.filter((m) => !m.nome.toLowerCase().includes('sidarta'));
+  const medico3 = outrosMedicos[0];
+  const medico4 = outrosMedicos[1];
+  const medico5 = outrosMedicos[2];
 
   return (
     <>
@@ -173,14 +176,13 @@ export default async function HomePage() {
               </h1>
 
               <p className="text-muted-foreground mt-6 max-w-lg text-base leading-relaxed sm:text-lg">
-                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide,
-                com responsabilidade, acolhimento e do seu lado em cada etapa.
+                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 >
                   Iniciar acolhimento
                   <ChevronRight size={16} />
@@ -271,7 +273,7 @@ export default async function HomePage() {
                 </p>
                 <p>
                   Acreditamos que{' '}
-                  <strong className="text-foreground">saúde é um direito de todos</strong> — não
+                  <strong className="text-foreground">saúde é um direito de todos</strong>, não
                   importa onde você mora ou qual é a sua condição financeira. Por isso, atuamos para
                   garantir que <strong className="text-foreground">medicamentos essenciais</strong>{' '}
                   cheguem de forma justa e legal até quem realmente precisa.
@@ -292,7 +294,7 @@ export default async function HomePage() {
               <div className="mt-8 flex justify-center">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 >
                   Iniciar acolhimento com especialista
                   <ChevronRight size={16} />
@@ -439,15 +441,15 @@ export default async function HomePage() {
                   buscando as melhores soluções para os pacientes.
                 </p>
                 <p>
-                  Seus principais componentes ativos — o <strong className="text-foreground">CBD</strong>{' '}
+                  Seus principais componentes ativos, o <strong className="text-foreground">CBD</strong>{' '}
                   (canabidiol) e o <strong className="text-foreground">THC</strong>{' '}
-                  (tetra-hidrocanabinol) — demonstraram propriedades analgésicas,
+                  (tetra-hidrocanabinol), demonstraram propriedades analgésicas,
                   anti-inflamatórias, ansiolíticas e neuroprotetoras.
                 </p>
               </div>
               <Link
                 href="/historias"
-                className="mt-8 inline-flex bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                className="mt-8 inline-flex bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 items-center justify-center gap-2 border-0 text-sm cursor-pointer"
               >
                 Quero saber mais
                 <ChevronRight size={16} />
@@ -549,21 +551,43 @@ export default async function HomePage() {
             <MedicoCard
               nome="Dra. Cynthia De Carlo"
               avatarUrl="/images/home/cynthia.jpeg"
-              especialidade="Clínica Geral - Dor"
-              crm="CRM/SP 000000"
+              especialidade="Dentista"
+              crm="CRO/SP 43625"
               destaque={false}
             />
 
-            {/* 3. Outros médicos (banco de dados) */}
-            {outrosMedicos.map((m) => (
+            {/* 3. Dr. Wellington Briques (ou terceiro médico do banco) */}
+            {medico3 && (
               <MedicoCard
-                key={m.id}
-                nome={m.nome}
-                avatarUrl={m.avatarUrl}
-                especialidade={m.especialidade}
-                crm={m.crm}
+                key={medico3.id}
+                nome={medico3.nome}
+                avatarUrl={medico3.avatarUrl}
+                especialidade={medico3.especialidade}
+                crm="CRM/SP 53720"
               />
-            ))}
+            )}
+
+            {/* 4. Natalia Balderas Amurrio (ou quarto médico do banco) */}
+            {medico4 && (
+              <MedicoCard
+                key={medico4.id}
+                nome={medico4.nome}
+                avatarUrl={medico4.avatarUrl}
+                especialidade={medico4.especialidade}
+                crm="CRM/SP 250530"
+              />
+            )}
+
+            {/* 5. Quinto médico do banco */}
+            {medico5 && (
+              <MedicoCard
+                key={medico5.id}
+                nome={medico5.nome}
+                avatarUrl={medico5.avatarUrl}
+                especialidade={medico5.especialidade}
+                crm="CRM/MG 109940"
+              />
+            )}
           </div>
         </div>
       </section>
@@ -664,7 +688,7 @@ export default async function HomePage() {
               <div className="mt-10">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 >
                   Quero iniciar acolhimento
                   <ChevronRight size={16} />
@@ -709,7 +733,7 @@ export default async function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-[#2D4F3C] px-8 py-14 sm:px-14 lg:py-20">
+          <div className="relative overflow-hidden rounded-3xl bg-[#0d682e] px-8 py-14 sm:px-14 lg:py-20">
 
             {/* Círculos decorativos de profundidade */}
             <div
@@ -735,7 +759,7 @@ export default async function HomePage() {
                 </h2>
 
                 <p className="mt-6 text-base leading-relaxed text-white/70 max-w-md">
-                  A triagem leva poucos minutos e quem te atende é gente de verdade. Sem pressão, sem julgamento.
+                  A triagem leva poucos minutos e quem te atende é gente de verdade.
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-4">
@@ -743,7 +767,7 @@ export default async function HomePage() {
                     targetId="condicoes"
                     className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                   >
-                    Iniciar acolhimento gratuito
+                    Iniciar acolhimento
                     <ChevronRight size={16} />
                   </ScrollToSection>
                 </div>
@@ -763,7 +787,7 @@ export default async function HomePage() {
                   },
                   {
                     valor: 'Legal e regulamentado',
-                    desc: 'Atuamos dentro da ANVISA RDC 660 — do início ao fim, tudo dentro da lei.',
+                    desc: 'Atuamos dentro da ANVISA RDC 660, do início ao fim, tudo dentro da lei.',
                   },
                   {
                     valor: 'Você não fica sozinho',

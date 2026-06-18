@@ -221,16 +221,13 @@ export default function SignUpPage() {
                 className="text-xs font-semibold uppercase tracking-[0.3em]"
                 style={{ color: '#EA5429' }}
               >
-                Plataforma Médica
+                Plataforma do médico e do paciente
               </p>
             </div>
 
             <h1 className="font-display text-[2.6rem] font-bold leading-[1.08] tracking-tight text-gray-900">
-              Cuidar de quem cuida
-              <br />
-              é nosso{' '}
               <span className="text-accent-italic relative">
-                ato de amor.
+                Você {' '}
                 <span
                   className="absolute -bottom-1 left-0 h-0.5 w-full rounded-full"
                   style={{
@@ -239,11 +236,13 @@ export default function SignUpPage() {
                   }}
                 />
               </span>
+              não precisa
+              <br />
+              enfrentar isso sozinho.
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
-              Crie sua conta e acesse tratamentos com Medicina Endocanabinóide de forma
-              segura, humanizada e sem custo.
+              Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa. 
             </p>
           </div>
 
@@ -340,10 +339,6 @@ export default function SignUpPage() {
           <p className="text-xs text-gray-400">
             © {new Date().getFullYear()} Be4Hope · Medicina Endocanabinóide com Ciência e Cuidado
           </p>
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[0.65rem] text-gray-400">Cadastros abertos</span>
-          </div>
         </div>
 
         {/* ── Onda decorativa ── */}

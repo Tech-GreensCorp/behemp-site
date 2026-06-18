@@ -29,6 +29,7 @@ export * from './exames';
 export * from './ajustes-dosagem';
 export * from './relatorios';
 export * from './invoices';
+export * from './leads-ebook';
 
 // Relations
 export * from './relations';

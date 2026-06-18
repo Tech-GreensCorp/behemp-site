@@ -13,7 +13,9 @@ import {
   Mail,
   MapPin,
   Smartphone,
+  ChevronRight,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
   title: 'Contato',
@@ -78,16 +80,30 @@ export default function ContatoPage() {
     <div className="min-h-screen pt-24 pb-16">
       <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-16">
-          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-            Vamos
-            <br />
-            <span className="text-accent-italic">conversar?</span>
-          </h1>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-            Estamos aqui para ajudar. Escolha o canal mais confortável para você
-            ou envie uma mensagem diretamente.
-          </p>
+        <div className="mb-16 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+          <div>
+            <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+              Vamos
+              <br />
+              <span className="text-accent-italic">conversar?</span>
+            </h1>
+            <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+              Estamos aqui para ajudar. Escolha o canal mais confortável para você
+              ou envie uma mensagem diretamente.
+            </p>
+          </div>
+          <div className="sm:mb-2 shrink-0">
+            <Link href="/#condicoes">
+              <Button
+                size="lg"
+                className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 inline-flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                nativeButton={false}
+              >
+                Iniciar acolhimento
+                <ChevronRight size={16} />
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Grid de canais */}
@@ -126,7 +142,7 @@ export default function ContatoPage() {
           {/* Formulário (componente client) */}
           <div>
             <h2 className="font-display text-2xl font-bold">
-              Prefira nos <span className="text-accent-italic">escrever?</span>
+              Prefere nos <span className="text-accent-italic">escrever?</span>
             </h2>
             <p className="mt-2 mb-6 text-sm text-muted-foreground">
               Preencha o formulário e nossa equipe responderá o mais breve possível.

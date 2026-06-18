@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     template: '%s | Be4Hope',
   },
   description:
-    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide. Acolhimento humanizado, sem julgamento, sem custo.',
+    'Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.',
   keywords: [
     'Medicina Endocanabinóide',
     'medicina endocanabinóide',
@@ -72,7 +72,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={ptBR}>
+    <ClerkProvider
+      localization={{
+        ...ptBR,
+        formFieldInputPlaceholder__signUpPassword: 'Crie uma senha',
+      }}
+    >
       <html
         lang="pt-BR"
         suppressHydrationWarning

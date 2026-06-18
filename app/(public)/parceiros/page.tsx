@@ -28,7 +28,7 @@ const DIFERENCIAIS = [
   {
     icon: FlaskConical,
     titulo: 'Certificação Swiss GMP',
-    descricao: 'Protocolos internacionais de fabricação com certificação Swiss GMP — padrão de excelência global na indústria farmacêutica.',
+    descricao: 'Protocolos internacionais de fabricação com certificação Swiss GMP, padrão de excelência global na indústria farmacêutica.',
   },
   {
     icon: ShieldCheck,
@@ -127,7 +127,7 @@ export default function ParceirosPage() {
                   Indústria internacional dedicada ao{' '}
                   <strong className="text-foreground">desenvolvimento e entrega de terapias de alta complexidade</strong>{' '}
                   com excelência técnica, governança estruturada e visão de longo prazo.
-                  Atuam na interseção entre ciência, regulação e sustentabilidade —
+                  Atuam na interseção entre ciência, regulação e sustentabilidade,
                   assegurando que a inovação terapêutica chegue ao país com
                   <strong className="text-foreground"> responsabilidade institucional</strong>,
                   consistência técnica e estabilidade operacional.

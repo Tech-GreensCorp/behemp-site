@@ -19,6 +19,7 @@ import {
   User,
   Settings2,
   Stethoscope,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -34,6 +35,7 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: 'Médicos',            href: '/admin/medicos',         icon: Stethoscope },
   { label: 'Triagens',           href: '/admin/triagens',        icon: FileCheck },
   { label: 'Mensagens',          href: '/admin/mensagens',       icon: MessageSquare },
+  { label: 'Leads Ebooks',       href: '/admin/leads-ebooks',    icon: BookOpen },
   { label: 'Invoices',           href: '/admin/invoices',        icon: Receipt },
   { label: 'Recompras',          href: '/admin/recompras',       icon: ShoppingCart },
   { label: 'Auditoria',          href: '/admin/auditoria',       icon: Shield },

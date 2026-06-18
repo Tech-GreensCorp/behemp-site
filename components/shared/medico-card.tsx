@@ -40,7 +40,7 @@ export function MedicoCard({
       "bg-card border-0 shadow-sm transition-all hover:shadow-md relative overflow-hidden",
       destaque && "border-2 border-primary/20 shadow-md"
     )}>
-      <CardContent className="flex flex-col items-center p-8 text-center h-full justify-between min-h-[300px]">
+      <CardContent className="flex flex-col items-center p-8 text-center h-full justify-between min-h-[200px]">
         {destaque && (
           <span className="absolute top-3 right-3 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
             Destaque

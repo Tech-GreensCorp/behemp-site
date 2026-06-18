@@ -325,7 +325,7 @@ export function HistoriasContent() {
               </Button>
               <a href="/#condicoes" onClick={() => setActiveStory(null)}>
                 <Button
-                  className="bg-secondary hover:bg-secondary/90 text-white rounded-full px-6 border-0"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white rounded-full px-6 border-0"
                 >
                   Iniciar meu acolhimento
                 </Button>

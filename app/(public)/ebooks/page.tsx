@@ -27,26 +27,8 @@ export default function EbooksPage() {
           </h1>
 
           <p className="mt-6 text-base leading-relaxed text-muted-foreground max-w-xl mx-auto">
-            Ebooks, guias clínicos e materiais educativos desenvolvidos pela nossa equipe de especialistas
-            — tudo gratuito para pacientes e profissionais de saúde.
+            Ebooks, guias clínicos e materiais educativos desenvolvidos pela nossa equipe de especialistas, tudo gratuito para pacientes e profissionais de saúde.
           </p>
-        </div>
-
-        {/* ── Stats strip ──────────────────────────────────── */}
-        <div className="mb-16 grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-          {[
-            { value: '6+', label: 'Ebooks em produção' },
-            { value: '100%', label: 'Gratuitos' },
-            { value: '3', label: 'Especialidades' },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-border bg-card px-4 py-5 text-center shadow-sm"
-            >
-              <p className="font-display text-2xl font-bold text-secondary">{stat.value}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
-            </div>
-          ))}
         </div>
 
         {/* ── Interactive content ──────────────────────────── */}

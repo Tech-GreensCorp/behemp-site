@@ -21,7 +21,7 @@ export default function MundoEndocanabinoidePage() {
             <span className="text-accent-italic">importam.</span>
           </h1>
           <p className="mt-6 text-base leading-relaxed text-muted-foreground">
-            Casos reais, pesquisas atuais e bastidores da Be4Hope — escritos pela nossa equipe e por quem vive cada acolhimento.
+            Casos reais, pesquisas atuais e bastidores da Be4Hope, escritos pela nossa equipe e por quem vive cada acolhimento.
           </p>
         </div>
 
@@ -38,7 +38,7 @@ export default function MundoEndocanabinoidePage() {
             <Link href="/#condicoes">
               <Button
                 size="lg"
-                className="bg-secondary hover:bg-secondary/90 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
                 nativeButton={false}
               >
                 Fazer acolhimento gratuito

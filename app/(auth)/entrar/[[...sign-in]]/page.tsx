@@ -233,17 +233,13 @@ export default function SignInPage() {
             <div className="flex items-center gap-2 -mt-20">
               <div className="h-px w-8" style={{ background: '#EA5429' }} />
               <p className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: '#EA5429' }}>
-                Plataforma Médica
+                Plataforma do médico e do paciente
               </p>
             </div>
 
             <h1 className="font-display text-[2.6rem] font-bold leading-[1.08] tracking-tight text-gray-900">
-              Cuidar de quem cuida
-              <br />
-              é nosso{' '}
               <span className="text-accent-italic relative">
-                ato de amor.
-                {/* Sublinhado decorativo */}
+                Você {' '}
                 <span
                   className="absolute -bottom-1 left-0 h-0.5 w-full rounded-full"
                   style={{
@@ -252,11 +248,13 @@ export default function SignInPage() {
                   }}
                 />
               </span>
+              não precisa
+              <br />
+              enfrentar isso sozinho.
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
-              Bem-vindo de volta. Acesse sua conta para gerenciar pacientes,
-              consultas e tratamentos.
+              Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
             </p>
           </div>
 
