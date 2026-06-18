@@ -182,7 +182,7 @@ export default async function HomePage() {
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Iniciar acolhimento
                   <ChevronRight size={16} />
@@ -688,7 +688,7 @@ export default async function HomePage() {
               <div className="mt-10">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Quero iniciar acolhimento
                   <ChevronRight size={16} />
@@ -765,7 +765,7 @@ export default async function HomePage() {
                 <div className="mt-8 flex flex-wrap gap-4">
                   <ScrollToSection
                     targetId="condicoes"
-                    className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                    className="bg-white hover:bg-white/90 text-[#2D4F3C] font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                   >
                     Iniciar acolhimento
                     <ChevronRight size={16} />
@@ -782,28 +782,20 @@ export default async function HomePage() {
               <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-1">
                 {[
                   {
-                    valor: 'Gratuito',
-                    desc: 'A triagem não tem custo e não gera nenhum compromisso de compra.',
-                  },
-                  {
-                    valor: 'Legal e regulamentado',
-                    desc: 'Atuamos dentro da ANVISA RDC 660, do início ao fim, tudo dentro da lei.',
-                  },
-                  {
-                    valor: 'Você não fica sozinho',
-                    desc: 'Nossa equipe acompanha cada etapa, da triagem à recompra do produto.',
+                    valor: 'Você não está sozinho nessa jornada',
+                    desc: 'Da primeira triagem ao acompanhamento do tratamento, uma pessoa real da nossa equipe está ao seu lado em cada etapa.',
                   },
                 ].map((item) => (
                   <div
                     key={item.valor}
-                    className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-5 backdrop-blur-sm"
+                    className="flex flex-col sm:flex-row items-center sm:items-start gap-6 rounded-3xl border border-white/10 bg-white/[0.06] p-8 sm:p-10 backdrop-blur-sm shadow-xl"
                   >
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#D4A388]/20">
-                      <HeartPulse size={16} className="text-[#D4A388]" />
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#D4A388]/20">
+                      <HeartPulse size={24} className="text-[#D4A388]" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{item.valor}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-white/55">{item.desc}</p>
+                    <div className="text-center sm:text-left">
+                      <p className="text-lg sm:text-xl font-semibold text-white">{item.valor}</p>
+                      <p className="mt-3 text-sm sm:text-base leading-relaxed text-white/70">{item.desc}</p>
                     </div>
                   </div>
                 ))}
