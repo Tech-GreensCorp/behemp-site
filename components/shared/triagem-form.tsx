@@ -503,6 +503,30 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
     return true;
   }
 
+  async function buscarCEP(cepInput: string) {
+    const cleanCep = cepInput.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+    
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.erro) {
+        toast.error('CEP não encontrado.');
+        return;
+      }
+      
+      setDados((prev) => ({
+        ...prev,
+        estado: data.uf || prev.estado || '',
+        endereco: `${data.logradouro || ''}${data.bairro ? `, ${data.bairro}` : ''}${data.localidade ? `, ${data.localidade}` : ''}`.trim().replace(/^,\s*/, ''),
+      }));
+      toast.success('Endereço preenchido automaticamente pelo CEP!');
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+    }
+  }
+
   function validarPassoAtual(): boolean {
     const campos = currentStep.campos.filter(campoVisivel);
     
@@ -530,10 +554,26 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
       
       const val = dados[campo.id] || '';
       if (val.trim()) {
+        if (campo.id === 'nome_paciente') {
+          const words = val.trim().split(/\s+/);
+          if (words.length < 2) {
+            toast.error('Por favor, informe seu nome completo (nome e sobrenome).');
+            return false;
+          }
+          if (val.length > 80) {
+            toast.error('O nome completo deve ter no máximo 80 caracteres.');
+            return false;
+          }
+        }
+
         if (campo.id === 'email') {
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (!emailRegex.test(val)) {
             toast.error('O e-mail informado é inválido. Por favor, digite um formato válido (ex: nome@email.com).');
+            return false;
+          }
+          if (val.length > 100) {
+            toast.error('O e-mail deve ter no máximo 100 caracteres.');
             return false;
           }
         }
@@ -593,32 +633,53 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
 
         if (campo.id === 'peso') {
           const num = parseFloat(val);
-          if (isNaN(num) || num <= 0) {
-            toast.error('Por favor, informe um peso válido maior que 0.');
+          if (isNaN(num) || num <= 0 || num > 300) {
+            toast.error('Por favor, informe um peso válido entre 1 e 300 kg.');
+            return false;
+          }
+          if (val.length > 6) {
+            toast.error('O peso deve ter no máximo 6 caracteres.');
             return false;
           }
         }
 
         if (campo.id === 'altura') {
           const num = parseInt(val, 10);
-          if (isNaN(num) || num <= 0) {
-            toast.error('Por favor, informe uma altura válida maior que 0.');
+          if (isNaN(num) || num < 30 || num > 250) {
+            toast.error('Por favor, informe uma altura válida entre 30 e 250 cm.');
+            return false;
+          }
+          if (val.length > 3) {
+            toast.error('A altura deve ter no máximo 3 caracteres.');
             return false;
           }
         }
 
         if (campo.id === 'total_residencia') {
           const num = parseInt(val, 10);
-          if (isNaN(num) || num <= 0) {
-            toast.error('O número total de pessoas na residência deve ser maior que 0.');
+          if (isNaN(num) || num <= 0 || num > 30) {
+            toast.error('O número total de pessoas na residência deve ser entre 1 e 30.');
             return false;
           }
         }
 
         if (campo.id === 'num_criancas' || campo.id === 'num_idosos' || campo.id === 'num_deficiencia') {
           const num = parseInt(val, 10);
+          if (isNaN(num) || num < 0 || num > 30) {
+            toast.error(`O campo "${campo.label}" deve conter um valor entre 0 e 30.`);
+            return false;
+          }
+        }
+
+        if (campo.id === 'renda_total') {
+          const cleanVal = val.replace(/\./g, '').replace(',', '.');
+          const num = parseFloat(cleanVal);
           if (isNaN(num) || num < 0) {
-            toast.error(`O campo "${campo.label}" não pode conter valor negativo.`);
+            toast.error('Por favor, informe uma renda mensal válida.');
+            return false;
+          }
+          if (num > 1000000) {
+            toast.error('A renda mensal informada excede o limite máximo permitido (R$ 1.000.000,00).');
             return false;
           }
         }
@@ -644,6 +705,10 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
   function updateField(id: string, value: string) {
     const valueComMascara = aplicarMascara(id, value);
     setDados((prev) => ({ ...prev, [id]: valueComMascara }));
+    
+    if (id === 'cep' && valueComMascara.replace(/\D/g, '').length === 8) {
+      buscarCEP(valueComMascara);
+    }
   }
 
   function toggleCheckbox(id: string, opcao: string) {
@@ -714,25 +779,29 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
   /* ── Tela de sucesso ─────────────────────────────── */
   if (enviado) {
     return (
-      <Card className="mx-auto max-w-md border-0 shadow-lg">
-        <CardContent className="p-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <CheckCircle2 size={32} className="text-primary" />
-          </div>
-          <h2 className="font-display text-2xl font-bold">Triagem enviada!</h2>
-          <p className="mt-3 text-muted-foreground">
-            {medicoClerkId
-              ? 'Triagem registrada com sucesso. Você pode acompanhar na aba "Minhas triagens".'
-              : 'Obrigado pelas informações. Nossa equipe analisará suas respostas e entrará em contato em até 48h pelo WhatsApp.'}
-          </p>
-          <Button
-            className="btn-pill mt-6 bg-primary text-primary-foreground"
-            onClick={resetForm}
-          >
-            {medicoClerkId ? 'Nova triagem' : 'Enviar outra triagem'}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className={cn(compact ? '' : 'min-h-screen pb-16 pt-24 flex items-center justify-center')}>
+        <div className={cn(compact ? '' : 'mx-auto max-w-[80rem] w-full px-4 sm:px-6 lg:px-8 flex justify-center')}>
+          <Card className="mx-auto max-w-md border-0 shadow-lg w-full">
+            <CardContent className="p-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <CheckCircle2 size={32} className="text-primary" />
+              </div>
+              <h2 className="font-display text-2xl font-bold">Triagem enviada!</h2>
+              <p className="mt-3 text-muted-foreground">
+                {medicoClerkId
+                  ? 'Triagem registrada com sucesso. Você pode acompanhar na aba "Minhas triagens".'
+                  : 'Obrigado pelas informações. Nossa equipe analisará suas respostas e entrará em contato em até 48h pelo WhatsApp.'}
+              </p>
+              <Button
+                className="btn-pill mt-6 bg-primary text-primary-foreground"
+                onClick={resetForm}
+              >
+                {medicoClerkId ? 'Nova triagem' : 'Enviar outra triagem'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     );
   }
 
@@ -841,7 +910,7 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
                     .map((campo) => (
                       <div
                         key={campo.id}
-                        className={campo.halfWidth ? 'col-span-1' : 'col-span-2'}
+                        className={campo.halfWidth ? 'col-span-2 sm:col-span-1' : 'col-span-2'}
                       >
                         <Label
                           htmlFor={campo.id}

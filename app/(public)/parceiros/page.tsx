@@ -93,7 +93,7 @@ export default function ParceirosPage() {
 
         {/* ── Card Greens Premium ───────────────────────── */}
         <div className="mt-16 animate-fade-up delay-200">
-          <div className="group relative overflow-hidden rounded-3xl bg-white shadow-xl transition-all duration-500 hover:shadow-2xl">
+          <div className="group relative overflow-hidden rounded-2xl bg-white shadow-xl transition-all duration-500 hover:shadow-2xl">
             {/* Barra superior com gradiente animada */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-green-500 via-emerald-400 to-green-600 transition-all duration-500 group-hover:h-2" />
 
@@ -192,8 +192,8 @@ export default function ParceirosPage() {
                 <div className="relative flex h-full flex-col items-center justify-center p-8 text-center">
                   {/* Logo/Ícone animado */}
                   <div className="relative">
-                    <div className="absolute inset-0 animate-gentle-pulse rounded-3xl bg-white/20 blur-xl" />
-                    <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm transition-all duration-500 group-hover:scale-110 group-hover:bg-white/25 group-hover:rounded-[2rem]">
+                    <div className="absolute inset-0 animate-gentle-pulse rounded-2xl bg-white/20 blur-xl" />
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm transition-all duration-500 group-hover:scale-110 group-hover:bg-white/25 group-hover:rounded-[1.5rem]">
                       <Leaf size={44} className="text-white transition-transform duration-500 group-hover:scale-110" />
                     </div>
                   </div>
@@ -229,7 +229,7 @@ export default function ParceirosPage() {
 
         {/* ── Card Cannect ──────────────────────────────── */}
         <div className="mt-12 animate-fade-up delay-300">
-          <div className="group relative overflow-hidden rounded-3xl bg-white shadow-xl transition-all duration-500 hover:shadow-2xl">
+          <div className="group relative overflow-hidden rounded-2xl bg-white shadow-xl transition-all duration-500 hover:shadow-2xl">
             {/* Barra superior verde musgo */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#6B7B3C] via-[#7a8f45] to-[#5a6833] transition-all duration-500 group-hover:h-2" />
 
@@ -326,8 +326,8 @@ export default function ParceirosPage() {
                 {/* Conteúdo central */}
                 <div className="relative flex h-full flex-col items-center justify-center p-8 text-center">
                   <div className="relative">
-                    <div className="absolute inset-0 animate-gentle-pulse rounded-3xl bg-white/20 blur-xl" />
-                    <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm transition-all duration-500 group-hover:scale-110 group-hover:bg-white/25 group-hover:rounded-[2rem]">
+                    <div className="absolute inset-0 animate-gentle-pulse rounded-2xl bg-white/20 blur-xl" />
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm transition-all duration-500 group-hover:scale-110 group-hover:bg-white/25 group-hover:rounded-[1.5rem]">
                       <Globe size={44} className="text-white transition-transform duration-500 group-hover:scale-110" />
                     </div>
                   </div>
@@ -363,7 +363,7 @@ export default function ParceirosPage() {
 
         {/* ── CTA Parceria ─────────────────────────────── */}
         <div className="mt-20 animate-fade-up delay-400">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-8 py-14 text-center text-white shadow-lg sm:px-16">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-8 py-14 text-center text-white shadow-lg sm:px-16">
             {/* Padrão decorativo */}
             <div className="absolute inset-0 opacity-[0.06]" style={{
               backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',

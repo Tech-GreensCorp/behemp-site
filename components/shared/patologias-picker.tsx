@@ -375,7 +375,7 @@ export function PatologiasPicker() {
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
             <DialogClose
               render={
-                <Button type="button" variant="outline" size="lg" className="btn-pill border-primary text-secondary px-8" />
+                <Button type="button" variant="outline" size="lg" className="btn-pill px-8" />
               }
             >
               Voltar a página inicial
@@ -385,8 +385,7 @@ export function PatologiasPicker() {
               size="lg"
               disabled={!podeEnviar}
               onClick={falarComMedico}
-              className="btn-pill text-white border border-primary gap-2 px-8"
-              style={{ backgroundColor: '#54ab34' }}
+              className="btn-pill text-white bg-green-600 hover:bg-green-700 transition-colors gap-2 px-8 border-0"
             >
               <MessageCircle size={16} />
               Falar com médico

@@ -96,7 +96,7 @@ export default function ContatoPage() {
             <Link href="/#condicoes">
               <Button
                 size="lg"
-                className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 inline-flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 inline-flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 nativeButton={false}
               >
                 Iniciar acolhimento
@@ -107,7 +107,7 @@ export default function ContatoPage() {
         </div>
 
         {/* Grid de canais */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3 max-w-sm mx-auto sm:max-w-none">
           {CANAIS.map((canal) => {
             const cardContent = (
               <Card className="group h-full border-0 bg-card shadow-sm transition-all hover:shadow-md">

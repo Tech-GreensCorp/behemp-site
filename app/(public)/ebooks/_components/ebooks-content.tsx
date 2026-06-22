@@ -462,7 +462,7 @@ function EbookCard({ ebook, onDownloadClick }: EbookCardProps) {
 ─────────────────────────────────────────────── */
 export function EbooksCta() {
   return (
-    <div className="mt-24 rounded-3xl border border-secondary/20 bg-secondary/5 px-8 py-14 text-center">
+    <div className="mt-24 rounded-2xl border border-secondary/20 bg-secondary/5 px-8 py-14 text-center">
       <span className="inline-block rounded-full bg-secondary/10 px-4 py-1 text-xs font-semibold text-secondary uppercase tracking-widest mb-5">
         Cuidado e Acolhimento
       </span>
@@ -478,7 +478,7 @@ export function EbooksCta() {
         <a href="/#condicoes">
           <Button
             size="lg"
-            className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 inline-flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+            className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 inline-flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
             nativeButton={false}
           >
             Iniciar acolhimento
