@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Habilitar React Strict Mode para detecção precoce de problemas
   reactStrictMode: true,
 
+  // Habilitar build standalone otimizada para Docker
+  output: 'standalone',
+
   experimental: {
     serverActions: {
       bodySizeLimit: '100mb',
