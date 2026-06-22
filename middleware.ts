@@ -18,7 +18,7 @@ const isPublicRoute = createRouteMatcher([
   '/entrar(.*)',
   '/registrar-se(.*)',
   '/historias',
-  '/ebooks',
+  '/ebooks(.*)',
   '/agendamento',
   '/parceiros',
   '/contato',
@@ -65,7 +65,7 @@ export default clerkMiddleware(
 export const config = {
   matcher: [
     // Ignora arquivos estáticos e API routes internas do Next.js
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|mov|webm)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|mov|webm|pdf)).*)',
     // Sempre roda para API routes
     '/(api|trpc)(.*)',
   ],

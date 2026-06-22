@@ -294,7 +294,7 @@ export default async function HomePage() {
               <div className="mt-8 flex justify-center">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer"
+                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Iniciar acolhimento com especialista
                   <ChevronRight size={16} />
@@ -318,7 +318,7 @@ export default async function HomePage() {
               </div>
 
               {/* Cards de especialidade */}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 max-w-sm mx-auto sm:max-w-none">
                 {ESPECIALIDADES.map((esp) => (
                   <Card
                     key={esp.titulo}
@@ -384,7 +384,7 @@ export default async function HomePage() {
               },
             ];
             return (
-              <div className="mt-16 grid gap-4 sm:gap-8 sm:grid-cols-3">
+              <div className="mt-16 grid gap-4 sm:gap-8 sm:grid-cols-3 max-w-sm mx-auto sm:max-w-none">
                 {CARDS.map((item) => (
                   <Card
                     key={item.titulo}
@@ -485,7 +485,7 @@ export default async function HomePage() {
             </h2>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-sm mx-auto sm:max-w-none">
             {TESTEMUNHOS.map((t) => (
               <Card key={t.nome} className="bg-card border-0 shadow-sm">
                 <CardContent className="flex h-full flex-col p-6">
@@ -535,7 +535,7 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 max-w-sm mx-auto sm:max-w-none">
             {/* 1. Dr. Sidarta (se cadastrado no banco) */}
             {sidarta && (
               <MedicoCard
@@ -600,10 +600,10 @@ export default async function HomePage() {
             <div className="relative">
               {/* Quadrado decorativo de fundo */}
               <div
-                className="bg-primary/6 absolute -top-4 -left-4 h-full w-full rounded-3xl lg:-top-6 lg:-left-6"
+                className="bg-primary/6 absolute -top-4 -left-4 h-full w-full rounded-2xl lg:-top-6 lg:-left-6"
                 aria-hidden="true"
               />
-              <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-2xl">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl shadow-2xl">
                 <video
                   autoPlay
                   loop
@@ -733,7 +733,7 @@ export default async function HomePage() {
       {/* ── CTA Final — Dê o primeiro passo ───────────────── */}
       <section className="py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-[#0d682e] px-8 py-14 sm:px-14 lg:py-20">
+          <div className="relative overflow-hidden rounded-2xl bg-[#0d682e] px-8 py-14 sm:px-14 lg:py-20">
 
             {/* Círculos decorativos de profundidade */}
             <div
@@ -788,7 +788,7 @@ export default async function HomePage() {
                 ].map((item) => (
                   <div
                     key={item.valor}
-                    className="flex flex-col sm:flex-row items-center sm:items-start gap-6 rounded-3xl border border-white/10 bg-white/[0.06] p-8 sm:p-10 backdrop-blur-sm shadow-xl"
+                    className="flex flex-col sm:flex-row items-center sm:items-start gap-6 rounded-2xl border border-white/10 bg-white/[0.06] p-8 sm:p-10 backdrop-blur-sm shadow-xl"
                   >
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#D4A388]/20">
                       <HeartPulse size={24} className="text-[#D4A388]" />

@@ -40,7 +40,7 @@ export function MedicoCard({
       "bg-card border-0 shadow-sm transition-all hover:shadow-md relative overflow-hidden",
       destaque && "border-2 border-primary/20 shadow-md"
     )}>
-      <CardContent className="flex flex-col items-center p-8 text-center h-full justify-between min-h-[200px]">
+      <CardContent className="flex flex-col items-center p-5 text-center h-full justify-between min-h-[160px]">
         {destaque && (
           <span className="absolute top-3 right-3 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
             Destaque
@@ -49,24 +49,24 @@ export function MedicoCard({
         
         <div className="flex flex-col items-center w-full">
           {avatarUrl ? (
-            <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-primary/10">
+            <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-primary/10">
               <Image
                 src={avatarUrl}
                 alt={nome}
                 fill
                 className="object-cover"
-                sizes="80px"
+                sizes="64px"
               />
             </div>
           ) : (
-            <div className="gradient-moss flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold text-white">
+            <div className="gradient-moss flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold text-white">
               {iniciais}
             </div>
           )}
-          <h3 className="mt-5 text-base font-semibold">{nome}</h3>
-          <p className="text-muted-foreground mt-1 text-sm">{especialidade}</p>
+          <h3 className="mt-3 text-sm font-semibold">{nome}</h3>
+          <p className="text-muted-foreground mt-0.5 text-xs">{especialidade}</p>
           {crm && (
-            <p className="text-primary mt-3 text-sm font-semibold tracking-wide">
+            <p className="text-primary mt-1.5 text-xs font-semibold tracking-wide">
               {crm.startsWith('CRM') || crm.startsWith('CRO') ? crm : `CRM ${crm}`}
             </p>
           )}
@@ -75,7 +75,7 @@ export function MedicoCard({
         {curriculo && curriculo.length > 0 ? (
           <Dialog>
             <DialogTrigger render={
-              <Button variant="outline" size="sm" className="mt-5 btn-pill text-xs border-primary/30 text-secondary">
+              <Button variant="outline" size="sm" className="mt-3 btn-pill text-[10px] border-primary/30 text-secondary h-7">
                 Ver Currículo
               </Button>
             } />
@@ -108,7 +108,7 @@ export function MedicoCard({
             </DialogContent>
           </Dialog>
         ) : (
-          <div className="h-[38px]" /> /* spacer to match the card height */
+          <div className="h-[28px]" /> /* spacer to match the card height */
         )}
       </CardContent>
     </Card>

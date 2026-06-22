@@ -353,3 +353,29 @@
   background-size: 200% 100%;
   animation: shimmer-organic 1.5s ease-in-out;
 }
+
+/* ── Responsividade Celular ────────────────────── */
+@media (max-width: 768px) {
+  p,
+  .text-base,
+  .text-sm,
+  .text-xs,
+  [data-slot="accordion-content"] div {
+    text-align: justify;
+    text-justify: inter-word;
+  }
+  
+  /* Evitar justificar botões, badges, links, cabeçalhos e campos de formulário */
+  button,
+  a,
+  button *,
+  a *,
+  h1, h2, h3, h4, h5, h6,
+  label,
+  span,
+  input,
+  select,
+  textarea {
+    text-align: inherit;
+  }
+}

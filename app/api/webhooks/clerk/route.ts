@@ -36,6 +36,7 @@ interface ClerkUserCreatedData {
   }>;
   image_url: string | null;
   public_metadata: Record<string, unknown>;
+  unsafe_metadata?: Record<string, unknown>;
   created_at: number;
 }
 

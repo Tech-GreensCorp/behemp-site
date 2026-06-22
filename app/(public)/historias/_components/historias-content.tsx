@@ -142,7 +142,7 @@ export function HistoriasContent() {
   return (
     <div className="space-y-12">
       {/* Barra de Filtros e Busca */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-card p-6 rounded-3xl shadow-sm border border-border/40">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-card p-6 rounded-2xl shadow-sm border border-border/40">
         {/* Categorias */}
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => {
@@ -196,7 +196,7 @@ export function HistoriasContent() {
             <Card
               key={story.id}
               onClick={() => setActiveStory(story)}
-              className="group border-0 bg-card shadow-sm hover:shadow-md transition-all duration-300 rounded-3xl cursor-pointer flex flex-col justify-between"
+              className="group border-0 bg-card shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl cursor-pointer flex flex-col justify-between"
             >
               <CardContent className="p-8 flex flex-col justify-between h-full space-y-6">
                 <div>
@@ -230,7 +230,7 @@ export function HistoriasContent() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-card border border-border/40 rounded-3xl space-y-4">
+        <div className="text-center py-16 bg-card border border-border/40 rounded-2xl space-y-4">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted text-stone-400">
             <BookOpen size={28} />
           </div>
@@ -244,7 +244,7 @@ export function HistoriasContent() {
       {/* Modal / Dialog de Detalhe da Jornada */}
       {activeStory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#F5F2ED] rounded-3xl shadow-2xl border border-border flex flex-col p-6 sm:p-10 animate-fade-up">
+          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#F5F2ED] rounded-2xl shadow-2xl border border-border flex flex-col p-6 sm:p-10 animate-fade-up">
             {/* Botão fechar */}
             <button
               onClick={() => setActiveStory(null)}

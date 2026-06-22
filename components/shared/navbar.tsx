@@ -260,11 +260,11 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full hover:bg-muted"
+                  className="h-11 w-11 rounded-full hover:bg-muted flex items-center justify-center"
                 />
               }
             >
-              <Menu size={18} />
+              <Menu className="size-7" />
               <span className="sr-only">Menu</span>
             </SheetTrigger>
 
