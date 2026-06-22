@@ -1,0 +1,140 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 661842320892.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: behemp/sitebehemp
+  IMAGE_TAG: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::661842320892:role/github-actions-behemp
+          aws-region: us-east-1
+
+      - name: Login no ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build e push da imagem
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_APP_URL="${{ secrets.NEXT_PUBLIC_APP_URL }}" \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_IN_URL="${{ secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL }}" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_UP_URL="${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL }}" \
+            --build-arg NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL="${{ secrets.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL }}" \
+            --build-arg NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL="${{ secrets.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL }}" \
+            --build-arg NEXT_PUBLIC_SHEETS_SPREADSHEET_ID="${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}" \
+            --build-arg NEXT_PUBLIC_PUSHER_KEY="${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}" \
+            --build-arg NEXT_PUBLIC_PUSHER_CLUSTER="${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}" \
+            --build-arg NEXT_PUBLIC_WHATSAPP_BEHEMP="${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}" \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Deploy no EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: >-
+            ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,DATABASE_URL,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY,NEXT_PUBLIC_CLERK_SIGN_IN_URL,NEXT_PUBLIC_CLERK_SIGN_UP_URL,NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL,NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL,BREVO_API_KEY,BREVO_FROM_EMAIL,BREVO_FROM_NAME,BREVO_TO_EMAIL,RECOMPRA_EMAIL_DESTINO,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_SHEETS_SPREADSHEET_ID,GOOGLE_SHEETS_SHEET_NAME,NEXT_PUBLIC_SHEETS_SPREADSHEET_ID,GOOGLE_SERVICE_ACCOUNT_EMAIL,GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,NEXT_PUBLIC_PUSHER_KEY,NEXT_PUBLIC_PUSHER_CLUSTER,PUSHER_APP_ID,PUSHER_KEY,PUSHER_SECRET,PUSHER_CLUSTER,BLOB_READ_WRITE_TOKEN,BLOB_BEHEMP_READ_WRITE_TOKEN,INNGEST_EVENT_KEY,INNGEST_SIGNING_KEY,CRON_SECRET,NEXT_PUBLIC_WHATSAPP_BEHEMP
+          script: |
+            aws ecr get-login-password --region $AWS_REGION \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+            docker stop behemp-site || true
+            docker rm behemp-site || true
+
+            docker run -d \
+              --name behemp-site \
+              --restart unless-stopped \
+              -p 80:3000 \
+              -e DATABASE_URL="$DATABASE_URL" \
+              -e NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
+              -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+              -e CLERK_SECRET_KEY="$CLERK_SECRET_KEY" \
+              -e NEXT_PUBLIC_CLERK_SIGN_IN_URL="$NEXT_PUBLIC_CLERK_SIGN_IN_URL" \
+              -e NEXT_PUBLIC_CLERK_SIGN_UP_URL="$NEXT_PUBLIC_CLERK_SIGN_UP_URL" \
+              -e NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL="$NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL" \
+              -e NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL="$NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL" \
+              -e BREVO_API_KEY="$BREVO_API_KEY" \
+              -e BREVO_FROM_EMAIL="$BREVO_FROM_EMAIL" \
+              -e BREVO_FROM_NAME="$BREVO_FROM_NAME" \
+              -e BREVO_TO_EMAIL="$BREVO_TO_EMAIL" \
+              -e RECOMPRA_EMAIL_DESTINO="$RECOMPRA_EMAIL_DESTINO" \
+              -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+              -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+              -e GOOGLE_SHEETS_SPREADSHEET_ID="$GOOGLE_SHEETS_SPREADSHEET_ID" \
+              -e GOOGLE_SHEETS_SHEET_NAME="$GOOGLE_SHEETS_SHEET_NAME" \
+              -e NEXT_PUBLIC_SHEETS_SPREADSHEET_ID="$NEXT_PUBLIC_SHEETS_SPREADSHEET_ID" \
+              -e GOOGLE_SERVICE_ACCOUNT_EMAIL="$GOOGLE_SERVICE_ACCOUNT_EMAIL" \
+              -e GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="$GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY" \
+              -e NEXT_PUBLIC_PUSHER_KEY="$NEXT_PUBLIC_PUSHER_KEY" \
+              -e NEXT_PUBLIC_PUSHER_CLUSTER="$NEXT_PUBLIC_PUSHER_CLUSTER" \
+              -e PUSHER_APP_ID="$PUSHER_APP_ID" \
+              -e PUSHER_KEY="$PUSHER_KEY" \
+              -e PUSHER_SECRET="$PUSHER_SECRET" \
+              -e PUSHER_CLUSTER="$PUSHER_CLUSTER" \
+              -e BLOB_READ_WRITE_TOKEN="$BLOB_READ_WRITE_TOKEN" \
+              -e BLOB_BEHEMP_READ_WRITE_TOKEN="$BLOB_BEHEMP_READ_WRITE_TOKEN" \
+              -e INNGEST_EVENT_KEY="$INNGEST_EVENT_KEY" \
+              -e INNGEST_SIGNING_KEY="$INNGEST_SIGNING_KEY" \
+              -e CRON_SECRET="$CRON_SECRET" \
+              -e NEXT_PUBLIC_WHATSAPP_BEHEMP="$NEXT_PUBLIC_WHATSAPP_BEHEMP" \
+              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL }}
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL }}
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${{ secrets.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL }}
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${{ secrets.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_FROM_EMAIL: ${{ secrets.BREVO_FROM_EMAIL }}
+          BREVO_FROM_NAME: ${{ secrets.BREVO_FROM_NAME }}
+          BREVO_TO_EMAIL: ${{ secrets.BREVO_TO_EMAIL }}
+          RECOMPRA_EMAIL_DESTINO: ${{ secrets.RECOMPRA_EMAIL_DESTINO }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SHEETS_SHEET_NAME: ${{ secrets.GOOGLE_SHEETS_SHEET_NAME }}
+          NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: ${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
+          PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
+          PUSHER_KEY: ${{ secrets.PUSHER_KEY }}
+          PUSHER_SECRET: ${{ secrets.PUSHER_SECRET }}
+          PUSHER_CLUSTER: ${{ secrets.PUSHER_CLUSTER }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          BLOB_BEHEMP_READ_WRITE_TOKEN: ${{ secrets.BLOB_BEHEMP_READ_WRITE_TOKEN }}
+          INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY }}
+          INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_WHATSAPP_BEHEMP: ${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl --fail http://3.84.35.17/health || echo "Health check falhou"
