@@ -137,7 +137,8 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
   const clerkId = data.id;
   const email = data.email_addresses?.[0]?.email_address;
   const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || 'Novo Paciente';
-  const telefone = data.phone_numbers?.[0]?.phone_number || null;
+  const metadataPhone = (data.unsafe_metadata?.phone as string) || (data.public_metadata?.phone as string);
+  const telefone = data.phone_numbers?.[0]?.phone_number || metadataPhone || null;
   const role = (data.public_metadata?.role as string) || 'paciente';
 
   if (!email) {

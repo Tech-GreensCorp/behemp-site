@@ -14,7 +14,7 @@ import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
 import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import { Counter } from '@/components/shared/counter';
-import { MedicoCard } from '@/components/shared/medico-card';
+import { MedicosCarousel } from '@/components/shared/medicos-carousel';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
@@ -149,11 +149,6 @@ export default async function HomePage() {
   noStore();
   const medicosResult = await listarMedicosPublico();
   const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
-  const sidarta = medicosData.find((m) => m.nome.toLowerCase().includes('sidarta'));
-  const outrosMedicos = medicosData.filter((m) => !m.nome.toLowerCase().includes('sidarta'));
-  const medico3 = outrosMedicos[0];
-  const medico4 = outrosMedicos[1];
-  const medico5 = outrosMedicos[2];
 
   return (
     <>
@@ -179,17 +174,17 @@ export default async function HomePage() {
                 Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
+                  className="w-full sm:w-auto bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Iniciar acolhimento
                   <ChevronRight size={16} />
                 </ScrollToSection>
                 <Link
                   href="/#quem-somos"
-                  className="border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                  className="w-full sm:w-auto border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
                 >
                   Conhecer a Be4Hope
                 </Link>
@@ -535,59 +530,8 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 max-w-sm mx-auto sm:max-w-none">
-            {/* 1. Dr. Sidarta (se cadastrado no banco) */}
-            {sidarta && (
-              <MedicoCard
-                key={sidarta.id}
-                nome={sidarta.nome}
-                avatarUrl={sidarta.avatarUrl}
-                especialidade={sidarta.especialidade}
-                crm="CRM/SP 88877"
-              />
-            )}
-
-            {/* 2. Dra. Cynthia De Carlo (Padronizada, sem botão/currículo, com CRM/SP 000000) */}
-            <MedicoCard
-              nome="Dra. Cynthia De Carlo"
-              avatarUrl="/images/home/cynthia.jpeg"
-              especialidade="Dentista"
-              crm="CRO/SP 43625"
-              destaque={false}
-            />
-
-            {/* 3. Dr. Wellington Briques (ou terceiro médico do banco) */}
-            {medico3 && (
-              <MedicoCard
-                key={medico3.id}
-                nome={medico3.nome}
-                avatarUrl={medico3.avatarUrl}
-                especialidade={medico3.especialidade}
-                crm="CRM/SP 53720"
-              />
-            )}
-
-            {/* 4. Natalia Balderas Amurrio (ou quarto médico do banco) */}
-            {medico4 && (
-              <MedicoCard
-                key={medico4.id}
-                nome={medico4.nome}
-                avatarUrl={medico4.avatarUrl}
-                especialidade={medico4.especialidade}
-                crm="CRM/SP 250530"
-              />
-            )}
-
-            {/* 5. Quinto médico do banco */}
-            {medico5 && (
-              <MedicoCard
-                key={medico5.id}
-                nome={medico5.nome}
-                avatarUrl={medico5.avatarUrl}
-                especialidade={medico5.especialidade}
-                crm="CRM/MG 109940"
-              />
-            )}
+          <div className="mt-12">
+            <MedicosCarousel medicos={medicosData} />
           </div>
         </div>
       </section>

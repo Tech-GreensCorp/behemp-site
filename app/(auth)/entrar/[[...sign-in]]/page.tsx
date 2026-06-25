@@ -8,7 +8,9 @@ import {
   HeartPulse,
   MapPinned,
   Users,
+  Lock,
 } from 'lucide-react';
+import Link from 'next/link';
 
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
@@ -89,6 +91,9 @@ function AnimatedCounter({ target, duration = 4000 }: { target: number; duration
 
   return <span ref={ref}>{count}</span>;
 }
+
+/* ── Configurações ───────────────────────────────── */
+const AUTH_DISABLED = true;
 
 /* ── Componente principal ────────────────────────── */
 export default function SignInPage() {
@@ -411,49 +416,75 @@ export default function SignInPage() {
             transition: 'opacity 0.8s ease-out 0.25s, transform 0.8s ease-out 0.25s',
           }}
         >
-          {/* Cabeçalho — contexto de LOGIN */}
-          <div className="mb-8 space-y-1">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-              Bem-vindo de volta.
-            </h2>
-            <p className="text-sm text-gray-400">Entre com suas credenciais para continuar.</p>
-          </div>
+          {AUTH_DISABLED ? (
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 md:p-8 shadow-xl shadow-gray-200/40 text-center space-y-5">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-[#EA5429]">
+                <Lock size={24} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-display text-xl font-bold text-gray-900">Área de Membros em Manutenção</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Estamos finalizando os últimos ajustes da nossa plataforma. O acesso para pacientes e médicos estará disponível em breve.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  href="/"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#EA5429] hover:bg-[#D64319] text-white font-semibold px-6 text-sm transition-colors duration-200 shadow-md hover:shadow-lg"
+                >
+                  Voltar para o Início
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Cabeçalho — contexto de LOGIN */}
+              <div className="mb-8 space-y-1">
+                <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
+                  Bem-vindo de volta.
+                </h2>
+                <p className="text-sm text-gray-400">Entre com suas credenciais para continuar.</p>
+              </div>
 
-          <SignIn
-            forceRedirectUrl={redirectUrl}
-            appearance={{
-              options: {
-                logoPlacement: 'none',
-                socialButtonsVariant: 'iconButton',
-              },
-              variables: {
-                colorPrimary: '#EA5429',
-                colorBackground: '#ffffff',
-                colorInput: '#ffffff',
-                colorForeground: '#1A1612',
-                colorMutedForeground: '#8A7F73',
-                colorInputForeground: '#1A1612',
-                borderRadius: '0.75rem',
-                fontFamily: 'inherit',
-              },
-              elements: {
-                card: 'shadow-xl shadow-gray-200/60 border border-gray-100/80 rounded-2xl',
-                headerTitle: 'hidden',
-                headerSubtitle: 'hidden',
-                socialButtonsBlockButton:
-                  'border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 hover:shadow-sm hover:border-gray-300',
-                formButtonPrimary:
-                  'bg-[#EA5429] hover:bg-[#D64319] text-white font-semibold rounded-full px-8 tracking-wide transition-colors duration-200',
-                formFieldInput:
-                  'h-12 border-gray-200 focus:border-[#EA5429] focus:ring-2 focus:ring-[#EA5429]/20 bg-white rounded-xl transition-colors duration-200',
-                footerActionLink: 'text-[#EA5429] hover:text-[#D64319] font-semibold',
-                dividerLine: 'bg-gray-200',
-                dividerText: 'text-gray-400 text-xs',
-                footer: 'rounded-b-2xl',
-                formFieldLabel: 'text-gray-700 font-medium text-sm',
-              },
-            }}
-          />
+              <SignIn
+                path="/entrar"
+                signUpUrl="/registrar-se"
+                forceRedirectUrl={redirectUrl}
+                appearance={{
+                  options: {
+                    logoPlacement: 'none',
+                    socialButtonsVariant: 'iconButton',
+                  },
+                  variables: {
+                    colorPrimary: '#EA5429',
+                    colorBackground: '#ffffff',
+                    colorInput: '#ffffff',
+                    colorForeground: '#1A1612',
+                    colorMutedForeground: '#8A7F73',
+                    colorInputForeground: '#1A1612',
+                    borderRadius: '0.75rem',
+                    fontFamily: 'inherit',
+                  },
+                  elements: {
+                    card: 'shadow-xl shadow-gray-200/60 border border-gray-100/80 rounded-2xl',
+                    headerTitle: 'hidden',
+                    headerSubtitle: 'hidden',
+                    socialButtonsBlockButton:
+                      'border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 hover:shadow-sm hover:border-gray-300',
+                    formButtonPrimary:
+                      'bg-[#EA5429] hover:bg-[#D64319] text-white font-semibold rounded-full px-8 tracking-wide transition-colors duration-200',
+                    formFieldInput:
+                      'h-12 border-gray-200 focus:border-[#EA5429] focus:ring-2 focus:ring-[#EA5429]/20 bg-white rounded-xl transition-colors duration-200',
+                    footerActionLink: 'text-[#EA5429] hover:text-[#D64319] font-semibold',
+                    dividerLine: 'bg-gray-200',
+                    dividerText: 'text-gray-400 text-xs',
+                    footer: 'rounded-b-2xl',
+                    formFieldLabel: 'text-gray-700 font-medium text-sm',
+                  },
+                }}
+              />
+            </>
+          )}
         </div>
       </div>
 

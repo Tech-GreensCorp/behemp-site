@@ -4,7 +4,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       <Navbar />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="flex-1">{children}</main>
     </>
   );
 }

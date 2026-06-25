@@ -37,7 +37,7 @@ export function MedicoCard({
 
   return (
     <Card className={cn(
-      "bg-card border-0 shadow-sm transition-all hover:shadow-md relative overflow-hidden",
+      "bg-card border-0 shadow-sm transition-all hover:shadow-md relative overflow-hidden h-full w-full",
       destaque && "border-2 border-primary/20 shadow-md"
     )}>
       <CardContent className="flex flex-col items-center p-5 text-center h-full justify-between min-h-[160px]">
