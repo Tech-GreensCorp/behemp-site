@@ -149,11 +149,6 @@ export default async function HomePage() {
   noStore();
   const medicosResult = await listarMedicosPublico();
   const medicosData = (medicosResult.sucesso && medicosResult.dados) ? medicosResult.dados : [];
-  const sidarta = medicosData.find((m) => m.nome.toLowerCase().includes('sidarta'));
-  const outrosMedicos = medicosData.filter((m) => !m.nome.toLowerCase().includes('sidarta'));
-  const medico3 = outrosMedicos[0];
-  const medico4 = outrosMedicos[1];
-  const medico5 = outrosMedicos[2];
 
   return (
     <>
@@ -535,59 +530,16 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 max-w-sm mx-auto sm:max-w-none">
-            {/* 1. Dr. Sidarta (se cadastrado no banco) */}
-            {sidarta && (
+          <div className="mt-12 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-sm mx-auto sm:max-w-none lg:max-w-5xl">
+            {medicosData.map((medico) => (
               <MedicoCard
-                key={sidarta.id}
-                nome={sidarta.nome}
-                avatarUrl={sidarta.avatarUrl}
-                especialidade={sidarta.especialidade}
-                crm="CRM/SP 88877"
+                key={medico.id}
+                nome={medico.nome}
+                avatarUrl={medico.avatarUrl}
+                especialidade={medico.especialidade}
+                crm={medico.crm}
               />
-            )}
-
-            {/* 2. Dra. Cynthia De Carlo (Padronizada, sem botão/currículo, com CRM/SP 000000) */}
-            <MedicoCard
-              nome="Dra. Cynthia De Carlo"
-              avatarUrl="/images/home/cynthia.jpeg"
-              especialidade="Dentista"
-              crm="CRO/SP 43625"
-              destaque={false}
-            />
-
-            {/* 3. Dr. Wellington Briques (ou terceiro médico do banco) */}
-            {medico3 && (
-              <MedicoCard
-                key={medico3.id}
-                nome={medico3.nome}
-                avatarUrl={medico3.avatarUrl}
-                especialidade={medico3.especialidade}
-                crm="CRM/SP 53720"
-              />
-            )}
-
-            {/* 4. Natalia Balderas Amurrio (ou quarto médico do banco) */}
-            {medico4 && (
-              <MedicoCard
-                key={medico4.id}
-                nome={medico4.nome}
-                avatarUrl={medico4.avatarUrl}
-                especialidade={medico4.especialidade}
-                crm="CRM/SP 250530"
-              />
-            )}
-
-            {/* 5. Quinto médico do banco */}
-            {medico5 && (
-              <MedicoCard
-                key={medico5.id}
-                nome={medico5.nome}
-                avatarUrl={medico5.avatarUrl}
-                especialidade={medico5.especialidade}
-                crm="CRM/MG 109940"
-              />
-            )}
+            ))}
           </div>
         </div>
       </section>
