@@ -329,17 +329,17 @@
 /* ── Active scale pulse for call-to-actions ────── */
 @keyframes active-pulse {
   0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: none;
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   }
   50% {
-    transform: scale(1.04);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: none;
+    box-shadow: 0 0 14px 6px rgba(22, 163, 74, 0.6), 0 4px 6px -1px rgba(22, 163, 74, 0.2);
   }
 }
 
 .animate-active-pulse {
-  animation: active-pulse 2s ease-in-out infinite;
+  animation: active-pulse 3.5s ease-in-out infinite;
 }
 
 /* ── Organic shimmer on hover ──────────────────── */

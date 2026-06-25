@@ -14,7 +14,7 @@ import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
 import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import { Counter } from '@/components/shared/counter';
-import { MedicoCard } from '@/components/shared/medico-card';
+import { MedicosCarousel } from '@/components/shared/medicos-carousel';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
@@ -174,17 +174,17 @@ export default async function HomePage() {
                 Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <ScrollToSection
                   targetId="condicoes"
-                  className="bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
+                  className="w-full sm:w-auto bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
                 >
                   Iniciar acolhimento
                   <ChevronRight size={16} />
                 </ScrollToSection>
                 <Link
                   href="/#quem-somos"
-                  className="border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                  className="w-full sm:w-auto border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
                 >
                   Conhecer a Be4Hope
                 </Link>
@@ -530,16 +530,8 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-sm mx-auto sm:max-w-none lg:max-w-5xl">
-            {medicosData.map((medico) => (
-              <MedicoCard
-                key={medico.id}
-                nome={medico.nome}
-                avatarUrl={medico.avatarUrl}
-                especialidade={medico.especialidade}
-                crm={medico.crm}
-              />
-            ))}
+          <div className="mt-12">
+            <MedicosCarousel medicos={medicosData} />
           </div>
         </div>
       </section>

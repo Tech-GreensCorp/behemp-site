@@ -4,7 +4,7 @@ import { useSignUp } from '@clerk/nextjs/legacy';
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CalendarDays, HeartPulse, MapPinned, Users, Loader2, Eye, EyeOff } from 'lucide-react';
+import { CalendarDays, HeartPulse, MapPinned, Users, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -82,6 +82,9 @@ function AnimatedCounter({ target, duration = 4000 }: { target: number; duration
 
   return <span ref={ref}>{count}</span>;
 }
+
+/* ── Configurações ───────────────────────────────── */
+const AUTH_DISABLED = true;
 
 /* ── Componente principal ────────────────────────── */
 export default function SignUpPage() {
@@ -566,220 +569,244 @@ export default function SignUpPage() {
             transition: 'opacity 0.8s ease-out 0.25s, transform 0.8s ease-out 0.25s',
           }}
         >
-          {/* Cabeçalho — contexto de REGISTRO */}
-          <div className="mb-6 space-y-1">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-              {pendingVerification ? 'Verifique seu e-mail' : 'Crie sua conta.'}
-            </h2>
-            <p className="text-sm text-gray-400">
-              {pendingVerification
-                ? 'Enviamos um código de verificação para o seu e-mail.'
-                : 'Preencha os dados para começar sua jornada.'}
-            </p>
-          </div>
-
-          {/* Elemento requerido pelo Clerk para proteção de Bot (CAPTCHA) */}
-          <div id="clerk-captcha" />
-
-          {erro && (
-            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-medium text-red-600">
-              {erro}
-            </div>
-          )}
-
-          {!pendingVerification ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
-                <div className="space-y-1.5">
-                  <Label htmlFor="nomeCompleto" className="text-xs font-medium text-gray-700">
-                    Nome Completo
-                  </Label>
-                  <Input
-                    id="nomeCompleto"
-                    type="text"
-                    required
-                    placeholder="Nome e sobrenome"
-                    value={nomeCompleto}
-                    onChange={(e) => setNomeCompleto(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="telefone" className="text-xs font-medium text-gray-700">
-                    Telefone
-                  </Label>
-                  <Input
-                    id="telefone"
-                    type="text"
-                    required
-                    placeholder="(DD) 99999-9999"
-                    value={telefone}
-                    onChange={handleTelefoneChange}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium text-gray-700">
-                    E-mail
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="senha" className="text-xs font-medium text-gray-700">
-                    Senha
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="senha"
-                      type={showSenha ? 'text' : 'password'}
-                      required
-                      placeholder="Mínimo 8 caracteres"
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSenha(!showSenha)}
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    >
-                      {showSenha ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirmarSenha" className="text-xs font-medium text-gray-700">
-                    Confirmar Senha
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmarSenha"
-                      type={showConfirmarSenha ? 'text' : 'password'}
-                      required
-                      placeholder="Confirme sua senha"
-                      value={confirmarSenha}
-                      onChange={(e) => setConfirmarSenha(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    >
-                      {showConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
-                >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Criar Conta'}
-                </Button>
+          {AUTH_DISABLED ? (
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 md:p-8 shadow-xl shadow-gray-200/40 text-center space-y-5">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-[#EA5429]">
+                <Lock size={24} />
               </div>
-
-              {/* Botão de cadastro alternativo / Google */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
-                    ou
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={handleGoogleSignUp}
-                  disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
-                >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  Registrar com Google
-                </Button>
-
-                <p className="text-center text-xs text-gray-500">
-                  Já possui uma conta?{' '}
-                  <Link
-                    href="/entrar"
-                    className="font-semibold text-[#EA5429] hover:text-[#D64319] hover:underline"
-                  >
-                    Entrar
-                  </Link>
+              <div className="space-y-2">
+                <h3 className="font-display text-xl font-bold text-gray-900">Cadastro em Manutenção</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Estamos finalizando os últimos ajustes da nossa plataforma. O cadastro de novos pacientes e médicos estará disponível em breve.
                 </p>
               </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerify} className="space-y-4">
-              <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
-                <div className="space-y-1.5">
-                  <Label htmlFor="codigoVerificacao" className="text-xs font-medium text-gray-700">
-                    Código de 6 dígitos
-                  </Label>
-                  <Input
-                    id="codigoVerificacao"
-                    type="text"
-                    required
-                    placeholder="000000"
-                    maxLength={6}
-                    value={codigoVerificacao}
-                    onChange={(e) => setCodigoVerificacao(e.target.value.replace(/\D/g, ''))}
-                    className="h-12 rounded-xl border-gray-200 bg-white text-center text-lg font-bold tracking-[0.5em] transition-colors duration-200 placeholder:tracking-normal focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
+              <div className="pt-2">
+                <Link
+                  href="/"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#EA5429] hover:bg-[#D64319] text-white font-semibold px-6 text-sm transition-colors duration-200 shadow-md hover:shadow-lg"
                 >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirmar Código'}
-                </Button>
-
-                <div className="flex flex-col gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleVoltar}
-                    disabled={loading}
-                    className="flex h-10 w-full cursor-pointer items-center justify-center rounded-full border border-gray-200 tracking-wide text-gray-500 transition-colors duration-200 hover:bg-gray-50"
-                  >
-                    Voltar para o cadastro
-                  </Button>
-                </div>
+                  Voltar para o Início
+                </Link>
               </div>
-            </form>
+            </div>
+          ) : (
+            <>
+              {/* Cabeçalho — contexto de REGISTRO */}
+              <div className="mb-6 space-y-1">
+                <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
+                  {pendingVerification ? 'Verifique seu e-mail' : 'Crie sua conta.'}
+                </h2>
+                <p className="text-sm text-gray-400">
+                  {pendingVerification
+                    ? 'Enviamos um código de verificação para o seu e-mail.'
+                    : 'Preencha os dados para começar sua jornada.'}
+                </p>
+              </div>
+
+              {/* Elemento requerido pelo Clerk para proteção de Bot (CAPTCHA) */}
+              <div id="clerk-captcha" />
+
+              {erro && (
+                <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-medium text-red-600">
+                  {erro}
+                </div>
+              )}
+
+              {!pendingVerification ? (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="nomeCompleto" className="text-xs font-medium text-gray-700">
+                        Nome Completo
+                      </Label>
+                      <Input
+                        id="nomeCompleto"
+                        type="text"
+                        required
+                        placeholder="Nome e sobrenome"
+                        value={nomeCompleto}
+                        onChange={(e) => setNomeCompleto(e.target.value)}
+                        className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="telefone" className="text-xs font-medium text-gray-700">
+                        Telefone
+                      </Label>
+                      <Input
+                        id="telefone"
+                        type="text"
+                        required
+                        placeholder="(DD) 99999-9999"
+                        value={telefone}
+                        onChange={handleTelefoneChange}
+                        className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email" className="text-xs font-medium text-gray-700">
+                        E-mail
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        placeholder="seu@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="senha" className="text-xs font-medium text-gray-700">
+                        Senha
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="senha"
+                          type={showSenha ? 'text' : 'password'}
+                          required
+                          placeholder="Mínimo 8 caracteres"
+                          value={senha}
+                          onChange={(e) => setSenha(e.target.value)}
+                          className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSenha(!showSenha)}
+                          className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        >
+                          {showSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirmarSenha" className="text-xs font-medium text-gray-700">
+                        Confirmar Senha
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmarSenha"
+                          type={showConfirmarSenha ? 'text' : 'password'}
+                          required
+                          placeholder="Confirme sua senha"
+                          value={confirmarSenha}
+                          onChange={(e) => setConfirmarSenha(e.target.value)}
+                          className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
+                          className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        >
+                          {showConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
+                    >
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Criar Conta'}
+                    </Button>
+                  </div>
+
+                  {/* Botão de cadastro alternativo / Google */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-gray-200" />
+                      <span className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
+                        ou
+                      </span>
+                      <div className="h-px flex-1 bg-gray-200" />
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={handleGoogleSignUp}
+                      disabled={loading}
+                      className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
+                    >
+                      <svg className="h-5 w-5" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                      Registrar com Google
+                    </Button>
+
+                    <p className="text-center text-xs text-gray-500">
+                      Já possui uma conta?{' '}
+                      <Link
+                        href="/entrar"
+                        className="font-semibold text-[#EA5429] hover:text-[#D64319] hover:underline"
+                      >
+                        Entrar
+                      </Link>
+                    </p>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerify} className="space-y-4">
+                  <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="codigoVerificacao" className="text-xs font-medium text-gray-700">
+                        Código de 6 dígitos
+                      </Label>
+                      <Input
+                        id="codigoVerificacao"
+                        type="text"
+                        required
+                        placeholder="000000"
+                        maxLength={6}
+                        value={codigoVerificacao}
+                        onChange={(e) => setCodigoVerificacao(e.target.value.replace(/\D/g, ''))}
+                        className="h-12 rounded-xl border-gray-200 bg-white text-center text-lg font-bold tracking-[0.5em] transition-colors duration-200 placeholder:tracking-normal focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
+                    >
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirmar Código'}
+                    </Button>
+
+                    <div className="flex flex-col gap-2 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleVoltar}
+                        disabled={loading}
+                        className="flex h-10 w-full cursor-pointer items-center justify-center rounded-full border border-gray-200 tracking-wide text-gray-500 transition-colors duration-200 hover:bg-gray-50"
+                      >
+                        Voltar para o cadastro
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </>
           )}
         </div>
       </div>
