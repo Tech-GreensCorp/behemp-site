@@ -92,7 +92,7 @@ export default async function MedicoDetalhePage({ params }: Props) {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">{medico.nome}</h1>
               <p className="text-sm font-semibold text-primary">{medico.especialidade}</p>
-              <p className="mt-1 text-xs text-muted-foreground">CRM: {medico.crm}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{medico.crm}</p>
             </div>
 
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
