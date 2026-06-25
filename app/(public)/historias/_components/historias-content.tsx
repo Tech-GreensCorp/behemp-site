@@ -37,7 +37,7 @@ const CATEGORIES = ['Todas', 'Autismo & TDAH', 'Dor Crônica', 'Saúde Mental', 
 const STORIES_MOCK: Story[] = [
   {
     id: 'helena',
-    nome: 'Helena Costa',
+    nome: 'Helena C.',
     idade: 64,
     condicao: 'Fibromialgia e Insônia Refratária',
     categoria: 'Dor Crônica',
@@ -49,7 +49,7 @@ const STORIES_MOCK: Story[] = [
   },
   {
     id: 'julio',
-    nome: 'Júlio',
+    nome: 'Júlio S.',
     idade: 9,
     condicao: 'Autismo Nível 2 e TDAH',
     categoria: 'Autismo & TDAH',
@@ -62,7 +62,7 @@ const STORIES_MOCK: Story[] = [
   },
   {
     id: 'roberto',
-    nome: 'Roberto Antunes',
+    nome: 'Roberto A.',
     idade: 47,
     condicao: 'Dor Neuropática (Hérnia de Disco)',
     categoria: 'Dor Crônica',
@@ -74,7 +74,7 @@ const STORIES_MOCK: Story[] = [
   },
   {
     id: 'mariana',
-    nome: 'Mariana Azevedo',
+    nome: 'Mariana A.',
     idade: 32,
     condicao: 'Ansiedade Generalizada e Síndrome do Pânico',
     categoria: 'Saúde Mental',
@@ -86,7 +86,7 @@ const STORIES_MOCK: Story[] = [
   },
   {
     id: 'beatriz',
-    nome: 'Beatriz Vasconcellos',
+    nome: 'Beatriz V.',
     idade: 58,
     condicao: 'Suporte Oncológico (Câncer de Mama)',
     categoria: 'Oncologia',
@@ -98,7 +98,7 @@ const STORIES_MOCK: Story[] = [
   },
   {
     id: 'lucas',
-    nome: 'Lucas Martins',
+    nome: 'Lucas M.',
     idade: 23,
     condicao: 'TDAH e Ansiedade Acadêmica',
     categoria: 'Autismo & TDAH',
