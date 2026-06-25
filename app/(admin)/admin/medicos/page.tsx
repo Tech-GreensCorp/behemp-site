@@ -68,7 +68,7 @@ export default async function AdminMedicosPage() {
                       <p className="truncate text-sm font-semibold">{m.nome}</p>
                       <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
                       {m.crm && (
-                        <p className="mt-0.5 text-xs font-medium text-primary">CRM {m.crm}</p>
+                        <p className="mt-0.5 text-xs font-medium text-primary">{m.crm}</p>
                       )}
                       <p className="mt-1 text-xs text-muted-foreground">
                         {m.totalPacientes} paciente{m.totalPacientes !== 1 ? 's' : ''}
