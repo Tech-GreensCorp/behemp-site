@@ -37,6 +37,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/logo.png',
+  },
   title: {
     // Homepage define seu próprio título. Outras páginas usam: "Título da Página | Be4Hope"
     default: 'Be4Hope — Medicina Endocanabinóide com acolhimento',
