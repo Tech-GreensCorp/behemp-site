@@ -25,6 +25,7 @@ import {
   Heart,
   FileCheck,
   ExternalLink,
+  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState, useEffect, useCallback } from 'react';
@@ -450,9 +451,63 @@ export default function PerfilPacientePage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════
+          PREFERÊNCIAS E PRIVACIDADE — Notificações e LGPD
+          ═══════════════════════════════════════════════════════ */}
+      <section className="animate-fade-up delay-400">
+        <h2 className="font-heading mb-4 text-xl font-semibold tracking-tight">Preferências e Privacidade</h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Notificações */}
+          <Card className="border-border/40 shadow-sm bg-card grain">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                  <Bell className="h-5 w-5 text-amber-600" />
+                </div>
+                <CardTitle className="text-base font-semibold">Notificações por E-mail</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">E-mail de recompra</span>
+                <Badge className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 font-semibold transition-colors">Ativo</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Lembrete de consulta</span>
+                <Badge className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 font-semibold transition-colors">Ativo</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Renovação de documento</span>
+                <Badge className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 font-semibold transition-colors">Ativo</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Privacidade */}
+          <Card className="border-border/40 shadow-sm bg-card grain">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                </div>
+                <CardTitle className="text-base font-semibold">Privacidade e LGPD</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground leading-relaxed">
+              <p>
+                Seus dados pessoais e clínicos são protegidos conforme a Lei Geral de
+                Proteção de Dados (LGPD). Apenas seu médico responsável tem acesso
+                aos seus dados clínicos. Todas as operações são registradas em log
+                de auditoria.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════
           AÇÃO — Gerenciar conta
           ═══════════════════════════════════════════════════════ */}
-      <div className="animate-fade-up delay-400 pb-4">
+      <div className="animate-fade-up delay-500 pb-4">
         <Button variant="outline" onClick={() => openUserProfile()} className="gap-2 rounded-xl">
           <User className="h-4 w-4" /> Gerenciar conta
         </Button>

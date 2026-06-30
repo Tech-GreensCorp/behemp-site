@@ -1,9 +1,13 @@
 'use client';
 
 import { useUser, useClerk } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Camera,
   Mail,
@@ -21,11 +25,18 @@ import {
   BadgeCheck,
   BookOpen,
   Building2,
+  Save,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { obterPerfilContato, atualizarTelefonePaciente } from '@/app/_actions/perfil-paciente';
-import { obterPerfilMedico } from '@/app/(medico)/_actions/configuracoes';
+import {
+  obterPerfilMedico,
+  atualizarPerfilMedico,
+  obterUrlGoogleCalendar,
+} from '@/app/(medico)/_actions/configuracoes';
 
 /**
  * Página "Meu Perfil" do Médico.
@@ -52,11 +63,42 @@ export default function PerfilMedicoPage() {
   const [telefoneInput, setTelefoneInput]       = useState('');
   const [salvandoTelefone, setSalvandoTelefone] = useState(false);
 
+  const searchParams = useSearchParams();
+
   /* ── Dados profissionais (banco médicos) ─────────────────────── */
   const [crm, setCrm]                 = useState<string | null>(null);
   const [especialidade, setEspecialidade] = useState<string | null>(null);
   const [bio, setBio]                 = useState<string | null>(null);
+  const [googleConectado, setGoogleConectado] = useState(false);
+  const [medicoId, setMedicoId]       = useState<string | null>(null);
   const [carregandoPerfil, setCarregandoPerfil] = useState(true);
+
+  /* ── Edição de dados profissionais ──────────────────────────── */
+  const [editandoProfissional, setEditandoProfissional] = useState(false);
+  const [salvandoProfissional, setSalvandoProfissional] = useState(false);
+  const [crmInput, setCrmInput] = useState('');
+  const [especialidadeInput, setEspecialidadeInput] = useState('');
+  const [bioInput, setBioInput] = useState('');
+
+  /* ── Google Calendar integration ────────────────────────────── */
+  const [conectandoGoogle, setConectandoGoogle] = useState(false);
+
+  const carregarPerfilMedico = useCallback(async () => {
+    setCarregandoPerfil(true);
+    const res = await obterPerfilMedico();
+    if (res.sucesso && res.dados) {
+      setCrm(res.dados.crm);
+      setEspecialidade(res.dados.especialidade);
+      setBio(res.dados.bio);
+      setGoogleConectado(res.dados.googleConectado);
+      setMedicoId(res.dados.medicoId);
+      
+      setCrmInput(res.dados.crm ?? '');
+      setEspecialidadeInput(res.dados.especialidade ?? '');
+      setBioInput(res.dados.bio ?? '');
+    }
+    setCarregandoPerfil(false);
+  }, []);
 
   useEffect(() => {
     // Carrega telefone
@@ -64,16 +106,64 @@ export default function PerfilMedicoPage() {
       if (res.sucesso && res.dados) setTelefoneDb(res.dados.telefone);
     });
 
-    // Carrega dados profissionais do médico
-    obterPerfilMedico().then((res) => {
-      if (res.sucesso && res.dados) {
-        setCrm(res.dados.crm);
-        setEspecialidade(res.dados.especialidade);
-        setBio(res.dados.bio);
+    // Carrega dados profissionais
+    carregarPerfilMedico();
+  }, [carregarPerfilMedico]);
+
+  // Verificar resultado do OAuth do Google Calendar
+  useEffect(() => {
+    const googleParam = searchParams?.get('google');
+    if (googleParam === 'sucesso') {
+      toast.success('Google Calendar conectado com sucesso!');
+      carregarPerfilMedico();
+    } else if (googleParam === 'erro') {
+      const motivo = searchParams?.get('motivo');
+      const mensagens: Record<string, string> = {
+        negado: 'Você negou a autorização do Google Calendar.',
+        parametros: 'Parâmetros inválidos no callback.',
+        token: 'Erro ao obter token de acesso do Google.',
+      };
+      toast.error(mensagens[motivo ?? ''] ?? 'Erro ao conectar Google Calendar.');
+    }
+  }, [searchParams, carregarPerfilMedico]);
+
+  async function handleConectarGoogle() {
+    if (!medicoId) return;
+    setConectandoGoogle(true);
+    try {
+      const res = await obterUrlGoogleCalendar(medicoId);
+      if (res.sucesso && res.dados?.url) {
+        window.location.href = res.dados.url;
+      } else {
+        toast.error(res.erro ?? 'Erro ao gerar URL de autorização.');
+        setConectandoGoogle(false);
       }
-      setCarregandoPerfil(false);
+    } catch {
+      toast.error('Erro ao conectar com o Google.');
+      setConectandoGoogle(false);
+    }
+  }
+
+  async function handleSalvarProfissional() {
+    if (!crmInput.trim() || !especialidadeInput.trim()) {
+      toast.error('CRM e Especialidade são obrigatórios.');
+      return;
+    }
+    setSalvandoProfissional(true);
+    const res = await atualizarPerfilMedico({
+      crm: crmInput.trim(),
+      especialidade: especialidadeInput.trim(),
+      bio: bioInput.trim() || null,
     });
-  }, []);
+    setSalvandoProfissional(false);
+    if (res.sucesso) {
+      toast.success('Dados profissionais atualizados!');
+      setEditandoProfissional(false);
+      carregarPerfilMedico();
+    } else {
+      toast.error(res.erro || 'Erro ao salvar dados profissionais');
+    }
+  }
 
   if (!isLoaded) {
     return (
@@ -350,18 +440,97 @@ export default function PerfilMedicoPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════
-          DADOS PROFISSIONAIS — CRM e Especialidade (somente leitura)
+          DADOS PROFISSIONAIS — CRM e Especialidade (editável)
           ═══════════════════════════════════════════════════════ */}
       <section className="animate-fade-up delay-200">
-        <h2 className="font-heading mb-4 text-xl font-semibold tracking-tight">
-          Dados Profissionais
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-heading text-xl font-semibold tracking-tight">
+            Dados Profissionais
+          </h2>
+          {!editandoProfissional && !carregandoPerfil && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCrmInput(crm ?? '');
+                setEspecialidadeInput(especialidade ?? '');
+                setBioInput(bio ?? '');
+                setEditandoProfissional(true);
+              }}
+              className="gap-2 rounded-xl"
+            >
+              <Pencil size={14} />
+              Editar
+            </Button>
+          )}
+        </div>
         <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm grain">
           {carregandoPerfil ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 size={20} className="animate-spin text-muted-foreground" />
             </div>
+          ) : editandoProfissional ? (
+            /* ── Modo Edição ── */
+            <div className="space-y-4 animate-fade-in text-sm">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="crm">CRM</Label>
+                  <Input
+                    id="crm"
+                    value={crmInput}
+                    onChange={(e) => setCrmInput(e.target.value)}
+                    placeholder="Ex: CRM/SP 000000"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="especialidade">Especialidade</Label>
+                  <Input
+                    id="especialidade"
+                    value={especialidadeInput}
+                    onChange={(e) => setEspecialidadeInput(e.target.value)}
+                    placeholder="Ex: Neurologia, Medicina Endocanabinoide"
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bio">Bio / Apresentação</Label>
+                <Textarea
+                  id="bio"
+                  value={bioInput}
+                  onChange={(e) => setBioInput(e.target.value)}
+                  placeholder="Descreva sua formação e experiência profissional..."
+                  className="min-h-[120px] resize-y rounded-xl"
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {bioInput.length}/2000 caracteres
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditandoProfissional(false)}
+                  disabled={salvandoProfissional}
+                  className="gap-2 rounded-xl"
+                >
+                  <X size={14} />
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSalvarProfissional}
+                  disabled={salvandoProfissional}
+                  className="gap-2 rounded-xl"
+                >
+                  {salvandoProfissional ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
           ) : (
+            /* ── Modo Leitura ── */
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* CRM */}
@@ -393,26 +562,101 @@ export default function PerfilMedicoPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                     Sobre
                   </p>
-                  <p className="text-sm leading-relaxed text-foreground/80">{bio}</p>
+                  <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">{bio}</p>
                 </div>
               )}
-
-              <p className="text-xs text-muted-foreground">
-                Para atualizar CRM, especialidade ou bio, acesse{' '}
-                <a href="/medico/configuracoes" className="font-medium text-primary underline-offset-2 hover:underline">
-                  Configurações
-                </a>
-                .
-              </p>
             </div>
           )}
         </div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════
+          INTEGRAÇÕES E PREFERÊNCIAS — Google Calendar e Fuso Horário
+          ═══════════════════════════════════════════════════════ */}
+      <section className="animate-fade-up delay-300">
+        <h2 className="font-heading mb-4 text-xl font-semibold tracking-tight">
+          Integrações e Preferências
+        </h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Google Calendar */}
+          <Card className="border-border/40 shadow-sm bg-card grain">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+                    <CalendarDays size={20} className="text-violet-600" />
+                  </div>
+                  <CardTitle className="text-base font-semibold">Google Calendar</CardTitle>
+                </div>
+                {googleConectado ? (
+                  <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 font-semibold border-0">
+                    <CheckCircle2 size={12} className="h-3 w-3 shrink-0" />
+                    Conectado
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-500/[0.02]">
+                    Não conectado
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {googleConectado ? (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Seu Google Calendar está integrado. As consultas agendadas criarão eventos automaticamente com link do Google Meet.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Conecte seu Google Calendar para agendar consultas automaticamente
+                    com link do Google Meet.
+                  </p>
+                  <Button
+                    onClick={handleConectarGoogle}
+                    disabled={conectandoGoogle}
+                    className="w-full gap-2 rounded-xl"
+                    variant="outline"
+                  >
+                    {conectandoGoogle ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ExternalLink size={16} />
+                    )}
+                    {conectandoGoogle ? 'Redirecionando...' : 'Conectar Google Calendar'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Preferências */}
+          <Card className="border-border/40 shadow-sm bg-card grain">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                  <Settings size={20} className="text-amber-600" />
+                </div>
+                <CardTitle className="text-base font-semibold">Preferências</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Idioma</span>
+                <span className="font-medium">Português (BR)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Fuso horário</span>
+                <span className="font-medium">America/Sao_Paulo</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════
           SEGURANÇA
           ═══════════════════════════════════════════════════════ */}
-      <section className="animate-fade-up delay-300 pb-4">
+      <section className="animate-fade-up delay-400 pb-4">
         <h2 className="font-heading mb-4 text-xl font-semibold tracking-tight">Segurança</h2>
         <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm grain">
           <div className="flex items-start gap-4">

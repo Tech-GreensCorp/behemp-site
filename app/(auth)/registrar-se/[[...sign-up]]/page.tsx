@@ -84,7 +84,7 @@ function AnimatedCounter({ target, duration = 4000 }: { target: number; duration
 }
 
 /* ── Configurações ───────────────────────────────── */
-const AUTH_DISABLED = true;
+const AUTH_DISABLED = false;
 
 /* ── Componente principal ────────────────────────── */
 export default function SignUpPage() {
