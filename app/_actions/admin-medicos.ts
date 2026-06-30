@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { medicos, users } from '@/db/schema';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import { clerkClient } from '@clerk/nextjs/server';
 
 /**
  * Server Actions para visualização de médicos pelo admin.
@@ -309,10 +310,20 @@ export async function atualizarConfigAgenda(medicoId: string, configAgenda: any)
 
 const criarMedicoSchema = z.object({
   email: z.string().email('E-mail inválido'),
+  nome: z.string().min(2, 'Nome obrigatório').optional(),
+  senha: z
+    .string()
+    .min(8, 'A senha deve ter pelo menos 8 caracteres')
+    .max(72, 'Senha muito longa')
+    .regex(/[A-Z]/, 'Deve conter ao menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Deve conter ao menos um número')
+    .optional(),
   especialidade: z.string().min(2, 'Especialidade obrigatória'),
   crm: z.string().optional(),
   bio: z.string().optional(),
   ordem: z.number().int().optional(),
+  valorConsulta: z.string().optional(),
+  avatarUrl: z.string().url().optional(),
 });
 
 const atualizarMedicoSchema = z.object({
@@ -339,11 +350,11 @@ export async function criarMedico(
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const { email, especialidade, crm, bio, ordem } = parsed.data;
+    const { email, nome, senha, especialidade, crm, bio, ordem, valorConsulta, avatarUrl } = parsed.data;
 
     // Buscar usuário pelo e-mail
     const [user] = await db
-      .select({ id: users.id, role: users.role })
+      .select({ id: users.id, role: users.role, clerkId: users.clerkId })
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
@@ -366,9 +377,40 @@ export async function criarMedico(
       return { sucesso: false, erro: 'Este usuário já possui um perfil de médico cadastrado.' };
     }
 
-    // Atualizar role para medico (caso ainda seja paciente)
-    if (user.role !== 'medico') {
-      await db.update(users).set({ role: 'medico' }).where(eq(users.id, user.id));
+    // Atualizar dados do user (role, nome, avatar)
+    const userUpdate: Partial<{ role: 'medico'; nome: string; avatarUrl: string | null }> = {};
+    if (user.role !== 'medico') userUpdate.role = 'medico';
+    if (nome) userUpdate.nome = nome.trim();
+    if (avatarUrl) userUpdate.avatarUrl = avatarUrl;
+
+    if (Object.keys(userUpdate).length > 0) {
+      await db.update(users).set(userUpdate).where(eq(users.id, user.id));
+    }
+
+    // Sincronizar nome com Clerk se alterado
+    if (nome && user.clerkId) {
+      try {
+        const client = await clerkClient();
+        const partes = nome.trim().split(' ');
+        const firstName = partes[0];
+        const lastName = partes.slice(1).join(' ') || '';
+        await client.users.updateUser(user.clerkId, { firstName, lastName });
+      } catch (clerkError) {
+        console.warn('[Admin] Falha ao sincronizar nome com Clerk:', clerkError);
+      }
+    }
+
+    // Definir senha temporária via Clerk
+    if (senha && user.clerkId) {
+      try {
+        const client = await clerkClient();
+        await client.users.updateUser(user.clerkId, {
+          password: senha,
+          skipPasswordChecks: true,
+        });
+      } catch (clerkError) {
+        console.warn('[Admin] Falha ao definir senha via Clerk:', clerkError);
+      }
     }
 
     // Inserir na tabela medicos
@@ -380,6 +422,7 @@ export async function criarMedico(
         crm: crm || null,
         bio: bio || null,
         ordem: ordem ?? null,
+        valorConsulta: valorConsulta || null,
       })
       .returning({ id: medicos.id });
 
