@@ -16,7 +16,7 @@ export default async function MedicoLayout({ children }: { children: ReactNode }
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen">
       <MedicoSidebar />
       <main className="flex-1 overflow-auto">
         <div className="px-4 py-8 sm:px-6 lg:px-8">
