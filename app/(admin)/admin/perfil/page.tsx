@@ -224,19 +224,10 @@ export default function PerfilAdminPage() {
                       <Pencil size={12} />
                     </button>
                   </div>
-                  <p className="mt-0.5 text-sm text-muted-foreground">Administrador</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-medium text-red-600">
-                      <Shield className="h-3 w-3" /> Acesso total
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary uppercase tracking-wider border border-primary/20">
+                      Administrador
                     </span>
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-                      <BadgeCheck className="h-3 w-3" /> Conta verificada
-                    </span>
-                    {dataCriacao && (
-                      <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                        <CalendarDays className="h-3 w-3" /> Desde {dataCriacao}
-                      </span>
-                    )}
                   </div>
                 </div>
               )}
