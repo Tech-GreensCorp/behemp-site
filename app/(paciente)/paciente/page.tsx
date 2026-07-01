@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Pill,
@@ -35,22 +35,25 @@ const DICAS = [
     icone: Droplets,
     titulo: 'Hidratação',
     texto: 'Beba pelo menos 2L de água por dia para potencializar o efeito do medicamento.',
-    cor: 'text-sky-500',
+    cor: 'text-sky-600',
     bg: 'bg-sky-500/10',
+    border: 'border-sky-500/20',
   },
   {
     icone: Clock,
     titulo: 'Horário fixo',
     texto: 'Tome seu medicamento sempre no mesmo horário para manter níveis estáveis.',
-    cor: 'text-violet-500',
+    cor: 'text-violet-600',
     bg: 'bg-violet-500/10',
+    border: 'border-violet-500/20',
   },
   {
     icone: BookOpen,
     titulo: 'Registre seu progresso',
     texto: 'Anote sintomas e melhorias diariamente para compartilhar com seu médico.',
-    cor: 'text-emerald-500',
+    cor: 'text-emerald-600',
     bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/20',
   },
 ];
 
@@ -145,156 +148,249 @@ export default function PacienteDashboardPage() {
   const statusLabel = dados ? (LABEL_STATUS[dados.jornada.status] ?? dados.jornada.status) : '';
 
   return (
-    <div className="space-y-8">
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-          {carregando ? 'Carregando...' : `Olá, ${primeiroNome}! 👋`}
+    <div className="space-y-6 sm:space-y-10">
+      {/* ── Header Editorial ── */}
+      <div className="animate-fade-up">
+        <p className="text-primary mb-2 sm:mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
+          Área do Paciente
+        </p>
+        <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
+          {carregando ? 'Carregando...' : (
+            <>Olá, <span>{primeiroNome}</span></>
+          )}
         </h1>
-        <p className="mt-1 text-muted-foreground">Aqui está o resumo do seu tratamento</p>
+        <p className="text-muted-foreground mt-2 sm:mt-4 max-w-2xl text-sm sm:text-base leading-relaxed">
+          Acompanhe suas consultas, medicamentos e documentos.
+        </p>
       </div>
 
       {carregando ? (
-        <div className="flex min-h-[30vh] items-center justify-center">
+        <div className="flex min-h-[40vh] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
         <>
-          {/* ── KPIs principais ─────────────────────────────────── */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-            {/* Médico */}
-            <Card className="border-border/40 shadow-sm">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Stethoscope className="h-5 w-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Médico responsável</p>
-                  <p className="truncate text-sm font-medium">
-                    {dados?.medicoNome ?? (
-                      <span className="text-muted-foreground italic">Não atribuído</span>
-                    )}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Medicamento */}
-            <Card className="border-border/40 shadow-sm">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10">
-                  <Pill className="h-5 w-5 text-violet-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Medicamento</p>
-                  <p className="truncate text-sm font-medium">
-                    {med ? formatarTipoCanabinoide(med.tipoCanabinoide) : (
-                      <span className="text-muted-foreground italic">Nenhum prescrito</span>
-                    )}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Documentos */}
-            <Card className="border-border/40 shadow-sm">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                  <FileText className="h-5 w-5 text-amber-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Documentos</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{dados?.totalDocumentos ?? 0} enviado{dados?.totalDocumentos !== 1 ? 's' : ''}</p>
-                    {dados?.totalDocumentos === 0 && (
-                      <Badge variant="secondary" className="h-5 text-[10px]">⚠</Badge>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Mensagens */}
-            <Card className="border-border/40 shadow-sm">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
-                  <MessageCircle className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Mensagens</p>
-                  <p className="text-sm font-medium">
-                    {dados?.mensagensNaoLidas
-                      ? `${dados.mensagensNaoLidas} não lida${dados.mensagensNaoLidas > 1 ? 's' : ''}`
-                      : 'Em dia'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* ── KPIs principais ── */}
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-up delay-75">
+            {[
+              {
+                label: 'Médico',
+                valor: dados?.medicoNome ?? 'Não atribuído',
+                vazio: !dados?.medicoNome,
+                icone: Stethoscope,
+                cor: 'text-primary',
+                bg: 'bg-primary/10',
+              },
+              {
+                label: 'Medicamento',
+                valor: med ? formatarTipoCanabinoide(med.tipoCanabinoide) : 'Nenhum prescrito',
+                vazio: !med,
+                icone: Pill,
+                cor: 'text-violet-600',
+                bg: 'bg-violet-500/10',
+              },
+              {
+                label: 'Documentos',
+                valor: `${dados?.totalDocumentos ?? 0} enviado${dados?.totalDocumentos !== 1 ? 's' : ''}`,
+                vazio: dados?.totalDocumentos === 0,
+                icone: FileText,
+                cor: 'text-amber-600',
+                bg: 'bg-amber-500/10',
+              },
+              {
+                label: 'Mensagens',
+                valor: dados?.mensagensNaoLidas
+                  ? `${dados.mensagensNaoLidas} não lida${dados.mensagensNaoLidas > 1 ? 's' : ''}`
+                  : 'Em dia',
+                vazio: false,
+                icone: MessageCircle,
+                cor: 'text-emerald-600',
+                bg: 'bg-emerald-500/10',
+              },
+            ].map((kpi) => {
+              const Icon = kpi.icone;
+              return (
+                <Card key={kpi.label} className="border border-border/20 bg-white shadow-sm rounded-2xl grain overflow-hidden">
+                  <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+                    <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', kpi.bg)}>
+                      <Icon className={cn('h-4 w-4', kpi.cor)} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground/60 font-bold uppercase tracking-wider">{kpi.label}</p>
+                      <p className={cn('truncate text-sm font-semibold mt-0.5', kpi.vazio && 'text-muted-foreground italic')}>
+                        {kpi.valor}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
-          {/* ── Grid: Medicamento + Próxima consulta ────────────── */}
-          <div className="grid gap-6 lg:grid-cols-2">
-
-            {/* Medicamento atual */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Pill className="h-5 w-5 text-primary" />
-                  Medicamento Atual
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!med ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                      <Pill className="h-6 w-6 text-muted-foreground/40" />
+          {/* ── Próximos passos (PRIORIDADE 1) ─────────────────── */}
+          {proximosPassos.length > 0 && (
+            <div className="animate-fade-up delay-100">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10">
+                  <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                </div>
+                <h2 className="font-display text-lg font-bold text-foreground">Próximos Passos</h2>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {proximosPassos.map((passo, i) => (
+                  <Link
+                    key={passo!.id}
+                    href={passo!.href}
+                    className={cn(
+                      "group flex items-start gap-3 sm:gap-4 rounded-2xl sm:rounded-3xl border p-4 sm:p-5 transition-all hover:shadow-md bg-white grain cursor-pointer",
+                      passo!.urgente ? "border-amber-500/30 hover:border-amber-500/50" : "border-border/20 hover:border-primary/30"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
+                        passo!.urgente
+                          ? 'bg-amber-500/10 text-amber-600'
+                          : 'bg-primary/10 text-primary',
+                      )}
+                    >
+                      {i + 1}
                     </div>
-                    <p className="text-sm font-medium">Nenhum medicamento prescrito</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold leading-tight text-foreground">{passo!.titulo}</p>
+                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{passo!.descricao}</p>
+                    </div>
+                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Grid: Próxima consulta + Medicamento ────────────── */}
+          <div className="grid gap-6 lg:grid-cols-2 animate-fade-up delay-150">
+
+            {/* Próxima consulta (PRIORIDADE 2) */}
+            <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden">
+              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+                    <Calendar className="h-5 w-5 text-primary" />
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground">Próxima Consulta</h2>
+                </div>
+
+                {!consulta ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+                      <Calendar className="h-7 w-7 text-muted-foreground/30" />
+                    </div>
+                    <p className="text-sm font-bold text-foreground">Nenhuma consulta agendada</p>
+                    <Link
+                      href="/agendamento"
+                      className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                    >
+                      Agendar agora
+                      <ChevronRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-2xl bg-primary/5 border border-primary/10 p-4">
+                      <p className="text-lg font-bold text-foreground capitalize">
+                        {format(new Date(consulta.dataHora), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        às {format(new Date(consulta.dataHora), "HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
+                      <Stethoscope className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-sm text-muted-foreground">com</span>
+                      <span className="text-sm font-bold text-foreground">{consulta.medicoNome}</span>
+                    </div>
+
+                    {consulta.meetLink ? (
+                      <a
+                        href={consulta.meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 shadow-md"
+                      >
+                        <Video className="h-4 w-4" />
+                        Acessar Google Meet
+                      </a>
+                    ) : (
+                      <Badge variant="secondary" className="w-full justify-center py-2 rounded-2xl text-xs font-bold">
+                        Link do Meet em breve
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Medicamento atual (PRIORIDADE 3) */}
+            <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden">
+              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10">
+                    <Pill className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-foreground">Medicamento Atual</h2>
+                </div>
+
+                {!med ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+                      <Pill className="h-7 w-7 text-muted-foreground/30" />
+                    </div>
+                    <p className="text-sm font-bold text-foreground">Nenhum medicamento prescrito</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground max-w-xs">
                       Seu médico irá configurar sua dosagem em breve.
                     </p>
                   </div>
                 ) : (
                   <>
                     <div>
-                      <p className="text-lg font-semibold">{formatarTipoCanabinoide(med.tipoCanabinoide)}</p>
-                      <p className="text-sm text-muted-foreground">{med.novaDosagem} — {med.frequencia}</p>
+                      <p className="text-xl font-bold text-foreground">{formatarTipoCanabinoide(med.tipoCanabinoide)}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{med.novaDosagem} — {med.frequencia}</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       {med.concentracaoTHC && (
-                        <div className="rounded-xl bg-muted/50 px-3 py-2">
-                          <p className="text-muted-foreground">Concentração THC</p>
-                          <p className="font-semibold">{med.concentracaoTHC}</p>
+                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
+                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">THC</p>
+                          <p className="font-bold text-foreground mt-0.5">{med.concentracaoTHC}</p>
                         </div>
                       )}
                       {med.concentracaoCBD && (
-                        <div className="rounded-xl bg-muted/50 px-3 py-2">
-                          <p className="text-muted-foreground">Concentração CBD</p>
-                          <p className="font-semibold">{med.concentracaoCBD}</p>
+                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
+                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">CBD</p>
+                          <p className="font-bold text-foreground mt-0.5">{med.concentracaoCBD}</p>
                         </div>
                       )}
                       {med.viaAdministracao && (
-                        <div className="rounded-xl bg-muted/50 px-3 py-2">
-                          <p className="text-muted-foreground">Via</p>
-                          <p className="font-semibold">{med.viaAdministracao}</p>
+                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
+                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">Via</p>
+                          <p className="font-bold text-foreground mt-0.5">{med.viaAdministracao}</p>
                         </div>
                       )}
-                      <div className="rounded-xl bg-muted/50 px-3 py-2">
-                        <p className="text-muted-foreground">Último ajuste</p>
-                        <p className="font-semibold">
+                      <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
+                        <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">Último ajuste</p>
+                        <p className="font-bold text-foreground mt-0.5">
                           {format(new Date(med.dataAjuste + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
                         </p>
                       </div>
                     </div>
 
                     {med.proximaRevisao && (
-                      <div className="rounded-xl bg-primary/5 px-4 py-3">
+                      <div className="rounded-2xl bg-primary/5 border border-primary/10 px-4 py-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium text-primary">Próxima revisão</span>
+                            <span className="text-sm font-bold text-primary">Próxima revisão</span>
                           </div>
                           <span className="text-sm font-bold text-primary">
                             {format(new Date(med.proximaRevisao + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
@@ -305,187 +401,78 @@ export default function PacienteDashboardPage() {
 
                     <Link
                       href="/paciente/medicamentos"
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                      className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/30"
                     >
                       Ver todos meus medicamentos
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Próxima consulta */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Próxima Consulta
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!consulta ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                      <Calendar className="h-6 w-6 text-muted-foreground/40" />
-                    </div>
-                    <p className="text-sm font-medium">Nenhuma consulta agendada</p>
-                    <Link
-                      href="/agendamento"
-                      className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      Agendar agora
-                      <ChevronRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <p className="text-lg font-semibold capitalize">
-                        {format(new Date(consulta.dataHora), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        às {format(new Date(consulta.dataHora), "HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-muted/50 px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Stethoscope className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">com</span>
-                        <span className="font-medium">{consulta.medicoNome}</span>
-                      </div>
-                    </div>
-
-                    {consulta.meetLink ? (
-                      <a
-                        href={consulta.meetLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                      >
-                        <Video className="h-4 w-4" />
-                        Acessar Google Meet
-                      </a>
-                    ) : (
-                      <Badge variant="secondary" className="w-full justify-center py-1.5">
-                        Link do Meet em breve
-                      </Badge>
-                    )}
                   </>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* ── Grid: Jornada + Próximos passos ─────────────────── */}
-          <div className="grid gap-6 lg:grid-cols-2">
-
-            {/* Jornada / Status */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+          {/* ── Jornada / Status (PRIORIDADE 4) ───────────────── */}
+          <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up delay-200">
+            <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
                   <Route className="h-5 w-5 text-primary" />
-                  Sua Jornada
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl bg-primary/5 px-4 py-3">
-                  <p className="text-xs text-muted-foreground">Fase atual</p>
-                  <p className="mt-1 text-lg font-bold text-primary">{jornadaLabel}</p>
+                </div>
+                <h2 className="font-display text-lg font-bold text-foreground">Sua Jornada</h2>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl bg-primary/5 border border-primary/10 p-4">
+                  <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">Fase atual</p>
+                  <p className="mt-1.5 text-lg font-bold text-primary">{jornadaLabel}</p>
                 </div>
 
-                <div className="rounded-xl bg-muted/50 px-4 py-3">
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <p className="mt-1 text-sm font-semibold">{statusLabel}</p>
+                <div className="rounded-2xl bg-muted/30 border border-border/10 p-4">
+                  <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">Status</p>
+                  <p className="mt-1.5 text-lg font-bold text-foreground">{statusLabel}</p>
                 </div>
+              </div>
 
-                {dados?.medicoNome ? (
-                  <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                      Seu tratamento está sendo acompanhado por {dados.medicoNome}.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                    <UserX className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Nenhum médico responsável atribuído ainda. Entre em contato com a equipe.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              {dados?.medicoNome ? (
+                <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                    Seu tratamento está sendo acompanhado por <strong>{dados.medicoNome}</strong>.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <UserX className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
+                    Nenhum médico responsável atribuído ainda. Entre em contato com a equipe.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* Próximos passos */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  Próximos Passos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {proximosPassos.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500/40" />
-                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                      Tudo em dia!
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Nenhuma ação pendente no momento.
-                    </p>
-                  </div>
-                ) : (
-                  proximosPassos.map((passo, i) => (
-                    <Link
-                      key={passo!.id}
-                      href={passo!.href}
-                      className="flex items-start gap-3 rounded-xl border border-border/60 p-4 transition-colors hover:bg-accent/50"
-                    >
-                      <div
-                        className={cn(
-                          'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                          passo!.urgente
-                            ? 'bg-amber-500/10 text-amber-600'
-                            : 'bg-primary/10 text-primary',
-                        )}
-                      >
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-tight">{passo!.titulo}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{passo!.descricao}</p>
-                      </div>
-                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    </Link>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* ── Dicas para o Tratamento ── */}
+          <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up delay-300">
+            <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+                  <HeartPulse className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="font-display text-lg font-bold text-foreground">Dicas para o seu Tratamento</h2>
+              </div>
 
-          {/* ── Dicas de saúde ─────────────────────────────────── */}
-          <Card className="border-border/40 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <HeartPulse className="h-5 w-5 text-primary" />
-                Dicas para o seu Tratamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
               <div className="grid gap-4 sm:grid-cols-3">
                 {DICAS.map((dica, index) => {
                   const Icon = dica.icone;
                   return (
-                    <div key={index} className="flex gap-3">
+                    <div key={index} className="flex gap-3 items-start">
                       <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dica.bg)}>
                         <Icon className={cn('h-4 w-4', dica.cor)} />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">{dica.titulo}</p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{dica.texto}</p>
+                        <p className="text-sm font-bold text-foreground">{dica.titulo}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{dica.texto}</p>
                       </div>
                     </div>
                   );
