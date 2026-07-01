@@ -49,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Mensagens',
     items: [
+      { label: 'Chat', href: '/admin/chat', icon: MessageSquare },
       { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
       { label: 'Leads Ebooks', href: '/admin/leads-ebooks', icon: BookOpen },
     ],
