@@ -148,8 +148,8 @@ export function FormCriarMedico() {
           <div>
             <CardTitle className="text-base">Cadastrar novo médico</CardTitle>
             <CardDescription className="text-xs">
-              O usuário precisa ter conta criada no sistema. O e-mail deve corresponder ao cadastro
-              existente.
+              Informe o e-mail do médico. Se já tiver conta, será vinculado. Caso contrário, nome e
+              senha serão usados para criar a conta automaticamente.
             </CardDescription>
           </div>
         </div>
@@ -223,7 +223,8 @@ export function FormCriarMedico() {
               disabled={carregando}
             />
             <p className="text-muted-foreground text-xs">
-              O e-mail deve corresponder a um usuário já cadastrado no sistema.
+              Se o e-mail já estiver cadastrado, o perfil médico será vinculado. Caso contrário, uma
+              nova conta será criada.
             </p>
           </div>
 
@@ -237,7 +238,8 @@ export function FormCriarMedico() {
               disabled={carregando}
             />
             <p className="text-muted-foreground text-xs">
-              Se preenchido, atualiza o nome do usuário no sistema e no Clerk.
+              Obrigatório para novos usuários. Para existentes, atualiza o nome no sistema e no
+              Clerk.
             </p>
           </div>
 
@@ -263,7 +265,7 @@ export function FormCriarMedico() {
               </button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Se preenchida, define a senha de acesso do médico via Clerk.
+              Obrigatória para novos usuários. Para existentes, redefine a senha no Clerk.
             </p>
           </div>
 
