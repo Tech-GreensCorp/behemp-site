@@ -40,37 +40,37 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Controle',
     items: [
-      { label: 'Usuários',          href: '/admin/usuarios',        icon: Users },
-      { label: 'Gerenciar Contas',   href: '/admin/gerenciar-contas', icon: Settings2 },
-      { label: 'Atribuir Médico',    href: '/admin/atribuir-medico', icon: UserPlus },
-      { label: 'Médicos',            href: '/admin/medicos',         icon: Stethoscope },
-      { label: 'Triagens',           href: '/admin/triagens',        icon: FileCheck },
+      { label: 'Usuários', href: '/admin/usuarios', icon: Users },
+      { label: 'Gerenciar Contas', href: '/admin/gerenciar-contas', icon: Settings2 },
+      { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
+      { label: 'Médicos', href: '/admin/medicos', icon: Stethoscope },
+      { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
     ],
   },
   {
     title: 'Mensagens',
     items: [
-      { label: 'Mensagens',          href: '/admin/mensagens',       icon: MessageSquare },
-      { label: 'Leads Ebooks',       href: '/admin/leads-ebooks',    icon: BookOpen },
+      { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
+      { label: 'Leads Ebooks', href: '/admin/leads-ebooks', icon: BookOpen },
     ],
   },
   {
     title: 'Financeiro',
     items: [
-      { label: 'Invoices',           href: '/admin/invoices',        icon: Receipt },
-      { label: 'Recompras',          href: '/admin/recompras',       icon: ShoppingCart },
+      { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
+      { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
     ],
   },
-  {
-    title: 'Segurança',
-    items: [
-      { label: 'Auditoria',          href: '/admin/auditoria',       icon: Shield },
-    ],
-  },
+  // {
+  //   title: 'Segurança',
+  //   items: [
+  //     { label: 'Auditoria',          href: '/admin/auditoria',       icon: Shield },
+  //   ],
+  // },
   {
     title: 'Configurações',
     items: [
-      { label: 'Meu Perfil',         href: '/admin/perfil',          icon: User },
+      { label: 'Meu Perfil', href: '/admin/perfil', icon: User },
     ],
   },
 ];
@@ -118,8 +118,8 @@ export function AdminSidebar() {
       return (
         <span className={cn(
           'flex items-center justify-center rounded-full bg-primary font-bold text-primary-foreground shadow-sm transition-all',
-          isCollapsed 
-            ? 'absolute -right-1 -top-1 h-3 w-3' 
+          isCollapsed
+            ? 'absolute -right-1 -top-1 h-3 w-3'
             : 'right-3 h-5 min-w-5 text-[10px] px-1'
         )}>
           {isCollapsed ? (
@@ -134,8 +134,8 @@ export function AdminSidebar() {
       return (
         <span className={cn(
           'flex items-center justify-center rounded-full bg-amber-500 font-bold text-white shadow-sm transition-all',
-          isCollapsed 
-            ? 'absolute -right-1 -top-1 h-3 w-3' 
+          isCollapsed
+            ? 'absolute -right-1 -top-1 h-3 w-3'
             : 'right-3 h-5 min-w-5 text-[10px] px-1'
         )}>
           {isCollapsed ? (
