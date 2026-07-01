@@ -392,6 +392,110 @@ export async function listarPacientes(filtros?: {
 }
 
 /**
+ * Lista pacientes do médico autenticado com filtros e paginação server-side.
+ */
+export async function listarPacientesPaginado(filtros?: {
+  busca?: string;
+  status?: string;
+  tratamento?: string;
+  jornada?: string;
+  pagina?: number;
+  porPagina?: number;
+}): Promise<ActionResult<{
+  pacientes: Array<{
+    id: string;
+    nome: string;
+    email: string;
+    telefone: string | null;
+    status: string;
+    jornadaFase: string | null;
+    tratamentoTipo: string | null;
+    dataNascimento: string | null;
+    createdAt: Date;
+  }>;
+  total: number;
+  totalPaginas: number;
+}>> {
+  try {
+    const auth = await verificarMedicoOuAdmin();
+    if (!auth.autorizado) {
+      return { sucesso: false, erro: auth.erro };
+    }
+
+    const medicoId = await obterMedicoIdDoUsuario(auth.clerkId!);
+
+    const conditions = [isNull(pacientes.deletedAt)];
+
+    // Se for médico (não admin), filtrar por seus pacientes
+    if (auth.role === 'medico' && medicoId) {
+      conditions.push(eq(pacientes.medicoId, medicoId));
+    }
+
+    if (filtros?.status && filtros.status !== 'todos') {
+      conditions.push(eq(pacientes.status, filtros.status as 'aguardando_consulta' | 'em_tratamento' | 'concluido' | 'arquivado'));
+    }
+
+    if (filtros?.tratamento && filtros.tratamento !== 'todos') {
+      conditions.push(eq(pacientes.tratamentoTipo, filtros.tratamento as 'cbd' | 'thc' | 'cbd_thc'));
+    }
+
+    if (filtros?.jornada && filtros.jornada !== 'todos') {
+      conditions.push(
+        eq(
+          pacientes.jornadaFase,
+          filtros.jornada as 'acolhimento' | 'avaliacao_medica' | 'burocracia_anvisa' | 'logistica' | 'acompanhamento_continuo',
+        ),
+      );
+    }
+
+    // Condição de busca
+    const allConditions = filtros?.busca
+      ? and(...conditions, ilike(users.nome, `%${filtros.busca}%`))
+      : and(...conditions);
+
+    // Paginação
+    const pagina = Math.max(1, filtros?.pagina ?? 1);
+    const porPagina = Math.min(100, Math.max(1, filtros?.porPagina ?? 20));
+    const offset = (pagina - 1) * porPagina;
+
+    // Query principal com LIMIT/OFFSET
+    const resultado = await db
+      .select({
+        id: pacientes.id,
+        nome: users.nome,
+        email: users.email,
+        telefone: users.telefone,
+        status: pacientes.status,
+        jornadaFase: pacientes.jornadaFase,
+        tratamentoTipo: pacientes.tratamentoTipo,
+        dataNascimento: pacientes.dataNascimento,
+        createdAt: pacientes.createdAt,
+      })
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(allConditions)
+      .orderBy(desc(pacientes.createdAt))
+      .limit(porPagina)
+      .offset(offset);
+
+    // Contagem total filtrada
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(allConditions);
+
+    const total = count ?? 0;
+    const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+
+    return { sucesso: true, dados: { pacientes: resultado, total, totalPaginas } };
+  } catch (error) {
+    console.error('[Action] Erro ao listar pacientes paginado:', error);
+    return { sucesso: false, erro: 'Erro ao listar pacientes' };
+  }
+}
+
+/**
  * Obtém detalhes completos de um paciente pelo ID.
  */
 /** Tipo completo de paciente retornado por obterPaciente */
