@@ -63,6 +63,7 @@ export const EVENTOS_PUSHER = {
   MENSAGEM_LIDA: 'mensagem-lida',
   DIGITANDO: 'client-digitando',
   NOVA_NOTIFICACAO: 'nova-notificacao',
+  MENSAGEM_REACAO: 'mensagem-reacao',
 } as const;
 
 // ── Funções de envio ──────────────────────────────────────────
@@ -77,6 +78,9 @@ export async function enviarMensagemChat(params: {
   autorNome: string;
   autorRole?: string | null;
   conteudo: string;
+  urlAnexo?: string | null;
+  tipoAnexo?: string | null;
+  nomeAnexo?: string | null;
   criadoEm: string;
 }): Promise<void> {
   const pusher = getPusherServer();
@@ -86,7 +90,27 @@ export async function enviarMensagemChat(params: {
     autorNome: params.autorNome,
     autorRole: params.autorRole ?? null,
     conteudo: params.conteudo,
+    urlAnexo: params.urlAnexo ?? null,
+    tipoAnexo: params.tipoAnexo ?? null,
+    nomeAnexo: params.nomeAnexo ?? null,
     criadoEm: params.criadoEm,
+  });
+}
+
+/**
+ * Envia uma reação a uma mensagem para o canal de chat.
+ */
+export async function enviarReacaoChat(params: {
+  grupoId: string;
+  mensagemId: string;
+  userId: string;
+  emoji: string;
+}): Promise<void> {
+  const pusher = getPusherServer();
+  await pusher.trigger(canalChat(params.grupoId), EVENTOS_PUSHER.MENSAGEM_REACAO, {
+    mensagemId: params.mensagemId,
+    userId: params.userId,
+    emoji: params.emoji,
   });
 }
 
