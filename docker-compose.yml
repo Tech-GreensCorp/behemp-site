@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dummy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dummy
+      POSTGRES_PASSWORD: dummy
+      POSTGRES_DB: dummy
+    ports:
+      - "5432:5432"
+    volumes:
+      - dummy_pgdata:/var/lib/postgresql/data
+
+volumes:
+  dummy_pgdata:
