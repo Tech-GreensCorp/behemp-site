@@ -98,18 +98,18 @@ export default function NotificacoesPacientePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-10">
+    <div className="space-y-10">
       
       {/* ── Header Editorial ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up">
         <div>
-          <p className="text-primary mb-3 text-xs font-semibold tracking-[0.25em] uppercase">
+          <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
             Área do Paciente
           </p>
-          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight text-foreground">
+          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
             Minhas <span className="text-accent-italic">Notificações</span>
           </h1>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
+          <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-relaxed">
             {naoLidas > 0
               ? `Você possui ${naoLidas} notificação${naoLidas > 1 ? 'ões' : ''} não lida${naoLidas > 1 ? 's' : ''} pendente${naoLidas > 1 ? 's' : ''}.`
               : 'Você está em dia! Todas as notificações foram lidas.'}
