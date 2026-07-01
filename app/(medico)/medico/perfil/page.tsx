@@ -333,21 +333,10 @@ export default function PerfilMedicoPage() {
                       <Pencil size={12} />
                     </button>
                   </div>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {especialidade ? `${especialidade} · Médico` : 'Médico'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-                      <Stethoscope className="h-3 w-3" /> Médico
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary uppercase tracking-wider border border-primary/20">
+                      Médico {especialidade ? `· ${especialidade}` : ''}
                     </span>
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-                      <BadgeCheck className="h-3 w-3" /> Conta verificada
-                    </span>
-                    {dataCriacao && (
-                      <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                        <CalendarDays className="h-3 w-3" /> Desde {dataCriacao}
-                      </span>
-                    )}
                   </div>
                 </div>
               )}
