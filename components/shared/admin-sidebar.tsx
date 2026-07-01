@@ -17,7 +17,7 @@ import {
   Receipt,
   ShoppingCart,
   User,
-  Settings2,
+
   Stethoscope,
   BookOpen,
 } from 'lucide-react';
@@ -41,7 +41,6 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Controle',
     items: [
       { label: 'Usuários', href: '/admin/usuarios', icon: Users },
-      { label: 'Gerenciar Contas', href: '/admin/gerenciar-contas', icon: Settings2 },
       { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
       { label: 'Médicos', href: '/admin/medicos', icon: Stethoscope },
       { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
