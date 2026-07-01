@@ -1,57 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
 import {
-  Award,
-  Baby,
-  BadgeCheck,
-  Bell,
-  Brain,
-  Calendar,
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  DollarSign,
-  Dumbbell,
-  ExternalLink,
-  Eye,
-  FileCheck,
-  FileText,
-  HeartCrack,
-  HeartPulse,
-  Home,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
-  Mail,
-  MapPin,
-  MapPinned,
-  Menu,
-  MessageSquare,
-  Package,
-  Pencil,
-  Pill,
   Search,
   Shield,
-  ShieldCheck,
-  Smartphone,
-  Smile,
-  Sparkles,
   Stethoscope,
-  Truck,
   User,
-  UserCheck,
-  UserPlus,
   Users,
-  Video,
-  X,
 } from 'lucide-react';
 
 /**
  * Página de administração de usuários — dados reais do banco.
+ * Paginação server-side, busca com debounce e ordenação dinâmica.
  */
 
 interface Usuario {
@@ -74,28 +51,78 @@ const ROLE_CONFIG: Record<string, {
   paciente: { label: 'Paciente', variant: 'outline', icon: User, cor: 'bg-emerald-500/10 text-emerald-600' },
 };
 
+type OrdenacaoKey = 'nome-asc' | 'nome-desc' | 'email-asc' | 'email-desc' | 'createdAt-desc' | 'createdAt-asc';
+
+const ORDENACAO_OPCOES: { value: OrdenacaoKey; label: string }[] = [
+  { value: 'createdAt-desc', label: 'Mais recentes' },
+  { value: 'createdAt-asc', label: 'Mais antigos' },
+  { value: 'nome-asc', label: 'Nome (A → Z)' },
+  { value: 'nome-desc', label: 'Nome (Z → A)' },
+  { value: 'email-asc', label: 'E-mail (A → Z)' },
+  { value: 'email-desc', label: 'E-mail (Z → A)' },
+];
+
+const POR_PAGINA_OPCOES = [10, 20, 50];
+
+function parseOrdenacao(key: OrdenacaoKey) {
+  const [ordenarPor, direcao] = key.split('-') as ['nome' | 'email' | 'createdAt', 'asc' | 'desc'];
+  return { ordenarPor, direcao };
+}
+
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroRole, setFiltroRole] = useState<string | undefined>();
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoKey>('createdAt-desc');
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(20);
+  const [totalFiltrado, setTotalFiltrado] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [stats, setStats] = useState({ total: 0, admins: 0, medicos: 0, pacientes: 0 });
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce da busca
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setBuscaDebounced(busca);
+      setPagina(1);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [busca]);
+
+  // Reset de página ao trocar filtros
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroRole, ordenacao, porPagina]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
+    const { ordenarPor, direcao } = parseOrdenacao(ordenacao);
     const res = await listarUsuariosAdmin({
-      busca: busca || undefined,
+      busca: buscaDebounced || undefined,
       role: filtroRole,
+      pagina,
+      porPagina,
+      ordenarPor,
+      direcao,
     });
     if (res.sucesso && res.dados) {
       setUsuarios(res.dados.usuarios as Usuario[]);
+      setTotalFiltrado(res.dados.totalFiltrado);
+      setTotalPaginas(res.dados.totalPaginas);
       setStats({
         total: res.dados.total,
         ...res.dados.porRole,
       });
     }
     setCarregando(false);
-  }, [busca, filtroRole]);
+  }, [buscaDebounced, filtroRole, ordenacao, pagina, porPagina]);
 
   useEffect(() => {
     carregar();
@@ -134,7 +161,8 @@ export default function UsuariosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Busca */}
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -144,18 +172,48 @@ export default function UsuariosPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex gap-2">
-          {['admin', 'medico', 'paciente'].map((role) => (
-            <Button
-              key={role}
-              variant={filtroRole === role ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFiltroRole(filtroRole === role ? undefined : role)}
-            >
-              {ROLE_CONFIG[role].label}
-            </Button>
-          ))}
-        </div>
+
+        {/* Ordenação */}
+        <Select
+          value={ordenacao}
+          onValueChange={(val) => { if (val) setOrdenacao(val as OrdenacaoKey); }}
+        >
+          <SelectTrigger className="w-full sm:w-48">
+            <ArrowDownAZ size={14} className="shrink-0 text-muted-foreground" />
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            {ORDENACAO_OPCOES.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Filtros de role */}
+      <div className="flex gap-2">
+        {['admin', 'medico', 'paciente'].map((role) => (
+          <Button
+            key={role}
+            variant={filtroRole === role ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFiltroRole(filtroRole === role ? undefined : role)}
+          >
+            {ROLE_CONFIG[role].label}
+          </Button>
+        ))}
+        {filtroRole && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFiltroRole(undefined)}
+            className="text-muted-foreground"
+          >
+            Limpar
+          </Button>
+        )}
       </div>
 
       {/* Lista */}
@@ -168,6 +226,11 @@ export default function UsuariosPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Users size={40} className="mb-3 text-muted-foreground/40" />
             <p className="text-lg font-medium">Nenhum usuário encontrado</p>
+            {(buscaDebounced || filtroRole) && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tente ajustar os filtros de busca
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -196,6 +259,65 @@ export default function UsuariosPage() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Paginação */}
+      {totalPaginas > 0 && !carregando && usuarios.length > 0 && (
+        <div className="flex flex-col items-center gap-4 pt-2 sm:flex-row sm:justify-between">
+          {/* Info + itens por página */}
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span>
+              {totalFiltrado} resultado{totalFiltrado !== 1 ? 's' : ''}
+            </span>
+            <span className="text-border">·</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">Exibir</span>
+              <Select
+                value={String(porPagina)}
+                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
+              >
+                <SelectTrigger size="sm" className="w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POR_PAGINA_OPCOES.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs">por página</span>
+            </div>
+          </div>
+
+          {/* Controles de página */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              className="gap-1"
+            >
+              <ChevronLeft size={14} />
+              Anterior
+            </Button>
+            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
+              Página {pagina} de {totalPaginas}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina >= totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              className="gap-1"
+            >
+              Próximo
+              <ChevronRight size={14} />
+            </Button>
+          </div>
         </div>
       )}
     </div>
