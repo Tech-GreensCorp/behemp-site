@@ -10,7 +10,10 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import {
+  ChevronLeft,
+  ChevronRight,
   FileCheck,
   HeartPulse,
   HelpCircle,
@@ -31,6 +34,7 @@ import type { LucideIcon } from 'lucide-react';
  * - Drag & drop nativo HTML5 com feedback visual orgânico
  * - Cores: secondary (moss), terracotta, clay, peach, stone
  * - Ícone contextual por fase (HugeIcons free)
+ * - Paginação independente por coluna
  */
 
 /** Configuração de cada coluna do Kanban */
@@ -147,6 +151,8 @@ type FaseId =
 
 type DadosKanban = Record<FaseId, PacienteKanban[]>;
 
+const ITENS_POR_PAGINA = 10;
+
 interface KanbanBoardProps {
   dadosIniciais: DadosKanban;
 }
@@ -158,6 +164,19 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
   const [isPending, startTransition] = useTransition();
   const [busca, setBusca] = useState('');
   const [modoCompacto, setModoCompacto] = useState(false);
+
+  // Paginação independente por coluna
+  const [paginas, setPaginas] = useState<Record<FaseId, number>>({
+    acolhimento: 1,
+    avaliacao_medica: 1,
+    burocracia_anvisa: 1,
+    logistica: 1,
+    acompanhamento_continuo: 1,
+  });
+
+  const setPaginaColuna = useCallback((faseId: FaseId, pagina: number) => {
+    setPaginas((prev) => ({ ...prev, [faseId]: pagina }));
+  }, []);
 
   const handleDragStart = useCallback((e: React.DragEvent, pacienteId: string) => {
     e.dataTransfer.setData('text/plain', pacienteId);
@@ -266,7 +285,7 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="flex h-full flex-col gap-4">
         {/* Barra de controles: busca + modo + status */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Busca */}
@@ -275,13 +294,32 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
             <input
               type="text"
               value={busca}
-              onChange={(e) => setBusca(e.target.value)}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                // Reset todas as paginações ao buscar
+                setPaginas({
+                  acolhimento: 1,
+                  avaliacao_medica: 1,
+                  burocracia_anvisa: 1,
+                  logistica: 1,
+                  acompanhamento_continuo: 1,
+                });
+              }}
               placeholder="Buscar paciente em todas as fases..."
               className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
             />
             {busca && (
               <button
-                onClick={() => setBusca('')}
+                onClick={() => {
+                  setBusca('');
+                  setPaginas({
+                    acolhimento: 1,
+                    avaliacao_medica: 1,
+                    burocracia_anvisa: 1,
+                    logistica: 1,
+                    acompanhamento_continuo: 1,
+                  });
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
               >
                 ✕
@@ -340,21 +378,29 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
           </div>
         </div>
 
-        {/* Board Kanban */}
+        {/* Board Kanban — preenche o espaço restante */}
         <div
-          className="grid gap-5"
-          style={{ gridTemplateColumns: `repeat(${COLUNAS.length}, minmax(300px, 1fr))` }}
+          className="min-h-0 flex-1 grid gap-5"
+          style={{
+            gridTemplateColumns: `repeat(${COLUNAS.length}, minmax(300px, 1fr))`,
+            gridTemplateRows: '1fr',
+          }}
           onDragEnd={handleDragEnd}
         >
           {COLUNAS.map((coluna, i) => {
             const pacientesColuna = dados[coluna.id] || [];
+            const listaFiltrada = filtrarPacientes(pacientesColuna);
             const isOver = dragOverColuna === coluna.id;
+            const paginaAtual = paginas[coluna.id];
+            const totalPaginas = Math.max(1, Math.ceil(listaFiltrada.length / ITENS_POR_PAGINA));
+            const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+            const listaPaginada = listaFiltrada.slice(inicio, inicio + ITENS_POR_PAGINA);
 
             return (
               <div
                 key={coluna.id}
                 className={`
-                  flex flex-col rounded-2xl border transition-all duration-300 ease-out
+                  flex flex-col overflow-hidden min-h-0 rounded-2xl border transition-all duration-300 ease-out
                   animate-fade-up
                   ${isOver
                     ? `${coluna.cores.dropZone} ${coluna.cores.dropBorder} scale-[1.01]`
@@ -384,58 +430,75 @@ export function KanbanBoard({ dadosIniciais }: KanbanBoardProps) {
                       </div>
                     </div>
                     <span className={`font-heading text-2xl font-bold shrink-0 ${coluna.cores.contagem}`}>
-                      {pacientesColuna.length}
+                      {listaFiltrada.length}
                     </span>
                   </div>
                 </div>
 
-                {/* Lista de cards — scroll interno */}
+                {/* Lista de cards — scroll interno, preenche o restante da coluna */}
                 <div
-                  className="flex-1 overflow-y-auto p-3 min-h-[140px]"
-                  style={{
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'rgba(0,0,0,0.10) transparent',
-                  }}
+                  className="kanban-scroll min-h-0 flex-1 overflow-y-auto p-3"
                 >
-                  {(() => {
-                    const lista = filtrarPacientes(pacientesColuna);
-                    if (lista.length === 0) {
-                      return (
-                        <div className="flex flex-col items-center justify-center py-10 text-center">
-                          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60">
-                            {(() => { const DynIcon = busca ? Search : coluna.icon; return <DynIcon size={20} className="text-muted-foreground/30" />; })()}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground/50 leading-relaxed max-w-[160px]">
-                            {busca
-                              ? `Nenhum resultado para "${busca}"`
-                              : 'Arraste pacientes para esta fase'}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className={modoCompacto ? 'space-y-1' : 'space-y-3'}>
-                        {lista.map((paciente) => (
-                          <div
-                            key={paciente.id}
-                            className={`transition-all duration-200 ${
-                              draggingId === paciente.id
-                                ? 'opacity-30 scale-95'
-                                : 'opacity-100 scale-100'
-                            }`}
-                          >
-                            <PacienteCard
-                              paciente={paciente}
-                              onDragStart={handleDragStart}
-                              accentColor={coluna.cores.accent}
-                              compact={modoCompacto}
-                            />
-                          </div>
-                        ))}
+                  {listaPaginada.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60">
+                        {(() => { const DynIcon = busca ? Search : coluna.icon; return <DynIcon size={20} className="text-muted-foreground/30" />; })()}
                       </div>
-                    );
-                  })()}
+                      <p className="text-[11px] text-muted-foreground/50 leading-relaxed max-w-[160px]">
+                        {busca
+                          ? `Nenhum resultado para "${busca}"`
+                          : 'Arraste pacientes para esta fase'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={modoCompacto ? 'space-y-1' : 'space-y-3'}>
+                      {listaPaginada.map((paciente) => (
+                        <div
+                          key={paciente.id}
+                          className={`transition-all duration-200 ${
+                            draggingId === paciente.id
+                              ? 'opacity-30 scale-95'
+                              : 'opacity-100 scale-100'
+                          }`}
+                        >
+                          <PacienteCard
+                            paciente={paciente}
+                            onDragStart={handleDragStart}
+                            accentColor={coluna.cores.accent}
+                            compact={modoCompacto}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Paginação da coluna */}
+                {listaFiltrada.length > ITENS_POR_PAGINA && (
+                  <div className="flex items-center justify-between border-t border-border/30 px-3 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={paginaAtual <= 1}
+                      onClick={() => setPaginaColuna(coluna.id, paginaAtual - 1)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ChevronLeft size={14} />
+                    </Button>
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {paginaAtual} / {totalPaginas}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={paginaAtual >= totalPaginas}
+                      onClick={() => setPaginaColuna(coluna.id, paginaAtual + 1)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ChevronRight size={14} />
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })}

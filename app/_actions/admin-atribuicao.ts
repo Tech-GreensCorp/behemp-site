@@ -74,6 +74,113 @@ export async function listarPacientesComMedico(): Promise<ActionResult<PacienteS
 }
 
 /**
+ * Lista pacientes com paginação, busca e ordenação.
+ * Filtra por status de atribuição (todos, sem médico, com médico).
+ */
+export async function listarPacientesComMedicoPaginado(params?: {
+  busca?: string;
+  filtro?: 'todos' | 'sem_medico' | 'com_medico';
+  pagina?: number;
+  porPagina?: number;
+  ordenarPor?: 'nome' | 'criadoEm';
+  direcao?: 'asc' | 'desc';
+}): Promise<ActionResult<{
+  pacientes: PacienteSemMedico[];
+  total: number;
+  totalPaginas: number;
+  semMedico: number;
+  comMedico: number;
+}>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const pagina = Math.max(1, params?.pagina ?? 1);
+    const porPagina = Math.min(100, Math.max(1, params?.porPagina ?? 20));
+    const offset = (pagina - 1) * porPagina;
+
+    const buscaTerm = params?.busca ? `%${params.busca}%` : null;
+    const filtro = params?.filtro ?? 'todos';
+
+    // --- Ordenação dinâmica ---
+    const colunasOrdenacao: Record<string, string> = {
+      nome: 'u.nome',
+      criadoEm: 'p.created_at',
+    };
+    const coluna = colunasOrdenacao[params?.ordenarPor ?? 'criadoEm'] ?? 'p.created_at';
+    const direcao = (params?.direcao ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+
+    // --- Filtro de atribuição ---
+    const filtroAtribuicao =
+      filtro === 'sem_medico' ? sql`AND p.medico_id IS NULL` :
+      filtro === 'com_medico' ? sql`AND p.medico_id IS NOT NULL` :
+      sql``;
+
+    // --- Query principal ---
+    const resultado = await db.execute(sql`
+      SELECT
+        p.id                     AS "pacienteId",
+        u.nome,
+        u.email,
+        u.telefone,
+        p.status,
+        p.medico_id              AS "medicoId",
+        um.nome                  AS "medicoNome",
+        TO_CHAR(p.created_at, 'YYYY-MM-DD') AS "criadoEm"
+      FROM pacientes p
+      INNER JOIN users u ON u.id = p.user_id
+      LEFT JOIN medicos m ON m.id = p.medico_id
+      LEFT JOIN users um ON um.id = m.user_id
+      WHERE p.deleted_at IS NULL
+        ${filtroAtribuicao}
+        ${buscaTerm ? sql`AND (u.nome ILIKE ${buscaTerm} OR u.email ILIKE ${buscaTerm})` : sql``}
+      ORDER BY
+        CASE WHEN p.medico_id IS NULL THEN 0 ELSE 1 END,
+        ${sql.raw(`${coluna} ${direcao}`)}
+      LIMIT ${porPagina}
+      OFFSET ${offset}
+    `);
+
+    // --- Contagem filtrada ---
+    const contagemRes = await db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM pacientes p
+      INNER JOIN users u ON u.id = p.user_id
+      WHERE p.deleted_at IS NULL
+        ${filtroAtribuicao}
+        ${buscaTerm ? sql`AND (u.nome ILIKE ${buscaTerm} OR u.email ILIKE ${buscaTerm})` : sql``}
+    `);
+
+    const total = (contagemRes.rows[0] as { total: number })?.total ?? 0;
+    const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+
+    // --- Contagens globais de atribuição ---
+    const statsRes = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE p.medico_id IS NULL)::int AS "semMedico",
+        COUNT(*) FILTER (WHERE p.medico_id IS NOT NULL)::int AS "comMedico"
+      FROM pacientes p
+      WHERE p.deleted_at IS NULL
+    `);
+    const stats = statsRes.rows[0] as { semMedico: number; comMedico: number };
+
+    return {
+      sucesso: true,
+      dados: {
+        pacientes: resultado.rows as unknown as PacienteSemMedico[],
+        total,
+        totalPaginas,
+        semMedico: stats.semMedico,
+        comMedico: stats.comMedico,
+      },
+    };
+  } catch (error) {
+    console.error('[Admin] Erro ao listar pacientes paginado:', error);
+    return { sucesso: false, erro: 'Erro ao carregar pacientes' };
+  }
+}
+
+/**
  * Lista médicos disponíveis para atribuição.
  */
 export async function listarMedicosDisponiveis(): Promise<ActionResult<MedicoDisponivel[]>> {

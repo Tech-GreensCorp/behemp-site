@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { obterMedicoDetalhe } from '@/app/_actions/admin-medicos';
+import { TabPacientesPaginada } from './tab-pacientes-paginada';
 import { FormConfigAgenda } from '@/components/medicos/form-config-agenda';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +28,6 @@ const LABEL_JORNADA: Record<string, string> = {
   acompanhamento_continuo: 'Acompanhamento Contínuo',
 };
 
-const LABEL_STATUS_PACIENTE: Record<string, string> = {
-  aguardando_consulta: 'Aguardando consulta',
-  em_tratamento: 'Em tratamento',
-  concluido: 'Concluído',
-  arquivado: 'Arquivado',
-};
 
 const LABEL_STATUS_CONSULTA: Record<string, string> = {
   agendada: 'Agendada',
@@ -172,37 +167,7 @@ export default async function MedicoDetalhePage({ params }: Props) {
 
         {/* Pacientes */}
         <TabsContent value="pacientes" className="mt-4">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-0">
-              {pacientes.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">
-                  Nenhum paciente atribuído.
-                </p>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {pacientes.map((p) => (
-                    <div key={p.pacienteId} className="flex items-center justify-between p-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{p.nome}</p>
-                        <p className="truncate text-xs text-muted-foreground">{p.email}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Desde {format(new Date(p.criadoEm + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {LABEL_STATUS_PACIENTE[p.status] ?? p.status}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {LABEL_JORNADA[p.jornadaFase] ?? p.jornadaFase}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TabPacientesPaginada medicoId={medico.id} />
         </TabsContent>
 
         {/* Triagens */}
