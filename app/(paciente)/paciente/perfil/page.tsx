@@ -288,7 +288,7 @@ export default function PerfilPacientePage() {
   const docsPendentes = docs.filter((d) => d.dataValidade && new Date(d.dataValidade) < new Date()).length;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-12">
+    <div className="space-y-12">
 
       {/* ── Top Header Section (Estilo Editorial Landing Page) ── */}
       <div className="animate-fade-up">

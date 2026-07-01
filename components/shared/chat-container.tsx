@@ -506,13 +506,13 @@ export function ChatContainer({
       {/* ── Header Editorial ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 animate-fade-up">
         <div>
-          <p className="text-primary mb-1 sm:mb-2 text-xs font-semibold tracking-[0.25em] uppercase">
+          <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
             {roleAtual === 'medico' ? 'Área Médica' : roleAtual === 'admin' ? 'Área Administrativa' : 'Área do Paciente'}
           </p>
-          <h1 className="font-display text-2xl sm:text-4xl leading-[1.1] font-bold tracking-tight text-foreground">
+          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
             Meu <span className="text-accent-italic">Chat</span>
           </h1>
-          <p className="text-muted-foreground mt-1 sm:mt-2 max-w-2xl text-sm leading-relaxed hidden sm:block">
+          <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-relaxed hidden sm:block">
             {subtitulo}
           </p>
         </div>
