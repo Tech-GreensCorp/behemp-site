@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,6 +21,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  ArrowDownAZ,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   UserPlus,
   UserCheck,
@@ -31,13 +34,12 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
-  listarPacientesComMedico,
+  listarPacientesComMedicoPaginado,
   listarMedicosDisponiveis,
   atribuirMedicoAoPaciente,
   reatribuirTodosPacientes,
 } from '@/app/_actions/admin-atribuicao';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface Paciente {
   pacienteId: string;
@@ -56,28 +58,89 @@ interface Medico {
   email: string;
 }
 
+type OrdenacaoKey = 'nome-asc' | 'nome-desc' | 'criadoEm-desc' | 'criadoEm-asc';
+type FiltroAtribuicao = 'todos' | 'sem_medico' | 'com_medico';
+
+const ORDENACAO_OPCOES: { value: OrdenacaoKey; label: string }[] = [
+  { value: 'criadoEm-desc', label: 'Mais recentes' },
+  { value: 'criadoEm-asc', label: 'Mais antigos' },
+  { value: 'nome-asc', label: 'Nome (A → Z)' },
+  { value: 'nome-desc', label: 'Nome (Z → A)' },
+];
+
+const POR_PAGINA_OPCOES = [10, 20, 50];
+
+function parseOrdenacao(key: OrdenacaoKey) {
+  const [ordenarPor, direcao] = key.split('-') as ['nome' | 'criadoEm', 'asc' | 'desc'];
+  return { ordenarPor, direcao };
+}
+
 export default function AtribuirMedicoPage() {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState<string | null>(null);
-  const [busca, setBusca] = useState('');
 
-  // Estado do dialog de reatribuição em lote
+  // Filtros e paginação
+  const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
+  const [filtroAtribuicao, setFiltroAtribuicao] = useState<FiltroAtribuicao>('todos');
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoKey>('criadoEm-desc');
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [statsSemMedico, setStatsSemMedico] = useState(0);
+  const [statsComMedico, setStatsComMedico] = useState(0);
+
+  // Dialog de reatribuição em lote
   const [dialogAberto, setDialogAberto] = useState(false);
   const [medicoDestinoLote, setMedicoDestinoLote] = useState<string>('');
   const [salvandoLote, setSalvandoLote] = useState(false);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce da busca
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setBuscaDebounced(busca);
+      setPagina(1);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [busca]);
+
+  // Reset de página ao trocar filtros
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroAtribuicao, ordenacao, porPagina]);
+
   const carregar = useCallback(async () => {
     setCarregando(true);
+    const { ordenarPor, direcao } = parseOrdenacao(ordenacao);
     const [resPacientes, resMedicos] = await Promise.all([
-      listarPacientesComMedico(),
+      listarPacientesComMedicoPaginado({
+        busca: buscaDebounced || undefined,
+        filtro: filtroAtribuicao,
+        pagina,
+        porPagina,
+        ordenarPor,
+        direcao,
+      }),
       listarMedicosDisponiveis(),
     ]);
-    if (resPacientes.sucesso && resPacientes.dados) setPacientes(resPacientes.dados);
-    if (resMedicos.sucesso && resMedicos.dados) setMedicos(resMedicos.dados);
+    if (resPacientes.sucesso && resPacientes.dados) {
+      setPacientes(resPacientes.dados.pacientes as Paciente[]);
+      setTotal(resPacientes.dados.total);
+      setTotalPaginas(resPacientes.dados.totalPaginas);
+      setStatsSemMedico(resPacientes.dados.semMedico);
+      setStatsComMedico(resPacientes.dados.comMedico);
+    }
+    if (resMedicos.sucesso && resMedicos.dados) setMedicos(resMedicos.dados as Medico[]);
     setCarregando(false);
-  }, []);
+  }, [buscaDebounced, filtroAtribuicao, ordenacao, pagina, porPagina]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -86,7 +149,6 @@ export default function AtribuirMedicoPage() {
     const res = await atribuirMedicoAoPaciente(pacienteId, medicoId);
     if (res.sucesso) {
       toast.success('Médico atribuído com sucesso!');
-      // Notifica o sidebar para atualizar o badge
       window.dispatchEvent(new CustomEvent('paciente-atribuido'));
       await carregar();
     } else {
@@ -115,30 +177,6 @@ export default function AtribuirMedicoPage() {
     setSalvandoLote(false);
   }
 
-  const semMedico = pacientes.filter((p) => !p.medicoId);
-  const comMedico = pacientes.filter((p) => !!p.medicoId);
-
-  const filtrar = (lista: Paciente[]) => {
-    if (!busca.trim()) return lista;
-    const termo = busca.toLowerCase();
-    return lista.filter(
-      (p) =>
-        p.nome.toLowerCase().includes(termo) ||
-        p.email.toLowerCase().includes(termo),
-    );
-  };
-
-  const semMedicoFiltrado = filtrar(semMedico);
-  const comMedicoFiltrado = filtrar(comMedico);
-
-  if (carregando) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,14 +190,14 @@ export default function AtribuirMedicoPage() {
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
             <AlertCircle className="h-3 w-3 text-amber-500" />
-            {semMedico.length} sem médico
+            {statsSemMedico} sem médico
           </Badge>
           <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
             <UserCheck className="h-3 w-3 text-emerald-500" />
-            {comMedico.length} atribuídos
+            {statsComMedico} atribuídos
           </Badge>
 
-          {/* Botão Reatribuir Todos com Dialog de confirmação */}
+          {/* Botão Reatribuir Todos com Dialog */}
           <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
             <DialogTrigger
               render={
@@ -177,7 +215,7 @@ export default function AtribuirMedicoPage() {
               <DialogHeader>
                 <DialogTitle>Reatribuir todos os pacientes</DialogTitle>
                 <DialogDescription>
-                  Todos os <strong>{pacientes.length}</strong> pacientes serão
+                  Todos os <strong>{statsSemMedico + statsComMedico}</strong> pacientes serão
                   reatribuídos para o médico selecionado abaixo. Essa ação
                   substitui qualquer atribuição anterior.
                 </DialogDescription>
@@ -216,7 +254,7 @@ export default function AtribuirMedicoPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <p className="text-xs text-amber-800">
                     <strong>Atenção:</strong> essa ação afetará{' '}
-                    <strong>{pacientes.length}</strong> paciente(s) e não pode
+                    <strong>{statsSemMedico + statsComMedico}</strong> paciente(s) e não pode
                     ser desfeita em lote. Verifique se o médico selecionado
                     está correto.
                   </p>
@@ -254,31 +292,91 @@ export default function AtribuirMedicoPage() {
         </div>
       </div>
 
-      {/* Busca */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar paciente..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="pl-9"
-        />
+      {/* Filtros */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Busca */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar paciente por nome ou e-mail..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* Ordenação */}
+        <Select
+          value={ordenacao}
+          onValueChange={(val) => { if (val) setOrdenacao(val as OrdenacaoKey); }}
+        >
+          <SelectTrigger className="w-full sm:w-48">
+            <ArrowDownAZ size={14} className="shrink-0 text-muted-foreground" />
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            {ORDENACAO_OPCOES.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Pacientes sem médico */}
-      {semMedicoFiltrado.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-heading text-xs font-semibold uppercase tracking-widest text-amber-600">
-            ⚠ Pacientes sem médico responsável
-          </h2>
-          <div className="space-y-3">
-            {semMedicoFiltrado.map((p) => (
-              <Card key={p.pacienteId} className="border-amber-200/50 shadow-sm">
-                <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Filtros de atribuição */}
+      <div className="flex gap-2">
+        {([
+          { key: 'todos' as const, label: 'Todos' },
+          { key: 'sem_medico' as const, label: 'Sem médico' },
+          { key: 'com_medico' as const, label: 'Com médico' },
+        ]).map(({ key, label }) => (
+          <Button
+            key={key}
+            variant={filtroAtribuicao === key ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFiltroAtribuicao(key)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {carregando ? (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : pacientes.length === 0 ? (
+        <Card className="border-border/40 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <UserCheck className="mb-4 h-12 w-12 text-muted-foreground/30" />
+            <p className="text-base font-medium">
+              {buscaDebounced ? 'Nenhum paciente encontrado' : 'Nenhum paciente cadastrado'}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {buscaDebounced
+                ? 'Tente ajustar os filtros de busca'
+                : 'Pacientes aparecerão aqui após se cadastrarem ou serem adicionados por um médico.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {pacientes.map((p) => {
+            const temMedico = !!p.medicoId;
+            return (
+              <Card key={p.pacienteId} className={temMedico ? 'border-border/40 shadow-sm' : 'border-amber-200/50 shadow-sm'}>
+                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                   {/* Info */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                      <UserPlus className="h-4 w-4 text-amber-600" />
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                      temMedico ? 'bg-emerald-500/10' : 'bg-amber-500/10'
+                    }`}>
+                      {temMedico
+                        ? <UserCheck className="h-4 w-4 text-emerald-600" />
+                        : <UserPlus className="h-4 w-4 text-amber-600" />
+                      }
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">{p.nome}</p>
@@ -286,14 +384,20 @@ export default function AtribuirMedicoPage() {
                     </div>
                   </div>
 
-                  {/* Select de médico + botão */}
+                  {/* Atribuição */}
                   <div className="flex items-center gap-2">
+                    {temMedico && (
+                      <Badge variant="outline" className="gap-1.5">
+                        <Stethoscope className="h-3 w-3" />
+                        {p.medicoNome}
+                      </Badge>
+                    )}
                     <Select
                       onValueChange={(val) => handleAtribuir(p.pacienteId, val as string)}
                       disabled={salvando === p.pacienteId}
                     >
-                      <SelectTrigger className="w-[220px]">
-                        <SelectValue placeholder="Selecionar médico" />
+                      <SelectTrigger className={temMedico ? 'w-[180px]' : 'w-[220px]'}>
+                        <SelectValue placeholder={temMedico ? 'Reatribuir' : 'Selecionar médico'} />
                       </SelectTrigger>
                       <SelectContent>
                         {medicos.map((m) => (
@@ -312,74 +416,68 @@ export default function AtribuirMedicoPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </section>
+            );
+          })}
+        </div>
       )}
 
-      {/* Pacientes com médico */}
-      {comMedicoFiltrado.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-heading text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Pacientes com médico atribuído
-          </h2>
-          <div className="space-y-2">
-            {comMedicoFiltrado.map((p) => (
-              <Card key={p.pacienteId} className="border-border/40 shadow-sm">
-                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
-                      <UserCheck className="h-4 w-4 text-emerald-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{p.nome}</p>
-                      <p className="truncate text-xs text-muted-foreground">{p.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="gap-1.5">
-                      <Stethoscope className="h-3 w-3" />
-                      {p.medicoNome}
-                    </Badge>
-                    {/* Permite reatribuir */}
-                    <Select
-                      onValueChange={(val) => handleAtribuir(p.pacienteId, val as string)}
-                      disabled={salvando === p.pacienteId}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Reatribuir" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {medicos.map((m) => (
-                          <SelectItem key={m.medicoId} value={m.medicoId}>
-                            {m.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {salvando === p.pacienteId && (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {/* Paginação */}
+      {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+          {/* Info + itens por página */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span>
+              {total} paciente{total !== 1 ? 's' : ''}
+            </span>
+            <span className="text-border">·</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">Exibir</span>
+              <Select
+                value={String(porPagina)}
+                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
+              >
+                <SelectTrigger size="sm" className="w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POR_PAGINA_OPCOES.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs">por página</span>
+            </div>
           </div>
-        </section>
-      )}
 
-      {/* Empty state geral */}
-      {pacientes.length === 0 && (
-        <Card className="border-border/40 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <UserCheck className="mb-4 h-12 w-12 text-muted-foreground/30" />
-            <p className="text-base font-medium">Nenhum paciente cadastrado</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pacientes aparecerão aqui após se cadastrarem ou serem adicionados por um médico.
-            </p>
-          </CardContent>
-        </Card>
+          {/* Controles de página */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              className="gap-1"
+            >
+              <ChevronLeft size={14} />
+              Anterior
+            </Button>
+            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
+              Página {pagina} de {totalPaginas}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina >= totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              className="gap-1"
+            >
+              Próximo
+              <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

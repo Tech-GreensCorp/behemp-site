@@ -14,12 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  listarPacientes,
+  listarPacientesPaginado,
   importarPacientesCSV,
   exportarPacientesCSV,
 } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
 import {
+  ChevronLeft,
   ChevronRight,
   Download,
   Loader2,
@@ -63,8 +64,11 @@ interface Paciente {
   createdAt: Date;
 }
 
+const POR_PAGINA_OPCOES = [10, 20, 50];
+
 export default function PacientesPage() {
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroTratamento, setFiltroTratamento] = useState('todos');
   const [filtroJornada, setFiltroJornada] = useState('todos');
@@ -72,28 +76,53 @@ export default function PacientesPage() {
   const [carregando, setCarregando] = useState(true);
   const [importando, setImportando] = useState(false);
   const [exportando, setExportando] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const carregarPacientes = useCallback(async () => {
-    setCarregando(true);
-    const resultado = await listarPacientes({
-      busca: busca || undefined,
-      status: filtroStatus,
-      tratamento: filtroTratamento,
-      jornada: filtroJornada,
-    });
-    if (resultado.sucesso && resultado.dados) {
-      setPacientes(resultado.dados);
-    }
-    setCarregando(false);
-  }, [busca, filtroStatus, filtroTratamento, filtroJornada]);
+  // Paginação
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce na busca
   useEffect(() => {
-    const timer = setTimeout(() => {
-      carregarPacientes();
-    }, 300);
-    return () => clearTimeout(timer);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setBuscaDebounced(busca);
+      setPagina(1);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [busca]);
+
+  // Reset de página ao trocar filtros
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroStatus, filtroTratamento, filtroJornada, porPagina]);
+
+  const carregarPacientes = useCallback(async () => {
+    setCarregando(true);
+    const resultado = await listarPacientesPaginado({
+      busca: buscaDebounced || undefined,
+      status: filtroStatus,
+      tratamento: filtroTratamento,
+      jornada: filtroJornada,
+      pagina,
+      porPagina,
+    });
+    if (resultado.sucesso && resultado.dados) {
+      setPacientes(resultado.dados.pacientes as Paciente[]);
+      setTotal(resultado.dados.total);
+      setTotalPaginas(resultado.dados.totalPaginas);
+    }
+    setCarregando(false);
+  }, [buscaDebounced, filtroStatus, filtroTratamento, filtroJornada, pagina, porPagina]);
+
+  useEffect(() => {
+    carregarPacientes();
   }, [carregarPacientes]);
 
   // ── Importar CSV / XLSX ───────────────────────────────────────
@@ -111,13 +140,11 @@ export default function PacientesPage() {
       let conteudo: string;
 
       if (isXlsx) {
-        // Ler XLSX no cliente e converter para CSV com separador ;
         const XLSX = await import('xlsx');
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const primeiraAba = workbook.SheetNames[0];
         const planilha = workbook.Sheets[primeiraAba];
-        // csv_para_csv_sep: usa ; para compatibilidade com parseCsvLinhas do backend
         conteudo = XLSX.utils.sheet_to_csv(planilha, { FS: ';' });
       } else {
         conteudo = await file.text();
@@ -164,7 +191,6 @@ export default function PacientesPage() {
     try {
       const resultado = await exportarPacientesCSV();
       if (resultado.sucesso && resultado.dados) {
-        // Criar e baixar arquivo
         const blob = new Blob(['\uFEFF' + resultado.dados], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -199,7 +225,7 @@ export default function PacientesPage() {
             <span className="text-accent-italic">Pacientes</span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {carregando ? 'Carregando...' : `${pacientes.length} paciente${pacientes.length !== 1 ? 's' : ''} cadastrado${pacientes.length !== 1 ? 's' : ''}`}
+            {carregando ? 'Carregando...' : `${total} paciente${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +256,7 @@ export default function PacientesPage() {
             size="sm"
             className="gap-2 rounded-xl"
             onClick={handleExportar}
-            disabled={exportando || pacientes.length === 0}
+            disabled={exportando || total === 0}
           >
             {exportando ? (
               <Loader2 size={14} className="animate-spin" />
@@ -406,6 +432,65 @@ export default function PacientesPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* Paginação */}
+      {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+          {/* Info + itens por página */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span>
+              {total} paciente{total !== 1 ? 's' : ''}
+            </span>
+            <span className="text-border">·</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">Exibir</span>
+              <Select
+                value={String(porPagina)}
+                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
+              >
+                <SelectTrigger size="sm" className="w-16">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POR_PAGINA_OPCOES.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs">por página</span>
+            </div>
+          </div>
+
+          {/* Controles de página */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina <= 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              className="gap-1"
+            >
+              <ChevronLeft size={14} />
+              Anterior
+            </Button>
+            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
+              Página {pagina} de {totalPaginas}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina >= totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              className="gap-1"
+            >
+              Próximo
+              <ChevronRight size={14} />
+            </Button>
+          </div>
         </div>
       )}
     </div>

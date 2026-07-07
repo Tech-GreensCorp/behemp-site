@@ -5,7 +5,8 @@ import { gruposChat, participantesGrupo, mensagens, users } from '@/db/schema';
 import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarUsuarioAutenticado } from '@/lib/auth';
-import { enviarMensagemChat } from '@/lib/integrations/pusher/server';
+import { enviarMensagemChat, enviarReacaoChat } from '@/lib/integrations/pusher/server';
+import { put } from '@vercel/blob';
 
 /**
  * Server Actions de chat em tempo real.
@@ -598,6 +599,97 @@ export async function editarMensagem(
   } catch (error) {
     console.error('[Chat] Erro ao editar mensagem:', error);
     return { sucesso: false, erro: 'Erro ao editar mensagem' };
+  }
+}
+
+/**
+ * Faz upload de um arquivo para o chat via Vercel Blob.
+ */
+export async function enviarArquivoChat(
+  formData: FormData,
+): Promise<ActionResult<{ mensagemId: string; url: string }>> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    const arquivo = formData.get('arquivo') as File | null;
+    const grupoId = formData.get('grupoId') as string;
+
+    if (!arquivo || !grupoId) return { sucesso: false, erro: 'Dados incompletos' };
+
+    // Validar arquivo (max 10MB)
+    if (arquivo.size > 10 * 1024 * 1024) return { sucesso: false, erro: 'Arquivo muito grande (máx 10MB)' };
+
+    // Upload para Vercel Blob
+    const blob = await put(`chat/${grupoId}/${Date.now()}_${arquivo.name}`, arquivo, {
+      access: 'public',
+    });
+
+    // Inserir mensagem do tipo arquivo — URL do blob é guardada no conteudo
+    const conteudoMsg = `[ARQUIVO:${blob.url}] ${arquivo.name}`;
+    const [novaMensagem] = await db
+      .insert(mensagens)
+      .values({
+        grupoId,
+        autorId: userId,
+        conteudo: conteudoMsg,
+        lidaPor: [userId],
+      })
+      .returning({ id: mensagens.id, createdAt: mensagens.createdAt });
+
+    // Buscar info do autor
+    const [autor] = await db.select({ nome: users.nome, role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+
+    // Notificar via Pusher
+    await enviarMensagemChat({
+      grupoId,
+      mensagemId: novaMensagem.id,
+      autorId: userId,
+      autorNome: autor?.nome ?? 'Usuário',
+      autorRole: autor?.role ?? null,
+      conteudo: conteudoMsg,
+      criadoEm: novaMensagem.createdAt.toISOString(),
+    });
+
+    return { sucesso: true, dados: { mensagemId: novaMensagem.id, url: blob.url } };
+  } catch (error) {
+    console.error('[Chat] Erro ao enviar arquivo:', error);
+    return { sucesso: false, erro: 'Erro ao enviar arquivo' };
+  }
+}
+
+/**
+ * Adiciona ou remove uma reação a uma mensagem.
+ */
+export async function reagirMensagem(
+  mensagemId: string,
+  emoji: string,
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarUsuarioAutenticado();
+    if (!auth) return { sucesso: false, erro: 'Não autenticado' };
+
+    const userId = await obterUserIdPorClerkId(auth.clerkId);
+    if (!userId) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+    // Buscar mensagem para saber o grupo
+    const [msg] = await db.select({ grupoId: mensagens.grupoId }).from(mensagens).where(eq(mensagens.id, mensagemId)).limit(1);
+    if (!msg) return { sucesso: false, erro: 'Mensagem não encontrada' };
+
+    await enviarReacaoChat({
+      grupoId: msg.grupoId,
+      mensagemId,
+      userId,
+      emoji,
+    });
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Chat] Erro ao reagir:', error);
+    return { sucesso: false, erro: 'Erro ao reagir' };
   }
 }
 

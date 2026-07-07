@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { medicos, users } from '@/db/schema';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import { clerkClient } from '@clerk/nextjs/server';
 
 /**
  * Server Actions para visualização de médicos pelo admin.
@@ -124,6 +125,90 @@ export async function listarMedicosAdmin(): Promise<ActionResult<MedicoResumo[]>
   } catch (error) {
     console.error('[Admin] Erro ao listar médicos:', error);
     return { sucesso: false, erro: 'Erro ao carregar médicos' };
+  }
+}
+
+/**
+ * Lista pacientes de um médico com paginação, busca e ordenação.
+ * Usada na tab "Pacientes" da página /admin/medicos/[id].
+ */
+export async function listarPacientesMedicoPaginado(params: {
+  medicoId: string;
+  busca?: string;
+  pagina?: number;
+  porPagina?: number;
+  ordenarPor?: 'nome' | 'criadoEm';
+  direcao?: 'asc' | 'desc';
+}): Promise<ActionResult<{
+  pacientes: PacienteDoMedico[];
+  total: number;
+  totalPaginas: number;
+}>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    if (!params.medicoId) return { sucesso: false, erro: 'ID do médico é obrigatório' };
+
+    const pagina = Math.max(1, params.pagina ?? 1);
+    const porPagina = Math.min(100, Math.max(1, params.porPagina ?? 20));
+    const offset = (pagina - 1) * porPagina;
+
+    // --- Ordenação dinâmica ---
+    const colunasOrdenacao: Record<string, string> = {
+      nome: 'u.nome',
+      criadoEm: 'p.created_at',
+    };
+    const coluna = colunasOrdenacao[params.ordenarPor ?? 'criadoEm'] ?? 'p.created_at';
+    const direcao = (params.direcao ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+
+    const buscaTerm = params.busca ? `%${params.busca}%` : null;
+
+    // --- Query principal ---
+    const resultado = await db.execute(sql`
+      SELECT
+        p.id              AS "pacienteId",
+        u.nome,
+        u.email,
+        p.status,
+        p.jornada_fase    AS "jornadaFase",
+        TO_CHAR(p.created_at, 'YYYY-MM-DD') AS "criadoEm"
+      FROM pacientes p
+      INNER JOIN users u ON u.id = p.user_id
+      WHERE p.medico_id = ${params.medicoId}
+        AND p.deleted_at IS NULL
+        ${buscaTerm ? sql`AND (u.nome ILIKE ${buscaTerm} OR u.email ILIKE ${buscaTerm})` : sql``}
+      ORDER BY ${sql.raw(`${coluna} ${direcao}`)}
+      LIMIT ${porPagina}
+      OFFSET ${offset}
+    `);
+
+    // --- Contagem filtrada ---
+    const contagemRes = await db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM pacientes p
+      INNER JOIN users u ON u.id = p.user_id
+      WHERE p.medico_id = ${params.medicoId}
+        AND p.deleted_at IS NULL
+        ${buscaTerm ? sql`AND (u.nome ILIKE ${buscaTerm} OR u.email ILIKE ${buscaTerm})` : sql``}
+    `);
+
+    const total = (contagemRes.rows[0] as { total: number })?.total ?? 0;
+    const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+
+    const pacientes: PacienteDoMedico[] = resultado.rows.map((row: any) => ({
+      pacienteId: row.pacienteId,
+      nome: row.nome,
+      email: row.email,
+      status: row.status,
+      jornadaFase: row.jornadaFase,
+      criadoEm: row.criadoEm,
+    }));
+
+    return { sucesso: true, dados: { pacientes, total, totalPaginas } };
+  } catch (error) {
+    console.error('[Admin] Erro ao listar pacientes do médico:', error);
+    return { sucesso: false, erro: 'Erro ao carregar pacientes' };
   }
 }
 
@@ -309,10 +394,20 @@ export async function atualizarConfigAgenda(medicoId: string, configAgenda: any)
 
 const criarMedicoSchema = z.object({
   email: z.string().email('E-mail inválido'),
+  nome: z.string().min(2, 'Nome é obrigatório para novos usuários').optional(),
+  senha: z
+    .string()
+    .min(8, 'A senha deve ter pelo menos 8 caracteres')
+    .max(72, 'Senha muito longa')
+    .regex(/[A-Z]/, 'Deve conter ao menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Deve conter ao menos um número')
+    .optional(),
   especialidade: z.string().min(2, 'Especialidade obrigatória'),
   crm: z.string().optional(),
   bio: z.string().optional(),
   ordem: z.number().int().optional(),
+  valorConsulta: z.string().optional(),
+  avatarUrl: z.string().url().optional(),
 });
 
 const atualizarMedicoSchema = z.object({
@@ -324,8 +419,9 @@ const atualizarMedicoSchema = z.object({
 });
 
 /**
- * Cria perfil médico para um usuário já existente no sistema.
- * Busca pelo e-mail, valida que não há duplicata e insere na tabela medicos.
+ * Cria perfil médico para um usuário.
+ * Se o usuário não existe no sistema, cria automaticamente no Clerk e no banco.
+ * Se já existe, vincula o perfil médico ao user existente.
  */
 export async function criarMedico(
   dados: z.infer<typeof criarMedicoSchema>,
@@ -339,47 +435,147 @@ export async function criarMedico(
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const { email, especialidade, crm, bio, ordem } = parsed.data;
+    const { email, nome, senha, especialidade, crm, bio, ordem, valorConsulta, avatarUrl } = parsed.data;
 
     // Buscar usuário pelo e-mail
-    const [user] = await db
-      .select({ id: users.id, role: users.role })
+    const [userExistente] = await db
+      .select({ id: users.id, role: users.role, clerkId: users.clerkId })
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
 
-    if (!user) {
-      return {
-        sucesso: false,
-        erro: 'Usuário não encontrado. O médico precisa ter uma conta criada no sistema antes.',
-      };
+    let userId: string;
+    let clerkId: string | null = null;
+
+    if (userExistente) {
+      // ── Usuário já existe: vincular perfil médico ────────────
+      userId = userExistente.id;
+      clerkId = userExistente.clerkId;
+
+      // Verificar se já tem perfil médico
+      const [perfilExistente] = await db
+        .select({ id: medicos.id })
+        .from(medicos)
+        .where(eq(medicos.userId, userId))
+        .limit(1);
+
+      if (perfilExistente) {
+        return { sucesso: false, erro: 'Este usuário já possui um perfil de médico cadastrado.' };
+      }
+
+      // Atualizar dados do user (role, nome, avatar)
+      const userUpdate: Partial<{ role: 'medico'; nome: string; avatarUrl: string | null }> = {};
+      if (userExistente.role !== 'medico') userUpdate.role = 'medico';
+      if (nome) userUpdate.nome = nome.trim();
+      if (avatarUrl) userUpdate.avatarUrl = avatarUrl;
+
+      if (Object.keys(userUpdate).length > 0) {
+        await db.update(users).set(userUpdate).where(eq(users.id, userId));
+      }
+    } else {
+      // ── Usuário NÃO existe: criar no Clerk e no banco ───────
+      if (!nome) {
+        return {
+          sucesso: false,
+          erro: 'O nome é obrigatório para cadastrar um novo usuário.',
+        };
+      }
+
+      if (!senha) {
+        return {
+          sucesso: false,
+          erro: 'A senha é obrigatória para cadastrar um novo usuário.',
+        };
+      }
+
+      // 1. Criar usuário no Clerk
+      try {
+        const client = await clerkClient();
+        const partes = nome.trim().split(' ');
+        const firstName = partes[0];
+        const lastName = partes.slice(1).join(' ') || '';
+
+        const clerkUser = await client.users.createUser({
+          emailAddress: [email],
+          firstName,
+          lastName,
+          password: senha,
+          skipPasswordChecks: true,
+          publicMetadata: { role: 'medico' },
+        });
+
+        clerkId = clerkUser.id;
+      } catch (clerkError: unknown) {
+        console.error('[Admin] Erro ao criar usuário no Clerk:', clerkError);
+        const msg = clerkError instanceof Error ? clerkError.message : '';
+        if (msg.includes('already exists') || msg.includes('taken')) {
+          return { sucesso: false, erro: 'Este e-mail já está cadastrado no Clerk mas não no banco. Peça ao usuário para fazer login primeiro.' };
+        }
+        return { sucesso: false, erro: 'Erro ao criar conta do usuário. Tente novamente.' };
+      }
+
+      // 2. Criar user no banco
+      const [novoUser] = await db
+        .insert(users)
+        .values({
+          email,
+          nome: nome.trim(),
+          clerkId,
+          role: 'medico',
+          avatarUrl: avatarUrl ?? null,
+        })
+        .returning({ id: users.id });
+
+      userId = novoUser.id;
     }
 
-    // Verificar se já tem perfil médico
-    const [perfilExistente] = await db
-      .select({ id: medicos.id })
-      .from(medicos)
-      .where(eq(medicos.userId, user.id))
-      .limit(1);
+    // ── Sincronizar nome e senha com Clerk (user existente) ────
+    if (userExistente && clerkId) {
+      if (nome) {
+        try {
+          const client = await clerkClient();
+          const partes = nome.trim().split(' ');
+          const firstName = partes[0];
+          const lastName = partes.slice(1).join(' ') || '';
+          await client.users.updateUser(clerkId, { firstName, lastName });
+        } catch (clerkError) {
+          console.warn('[Admin] Falha ao sincronizar nome com Clerk:', clerkError);
+        }
+      }
 
-    if (perfilExistente) {
-      return { sucesso: false, erro: 'Este usuário já possui um perfil de médico cadastrado.' };
+      if (senha) {
+        try {
+          const client = await clerkClient();
+          await client.users.updateUser(clerkId, {
+            password: senha,
+            skipPasswordChecks: true,
+          });
+        } catch (clerkError) {
+          console.warn('[Admin] Falha ao definir senha via Clerk:', clerkError);
+        }
+      }
+
+      // Sincronizar role no Clerk
+      try {
+        const client = await clerkClient();
+        await client.users.updateUserMetadata(clerkId, {
+          publicMetadata: { role: 'medico' },
+        });
+      } catch (clerkError) {
+        console.warn('[Admin] Falha ao sincronizar role com Clerk:', clerkError);
+      }
     }
 
-    // Atualizar role para medico (caso ainda seja paciente)
-    if (user.role !== 'medico') {
-      await db.update(users).set({ role: 'medico' }).where(eq(users.id, user.id));
-    }
-
-    // Inserir na tabela medicos
+    // ── Inserir na tabela medicos ──────────────────────────────
     const [novoMedico] = await db
       .insert(medicos)
       .values({
-        userId: user.id,
+        userId,
         especialidade,
         crm: crm || null,
         bio: bio || null,
         ordem: ordem ?? null,
+        valorConsulta: valorConsulta || null,
       })
       .returning({ id: medicos.id });
 
@@ -392,6 +588,7 @@ export async function criarMedico(
     return { sucesso: false, erro: 'Erro interno ao criar médico' };
   }
 }
+
 
 /**
  * Atualiza dados do perfil profissional de um médico.

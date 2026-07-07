@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { users } from '@/db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, asc, desc, sql } from 'drizzle-orm';
 import { verificarAdmin } from '@/lib/auth';
 import { clerkClient } from '@clerk/nextjs/server';
 import { z } from 'zod';
@@ -30,20 +30,31 @@ interface UsuarioAdmin {
 
 /**
  * Lista todos os usuários com contagem por role.
+ * Suporta paginação server-side e ordenação dinâmica.
  */
 export async function listarUsuariosAdmin(params?: {
   busca?: string;
   role?: string;
-  limite?: number;
+  pagina?: number;
+  porPagina?: number;
+  ordenarPor?: 'nome' | 'email' | 'createdAt';
+  direcao?: 'asc' | 'desc';
 }): Promise<ActionResult<{
   usuarios: UsuarioAdmin[];
   total: number;
+  totalFiltrado: number;
+  totalPaginas: number;
   porRole: { admins: number; medicos: number; pacientes: number };
 }>> {
   try {
     const auth = await verificarAdmin();
     if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
 
+    const pagina = Math.max(1, params?.pagina ?? 1);
+    const porPagina = Math.min(100, Math.max(1, params?.porPagina ?? 20));
+    const offset = (pagina - 1) * porPagina;
+
+    // --- Condições de filtro ---
     const condicoes = [];
 
     if (params?.busca) {
@@ -55,7 +66,22 @@ export async function listarUsuariosAdmin(params?: {
       condicoes.push(eq(users.role, params.role as 'admin' | 'medico' | 'paciente'));
     }
 
-    // Buscar usuários
+    const whereClause =
+      condicoes.length > 0
+        ? sql`${sql.join(condicoes, sql` AND `)}`
+        : undefined;
+
+    // --- Ordenação dinâmica ---
+    const colunaOrdenacao = {
+      nome: users.nome,
+      email: users.email,
+      createdAt: users.createdAt,
+    }[params?.ordenarPor ?? 'createdAt'];
+
+    const direcaoFn = (params?.direcao ?? 'desc') === 'asc' ? asc : desc;
+    const orderBy = direcaoFn(colunaOrdenacao);
+
+    // --- Query principal com paginação ---
     const resultado = await db
       .select({
         id: users.id,
@@ -67,15 +93,21 @@ export async function listarUsuariosAdmin(params?: {
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(
-        condicoes.length > 0
-          ? sql`${sql.join(condicoes, sql` AND `)}`
-          : undefined,
-      )
-      .orderBy(desc(users.createdAt))
-      .limit(params?.limite ?? 200);
+      .where(whereClause)
+      .orderBy(orderBy)
+      .limit(porPagina)
+      .offset(offset);
 
-    // Contagem por role
+    // --- Contagem filtrada (para paginação) ---
+    const [contagemFiltrada] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(users)
+      .where(whereClause);
+
+    const totalFiltrado = contagemFiltrada?.count ?? 0;
+    const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / porPagina));
+
+    // --- Contagem global por role (KPIs) ---
     const contagem = await db.execute(sql`
       SELECT
         COUNT(*) FILTER (WHERE role = 'admin')::int as admins,
@@ -92,6 +124,8 @@ export async function listarUsuariosAdmin(params?: {
       dados: {
         usuarios: resultado,
         total: c.total,
+        totalFiltrado,
+        totalPaginas,
         porRole: {
           admins: c.admins,
           medicos: c.medicos,
@@ -104,6 +138,7 @@ export async function listarUsuariosAdmin(params?: {
     return { sucesso: false, erro: 'Erro ao listar usuários' };
   }
 }
+
 
 const atualizarUsuarioSchema = z.object({
   nome: z.string().trim().min(2, 'Nome muito curto').max(100).optional(),
