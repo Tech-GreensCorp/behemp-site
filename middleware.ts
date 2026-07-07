@@ -21,6 +21,7 @@ const isPublicRoute = createRouteMatcher([
   '/ebooks(.*)',
   '/agendamento',
   '/parceiros',
+  '/programa-acesso-solidario',
   '/contato',
   '/triagem',
   '/politica-de-privacidade',

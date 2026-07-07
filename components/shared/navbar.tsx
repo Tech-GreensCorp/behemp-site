@@ -36,6 +36,7 @@ const NAV_ITEMS = [
   { label: 'Triagem', href: '/triagem' },
   { label: 'Histórias', href: '/historias' },
   { label: 'Ebooks', href: '/ebooks' },
+  { label: 'Programas de Acesso', href: '/programa-acesso-solidario' },
   { label: 'Contato', href: '/contato' },
 ];
 
