@@ -10,6 +10,7 @@ const LINKS_RAPIDOS = [
 ];
 
 const LINKS_SUPORTE = [
+  { label: 'Programa de Acesso Solidário', href: '/programa-acesso-solidario' },
   { label: 'Parceiros', href: '/parceiros' },
   { label: 'Contato', href: '/contato' },
   { label: 'Política de Privacidade', href: '/politica-de-privacidade' },
