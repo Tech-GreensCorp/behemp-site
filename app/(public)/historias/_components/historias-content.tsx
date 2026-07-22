@@ -78,7 +78,7 @@ const STORIES_MOCK: Story[] = [
     idade: 32,
     condicao: 'Ansiedade Generalizada e Síndrome do Pânico',
     categoria: 'Saúde Mental',
-    depoimento: 'Eu não conseguia sair de casa com medo de sofrer crises de pânico repentinas. A cannabis medicinal regulou meu sistema nervoso de forma equilibrada e sem os efeitos colaterais dos tarjas-pretas.',
+    depoimento: 'Eu não conseguia sair de casa com medo de sofrer crises de pânico repentinas. A Medicina Endocanabinoide regulou meu sistema nervoso de forma equilibrada e sem os efeitos colaterais dos tarjas-pretas.',
     jornadaAntes: 'Diagnosticada com transtorno de ansiedade generalizada (TAG), Mariana enfrentava insônia, crises de taquicardia diárias e crises de pânico recorrentes que começaram a isolá-la socialmente. Os ansiolíticos convencionais causavam fadiga extrema durante o dia.',
     jornadaAcolhimento: 'Por meio do acolhimento Be4Hope, Mariana foi direcionada a uma psiquiatra integrativa. Juntas, estruturaram um tratamento com CBD de amplo espectro (Broad Spectrum) para uso diário sublingual, visando a regulação do sistema endocanabinóide.',
     jornadaDepois: 'Após a regulação da dose, Mariana relatou uma sensação de calma contínua sem letargia. As crises de pânico desapareceram e ela conseguiu retirar a medicação controlada sob supervisão médica, retomando sua rotina profissional e social.',

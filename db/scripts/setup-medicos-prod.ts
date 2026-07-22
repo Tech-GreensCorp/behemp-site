@@ -27,7 +27,7 @@ const MEDICOS = [
     email: 'wellingtonbriques@hotmail.com',
     nome: 'Dr. Wellington Briques',
     especialidade: 'Clínico Geral',
-    bio: 'Dr. Wellington Briques é médico graduado pela Faculdade de Medicina da USP de Ribeirão Preto, com titulação de MBA e GFMD (Global Fellow in Medicine Development pelo Kings College, London UK, e IFAPP), ex-Presidente da Sociedade Brasileira de Medicina Farmacêutica (SBMF), Fundador da Cannabis Academy, e atuou como Chief Medical Officer do Butantan e como Diretor Médico Global da Canopy Growth no Canada, entre outros cargos. Atualmente é o Regional Medical Director LATAM na Regeneron, USA. Autor do livro Descomplicando a Prática Clínica da Cannabis Medicinal. Dedica sua carreira ao atendimento de pacientes, ensino médico, publicações científicas e ao desenvolvimento de novas moléculas em áreas como a cannabis medicinal, fibromialgia e oncologia.',
+    bio: 'Dr. Wellington Briques é médico graduado pela Faculdade de Medicina da USP de Ribeirão Preto, com titulação de MBA e GFMD (Global Fellow in Medicine Development pelo Kings College, London UK, e IFAPP), ex-Presidente da Sociedade Brasileira de Medicina Farmacêutica (SBMF), Fundador da Cannabis Academy, e atuou como Chief Medical Officer do Butantan e como Diretor Médico Global da Canopy Growth no Canada, entre outros cargos. Atualmente é o Regional Medical Director LATAM na Regeneron, USA. Autor do livro Descomplicando a Prática Clínica da Medicina Endocanabinoide. Dedica sua carreira ao atendimento de pacientes, ensino médico, publicações científicas e ao desenvolvimento de novas moléculas em áreas como a Medicina Endocanabinoide, fibromialgia e oncologia.',
     valorConsulta: '500.00',
     ordem: 2,
   },

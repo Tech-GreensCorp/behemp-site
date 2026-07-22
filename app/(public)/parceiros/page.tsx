@@ -61,7 +61,7 @@ const DIFERENCIAIS_CANNECT = [
   {
     icon: Stethoscope,
     titulo: 'Telemedicina especializada',
-    descricao: 'Agendamento de consultas com médicos habilitados a prescrever cannabis medicinal, com atendimento à distância e segurança jurídica.',
+    descricao: 'Agendamento de consultas com médicos habilitados a prescrever Medicina Endocanabinoide, com atendimento à distância e segurança jurídica.',
   },
   {
     icon: Brain,
@@ -254,7 +254,7 @@ export default function ParceirosPage() {
                   <span style={{ color: '#6B7B3C' }}>Cannect</span>
                 </h2>
                 <p className="mt-1 text-sm font-medium italic" style={{ color: '#6B7B3C' }}>
-                  Democratizando o acesso à cannabis medicinal.
+                  Democratizando o acesso à Medicina Endocanabinoide.
                 </p>
 
                 {/* Descrição */}
@@ -262,7 +262,7 @@ export default function ParceirosPage() {
                   Ecossistema digital brasileiro que{' '}
                   <strong className="text-foreground">conecta pacientes, médicos prescritores e fornecedores farmacêuticos</strong>,
                   simplificando a jornada do paciente desde a consulta até o acesso ao produto final.
-                  Como uma <strong className="text-foreground">healthtech</strong> especializada em cannabis medicinal,
+                  Como uma <strong className="text-foreground">healthtech</strong> especializada em Medicina Endocanabinoide,
                   a Cannect organiza a demanda e garante que os pacientes recebam orientação profissional
                   e acesso a produtos seguros dentro do marco regulatório brasileiro.
                 </p>
@@ -342,7 +342,7 @@ export default function ParceirosPage() {
                   {/* Selo */}
                   <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur-sm transition-colors duration-300 group-hover:bg-white/15">
                     <Smartphone size={14} />
-                    Healthtech · Cannabis Medicinal
+                    Healthtech · Medicina Endocanabinoide
                   </div>
 
                   {/* Link externo */}

@@ -264,7 +264,7 @@ export function PatologiasPicker() {
               Patologias
             </span>
             <p className="text-muted-foreground mt-3 text-sm leading-relaxed lg:ml-auto lg:max-w-sm">
-              Selecione as suas patologias abaixo e inicie seu tratamento com cannabis medicinal
+              Selecione as suas patologias abaixo e inicie seu tratamento com Medicina Endocanabinoide
               ainda hoje!
             </p>
           </div>

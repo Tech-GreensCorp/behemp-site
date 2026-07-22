@@ -102,7 +102,7 @@ const TESTEMUNHOS = [
 
 const FAQ = [
   {
-    pergunta: 'É legal usar cannabis medicinal no Brasil?',
+    pergunta: 'É legal usar Medicina Endocanabinoide no Brasil?',
     resposta:
       'Sim. O acesso é regulamentado pela ANVISA (RDC 660), com receita médica e autorização oficial de importação.',
   },

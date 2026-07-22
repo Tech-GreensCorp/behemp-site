@@ -126,6 +126,12 @@ export function ChatContainer({
   const [editandoMsg, setEditandoMsg] = useState<{ id: string; conteudo: string } | null>(null);
 
   const mensagensRef = useRef<HTMLDivElement>(null);
+  // Espelha grupoAtivo em uma ref para leitura sempre atualizada dentro de
+  // callbacks assíncronos (evita comparar contra valor stale capturado antes do await)
+  const grupoAtivoRef = useRef<string | null>(null);
+  useEffect(() => {
+    grupoAtivoRef.current = grupoAtivo;
+  }, [grupoAtivo]);
 
   // Carregar grupos
   const carregarGrupos = useCallback(async () => {
@@ -339,7 +345,7 @@ export function ChatContainer({
     const res = await excluirGrupo(grupoId);
     if (res.sucesso) {
       toast.success('Conversa excluída');
-      if (grupoAtivo === grupoId) {
+      if (grupoAtivoRef.current === grupoId) {
         setGrupoAtivo(null);
         setMensagensLista([]);
       }
@@ -727,9 +733,9 @@ export function ChatContainer({
                     <p className="text-sm font-bold text-foreground leading-snug">
                       {grupoSelecionado ? nomeGrupo(grupoSelecionado) : ''}
                     </p>
-                    {emailOutro(grupoSelecionado!) && (
+                    {grupoSelecionado && emailOutro(grupoSelecionado) && (
                       <p className="text-[10px] text-muted-foreground/50 font-medium truncate mt-0.5">
-                        {emailOutro(grupoSelecionado!)}
+                        {emailOutro(grupoSelecionado)}
                       </p>
                     )}
                   </div>

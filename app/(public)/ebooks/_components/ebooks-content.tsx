@@ -37,14 +37,14 @@ interface Ebook {
 ─────────────────────────────────────────────── */
 const CATEGORIES = [
   { id: 'todos', label: 'Todos', icon: BookOpen },
-  { id: 'cannabis', label: 'Cannabis Medicinal', icon: Leaf },
+  { id: 'cannabis', label: 'Medicina Endocanabinoide', icon: Leaf },
   { id: 'neurologia', label: 'Neurologia', icon: Brain },
 ];
 
 const EBOOKS: Ebook[] = [
   {
     id: '1',
-    title: 'Guia de Cannabis Medicinal',
+    title: 'Guia de Medicina Endocanabinoide',
     subtitle: 'Um guia prático sobre a história, a ciência e os tratamentos com canabinoides no Brasil.',
     category: 'cannabis',
     pages: 33,
@@ -56,7 +56,7 @@ const EBOOKS: Ebook[] = [
   },
   {
     id: '2',
-    title: 'Autismo e Cannabis Medicinal',
+    title: 'Autismo e Medicina Endocanabinoide',
     subtitle: 'Como os canabinoides podem auxiliar no manejo de sintomas, comportamento e qualidade de vida no TEA.',
     category: 'neurologia',
     pages: 78,
@@ -68,7 +68,7 @@ const EBOOKS: Ebook[] = [
   },
   {
     id: '3',
-    title: 'Epilepsia e Cannabis Medicinal',
+    title: 'Epilepsia e Medicina Endocanabinoide',
     subtitle: 'O papel do CBD e outros fitocanabinoides no controle de crises refratárias e qualidade de vida.',
     category: 'neurologia',
     pages: 78,
