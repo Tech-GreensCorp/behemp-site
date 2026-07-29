@@ -163,8 +163,8 @@ export default async function HomePage() {
           {/* ── Palco principal: texto lateral + composição central ── */}
           <div className="relative grid gap-8 lg:grid-cols-12 lg:gap-4">
             {/* ── Coluna esquerda: título + subtítulo + pilares ── */}
-            <div className="mt-14 vanimate-fade-up relative z-20 lg:col-span-4 lg:pt-2">
-              <h1 className="font-display text-[2.4rem] leading-[1.02] font-bold tracking-tight text-foreground sm:text-4xl lg:text-[3.2rem]">
+            <div className="mt-6 vanimate-fade-up relative z-20 lg:order-none lg:col-span-4 lg:mt-14 lg:pt-2">
+              <h1 className="font-display text-[2rem] leading-[1.05] font-bold tracking-tight text-foreground sm:text-4xl lg:text-[3.2rem] lg:leading-[1.02]">
                 Cuidar é o
                 <br />
                 <span className="text-primary">maior presente</span>
@@ -198,7 +198,7 @@ export default async function HomePage() {
               </p>
 
               {/* Pilares — 4 ícones em círculo (paleta e ícones fiéis ao modelo) */}
-              <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-3 max-w-md">
+              <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-3 max-w-md lg:mt-10">
                 {[
                   { icon: Heart, titulo: 'Presença', desc: 'que acolhe.' },
                   { icon: Users, titulo: 'Apoio', desc: 'que fortalece.' },
@@ -221,27 +221,27 @@ export default async function HomePage() {
 
             {/* ── Palco central: "b." + pessoa + decorativos ── */}
             <div className="animate-fade-up delay-100 relative lg:col-span-5">
-              <div className="relative mx-auto h-[520px] w-full max-w-md lg:h-[600px] lg:max-w-none">
+              <div className="relative mx-auto h-[420px] w-full max-w-md sm:h-[500px] lg:h-[600px] lg:max-w-none">
 
                 {/* Fundo "be." gigante */}
                 <span
                   aria-hidden="true"
-                  className="font-display absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-[56%] select-none whitespace-nowrap text-[22rem] leading-[0.75] font-bold text-primary/95 lg:text-[32rem]"
+                  className="font-display absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-[56%] select-none whitespace-nowrap text-[14rem] leading-[0.75] font-bold text-primary/95 sm:text-[20rem] lg:text-[32rem]"
                   style={{ letterSpacing: '-0.08em' }}
                 >
                   be.
                 </span>
 
                 {/* Elementos abstratos atrás */}
-                <div className="absolute right-4 top-40 z-[1] h-20 w-20 rounded-full bg-primary/20" />
-                <div className="absolute bottom-20 left-12 z-[1] h-14 w-14 rounded-full bg-[#F59E0B]/30" />
+                <div className="absolute right-4 top-32 z-[1] h-14 w-14 rounded-full bg-primary/20 sm:top-40 sm:h-20 sm:w-20" />
+                <div className="absolute bottom-20 left-6 z-[1] h-10 w-10 rounded-full bg-[#F59E0B]/30 sm:left-12 sm:h-14 sm:w-14" />
 
 
                 {/* Bonequinho amarelo */}
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 64 64"
-                  className="absolute right-0 top-[32%] z-[5] h-28 w-28 rotate-[-12deg] drop-shadow-lg lg:right-2 lg:h-32 lg:w-32"
+                  className="absolute right-0 top-[32%] z-[5] h-20 w-20 rotate-[-12deg] drop-shadow-lg sm:h-28 sm:w-28 lg:right-2 lg:h-32 lg:w-32"
                 >
                   <circle cx="32" cy="32" r="30" fill="#F59E0B" />
                   <circle cx="24" cy="27" r="3" fill="#1A1612" />
@@ -260,7 +260,7 @@ export default async function HomePage() {
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 64 64"
-                  className="absolute right-10 top-[55%] z-[5] h-24 w-24 rotate-[14deg] drop-shadow-lg lg:right-8 lg:h-28 lg:w-28"
+                  className="absolute right-6 top-[55%] z-[5] h-16 w-16 rotate-[14deg] drop-shadow-lg sm:right-10 sm:h-24 sm:w-24 lg:right-8 lg:h-28 lg:w-28"
                 >
                   <circle cx="32" cy="32" r="30" fill="#2563EB" />
                   <circle cx="24" cy="27" r="3" fill="#F5F2ED" />
@@ -286,28 +286,28 @@ export default async function HomePage() {
                     priority
                     quality={90}
                   />
-                </div> 
+                </div>
 
 
                 {/* Corações */}
                 <Heart
                   aria-hidden="true"
-                  size={52}
-                  className="absolute left-2 top-8 z-20 -rotate-12 fill-primary text-primary drop-shadow-sm"
-                  strokeWidth={0}
-                />
-
-                <Heart
-                  aria-hidden="true"
-                  size={28}
-                  className="absolute right-20 top-10 z-20 rotate-12 fill-primary text-primary"
+                  size={40}
+                  className="absolute left-2 top-6 z-20 -rotate-12 fill-primary text-primary drop-shadow-sm sm:top-8 sm:h-[52px] sm:w-[52px]"
                   strokeWidth={0}
                 />
 
                 <Heart
                   aria-hidden="true"
                   size={22}
-                  className="absolute right-2 top-24 z-20 rotate-6 fill-[#F08A6E] text-[#F08A6E]"
+                  className="absolute right-16 top-8 z-20 rotate-12 fill-primary text-primary sm:right-20 sm:top-10 sm:h-7 sm:w-7"
+                  strokeWidth={0}
+                />
+
+                <Heart
+                  aria-hidden="true"
+                  size={18}
+                  className="absolute right-2 top-20 z-20 rotate-6 fill-[#F08A6E] text-[#F08A6E] sm:top-24 sm:h-[22px] sm:w-[22px]"
                   strokeWidth={0}
                 />
 
@@ -329,12 +329,12 @@ export default async function HomePage() {
                 </a>
               </div> */}
 
-              <div className="mt-8 max-w-sm border-l-2 border-primary/30 pl-6 lg:mt-10">
+              <div className="mt-4 max-w-sm border-l-2 border-primary/30 pl-6 lg:mt-10">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
                   Institucional
                 </span>
 
-                <h2 className="font-display mt-3 text-[2.4rem] leading-[0.95] font-bold tracking-tight text-foreground">
+                <h2 className="font-display mt-3 text-[2rem] leading-[0.95] font-bold tracking-tight text-foreground sm:text-[2.4rem]">
                   Fundação
                   <br />
                   <span className="text-primary">Be4hope</span>
@@ -356,7 +356,7 @@ export default async function HomePage() {
           </div>
 
           {/* ── Cards flutuantes — sobrepõem a base da pessoa ─────── */}
-          <div className="animate-fade-up delay-300 relative z-30 -mt-6 grid gap-4 sm:grid-cols-5 lg:-mt-24 lg:grid-cols-12 lg:gap-4 ">
+          <div className="animate-fade-up delay-300 relative z-30 mt-8 grid gap-4 sm:mt-10 sm:grid-cols-5 lg:-mt-24 lg:grid-cols-12 lg:gap-4 ">
             {/* Card 1 — descrição da Fundação */}
             <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-3 lg:col-span-4 lg:col-start-6">
               <div className="flex items-start gap-4">
