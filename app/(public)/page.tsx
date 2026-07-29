@@ -19,12 +19,17 @@ import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
 import {
   Brain,
   ChevronRight,
+  Globe,
+  HandHeart,
+  Heart,
   HeartHandshake,
   HeartPulse,
   Shield,
   Star,
   Stethoscope,
+  Tag,
   Users,
+  Users2,
 } from 'lucide-react';
 export const metadata: Metadata = {
   // O template do layout adiciona "| Be4Hope" automaticamente.
@@ -152,63 +157,270 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ── Hero — Editorial Caloroso ────────────────────── */}
-      <section className="relative overflow-hidden pt-8">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-            {/* Texto */}
-            <div className="animate-fade-up">
-              <p className="text-muted-foreground mb-6 text-xs font-semibold tracking-[0.25em] uppercase">
-                Acolhimento · Medicina Endocanabinóide
-              </p>
+      {/* ── Hero — Fundação Be4Hope (editorial + institucional) ────── */}
+      <section className="relative overflow-hidden pt-4 lg:pt-8">
+        <div className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8 lg:pb-16">
+          {/* ── Palco principal: texto lateral + composição central ── */}
+          <div className="relative grid gap-8 lg:grid-cols-12 lg:gap-4">
+            {/* ── Coluna esquerda: título + subtítulo + pilares ── */}
+            <div className="mt-14 vanimate-fade-up relative z-20 lg:col-span-4 lg:pt-2">
+              <h1 className="font-display text-[2.4rem] leading-[1.02] font-bold tracking-tight text-foreground sm:text-4xl lg:text-[3.2rem]">
+                Cuidar é o
+                <br />
+                <span className="text-primary">maior presente</span>
+                <br />
+                que você pode
+                <br />
+                dar para{' '}
+                <span className="relative inline-block whitespace-nowrap">
+                  quem ama
 
-              <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                <span className="text-primary">Você</span> não precisa{' '}
-                <br />
-                enfrentar isso{' '}
-                <br />
-                sozinho.
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 250 28"
+                    className="pointer-events-none absolute -bottom-3 left-0 w-full text-primary"
+                    fill="none"
+                  >
+                    <path
+                      d="M6 16 C45 26,90 6,130 16 S210 24,244 14"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </h1>
 
-              <p className="text-muted-foreground mt-6 max-w-lg text-base leading-relaxed sm:text-lg">
-                Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinóide, responsabilidade, acolhimento e do seu lado em cada etapa.
+              <p className="text-foreground mt-7 max-w-md text-[15px] leading-relaxed">
+                Seja o presente que alguém precisa
+                <br />
+                para <strong className="font-semibold">viver com mais saúde.</strong>
               </p>
 
-              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <ScrollToSection
-                  targetId="condicoes"
-                  className="w-full sm:w-auto bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
-                >
-                  Iniciar acolhimento
-                  <ChevronRight size={16} />
-                </ScrollToSection>
-                <Link
-                  href="/#quem-somos"
-                  className="w-full sm:w-auto border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
-                >
-                  Conhecer a Be4Hope
-                </Link>
+              {/* Pilares — 4 ícones em círculo (paleta e ícones fiéis ao modelo) */}
+              <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-3 max-w-md">
+                {[
+                  { icon: Heart, titulo: 'Presença', desc: 'que acolhe.' },
+                  { icon: Users, titulo: 'Apoio', desc: 'que fortalece.' },
+                  { icon: HandHeart, titulo: 'Cuidado', desc: 'que transforma.' },
+                  { icon: Users2, titulo: 'Rede de apoio', desc: 'que caminha junto com você.' },
+                ].map((p) => {
+                  const DynIcon = p.icon;
+                  return (
+                    <div key={p.titulo} className="flex flex-col items-start">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#FBEDE5] text-primary shadow-[inset_0_0_0_1px_rgba(234,84,41,0.08)]">
+                        <DynIcon size={22} strokeWidth={1.75} />
+                      </div>
+                      <p className="text-foreground text-sm font-semibold leading-tight">{p.titulo}</p>
+                      <p className="text-muted-foreground mt-0.5 text-xs leading-tight">{p.desc}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Imagem Hero — Mãe e Filho */}
-            <div className="animate-fade-up delay-200">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl shadow-lg lg:aspect-[3/2]">
-                <Image
-                  src="/images/home/hero-mae-filho.jpg"
-                  alt="Mãe abraçando seu filho com carinho — acolhimento Be4Hope"
-                  fill
-                  className="object-cover"
-                  style={{ objectPosition: 'center 25%' }}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  priority
-                  quality={85}
+            {/* ── Palco central: "b." + pessoa + decorativos ── */}
+            <div className="animate-fade-up delay-100 relative lg:col-span-5">
+              <div className="relative mx-auto h-[520px] w-full max-w-md lg:h-[600px] lg:max-w-none">
+
+                {/* Fundo "be." gigante */}
+                <span
+                  aria-hidden="true"
+                  className="font-display absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-[56%] select-none whitespace-nowrap text-[22rem] leading-[0.75] font-bold text-primary/95 lg:text-[32rem]"
+                  style={{ letterSpacing: '-0.08em' }}
+                >
+                  be.
+                </span>
+
+                {/* Elementos abstratos atrás */}
+                <div className="absolute right-4 top-40 z-[1] h-20 w-20 rounded-full bg-primary/20" />
+                <div className="absolute bottom-20 left-12 z-[1] h-14 w-14 rounded-full bg-[#F59E0B]/30" />
+
+
+                {/* Bonequinho amarelo */}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 64 64"
+                  className="absolute right-0 top-[32%] z-[5] h-28 w-28 rotate-[-12deg] drop-shadow-lg lg:right-2 lg:h-32 lg:w-32"
+                >
+                  <circle cx="32" cy="32" r="30" fill="#F59E0B" />
+                  <circle cx="24" cy="27" r="3" fill="#1A1612" />
+                  <circle cx="40" cy="27" r="3" fill="#1A1612" />
+                  <path
+                    d="M20 38 Q32 52 44 38"
+                    stroke="#1A1612"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+
+
+                {/* Bonequinho azul */}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 64 64"
+                  className="absolute right-10 top-[55%] z-[5] h-24 w-24 rotate-[14deg] drop-shadow-lg lg:right-8 lg:h-28 lg:w-28"
+                >
+                  <circle cx="32" cy="32" r="30" fill="#2563EB" />
+                  <circle cx="24" cy="27" r="3" fill="#F5F2ED" />
+                  <circle cx="40" cy="27" r="3" fill="#F5F2ED" />
+                  <path
+                    d="M20 38 Q32 52 44 38"
+                    stroke="#F5F2ED"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+
+
+                {/* Foto principal */}
+                <div className="absolute inset-0 z-10">
+                  <Image
+                    src="/images/home/hero-be-pessoa.png"
+                    alt="Mulher vestindo moletom Be4Hope — presença que acolhe"
+                    fill
+                    className="object-contain object-bottom"
+                    sizes="(max-width: 1024px) 90vw, 45vw"
+                    priority
+                    quality={90}
+                  />
+                </div> 
+
+
+                {/* Corações */}
+                <Heart
+                  aria-hidden="true"
+                  size={52}
+                  className="absolute left-2 top-8 z-20 -rotate-12 fill-primary text-primary drop-shadow-sm"
+                  strokeWidth={0}
                 />
-                {/* Overlay sutil para manter harmonia com a paleta */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+
+                <Heart
+                  aria-hidden="true"
+                  size={28}
+                  className="absolute right-20 top-10 z-20 rotate-12 fill-primary text-primary"
+                  strokeWidth={0}
+                />
+
+                <Heart
+                  aria-hidden="true"
+                  size={22}
+                  className="absolute right-2 top-24 z-20 rotate-6 fill-[#F08A6E] text-[#F08A6E]"
+                  strokeWidth={0}
+                />
+
+              </div>
+            </div>
+
+            {/* ── Coluna direita: link + institucional ── */}
+            <div className="lg:pl-10 animate-fade-up delay-200 relative z-20 flex flex-col items-start lg:col-span-3 lg:items-end lg:pt-2">
+              {/* Link be4hope.org */}
+              {/* <div className="flex justify-start lg:justify-end">
+                <a
+                  href="https://be4hope.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-transparent px-4 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+                >
+                  <Globe size={14} strokeWidth={2} />
+                  be4hope.org
+                </a>
+              </div> */}
+
+              <div className="mt-8 max-w-sm border-l-2 border-primary/30 pl-6 lg:mt-10">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                  Institucional
+                </span>
+
+                <h2 className="font-display mt-3 text-[2.4rem] leading-[0.95] font-bold tracking-tight text-foreground">
+                  Fundação
+                  <br />
+                  <span className="text-primary">Be4hope</span>
+                </h2>
+
+                <p className="mt-5 text-[15px] leading-7 text-muted-foreground">
+                  Apoio, acolhimento e acesso a tratamentos com Medicina
+                  Endocanabinóide para pacientes que necessitam de acompanhamento
+                  e suporte da Fundação.
+                </p>
+
+                <div className="mt-6 h-px w-20 bg-primary/30" />
+
+                <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  Acolhimento • Tratamento • Esperança
+                </p>
               </div>
             </div>
           </div>
+
+          {/* ── Cards flutuantes — sobrepõem a base da pessoa ─────── */}
+          <div className="animate-fade-up delay-300 relative z-30 -mt-6 grid gap-4 sm:grid-cols-5 lg:-mt-24 lg:grid-cols-12 lg:gap-4 ">
+            {/* Card 1 — descrição da Fundação */}
+            <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-3 lg:col-span-4 lg:col-start-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
+                  <HandHeart size={22} strokeWidth={1.75} />
+                </div>
+                <p className="text-foreground text-sm leading-relaxed">
+                  A <strong className="font-semibold">Fundação Be4Hope</strong> dá acesso a produtos com
+                  Medicina Endocanabinóide para pacientes que precisam do tratamento e não têm condições
+                  de adquirir.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2 — benefícios (dois itens divididos) */}
+            <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-2 lg:col-span-3">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
+                    <Tag size={18} strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
+                      Produtos com até
+                    </p>
+                    <p className="text-foreground text-sm font-bold leading-tight tracking-tight uppercase">
+                      80% de desconto
+                    </p>
+                  </div>
+                </div>
+                <div className="border-t border-border/60" />
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
+                    <HandHeart size={18} strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
+                      Por triagem até
+                    </p>
+                    <p className="text-foreground text-sm font-bold leading-tight tracking-tight uppercase">
+                      Disponíveis gratuitamente
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── CTAs — mantém acesso ao fluxo ─────────────────── */}
+          {/* <div className="animate-fade-up delay-400 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <ScrollToSection
+              targetId="condicoes"
+              className="w-full sm:w-auto bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all duration-200 px-8 h-12 flex items-center justify-center gap-2 border-0 text-sm cursor-pointer animate-active-pulse"
+            >
+              Iniciar acolhimento
+              <ChevronRight size={16} />
+            </ScrollToSection>
+            <Link
+              href="/#quem-somos"
+              className="w-full sm:w-auto border border-secondary/30 bg-transparent hover:bg-secondary/5 text-secondary font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-300 px-8 h-12 flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              Conhecer a Be4Hope
+            </Link>
+          </div> */}
         </div>
       </section>
 
