@@ -170,8 +170,19 @@ export function PatologiasPicker() {
               />
             </div>
 
+            {/* Medicamento */}
+            <div className="absolute -left-24 bottom-0 z-20 hidden lg:block">
+              <Image
+                src="/images/home/medicamento.png"
+                alt="Medicamento"
+                width={240}
+                height={240}
+                className="drop-shadow-2xl"
+              />
+            </div>
+
             {/* Stats flutuantes à direita da imagem */}
-            <div className="mt-4 space-y-2 lg:absolute lg:-right-4 lg:top-1/2 lg:mt-0 lg:w-56 lg:-translate-y-1/2 lg:space-y-2">
+            <div className="mt-4 space-y-2 lg:absolute lg:-right-4 lg:top-3/4 lg:mt-0 lg:w-56 lg:-translate-y-1/2 lg:space-y-2">
               {HERO_STATS.map((s) => {
                 const Icon = s.icon;
                 return (
@@ -190,17 +201,17 @@ export function PatologiasPicker() {
             </div>
 
             {/* Rating */}
-            <div className="mt-3 flex items-center gap-2 lg:absolute lg:-right-4 lg:bottom-4 lg:mt-0 lg:w-56 lg:rounded-2xl lg:bg-card lg:px-3 lg:py-2 lg:shadow-card lg:ring-1 lg:ring-border/60">
+            {/* <div className="mt-3 flex items-center gap-2 lg:absolute lg:-right-4 lg:bottom-4 lg:mt-0 lg:w-56 lg:rounded-2xl lg:bg-card lg:px-3 lg:py-2 lg:shadow-card lg:ring-1 lg:ring-border/60">
               <div className="flex gap-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star key={i} size={12} className="fill-[var(--sun)] text-[var(--sun)]" />
                 ))}
               </div>
               <div className="leading-tight">
-                <p className="text-[11px] font-semibold text-foreground">Avaliação dos pacientes</p>
+                <p className="text-[11px] font-semibold text-foreground">Avaliação dos pacientesAAAAAAAAAAA</p>
                 <p className="text-[10px] text-foreground/70">4,9 de 5 (1.200+ avaliações)</p>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 

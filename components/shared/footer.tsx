@@ -18,7 +18,7 @@ const LINKS_SUPORTE = [
 ];
 
 const BARRA_INFO = [
-  { icon: WhatsApp, label: 'WhatsApp (11) 98901-2860' },
+  { icon: WhatsApp, label: 'WhatsApp (11) 93204-7360' },
   { icon: Globe, label: 'www.be4hope.org' },
   { icon: ShieldCheck, label: 'RDC 660/22 ANVISA' },
   { icon: ShieldCheck, label: 'Dados seguros e confidenciais' },

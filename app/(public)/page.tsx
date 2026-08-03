@@ -897,7 +897,7 @@ export default async function HomePage() {
           <div>
             <p className="eyebrow">Sua saúde merece atenção.</p>
             <h2 className="mt-4 font-display text-4xl leading-[1.02] font-extrabold sm:text-5xl lg:text-6xl">
-              <span className="text-primary">Você</span> não precisa enfrentar isso sozinho.
+              <span className="text-primary">Você</span> não precisa enfrentar isso sozinho(a).
             </h2>
             <p className="mt-6 max-w-lg text-base leading-relaxed text-foreground/80">
               Há mais de duas décadas conectando pessoas ao cuidado com Medicina Endocanabinoide,

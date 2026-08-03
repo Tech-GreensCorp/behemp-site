@@ -255,7 +255,7 @@ export default function SignInPage() {
               </span>
               não precisa
               <br />
-              enfrentar isso sozinho.
+              enfrentar isso sozinho(a).
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
