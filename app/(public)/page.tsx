@@ -3,7 +3,6 @@ import { unstable_noStore as noStore } from 'next/cache';
 import Image from 'next/image';
 import { PatologiasPicker } from '@/components/shared/patologias-picker';
 import { SeuCaminho } from '@/components/shared/seu-caminho';
-import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import { Counter } from '@/components/shared/counter';
 import { Smiley } from '@/components/shared/smiley';
 import { listarMedicosPublico } from '@/app/(public)/_actions/agendamento';
@@ -47,6 +46,10 @@ export const metadata: Metadata = {
     url: 'https://be4hope.org',
   },
 };
+
+/* ── Constantes ─────────────────────────────────── */
+
+const WHATSAPP_URL = 'https://wa.me/5511932047360';
 
 /* ── Dados estáticos ────────────────────────────── */
 
@@ -536,14 +539,16 @@ export default async function HomePage() {
               Estamos aqui para ouvir, acolher e caminhar ao seu lado.
             </p>
           </div>
-          <ScrollToSection
-            targetId="condicoes"
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex shrink-0 items-center gap-3 rounded-full bg-card px-7 py-4 text-base font-semibold text-primary shadow-soft transition-transform hover:-translate-y-0.5 cursor-pointer"
           >
             <CalendarDays size={20} />
             Agende sua consulta gratuita
             <ArrowRight size={18} />
-          </ScrollToSection>
+          </a>
         </div>
       </section>
 
@@ -587,13 +592,15 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <ScrollToSection
-            targetId="condicoes"
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-8 inline-flex items-center gap-3 rounded-full bg-primary px-7 py-4 text-base font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5 cursor-pointer"
           >
-            Iniciar acolhimento com especialista
+            Iniciar acolhimento
             <ArrowRight size={18} />
-          </ScrollToSection>
+          </a>
 
           <div className="mt-10 rounded-3xl border border-border bg-card p-6 shadow-card">
             <div className="flex items-center gap-2">
@@ -722,13 +729,15 @@ export default async function HomePage() {
           <p className="mt-4 text-sm opacity-85">
             A triagem leva poucos minutos e quem te atende é gente de verdade.
           </p>
-          <ScrollToSection
-            targetId="condicoes"
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-7 inline-flex items-center gap-2 rounded-full bg-card px-6 py-3.5 text-sm font-semibold text-secondary transition-transform hover:-translate-y-0.5 cursor-pointer"
           >
             Iniciar acolhimento
             <MessageCircle size={17} />
-          </ScrollToSection>
+          </a>
 
           <div className="mt-8 flex items-start gap-4 rounded-2xl bg-secondary-foreground/10 p-5">
             <Heart size={22} className="mt-0.5 shrink-0" />
@@ -775,13 +784,15 @@ export default async function HomePage() {
             })}
           </div>
 
-          <ScrollToSection
-            targetId="condicoes"
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-9 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5 cursor-pointer"
           >
             Quero iniciar acolhimento
             <MessageCircle size={17} />
-          </ScrollToSection>
+          </a>
         </div>
       </section>
 
@@ -927,20 +938,24 @@ export default async function HomePage() {
             </div>
 
             <div className="mt-9 flex max-w-md flex-col gap-3">
-              <ScrollToSection
-                targetId="condicoes"
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-3 rounded-full bg-primary px-7 py-4 text-base font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <CalendarDays size={20} />
                 Iniciar acolhimento gratuito
                 <ArrowRight size={18} />
-              </ScrollToSection>
-              <ScrollToSection
-                targetId="quem-somos"
+              </a>
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center rounded-full border border-foreground/15 bg-card px-7 py-4 text-base font-semibold text-foreground transition-colors hover:bg-accent cursor-pointer"
               >
                 Conhecer a Be4Hope
-              </ScrollToSection>
+              </a>
             </div>
           </div>
 

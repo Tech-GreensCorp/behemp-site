@@ -1,12 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { ScrollToSection } from '@/components/shared/scroll-to-section';
 import {
   BadgeCheck,
   ClipboardList,
   type LucideIcon,
-  MessageCircle,
   Minus,
   Package,
   Plus,
@@ -15,6 +13,8 @@ import {
 
 import { cn } from '@/lib/utils';
 import { WhatsApp } from '@/components/shared/icons';
+
+const WHATSAPP_URL = 'https://wa.me/5511932047360';
 
 type Etapa = {
   passo: string;
@@ -132,13 +132,15 @@ export function SeuCaminho() {
             <p className="font-display text-lg leading-snug font-bold text-white">
               Uma jornada de sucesso 100% humanizada com quem entende!
             </p>
-            <ScrollToSection
-              targetId="condicoes"
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-secondary bg-white rounded-full cursor-pointer transition-colors hover:bg-white/90"
             >
               Iniciar jornada
               <WhatsApp size={16} />
-            </ScrollToSection>
+            </a>
           </div>
         </div>
       </div>
