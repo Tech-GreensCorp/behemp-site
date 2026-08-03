@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Epilogue, JetBrains_Mono } from 'next/font/google';
+import { Epilogue, JetBrains_Mono, Outfit } from 'next/font/google';
 import localFont from 'next/font/local';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ptBR } from '@clerk/localizations';
@@ -13,7 +13,15 @@ const epilogue = Epilogue({
   display: 'swap',
 });
 
-/* ── Fraunces — display/headings (serif old-style) ── */
+/* ── Outfit — display/headings (sans-serif rounded, novo layout) ── */
+const outfit = Outfit({
+  variable: '--font-outfit',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  display: 'swap',
+});
+
+/* ── Fraunces — display/headings legado (serif) ── */
 const fraunces = localFont({
   src: [
     {
@@ -84,7 +92,7 @@ export default function RootLayout({
       <html
         lang="pt-BR"
         suppressHydrationWarning
-        className={`${epilogue.variable} ${fraunces.variable} ${jetbrainsMono.variable} h-full`}
+        className={`${epilogue.variable} ${fraunces.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full`}
       >
         <body className="flex min-h-full flex-col bg-background font-sans text-foreground antialiased">
           <Providers>{children}</Providers>
