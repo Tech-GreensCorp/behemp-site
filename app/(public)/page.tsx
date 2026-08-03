@@ -49,9 +49,7 @@ export const metadata: Metadata = {
 
 /* ── Constantes ─────────────────────────────────── */
 
-const WHATSAPP_URL =
-  "https://wa.me/5511932047360?text=" +
-  encodeURIComponent("Olá! Vim pelo site da Be4Hope e gostaria de iniciar meu acolhimento.");
+const WHATSAPP_URL = 'https://wa.me/5511932047360';
 
 /* ── Dados estáticos ────────────────────────────── */
 
