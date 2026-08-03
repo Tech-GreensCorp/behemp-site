@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
+  Heart,
   HeartHandshake,
   Leaf,
   MapPin,
@@ -14,7 +15,6 @@ import {
   Monitor,
   Shield,
   ShieldCheck,
-  Star,
   Users,
 } from 'lucide-react';
 
@@ -159,14 +159,87 @@ export function PatologiasPicker() {
 
           {/* Coluna direita — imagem + stats flutuantes */}
           <div className="relative mx-auto w-full max-w-sm lg:max-w-md">
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl bg-primary-soft">
-              <Image
-                src="/images/home/hero-be-pessoa-2.jpg"
-                alt="Paciente sorrindo, apoiada pelo cuidado da Be4Hope"
-                fill
-                sizes="(max-width: 1024px) 90vw, 32vw"
-                className="object-cover object-center"
-                priority={false}
+            {/* Palco: pano decorativo + foto ─────────────────── */}
+            <div className="relative aspect-[3/4] w-full">
+              {/* Fundo "be." gigante */}
+              <span
+                aria-hidden="true"
+                className="font-display absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-[56%] select-none whitespace-nowrap text-[10rem] leading-[0.75] font-bold text-primary/95 sm:text-[14rem] lg:text-[30rem]"
+                style={{ letterSpacing: '-0.08em' }}
+              >
+                be.
+              </span>
+
+              {/* Círculos abstratos atrás */}
+              <div className="absolute right-4 top-20 z-[1] h-10 w-10 rounded-full bg-primary/20 sm:top-24 sm:h-14 sm:w-14" />
+              <div className="absolute bottom-16 left-4 z-[1] h-8 w-8 rounded-full bg-[#F59E0B]/30 sm:left-8 sm:h-12 sm:w-12" />
+
+              {/* Bonequinho amarelo */}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 64 64"
+                className="absolute right-0 top-[30%] z-[5] h-14 w-14 rotate-[-12deg] drop-shadow-lg sm:h-20 sm:w-20 lg:h-24 lg:w-24"
+              >
+                <circle cx="32" cy="32" r="30" fill="#F59E0B" />
+                <circle cx="24" cy="27" r="3" fill="#1A1612" />
+                <circle cx="40" cy="27" r="3" fill="#1A1612" />
+                <path
+                  d="M20 38 Q32 52 44 38"
+                  stroke="#1A1612"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+
+              {/* Bonequinho azul */}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 64 64"
+                className="absolute right-4 top-[55%] z-[5] h-12 w-12 rotate-[14deg] drop-shadow-lg sm:right-6 sm:h-16 sm:w-16 lg:right-4 lg:h-20 lg:w-20"
+              >
+                <circle cx="32" cy="32" r="30" fill="#2563EB" />
+                <circle cx="24" cy="27" r="3" fill="#F5F2ED" />
+                <circle cx="40" cy="27" r="3" fill="#F5F2ED" />
+                <path
+                  d="M20 38 Q32 52 44 38"
+                  stroke="#F5F2ED"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+
+              {/* Foto principal (transparente por cima do pano) */}
+              <div className="absolute inset-0 z-10">
+                <Image
+                  src="/images/home/hero-be-pessoa-2.png"
+                  alt="Paciente sorrindo, apoiada pelo cuidado da Be4Hope"
+                  fill
+                  sizes="(max-width: 1024px) 90vw, 32vw"
+                  className="object-contain object-bottom scale-110"
+                  priority={false}
+                />
+              </div>
+
+              {/* Corações espalhados */}
+              <Heart
+                aria-hidden="true"
+                size={32}
+                className="absolute left-2 top-4 z-20 -rotate-12 fill-primary text-primary drop-shadow-sm sm:h-10 sm:w-10"
+                strokeWidth={0}
+              />
+              <Heart
+                aria-hidden="true"
+                size={18}
+                className="absolute right-14 top-6 z-20 rotate-12 fill-primary text-primary sm:right-16 sm:h-6 sm:w-6"
+                strokeWidth={0}
+              />
+              <Heart
+                aria-hidden="true"
+                size={14}
+                className="absolute right-2 top-16 z-20 rotate-6 fill-[#F08A6E] text-[#F08A6E] sm:top-20 sm:h-5 sm:w-5"
+                strokeWidth={0}
               />
             </div>
 
@@ -182,7 +255,7 @@ export function PatologiasPicker() {
             </div>
 
             {/* Stats flutuantes à direita da imagem */}
-            <div className="mt-4 space-y-2 lg:absolute lg:-right-4 lg:top-3/4 lg:mt-0 lg:w-56 lg:-translate-y-1/2 lg:space-y-2">
+            <div className="mt-4 space-y-2 lg:absolute lg:-right-4 lg:top-3/4 lg:z-30 lg:mt-0 lg:w-56 lg:-translate-y-1/2 lg:space-y-2">
               {HERO_STATS.map((s) => {
                 const Icon = s.icon;
                 return (
