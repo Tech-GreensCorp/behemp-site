@@ -100,6 +100,18 @@ export function Footer() {
         </div>
       </div>
 
+      {/* Barra legal */}
+      <div className="border-t border-border/60">
+        <div className="mx-auto flex max-w-7xl flex-col items-start gap-2 px-4 py-5 text-[11px] leading-relaxed text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>
+            Associação Behemp de Desenvolvimento, Pesquisa e Fomento em Cannabis no Brasil
+            <span className="mx-1.5 text-muted-foreground/50">·</span>
+            CNPJ 07.578.940/0001-01
+          </p>
+          {/* <p className="text-muted-foreground/70">© {new Date().getFullYear()} Be4Hope</p> */}
+        </div>
+      </div>
+
       {/* Barra inferior verde */}
       <div className="bg-secondary text-secondary-foreground">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 text-xs sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">

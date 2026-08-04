@@ -332,7 +332,7 @@ export default async function HomePage() {
                 {/* Foto principal */}
                 <div className="absolute inset-0 z-10">
                   <Image
-                    src="/images/home/hero-be-pessoa.png"
+                    src="/images/home/hero-be-pessoa.webp"
                     alt="Mulher vestindo moletom Be4Hope — presença que acolhe"
                     fill
                     className="object-contain object-bottom"
@@ -378,8 +378,7 @@ export default async function HomePage() {
                 </h2>
 
                 <p className="mt-5 text-[15px] leading-7 text-muted-foreground">
-                  Apoio, acolhimento e acesso a tratamentos com Medicina Endocanabinóide para
-                  pacientes que necessitam de acompanhamento e suporte da Fundação.
+                  Transformamos esperança em acesso. A Fundação Be4Hope conecta pacientes elegíveis a programas que tornam a Medicina Endocanabinoide mais acessível e possível.
                 </p>
 
                 <div className="mt-6 h-px w-20 bg-primary/30" />
@@ -394,49 +393,14 @@ export default async function HomePage() {
           {/* ── Cards flutuantes — sobrepõem a base da pessoa ─────── */}
           <div className="animate-fade-up delay-300 relative z-30 mt-8 grid gap-4 sm:mt-10 sm:grid-cols-5 lg:-mt-24 lg:grid-cols-12 lg:gap-4">
             {/* Card 1 — descrição da Fundação */}
-            <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-3 lg:col-span-4 lg:col-start-6">
+            <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-3 lg:col-span-6 lg:col-start-5">
               <div className="flex items-start gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
                   <HandHeart size={22} strokeWidth={1.75} />
                 </div>
                 <p className="text-foreground text-sm leading-relaxed">
-                  A <strong className="font-semibold">Fundação Be4Hope</strong> dá acesso a produtos
-                  com Medicina Endocanabinóide para pacientes que precisam do tratamento e não têm
-                  condições de adquirir.
+                  A <strong className="font-semibold">Fundação Be4Hope</strong> acredita que nenhum paciente deve ficar sem tratamento por questões financeiras. Por isso, promove programas de acesso à Medicina Endocanabinoide para quem mais precisa.
                 </p>
-              </div>
-            </div>
-
-            {/* Card 2 — benefícios */}
-            <div className="rounded-2xl border border-border bg-white/95 p-5 shadow-lg backdrop-blur-sm sm:col-span-2 lg:col-span-3">
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
-                    <Tag size={18} strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-                      Produtos com até
-                    </p>
-                    <p className="text-foreground text-sm font-bold leading-tight tracking-tight uppercase">
-                      80% de desconto
-                    </p>
-                  </div>
-                </div>
-                <div className="border-t border-border/60" />
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FBEDE5] text-primary">
-                    <HandHeart size={18} strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.18em] uppercase">
-                      Por triagem até
-                    </p>
-                    <p className="text-foreground text-sm font-bold leading-tight tracking-tight uppercase">
-                      Disponíveis gratuitamente
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
