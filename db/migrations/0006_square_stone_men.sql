@@ -1,0 +1,1 @@
+ALTER TABLE "medicos" ADD COLUMN "valor_consulta" numeric(10, 2);

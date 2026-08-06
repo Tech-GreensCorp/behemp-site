@@ -1,0 +1,1 @@
+ALTER TABLE "medicos" ADD COLUMN "config_agenda" jsonb;

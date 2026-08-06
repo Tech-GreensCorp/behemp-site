@@ -1,0 +1,1 @@
+ALTER TABLE "autorizacoes_anvisa" ALTER COLUMN "medico_id" DROP NOT NULL;

@@ -1,0 +1,2 @@
+CREATE TYPE "public"."anvisa_modalidade" AS ENUM('guiada', 'representacao');--> statement-breakpoint
+ALTER TABLE "autorizacoes_anvisa" ADD COLUMN "modalidade" "anvisa_modalidade" DEFAULT 'guiada' NOT NULL;

@@ -1,0 +1,2 @@
+// Placeholder para migrations geradas pelo Drizzle
+// Será populado na Fase 2 com `pnpm db:generate`

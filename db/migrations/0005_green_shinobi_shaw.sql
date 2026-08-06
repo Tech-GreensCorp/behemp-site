@@ -1,0 +1,1 @@
+ALTER TABLE "triagens" ADD COLUMN "medico_clerk_id" text;

@@ -1,0 +1,58 @@
+export const ICONES_MEDICOS: Record<string, string> = {
+  cruz: `<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>`,
+  estetoscopio: `<path d="M4 3v6a5 5 0 0 0 10 0V3"/><path d="M9 14v2a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="11" r="2"/>`,
+  pilula: `<rect x="3" y="8" width="18" height="8" rx="4"/><path d="M12 8v8"/>`,
+  seringa: `<path d="M18 2l4 4"/><path d="M15 5l-11 11 3 3 11-11z"/><path d="M9 11l3 3"/><path d="M14 6l2 2"/>`,
+  termometro: `<path d="M12 3a2 2 0 0 1 2 2v9a4 4 0 1 1-4 0V5a2 2 0 0 1 2-2z"/>`,
+  coracao: `<path d="M12 21s-7-4.5-9-8a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c-2 3.5-7 8-7 8z"/>`,
+  batimento: `<path d="M2 12h5l2-6 4 12 2-6h7"/>`,
+  mascara: `<path d="M3 8s3-2 9-2 9 2 9 2v4a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z"/><path d="M3 11h18"/>`,
+  frasco: `<path d="M9 3h6"/><path d="M10 3v6l-4 8a3 3 0 0 0 3 4h6a3 3 0 0 0 3-4l-4-8V3"/><path d="M7 15h10"/>`,
+  tubo_ensaio: `<path d="M9 2v14a3 3 0 0 0 6 0V2"/><path d="M8 2h8"/><path d="M9 10h6"/>`,
+  microscopio: `<path d="M6 20h12"/><path d="M9 20l-2-4 5-3 2 4z"/><path d="M12 12l2-3"/><circle cx="15" cy="6" r="2"/><path d="M8 22h9"/>`,
+  curativo: `<rect x="2" y="8" width="20" height="8" rx="4" transform="rotate(-30 12 12)"/><circle cx="12" cy="12" r="1"/>`,
+  dente: `<path d="M12 3c-3 0-5 1-6 2-1.5 1.5-1 5 0 9 .6 2.5 1 5 2 5s1-3 2-3 1 3 2 3 1.4-2.5 2-5c1-4 1.5-7.5 0-9-1-1-3-2-6-2z"/>`,
+  pulmoes: `<path d="M12 3v9"/><path d="M12 8c0-2-2-3-3-2s-2 4-3 7 1 4 3 4 3-2 3-4"/><path d="M12 8c0-2 2-3 3-2s2 4 3 7-1 4-3 4-3-2-3-4"/>`,
+  cerebro: `<path d="M9 4a2.5 2.5 0 0 0-2.5 2.5A2.5 2.5 0 0 0 5 11a2.5 2.5 0 0 0 1.5 4.5A2.5 2.5 0 0 0 9 18a2.5 2.5 0 0 0 3 0 2.5 2.5 0 0 0 2.5.5A2.5 2.5 0 0 0 17.5 16 2.5 2.5 0 0 0 19 11a2.5 2.5 0 0 0-1.5-4.5A2.5 2.5 0 0 0 15 4a2.5 2.5 0 0 0-3 0 2.5 2.5 0 0 0-3 0z"/><path d="M12 5v13"/>`,
+  olho: `<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>`,
+  osso: `<path d="M17 3a2.5 2.5 0 0 1 2 4l-9 9a2.5 2.5 0 0 1-4 2 2.5 2.5 0 0 1-2-4l9-9a2.5 2.5 0 0 1 4-2z"/>`,
+  dna: `<path d="M4 3c0 5 16 6 16 9"/><path d="M20 3c0 5-16 6-16 9"/><path d="M20 21c0-5-16-6-16-9"/><path d="M6 6h12"/><path d="M6 18h12"/>`,
+  prancheta: `<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M12 11v6"/><path d="M9 14h6"/>`,
+  gota: `<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>`,
+  maleta: `<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M12 11v5"/><path d="M9.5 13.5h5"/>`,
+  ambulancia: `<path d="M3 8h11v9H3z"/><path d="M14 11h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/><path d="M8 11v3"/><path d="M6.5 12.5h3"/>`,
+  cadeira_rodas: `<circle cx="12" cy="18" r="4"/><path d="M8 6h2l1 6h6l-2 4"/><circle cx="9" cy="4" r="1.6"/>`,
+  capsula: `<rect x="4" y="4" width="16" height="9" rx="4.5" transform="rotate(45 12 12)"/><path d="M9 9l6 6"/>`,
+};
+
+export const LISTA_ICONES: Array<{ id: string; label: string }> = [
+  { id: 'cruz', label: 'Cruz' },
+  { id: 'estetoscopio', label: 'Estetoscópio' },
+  { id: 'pilula', label: 'Pílula' },
+  { id: 'capsula', label: 'Cápsula' },
+  { id: 'seringa', label: 'Seringa' },
+  { id: 'termometro', label: 'Termômetro' },
+  { id: 'coracao', label: 'Coração' },
+  { id: 'batimento', label: 'Batimento' },
+  { id: 'mascara', label: 'Máscara' },
+  { id: 'frasco', label: 'Frasco' },
+  { id: 'tubo_ensaio', label: 'Tubo de ensaio' },
+  { id: 'microscopio', label: 'Microscópio' },
+  { id: 'curativo', label: 'Curativo' },
+  { id: 'dente', label: 'Dente' },
+  { id: 'pulmoes', label: 'Pulmões' },
+  { id: 'cerebro', label: 'Cérebro' },
+  { id: 'olho', label: 'Olho' },
+  { id: 'osso', label: 'Osso' },
+  { id: 'dna', label: 'DNA' },
+  { id: 'prancheta', label: 'Prancheta' },
+  { id: 'gota', label: 'Gota' },
+  { id: 'maleta', label: 'Maleta' },
+  { id: 'ambulancia', label: 'Ambulância' },
+  { id: 'cadeira_rodas', label: 'Cadeira de rodas' },
+];
+
+export function svgIcone(id: string, cor: string, largura: number): string {
+  const inner = ICONES_MEDICOS[id] ?? ICONES_MEDICOS.cruz;
+  return `<svg viewBox="0 0 24 24" width="${largura}" height="${largura}" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+}
