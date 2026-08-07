@@ -27,7 +27,7 @@ async function getBrowser(): Promise<Browser> {
   return puppeteer.default.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  }) as unknown as Browser;
 }
 
 export async function htmlParaPdf(html: string): Promise<Buffer> {
