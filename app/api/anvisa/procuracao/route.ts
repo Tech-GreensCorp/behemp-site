@@ -258,6 +258,12 @@ export async function POST(request: NextRequest) {
     .limit(1);
   if (!paciente) return NextResponse.json({ erro: 'Não autorizado' }, { status: 403 });
 
+  console.log('[PROCURACAO DEBUG] Iniciando geração de procuração');
+  console.log('[PROCURACAO DEBUG] autorizacaoId:', autorizacaoId);
+  console.log('[PROCURACAO DEBUG] user encontrado:', !!user);
+  console.log('[PROCURACAO DEBUG] paciente encontrado:', !!paciente);
+
+
   // Verificar acesso à autorização
   const [autorizacao] = await db
     .select({ id: autorizacoesAnvisa.id, pacienteId: autorizacoesAnvisa.pacienteId })
@@ -302,6 +308,12 @@ export async function POST(request: NextRequest) {
   };
 
   // Gerar PDF
+  console.log('[PROCURACAO DEBUG] Gerando HTML...');
+  console.log('[PROCURACAO DEBUG] Dados:', JSON.stringify({
+    nomeCompleto: dados.nomeCompleto,
+    cidade: dados.cidade,
+    uf: dados.uf,
+  }));
   const html = gerarHtmlProcuracao(dados);
   const { htmlParaPdf } = await import('@/lib/receituario/html-para-pdf');
   
@@ -329,6 +341,9 @@ export async function POST(request: NextRequest) {
   const blob = await put(nomeArquivo, pdfBuffer, { access: 'public' });
 
   // Criar registro da Procuração Específica
+  console.log('[PROCURACAO DEBUG] DocuSign configurado:', docusignConfigurado());
+  console.log('[PROCURACAO DEBUG] DOCUSIGN_INTEGRATION_KEY existe:', !!process.env.DOCUSIGN_INTEGRATION_KEY);
+  console.log('[PROCURACAO DEBUG] DOCUSIGN_PRIVATE_KEY existe:', !!process.env.DOCUSIGN_PRIVATE_KEY);
   const [procuracao] = await db.insert(procuracoesEspecificas).values({
     pacienteId: paciente.id,
     autorizacaoId,
