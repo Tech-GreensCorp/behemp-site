@@ -317,24 +317,7 @@ export async function POST(request: NextRequest) {
   const html = gerarHtmlProcuracao(dados);
   const { htmlParaPdf } = await import('@/lib/receituario/html-para-pdf');
   
-  const footerTemplate = `
-    <div style="width: 100%; font-size: 9px; font-family: 'Times New Roman', Times, serif; text-align: center; padding: 0 3cm 0.5cm 3cm; position: relative;">
-      <div style="font-weight: bold; color: black;">Associação Behemp de Desenvolvimento Pesquisa e Fomento em Cannabis no Brasil</div>
-      <div style="color: black;">R. Gomes de Carvalho, 1629, Vila Olímpia - São Paulo</div>
-      <div style="color: black;">www.be4hope.org &nbsp;-&nbsp; contato@be4hope.org</div>
-      <div style="color: #EA5429; font-weight: bold;">be.4hope</div>
-      <div style="position: absolute; right: 3cm; bottom: 0.5cm; font-weight: bold; color: black; font-size: 8px;">
-        Página <span class="pageNumber"></span> de <span class="totalPages"></span>
-      </div>
-    </div>
-  `;
-
-  const pdfBuffer = await htmlParaPdf(html, {
-    displayHeaderFooter: true,
-    headerTemplate: '<div></div>',
-    footerTemplate: footerTemplate,
-    margin: { top: '2.5cm', bottom: '2.5cm', left: '3cm', right: '3cm' },
-  });
+  const pdfBuffer = await htmlParaPdf(html);
 
   // Salvar PDF no Vercel Blob
   const nomeArquivo = `procuracoes/${paciente.id}/${autorizacaoId}-${Date.now()}.pdf`;
