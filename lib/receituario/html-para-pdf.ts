@@ -9,16 +9,17 @@ import type { Browser } from 'puppeteer-core';
 let browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
-  // Produção — Vercel serverless
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-    const chromium = await import('@sparticuz/chromium');
+    const chromium = await import('@sparticuz/chromium-min');
     const puppeteer = await import('puppeteer-core');
+
+    const packUrl = 'https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar';
 
     return puppeteer.default.launch({
       args: chromium.default.args,
       defaultViewport: chromium.default.defaultViewport,
-      executablePath: await chromium.default.executablePath(),
-      headless: true,
+      executablePath: await chromium.default.executablePath(packUrl),
+      headless: chromium.default.headless,
     });
   }
 

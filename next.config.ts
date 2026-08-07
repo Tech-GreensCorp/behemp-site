@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
 
-  serverExternalPackages: ['docusign-esign', '@sparticuz/chromium', 'puppeteer-core'],
+  serverExternalPackages: ['docusign-esign', '@sparticuz/chromium-min', 'puppeteer-core'],
 
   experimental: {
     serverActions: {
