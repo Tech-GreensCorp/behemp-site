@@ -1,176 +1,320 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, use } from "react";
-import { useRouter } from "next/navigation";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, UserRound } from "lucide-react";
-import { toast } from "sonner";
-import { getPusherClient } from "@/lib/integrations/pusher/client";
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import { getPusherClient } from '@/lib/integrations/pusher/client';
+import { buscarSalaPorRoomId, pacienteEntrarSala } from '../../../_actions/teleconsulta';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
-export default function TeleconsultaPaciente({ params }: { params: Promise<{ roomId: string }> }) {
-    const { roomId } = use(params);
-    const router = useRouter();
+function TeleconsultaPacienteContent() {
+  const params = useParams();
+  const router = useRouter();
+  const roomId = params.roomId as string;
 
-    const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
-    const streamRef = useRef<MediaStream | null>(null);
-    const pcRef = useRef<RTCPeerConnection | null>(null);
+  const [sala, setSala] = useState<{ salaId: string; medicoNome: string; medicoEspecialidade: string } | null>(null);
+  const [erroAcesso, setErroAcesso] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(true);
 
-    const [micOn, setMicOn] = useState(true);
-    const [camOn, setCamOn] = useState(true);
-    const [connected, setConnected] = useState(false);
-    const [phase, setPhase] = useState<"lobby" | "connecting" | "room">("lobby");
-    const [cameraOk, setCameraOk] = useState(false);
+  const [phase, setPhase] = useState<'lobby' | 'connecting' | 'room'>('lobby');
 
-    useEffect(() => {
-        (async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                streamRef.current = stream;
-                if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-                setCameraOk(true);
-            } catch {
-                toast.error("Câmera/microfone indisponível.");
-            }
-        })();
-        return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
-    }, []);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [cameraOk, setCameraOk] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
-    const toggleMic = useCallback(() => {
-        const audio = streamRef.current?.getAudioTracks()[0];
-        if (audio) { audio.enabled = !audio.enabled; setMicOn(audio.enabled); }
-    }, []);
+  const [remoteConnected, setRemoteConnected] = useState(false);
+  const [duration, setDuration] = useState(0);
 
-    const toggleCam = useCallback(() => {
-        const video = streamRef.current?.getVideoTracks()[0];
-        if (video) { video.enabled = !video.enabled; setCamOn(video.enabled); }
-    }, []);
+  useEffect(() => {
+    const verificar = async () => {
+      if (!roomId) return;
+      const res = await buscarSalaPorRoomId(roomId);
+      if (!res.sucesso || !res.dados) {
+        setErroAcesso(res.erro ?? 'Sala não encontrada');
+      } else {
+        setSala(res.dados);
+      }
+      setCarregando(false);
+    };
+    verificar();
+  }, [roomId]);
 
-    const sinalizarWebRTC = async (tipo: string, payload: unknown) => {
-        await fetch('/api/teleconsulta/sinalizar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId, tipo, payload }),
-        });
+  const iniciarMidia = useCallback(async () => {
+    setMediaError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
+      });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      setCameraOk(true);
+    } catch {
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+        localStreamRef.current = audioStream;
+        setCameraOk(true);
+      } catch {
+        setMediaError('Câmera/microfone indisponível. Verifique as permissões.');
+        setCameraOk(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sala) return;
+    iniciarMidia();
+    return () => { localStreamRef.current?.getTracks().forEach(t => t.stop()); };
+  }, [sala, iniciarMidia]);
+
+  const toggleMic = () => {
+    const track = localStreamRef.current?.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setMicOn(track.enabled);
+  };
+
+  const toggleCam = () => {
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setCamOn(track.enabled);
+  };
+
+  const sinalizarWebRTC = async (tipo: string, payload: unknown) => {
+    await fetch('/api/teleconsulta/sinalizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId, tipo, payload }),
+    });
+  };
+
+  const entrarNaSala = useCallback(async () => {
+    if (!localStreamRef.current || !sala) return;
+    setPhase('connecting');
+
+    await pacienteEntrarSala(sala.salaId);
+
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe(`presence-sala-${roomId}`);
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    });
+    pcRef.current = pc;
+
+    localStreamRef.current.getTracks().forEach(track => {
+      pc.addTrack(track, localStreamRef.current!);
+    });
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+        setRemoteConnected(true);
+        toast.success(`${sala.medicoNome} conectado!`);
+      }
     };
 
-    const entrarNaSala = useCallback(async () => {
-        if (!streamRef.current || !cameraOk) return;
-        setPhase("connecting");
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sinalizarWebRTC('ice-candidate', { candidate: event.candidate });
+      }
+    };
 
-        try {
-            const pusher = getPusherClient();
-            const channel = pusher.subscribe(`presence-sala-${roomId}`);
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      if (s === 'disconnected' || s === 'failed') {
+        setRemoteConnected(false);
+      }
+    };
 
-            const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-            pcRef.current = pc;
+    channel.bind('pusher:subscription_succeeded', () => {
+      setPhase('room');
+      sinalizarWebRTC('peer-joined', { role: 'paciente' });
+    });
 
-            streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current!));
+    channel.bind('webrtc:offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sinalizarWebRTC('answer', { answer });
+      } catch (err) {
+        console.error('[WebRTC] Erro ao processar offer:', err);
+      }
+    });
 
-            pc.ontrack = (event) => {
-                if (remoteVideoRef.current && event.streams[0]) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
-                    setConnected(true);
-                }
-            };
+    channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn('[WebRTC] ICE candidate ignorado:', err);
+      }
+    });
+  }, [sala, roomId]);
 
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    sinalizarWebRTC("ice-candidate", { candidate: event.candidate });
-                }
-            };
+  useEffect(() => {
+    if (phase !== 'room') return;
+    const t = setInterval(() => setDuration(d => d + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
 
-            channel.bind('pusher:subscription_succeeded', () => {
-                setPhase("room");
-                sinalizarWebRTC("peer-joined", { role: "paciente" });
-            });
+  const encerrar = useCallback(async () => {
+    pcRef.current?.close();
+    pcRef.current = null;
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    toast.info('Consulta encerrada.');
+    router.push('/paciente');
+  }, [router]);
 
-            channel.bind('webrtc:offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
-                try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    sinalizarWebRTC("answer", { answer });
-                } catch (err) {}
-            });
+  if (carregando) {
+    return <div className="h-screen flex items-center justify-center bg-[#1A1A1A] text-white">Carregando sala...</div>;
+  }
 
-            channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {}
-            });
-
-        } catch (err) {
-            toast.error("Erro ao conectar.");
-            setPhase("lobby");
-        }
-    }, [roomId, cameraOk]);
-
-    const encerrar = useCallback(() => {
-        pcRef.current?.close();
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        router.push("/");
-    }, [router]);
-
-    if (phase === "lobby" || phase === "connecting") {
-        return (
-            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6">
-                <div className="max-w-2xl w-full text-center">
-                    <h1 className="text-3xl font-bold text-white mb-2">Teleconsulta</h1>
-                    <p className="text-slate-400 mb-8">Verifique seus dispositivos antes de entrar.</p>
-
-                    <div className="relative aspect-video bg-slate-900 rounded-xl overflow-hidden mb-6 border border-slate-800">
-                        <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-                        {!camOn && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                                <VideoOff className="w-12 h-12 text-slate-500" />
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex justify-center gap-4">
-                        <button onClick={toggleMic} className={`w-14 h-14 rounded-full flex items-center justify-center ${micOn ? 'bg-slate-800' : 'bg-red-500'}`}>
-                            {micOn ? <Mic className="text-white" /> : <MicOff className="text-white" />}
-                        </button>
-                        <button onClick={toggleCam} className={`w-14 h-14 rounded-full flex items-center justify-center ${camOn ? 'bg-slate-800' : 'bg-red-500'}`}>
-                            {camOn ? <Video className="text-white" /> : <VideoOff className="text-white" />}
-                        </button>
-                        <button onClick={entrarNaSala} disabled={!cameraOk || phase === "connecting"} className="flex-1 max-w-[200px] rounded-full bg-[var(--primary)] text-white font-semibold">
-                            {phase === "connecting" ? "Conectando..." : "Entrar na Sala"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
+  if (erroAcesso) {
     return (
-        <div className="h-screen bg-slate-950 flex flex-col">
-            <div className="flex-1 relative bg-slate-900">
-                <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
-                
-                {!connected && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <UserRound className="w-16 h-16 text-slate-600 mb-4" />
-                        <p className="text-slate-400">Aguardando médico...</p>
-                    </div>
-                )}
-
-                <div className="absolute bottom-6 right-6 w-32 md:w-48 aspect-video bg-black rounded-lg overflow-hidden border-2 border-slate-700">
-                    <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && "opacity-0"}`} />
-                </div>
-            </div>
-
-            <div className="h-24 bg-slate-950 border-t border-slate-800 flex items-center justify-center gap-6">
-                <button onClick={toggleMic} className={`w-14 h-14 rounded-full flex items-center justify-center ${micOn ? 'bg-slate-800 hover:bg-slate-700' : 'bg-red-500'}`}>
-                    {micOn ? <Mic className="text-white" /> : <MicOff className="text-white" />}
-                </button>
-                <button onClick={toggleCam} className={`w-14 h-14 rounded-full flex items-center justify-center ${camOn ? 'bg-slate-800 hover:bg-slate-700' : 'bg-red-500'}`}>
-                    {camOn ? <Video className="text-white" /> : <VideoOff className="text-white" />}
-                </button>
-                <button onClick={encerrar} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
-                    <PhoneOff className="text-white w-6 h-6" />
-                </button>
-            </div>
-        </div>
+      <div className="h-screen flex flex-col items-center justify-center bg-[#1A1A1A] text-white p-6 space-y-4">
+        <AlertCircle className="h-16 w-16 text-red-500" />
+        <h1 className="text-2xl font-bold">Acesso Negado</h1>
+        <p className="text-muted-foreground">{erroAcesso}</p>
+        <Button variant="default" onClick={() => router.push('/paciente')} className="mt-4 bg-[#EA5429] hover:bg-[#D4471E]">
+          Voltar ao Dashboard
+        </Button>
+      </div>
     );
+  }
+
+  if (phase === 'lobby' || phase === 'connecting') {
+    return (
+      <div className="min-h-screen bg-[#1A1A1A] text-white p-6 flex flex-col items-center justify-center">
+        <div className="max-w-2xl w-full space-y-6">
+          <Button variant="ghost" onClick={() => router.push('/paciente')} className="text-slate-300 hover:text-white">
+            <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+          </Button>
+
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-display font-bold text-[#EA5429]">Sala de Espera</h1>
+            <p className="text-slate-400">
+              Consulta com {sala?.medicoNome} {sala?.medicoEspecialidade ? `(${sala.medicoEspecialidade})` : ''}
+            </p>
+          </div>
+
+          <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
+            <video ref={localVideoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
+            {!camOn && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                <VideoOff className="h-12 w-12 text-slate-600" />
+                <span className="text-sm text-slate-500">Câmera desativada</span>
+              </div>
+            )}
+            <div className="absolute top-4 left-4">
+              {cameraOk ? (
+                <Badge className="bg-green-500/20 text-green-400 hover:bg-green-500/20 border-green-500/30">● Câmera OK</Badge>
+              ) : (
+                <Badge className="bg-red-500/20 text-red-400 hover:bg-red-500/20 border-red-500/30">● Câmera indisponível</Badge>
+              )}
+            </div>
+            {mediaError && (
+              <div className="absolute bottom-4 left-4 right-4 bg-red-500/90 text-white text-sm p-3 rounded-lg">
+                {mediaError}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-4 justify-center">
+            <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="lg" className="rounded-full h-14 w-14 p-0">
+              {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+            </Button>
+            <Button onClick={toggleCam} variant={camOn ? 'secondary' : 'destructive'} size="lg" className="rounded-full h-14 w-14 p-0">
+              {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+            </Button>
+          </div>
+
+          <div className="bg-[#2D4F3C]/20 border border-[#2D4F3C]/30 p-4 rounded-xl text-center">
+            <p className="text-sm text-[#2D4F3C] font-medium text-green-300/80">
+              Esta consulta pode ser gravada e transcrita com fins clínicos.
+            </p>
+          </div>
+
+          <Button 
+            className="w-full h-14 text-lg font-bold bg-[#EA5429] hover:bg-[#D4471E]" 
+            onClick={entrarNaSala} 
+            disabled={!cameraOk || phase === 'connecting'}
+          >
+            {phase === 'connecting' ? 'Conectando...' : 'Entrar na Consulta'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-slate-950">
+      <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-white text-sm font-medium font-mono">
+            AO VIVO {String(Math.floor(duration / 60)).padStart(2, '0')}:{String(duration % 60).padStart(2, '0')}
+          </span>
+        </div>
+        <div className="text-sm font-medium text-slate-300">
+          Dr(a). {sala?.medicoNome}
+        </div>
+      </div>
+      
+      <div className="flex-1 relative bg-black overflow-hidden">
+        <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+        {!remoteConnected && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4">
+            <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
+            <p className="text-slate-400 font-medium">Aguardando médico...</p>
+          </div>
+        )}
+        
+        <div className="absolute bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
+          <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
+          {!camOn && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+              <VideoOff className="h-6 w-6 text-slate-500" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="h-24 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-6 px-6 pb-2">
+        <Button onClick={toggleMic} variant={micOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-14 w-14 hover:scale-105 transition-transform">
+          {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+        </Button>
+        <Button onClick={toggleCam} variant={camOn ? 'secondary' : 'destructive'} size="icon" className="rounded-full h-14 w-14 hover:scale-105 transition-transform">
+          {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+        </Button>
+        <Button onClick={() => {
+          if (confirm('Tem certeza que deseja encerrar a consulta?')) {
+            encerrar();
+          }
+        }} variant="destructive" size="icon" className="rounded-full h-14 w-14 hover:scale-105 transition-transform hover:bg-red-600">
+          <PhoneOff className="h-6 w-6" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function TeleconsultaPacientePage() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-[#1A1A1A] text-white">Carregando sala...</div>}>
+      <TeleconsultaPacienteContent />
+    </Suspense>
+  );
 }
