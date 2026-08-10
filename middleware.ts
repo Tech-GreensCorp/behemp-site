@@ -37,6 +37,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/cron(.*)',
   '/api/inngest(.*)',
   '/api/auth/callback',
+  '/api/anvisa/signing-complete',
 ]);
 
 export default clerkMiddleware(
