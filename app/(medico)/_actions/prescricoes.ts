@@ -73,6 +73,56 @@ export async function criarPrescricao(input: unknown) {
     validade,
   }).returning();
 
+  // Desbloqueio ANVISA após prescrição emitida
+  try {
+    const { autorizacoesAnvisa, notificacoes } = await import('@/db/schema');
+    const [autorizacao] = await db
+      .select({ id: autorizacoesAnvisa.id, documentos: autorizacoesAnvisa.documentos })
+      .from(autorizacoesAnvisa)
+      .where(
+        and(
+          eq(autorizacoesAnvisa.pacienteId, prescricao.pacienteId),
+          eq(autorizacoesAnvisa.status, 'pendente'),
+          isNull(autorizacoesAnvisa.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (autorizacao) {
+      // Atualizar item receita_medica no checklist
+      const docs = (autorizacao.documentos as { tipo: string; enviado: boolean; validado?: boolean }[]) ?? [];
+      const docsAtualizados = docs.map((d) =>
+        d.tipo === 'receita_medica'
+          ? { ...d, enviado: true, validado: true }
+          : d
+      );
+
+      await db.update(autorizacoesAnvisa)
+        .set({ documentos: docsAtualizados })
+        .where(eq(autorizacoesAnvisa.id, autorizacao.id));
+
+      // Notificar paciente que ANVISA foi desbloqueada
+      const [pacienteUser] = await db
+        .select({ userId: pacientes.userId })
+        .from(pacientes)
+        .where(eq(pacientes.id, prescricao.pacienteId))
+        .limit(1);
+
+      if (pacienteUser) {
+        await db.insert(notificacoes).values({
+          userId: pacienteUser.userId,
+          tipo: 'geral',
+          titulo: '📋 Prescrição disponível',
+          mensagem: 'Sua prescrição médica foi emitida. Acesse o portal para dar início à autorização ANVISA.',
+          lida: false,
+          linkAcao: '/paciente/anvisa',
+        }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('[Prescrição] Erro ao atualizar ANVISA:', err);
+  }
+
   // 6. Auditoria
   await db.insert(logsAuditoria).values({
     userId: medico.userId,

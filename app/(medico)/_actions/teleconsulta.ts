@@ -77,6 +77,7 @@ export async function encerrarTeleconsulta(salaId: string, duracaoSegundos: numb
   const perm = await verificarMedico();
   if (!perm.autorizado) redirect('/entrar');
 
+  // 1. Atualizar teleconsulta → encerrada
   await db.update(teleconsultas)
     .set({
       status: 'encerrada',
@@ -85,6 +86,56 @@ export async function encerrarTeleconsulta(salaId: string, duracaoSegundos: numb
     })
     .where(eq(teleconsultas.id, salaId));
 
+  // 2. CORREÇÃO SPRINT 4: atualizar consulta vinculada → realizada
+  // Buscar consultaId da teleconsulta
+  const [sala] = await db
+    .select({ consultaId: teleconsultas.consultaId, pacienteId: teleconsultas.pacienteId })
+    .from(teleconsultas)
+    .where(eq(teleconsultas.id, salaId))
+    .limit(1);
+
+  if (sala?.consultaId) {
+    const { consultas } = await import('@/db/schema');
+    await db.update(consultas)
+      .set({ status: 'realizada' })
+      .where(eq(consultas.id, sala.consultaId));
+  }
+
+  // 3. Notificar paciente que a consulta foi encerrada
+  if (sala?.pacienteId) {
+    try {
+      const { users, pacientes } = await import('@/db/schema');
+      const [paciente] = await db
+        .select({ userId: pacientes.userId })
+        .from(pacientes)
+        .where(eq(pacientes.id, sala.pacienteId))
+        .limit(1);
+
+      if (paciente) {
+        const { notificacoes } = await import('@/db/schema');
+        await db.insert(notificacoes).values({
+          userId: paciente.userId,
+          tipo: 'geral',
+          titulo: '✅ Consulta realizada',
+          mensagem: 'Sua teleconsulta foi concluída. Acesse o portal para ver sua prescrição em breve.',
+          lida: false,
+          linkAcao: '/paciente',
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error('[Teleconsulta] Erro ao notificar paciente pós-consulta:', err);
+    }
+  }
+
+  // 4. Log de auditoria
+  await db.insert(logsAuditoria).values({
+    acao: 'ENCERRAR',
+    entidade: 'teleconsultas',
+    entidadeId: salaId,
+  }).catch(() => {});
+
+  revalidatePath('/medico/agenda');
   revalidatePath('/medico/consultas');
   return { sucesso: true };
 }
+

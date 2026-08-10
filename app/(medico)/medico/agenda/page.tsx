@@ -30,6 +30,7 @@ import {
   User,
   Video,
   X,
+  FileText,
 } from 'lucide-react';
 
 interface Consulta {
@@ -473,6 +474,19 @@ export default function AgendaPage() {
                     </p>
                   </div>
                   <Badge className={cfg.cor}>{cfg.label}</Badge>
+
+                  {/* Botão Emitir Prescrição — só para consultas realizadas */}
+                  {c.status === 'realizada' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                      onClick={() => router.push(`/medico/pacientes/${c.pacienteId}?tab=prescricao`)}
+                    >
+                      <FileText size={14} />
+                      Emitir Prescrição
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

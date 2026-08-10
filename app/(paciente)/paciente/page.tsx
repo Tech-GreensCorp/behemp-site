@@ -238,6 +238,39 @@ export default function PacienteDashboardPage() {
             </div>
           )}
 
+          {/* ── Card PÓS-CONSULTA (Recém-realizada) ───────────── */}
+          {dados?.consultaRecenteRealizada && !dados.teleconsultaAtiva && (
+            <div className="animate-fade-up">
+              <Card className="border-2 border-green-500/40 bg-green-50/50 rounded-2xl">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-green-800">✅ Consulta realizada!</p>
+                      <p className="text-sm text-green-700">
+                        com Dr(a). {dados.consultaRecenteRealizada.medicoNome}
+                      </p>
+                    </div>
+                  </div>
+                  {dados.consultaRecenteRealizada.temPrescricao ? (
+                    <Link href="/paciente/anvisa">
+                      <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2 rounded-xl">
+                        <ShieldCheck className="h-4 w-4" />
+                        Iniciar Autorização ANVISA
+                      </Button>
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-green-700 text-center">
+                      Aguardando emissão da prescrição pelo médico...
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* ── KPIs principais ── */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-up delay-75">
             {[

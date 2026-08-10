@@ -43,6 +43,11 @@ export interface DadosDashboard {
     medicoNome: string;
     iniciadaEm: string;
   } | null;
+  consultaRecenteRealizada: {
+    dataHora: string;
+    medicoNome: string;
+    temPrescricao: boolean;
+  } | null;
   userId: string | null;
 }
 
@@ -58,7 +63,7 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, userIdRes] = await Promise.all([
+    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, consultaRecenteRes, userIdRes] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -157,7 +162,32 @@ export async function obterDadosDashboard(): Promise<{
         LIMIT 1
       `),
 
-      // 8. User ID do Banco
+      // 8. Consulta recente
+      db.execute(sql`
+        SELECT
+          c.data_hora AS "dataHora",
+          um.nome     AS "medicoNome",
+          EXISTS(
+            SELECT 1 FROM prescricoes pr
+            WHERE pr.paciente_id = p.id
+              AND pr.status = 'emitida'
+              AND pr.deleted_at IS NULL
+              AND pr.created_at > NOW() - INTERVAL '48 hours'
+          ) AS "temPrescricao"
+        FROM consultas c
+        INNER JOIN pacientes p ON p.id = c.paciente_id
+        INNER JOIN users u     ON u.id = p.user_id
+        INNER JOIN medicos m   ON m.id = c.medico_id
+        INNER JOIN users um    ON um.id = m.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND c.deleted_at IS NULL
+          AND c.status = 'realizada'
+          AND c.data_hora > NOW() - INTERVAL '48 hours'
+        ORDER BY c.data_hora DESC
+        LIMIT 1
+      `),
+
+      // 9. User ID do Banco
       db.execute(sql`
         SELECT u.id AS "userId"
         FROM users u
@@ -219,6 +249,13 @@ export async function obterDadosDashboard(): Promise<{
       iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
     } : null;
 
+    const consultaRecenteRow = consultaRecenteRes.rows[0] as any;
+    const consultaRecenteRealizada = consultaRecenteRow ? {
+      dataHora: consultaRecenteRow.dataHora instanceof Date ? consultaRecenteRow.dataHora.toISOString() : String(consultaRecenteRow.dataHora),
+      medicoNome: String(consultaRecenteRow.medicoNome),
+      temPrescricao: Boolean(consultaRecenteRow.temPrescricao),
+    } : null;
+
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
 
     return {
@@ -231,6 +268,7 @@ export async function obterDadosDashboard(): Promise<{
         totalDocumentos,
         mensagensNaoLidas,
         teleconsultaAtiva,
+        consultaRecenteRealizada,
         userId,
       },
     };
