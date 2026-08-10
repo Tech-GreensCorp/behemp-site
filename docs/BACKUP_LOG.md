@@ -90,3 +90,18 @@ Em vez de @sparticuz/chromium, instalar Chrome nativo no servidor:
 apt-get install -y chromium-browser
 # E usar puppeteer com executablePath apontando para o Chrome instalado
 ```
+
+---
+
+## Nota: NEXT_PUBLIC_APP_URL por Ambiente
+
+| Ambiente | Valor correto |
+|----------|--------------|
+| Produção AWS (be4hope.org) | `https://be4hope.org` |
+| Vercel (behemp-site.vercel.app) | `https://behemp-site.vercel.app` |
+| Desenvolvimento local | `http://localhost:3000` |
+| ngrok | `https://frenzied-humped-kiln.ngrok-free.dev` |
+
+⚠️ A variável na Vercel (Environment Variables) deve ser
+`https://behemp-site.vercel.app` para os previews funcionarem.
+No servidor AWS, deve ser `https://be4hope.org`.

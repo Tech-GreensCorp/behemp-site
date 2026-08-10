@@ -84,3 +84,98 @@ AWS EC2/Docker precisam de configuração manual.
 - ✅ Vercel: automático
 - ✅ Localhost: sem impacto (pnpm ignora .nvmrc)
 - ⚠️ AWS EC2/Docker: garantir Node 18+ no servidor
+
+---
+
+## DT-006: Infraestrutura de Produção AWS EC2
+**Data:** 10/08/2026
+**Status:** ✅ Em produção
+
+### Configuração do Servidor
+
+| Item | Valor |
+|------|-------|
+| Provedor | AWS EC2 |
+| Instância | t2.small (1 vCPU, 2GB RAM) |
+| Sistema Operacional | Ubuntu 26.04 LTS |
+| Gerenciador de Processos | PM2 |
+| Gerenciador de Pacotes | pnpm |
+| Domínio | be4hope.org |
+
+### ⚠️ Limitação Crítica: Memória RAM (OOM Killed)
+
+O build do Next.js exige picos de 4.5–5GB de RAM.
+A instância t2.small tem apenas 2GB → causa OOM Killed (código 137).
+
+**Solução aplicada:** Swap de 8GB no volume EBS (`/swapfile`).
+
+⚠️ **ATENÇÃO:** O Swap NÃO está persistido no `/etc/fstab`.
+Se a instância for reiniciada, o swap é perdido e o build falha.
+Sempre reativar manualmente antes de buildar.
+
+**Ação recomendada:** Persistir swap no `/etc/fstab`:
+```bash
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### ⚠️ IP Dinâmico — Risco de Downtime
+
+A instância usa IP público dinâmico da AWS.
+Um Stop/Start altera o IP → DNS desatualizado → site fora do ar.
+
+**Ação recomendada (urgente):** Alocar Elastic IP na AWS e associar
+à instância para garantir IP fixo permanente.
+
+### Variáveis de Ambiente Críticas para Produção
+
+NEXT_PUBLIC_APP_URL=https://be4hope.org
+
+⚠️ Este valor afeta diretamente callbacks do DocuSign e Auth.
+Nunca usar ngrok ou localhost nesta variável em produção.
+
+### DocuSign em Produção
+
+O `X-Frame-Options` no `next.config.ts` deve ser `SAMEORIGIN`
+(não `DENY`) para o Embedded Signing funcionar no iframe.
+
+Redirect URIs registradas no DocuSign:
+- `https://be4hope.org/api/anvisa/signing-complete`
+- `https://behemp-site.vercel.app` (preview/testes)
+- `http://localhost:3000` (desenvolvimento)
+- `https://frenzied-humped-kiln.ngrok-free.dev` (ngrok dev)
+
+### Playbook Oficial de Deploy em Produção
+
+**Sempre seguir esta ordem no servidor via SSH:**
+
+```bash
+# Passo 1 — CRÍTICO: Reativar Swap antes de qualquer coisa
+sudo swapon /swapfile
+export NODE_OPTIONS="--max-old-space-size=8192"
+
+# Passo 2 — Atualizar código
+cd ~/behemp-site
+git pull origin main
+pnpm install
+
+# Passo 3 — Build (~20 minutos na t2.small)
+pnpm build
+
+# Passo 4 — Reiniciar PM2
+pm2 delete all
+pm2 start pnpm --name "behemp-site" -- run start
+pm2 save
+```
+
+⚠️ **Sem o Passo 1, o build será morto pelo Kernel (OOM Killed).**
+
+### Melhorias Pendentes para Produção
+
+- [ ] Persistir swap no `/etc/fstab` (evitar perda após restart)
+- [ ] Alocar Elastic IP (evitar mudança de IP após restart)
+- [ ] Upgrade para t2.medium ou t3.small (mais RAM, build mais rápido)
+- [ ] Configurar PM2 para iniciar automaticamente após restart do servidor:
+```bash
+  pm2 startup
+  pm2 save
+```
