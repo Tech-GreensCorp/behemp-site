@@ -60,10 +60,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: 'Procuração não encontrada' }, { status: 404 });
   }
 
-  // Usar URL base do request atual — evita redirect loop entre
-  // behemp-site.vercel.app e URLs de preview da Vercel
-  const requestUrl = new URL(request.url);
-  const appUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+  // Usar URL oficial do ambiente em vez de request.url, pois o Nginx/Proxy
+  // pode não estar repassando o Host correto (causando retorno para localhost:3000)
+  const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://be4hope.org';
   const returnUrl = `${appUrl}/api/anvisa/signing-complete?procuracaoId=${procuracaoId}&event=signing_complete`;
 
   // Baixar PDF do Vercel Blob para reenviar ao DocuSign
