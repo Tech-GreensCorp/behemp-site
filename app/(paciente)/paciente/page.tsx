@@ -4,6 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { getPusherClient } from '@/lib/integrations/pusher/client';
 import {
   Pill,
   FileText,
@@ -89,9 +93,14 @@ function formatarTipoCanabinoide(tipo: string): string {
 export default function PacienteDashboardPage() {
   const { user } = useUser();
   const primeiroNome = user?.firstName ?? user?.username ?? 'Paciente';
+  const router = useRouter();
 
   const [dados, setDados] = useState<DadosDashboard | null>(null);
   const [carregando, setCarregando] = useState(true);
+
+  const [teleconsultaAtiva, setTeleconsultaAtiva] = useState<{
+    roomId: string; medicoNome: string;
+  } | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -101,6 +110,36 @@ export default function PacienteDashboardPage() {
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    if (dados?.teleconsultaAtiva) {
+      setTeleconsultaAtiva(dados.teleconsultaAtiva);
+    }
+  }, [dados?.teleconsultaAtiva]);
+
+  useEffect(() => {
+    if (!dados?.userId) return;
+
+    const pusher = getPusherClient();
+    const handleTeleconsultaIniciada = (data: { roomId: string; medicoNome: string }) => {
+      setTeleconsultaAtiva({ roomId: data.roomId, medicoNome: data.medicoNome });
+      toast('🔴 Sua teleconsulta está começando!', {
+        duration: 10000,
+        action: {
+          label: 'Entrar Agora',
+          onClick: () => router.push(`/paciente/teleconsulta/${data.roomId}`),
+        },
+      });
+    };
+
+    const channel = pusher.subscribe(`private-user-${dados.userId}`);
+    channel.bind('teleconsulta:iniciada', handleTeleconsultaIniciada);
+
+    return () => {
+      channel.unbind('teleconsulta:iniciada', handleTeleconsultaIniciada);
+      pusher.unsubscribe(`private-user-${dados.userId}`);
+    };
+  }, [dados?.userId, router]);
 
   // ── Próximos passos dinâmicos baseados em dados reais ───────
   const proximosPassos = dados ? [
@@ -170,6 +209,35 @@ export default function PacienteDashboardPage() {
         </div>
       ) : (
         <>
+          {/* ── Card TELECONSULTA AO VIVO ─────────────────────── */}
+          {teleconsultaAtiva && (
+            <div className="animate-fade-up">
+              <Card className="border-2 border-red-500/60 bg-red-50/80 shadow-lg rounded-2xl overflow-hidden">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                      <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-display font-bold text-base text-red-700 leading-tight">
+                        🔴 Teleconsulta ao Vivo!
+                      </p>
+                      <p className="text-sm text-red-600 mt-0.5">
+                        Dr(a). {teleconsultaAtiva.medicoNome} está esperando você
+                      </p>
+                    </div>
+                  </div>
+                  <Link href={`/paciente/teleconsulta/${teleconsultaAtiva.roomId}`}>
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold gap-2 rounded-xl shadow-md">
+                      <Video className="h-4 w-4" />
+                      Entrar Agora
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* ── KPIs principais ── */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-up delay-75">
             {[

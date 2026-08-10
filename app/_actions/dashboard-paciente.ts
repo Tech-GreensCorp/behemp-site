@@ -38,6 +38,12 @@ export interface DadosDashboard {
   } | null;
   totalDocumentos: number;
   mensagensNaoLidas: number;
+  teleconsultaAtiva: {
+    roomId: string;
+    medicoNome: string;
+    iniciadaEm: string;
+  } | null;
+  userId: string | null;
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -52,7 +58,7 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes] = await Promise.all([
+    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, userIdRes] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -131,6 +137,33 @@ export async function obterDadosDashboard(): Promise<{
 
       // 6. Mensagens não lidas
       contarMensagensNaoLidas(),
+
+      // 7. Teleconsulta ativa
+      db.execute(sql`
+        SELECT
+          t.room_id     AS "roomId",
+          um.nome       AS "medicoNome",
+          t.iniciada_em AS "iniciadaEm"
+        FROM teleconsultas t
+        INNER JOIN pacientes p   ON p.id = t.paciente_id
+        INNER JOIN users u       ON u.id = p.user_id
+        INNER JOIN medicos m     ON m.id = t.medico_id
+        INNER JOIN users um      ON um.id = m.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND p.deleted_at IS NULL
+          AND t.deleted_at IS NULL
+          AND t.status IN ('aguardando', 'em_andamento')
+        ORDER BY t.iniciada_em DESC
+        LIMIT 1
+      `),
+
+      // 8. User ID do Banco
+      db.execute(sql`
+        SELECT u.id AS "userId"
+        FROM users u
+        WHERE u.clerk_id = ${auth.clerkId}
+        LIMIT 1
+      `),
     ]);
 
     // Processar médico
@@ -179,6 +212,15 @@ export async function obterDadosDashboard(): Promise<{
     // Processar mensagens
     const mensagensNaoLidas = mensagensRes.sucesso ? (mensagensRes.dados ?? 0) : 0;
 
+    const teleconsultaAtivaRow = teleconsultaRes.rows[0] as any;
+    const teleconsultaAtiva = teleconsultaAtivaRow ? {
+      roomId: String(teleconsultaAtivaRow.roomId),
+      medicoNome: String(teleconsultaAtivaRow.medicoNome),
+      iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
+    } : null;
+
+    const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
+
     return {
       sucesso: true,
       dados: {
@@ -188,6 +230,8 @@ export async function obterDadosDashboard(): Promise<{
         proximaConsulta,
         totalDocumentos,
         mensagensNaoLidas,
+        teleconsultaAtiva,
+        userId,
       },
     };
   } catch (error) {

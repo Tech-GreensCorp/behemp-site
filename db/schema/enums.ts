@@ -52,6 +52,7 @@ export const notificacaoTipoEnum = pgEnum('notificacao_tipo', [
   'nova_mensagem',
   'novo_paciente',
   'geral',
+  'teleconsulta_iniciada',
 ]);
 
 /** Status da recompra de medicamento */

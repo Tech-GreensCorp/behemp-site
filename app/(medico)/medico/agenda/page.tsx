@@ -15,6 +15,8 @@ import {
   listarTodosHorariosMedico, obterConfigAgendaMedicoLogado,
 } from '@/app/(medico)/_actions/consultas';
 import { FormConfigAgenda, ConfigAgendaDia } from '@/components/medicos/form-config-agenda';
+import { iniciarTeleconsulta } from '@/app/(medico)/_actions/notificar-teleconsulta';
+import { useRouter } from 'next/navigation';
 
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -45,6 +47,7 @@ const STATUS_CONFIG: Record<string, { label: string; cor: string }> = {
 };
 
 export default function AgendaPage() {
+  const router = useRouter();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -74,6 +77,9 @@ export default function AgendaPage() {
   const [cancelarId, setCancelarId] = useState<string | null>(null);
   const [motivo, setMotivo] = useState('');
   const [cancelando, setCancelando] = useState(false);
+
+  // Teleconsulta
+  const [iniciando, setIniciando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -153,6 +159,23 @@ export default function AgendaPage() {
     setCancelando(false);
   }
 
+  const handleIniciarTeleconsulta = async (consultaId: string) => {
+    setIniciando(consultaId);
+    try {
+      const res = await iniciarTeleconsulta(consultaId);
+      if (res.sucesso && res.dados) {
+        toast.success('Teleconsulta iniciada! Redirecionando...');
+        router.push(`/medico/teleconsulta?roomId=${res.dados.roomId}&salaId=${res.dados.salaId}`);
+      } else {
+        toast.error(res.erro ?? 'Erro ao iniciar teleconsulta');
+      }
+    } catch {
+      toast.error('Erro de conexão. Tente novamente.');
+    } finally {
+      setIniciando(null);
+    }
+  };
+
   const consultasAtivas = consultas.filter(c => c.status !== 'cancelada' && c.status !== 'realizada');
   const consultasPassadas = consultas.filter(c => c.status === 'cancelada' || c.status === 'realizada');
 
@@ -204,6 +227,21 @@ export default function AgendaPage() {
                     </div>
                     <Badge className={cfg.cor}>{cfg.label}</Badge>
                     <div className="flex gap-1">
+                      {(c.status === 'agendada' || c.status === 'confirmada') && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleIniciarTeleconsulta(c.id)}
+                          disabled={iniciando === c.id}
+                          className="gap-1.5 bg-primary hover:bg-primary/90 text-white"
+                        >
+                          {iniciando === c.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Video size={14} />
+                          )}
+                          {iniciando === c.id ? 'Iniciando...' : 'Iniciar Teleconsulta'}
+                        </Button>
+                      )}
                       {c.googleMeetLink && (
                         <a href={c.googleMeetLink} target="_blank" rel="noopener noreferrer">
                           <Button variant="ghost" size="icon" title="Google Meet">

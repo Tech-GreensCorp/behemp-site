@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Templates de e-mail para consultas via Brevo.
  * Agendamento, remarcação e cancelamento.
  */
@@ -949,5 +949,144 @@ export async function enviarEmailCancelamentoMedico(params: {
     htmlContent: html,
     sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
     to: [{ email: params.medicoEmail, name: params.medicoNome }],
+  });
+}
+
+export async function enviarEmailTeleconsultaIniciada(params: {
+  pacienteNome: string;
+  pacienteEmail: string;
+  medicoNome: string;
+  linkSala: string;
+}): Promise<void> {
+  const primeiroNome = escapeHtml(params.pacienteNome.split(' ')[0]);
+  const medicoNomeEscapado = escapeHtml(params.medicoNome);
+  const horaAtual = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit', minute: '2-digit',
+  }).format(new Date());
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Teleconsulta Iniciada — Be4Hope</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f1ed;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ed;">
+<tr><td style="padding:40px 16px;">
+<table align="center" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;margin:0 auto;">
+
+  <!-- Logo -->
+  <tr><td align="center" style="padding:0 0 32px;">
+    <img src="${APP_URL()}/logo.png" alt="Be4Hope" width="140" style="display:block;border:0;max-width:140px;">
+  </td></tr>
+
+  <!-- Card principal -->
+  <tr><td style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+    <table width="100%" cellpadding="0" cellspacing="0">
+
+      <!-- Header vermelho urgente -->
+      <tr><td style="background:linear-gradient(135deg,#EF4444 0%,#DC2626 50%,#B91C1C 100%);padding:40px 36px 32px;text-align:center;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center">
+            <div style="display:inline-block;width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.2);text-align:center;line-height:72px;font-size:36px;margin-bottom:16px;">🔴</div>
+          </td></tr>
+          <tr><td align="center">
+            <h1 style="margin:0 0 8px;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Teleconsulta Começando!</h1>
+            <p style="margin:0;font-size:15px;color:rgba(255,255,255,0.9);">Dr(a). ${medicoNomeEscapado} está aguardando você agora</p>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- Saudação -->
+      <tr><td style="padding:32px 36px 0;">
+        <p style="margin:0;font-size:16px;color:#1a1a1a;line-height:1.7;">
+          Olá, <strong>${primeiroNome}</strong>! 👋
+        </p>
+        <p style="margin:8px 0 0;font-size:15px;color:#666666;line-height:1.7;">
+          Seu médico iniciou a teleconsulta. Entre agora para não perder sua consulta!
+        </p>
+      </td></tr>
+
+      <!-- Card detalhes -->
+      <tr><td style="padding:24px 36px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f5;border-radius:16px;border:1px solid #ece8e3;overflow:hidden;">
+          <tr><td style="padding:20px 24px 16px;">
+            <table cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="40"><div style="width:40px;height:40px;border-radius:12px;background:#e8f8f0;text-align:center;line-height:40px;font-size:18px;">🩺</div></td>
+                <td style="padding-left:14px;">
+                  <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#999;">Médico</p>
+                  <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#1a1a1a;">Dr(a). ${medicoNomeEscapado}</p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+          <tr><td style="padding:0 24px;"><div style="border-top:1px solid #eee9e3;"></div></td></tr>
+          <tr><td style="padding:16px 24px;">
+            <table cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="40"><div style="width:40px;height:40px;border-radius:12px;background:#fdf6ec;text-align:center;line-height:40px;font-size:18px;">⏰</div></td>
+                <td style="padding-left:14px;">
+                  <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#999;">Horário</p>
+                  <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#EF4444;">Agora — ${horaAtual}</p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+          <tr><td style="padding:0 24px;"><div style="border-top:1px solid #eee9e3;"></div></td></tr>
+          <tr><td style="padding:16px 24px 20px;">
+            <table cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="40"><div style="width:40px;height:40px;border-radius:12px;background:#fef3f2;text-align:center;line-height:40px;font-size:18px;">💻</div></td>
+                <td style="padding-left:14px;">
+                  <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#999;">Plataforma</p>
+                  <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#1a1a1a;">Be4Hope — Online</p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- Botão ENTRAR (laranja Be4Hope) -->
+      <tr><td style="padding:8px 36px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center">
+            <a href="${params.linkSala}" target="_blank"
+               style="display:inline-block;background:#EA5429;color:#ffffff;font-size:17px;font-weight:800;padding:18px 52px;border-radius:14px;text-decoration:none;letter-spacing:0.3px;box-shadow:0 4px 20px rgba(234,84,41,0.4);">
+              📹&nbsp;&nbsp;Entrar na Consulta Agora
+            </a>
+          </td></tr>
+          <tr><td align="center" style="padding-top:12px;">
+            <p style="margin:0;font-size:12px;color:#999999;">
+              ⚠️ Este link é exclusivo para você e expira quando a consulta encerrar
+            </p>
+          </td></tr>
+        </table>
+      </td></tr>
+
+    </table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:32px 20px 0;text-align:center;">
+    <p style="margin:0 0 8px;font-size:13px;color:#999999;font-weight:500;">
+      Be4Hope — Cuidar de quem cuida é nosso ato de amor 💚
+    </p>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body>
+</html>`;
+
+  const client = criarClienteBrevo();
+  await client.transactionalEmails.sendTransacEmail({
+    subject: `🔴 Sua teleconsulta está começando agora — Dr(a). ${params.medicoNome}`,
+    htmlContent: html,
+    sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+    to: [{ email: params.pacienteEmail, name: params.pacienteNome }],
   });
 }

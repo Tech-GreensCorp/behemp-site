@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notificacao_tipo" ADD VALUE 'teleconsulta_iniciada';
