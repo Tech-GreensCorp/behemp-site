@@ -57,32 +57,126 @@ async function processarTranscricao(
   audioFile: File,
   sala: { id: string; medicoId: string; pacienteId: string }
 ) {
-  // 1. Converter áudio para texto (aqui usaríamos Whisper ou Google Speech)
-  // Por ora: placeholder até integrar API de STT
-  const textoCompleto = '[Transcrição via STT pendente de integração]';
+  const googleApiKey = process.env.GOOGLE_API_KEY;
 
-  // 2. Mascarar PII antes de qualquer LLM (LGPD)
-  // Por ora: texto já está mascarado (placeholder)
-  const textoMascarado = textoCompleto;
+  // ── MODO STUB (sem GOOGLE_API_KEY) ────────────────────────────
+  if (!googleApiKey) {
+    console.log('[Transcrição STUB] GOOGLE_API_KEY não configurada — salvando stub');
 
-  // 3. Normalizar via Gemini 2.5 Flash
+    await db.update(transcricoes)
+      .set({
+        status: 'concluida',
+        textoCompleto: '[STUB] Transcrição pendente — GOOGLE_API_KEY não configurada.',
+        narrativa: [
+          'Queixa principal: [aguardando integração Google Speech-to-Text]',
+          'HDA (início, duração, evolução, fatores de melhora/piora): não relatado',
+          'Sintomas afirmados: não relatado',
+          'Negativos pertinentes: não relatado',
+          'Antecedentes / comorbidades / hábitos: não relatado',
+          'Medicações em uso: não relatado',
+        ].join('\n'),
+        hashTexto: 'stub-sem-api-key',
+        modeloUsado: 'stub',
+        duracaoSegundos: Math.round(audioFile.size / 16000), // estimativa
+      })
+      .where(eq(transcricoes.id, transcricaoId));
+
+    await db.insert(logsAuditoria).values({
+      acao: 'TRANSCRICAO_STUB',
+      entidade: 'transcricoes',
+      entidadeId: transcricaoId,
+    }).catch(() => {});
+
+    return;
+  }
+
+  // ── MODO PRODUÇÃO (com GOOGLE_API_KEY) ───────────────────────
+  // ETAPA A: Converter áudio para texto via Google Speech-to-Text v2
+  const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+  const audioBase64 = audioBuffer.toString('base64');
+
+  // Detectar codec (webm/opus padrão da Web API)
+  const mimeType = audioFile.type || 'audio/webm;codecs=opus';
+
+  const sttResponse = await fetch(
+    `https://speech.googleapis.com/v1/speech:recognize?key=${googleApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config: {
+          encoding: 'WEBM_OPUS',
+          sampleRateHertz: 48000,
+          audioChannelCount: 2,          // dual-channel: médico (L) + paciente (R)
+          enableSeparateRecognitionPerChannel: true, // separação por canal
+          languageCode: 'pt-BR',
+          model: 'medical_conversation',  // modelo otimizado para consultas médicas
+          useEnhanced: true,
+          enableAutomaticPunctuation: true,
+          diarizationConfig: {           // identificação de falantes
+            enableSpeakerDiarization: true,
+            minSpeakerCount: 2,
+            maxSpeakerCount: 2,
+          },
+        },
+        audio: { content: audioBase64 },
+      }),
+      signal: AbortSignal.timeout(120_000), // 2 min para áudios longos
+    }
+  );
+
+  if (!sttResponse.ok) {
+    const erro = await sttResponse.text();
+    throw new Error(`Google STT error: ${sttResponse.status} — ${erro}`);
+  }
+
+  const sttData = await sttResponse.json() as {
+    results?: Array<{
+      alternatives?: Array<{ transcript: string }>;
+      channelTag?: number;
+    }>;
+  };
+
+  // Montar texto completo com separação por canal (médico/paciente)
+  const textoCompleto = (sttData.results ?? [])
+    .map((result) => {
+      const texto = result.alternatives?.[0]?.transcript ?? '';
+      const canal = result.channelTag === 1 ? '[MÉDICO]' : '[PACIENTE]';
+      return `${canal} ${texto}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  if (!textoCompleto.trim()) {
+    throw new Error('Transcrição vazia — áudio sem fala detectada');
+  }
+
+  // ETAPA B: Mascarar PII antes do Gemini (LGPD)
+  // Remover CPF, RG, telefones, emails, endereços
+  const textoMascarado = textoCompleto
+    .replace(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/g, '[CPF]')
+    .replace(/\d{1,2}\.\d{3}\.\d{3}-?\d{1}/g, '[RG]')
+    .replace(/\(\d{2}\)\s?\d{4,5}-?\d{4}/g, '[TELEFONE]')
+    .replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]');
+
+  // ETAPA C: Normalizar via Gemini 2.5 Flash
   const { normalizarTranscricao } = await import('@/lib/teleconsulta/normalizar-transcricao');
   const narrativa = await normalizarTranscricao(textoMascarado);
 
-  // 4. Hash para idempotência
+  // ETAPA D: Hash para idempotência e persistência
   const hashTexto = createHash('sha256').update(textoCompleto).digest('hex');
 
-  // 5. Persistir
   await db.update(transcricoes)
     .set({
       status: 'concluida',
-      textoCompleto,
+      textoCompleto: textoMascarado, // Salvar versão mascarada (LGPD)
       narrativa,
       hashTexto,
+      modeloUsado: 'gemini-2.5-flash',
+      duracaoSegundos: Math.round(audioFile.size / 16000),
     })
     .where(eq(transcricoes.id, transcricaoId));
 
-  // 6. Auditoria LGPD
   await db.insert(logsAuditoria).values({
     acao: 'PROCESSAR',
     entidade: 'transcricoes',

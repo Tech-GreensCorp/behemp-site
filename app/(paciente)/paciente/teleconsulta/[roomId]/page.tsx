@@ -25,6 +25,10 @@ function TeleconsultaPacienteContent() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRecorderRef = useRef<MediaRecorder | null>(null);
+  
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [cameraOk, setCameraOk] = useState(false);
@@ -123,6 +127,33 @@ function TeleconsultaPacienteContent() {
         remoteVideoRef.current.srcObject = event.streams[0];
         setRemoteConnected(true);
         toast.success(`${sala.medicoNome} conectado!`);
+
+        // Quando médico conectar, iniciar mix de áudio dual-channel
+        if (localStreamRef.current) {
+          try {
+            const audioCtx = new window.AudioContext();
+            audioCtxRef.current = audioCtx;
+            const dest = audioCtx.createMediaStreamDestination();
+
+            // Canal L = paciente (local)
+            const localNode = audioCtx.createMediaStreamSource(localStreamRef.current);
+            // Canal R = médico (remoto)
+            const remoteNode = audioCtx.createMediaStreamSource(event.streams[0]);
+
+            const merger = audioCtx.createChannelMerger(2);
+            localNode.connect(merger, 0, 0); // canal L
+            remoteNode.connect(merger, 0, 1); // canal R
+            merger.connect(dest);
+
+            const mr = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+            audioRecorderRef.current = mr;
+            audioChunksRef.current = [];
+            mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+            mr.start(1000);
+          } catch (e) {
+            console.warn('[Paciente] Mixer de áudio dual-channel não disponível:', e);
+          }
+        }
       }
     };
 
@@ -174,6 +205,10 @@ function TeleconsultaPacienteContent() {
     pcRef.current?.close();
     pcRef.current = null;
     localStreamRef.current?.getTracks().forEach(t => t.stop());
+    
+    audioCtxRef.current?.close().catch(() => {});
+    audioRecorderRef.current?.stop();
+
     toast.info('Consulta encerrada.');
     router.push('/paciente');
   }, [router]);

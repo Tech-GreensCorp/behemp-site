@@ -176,6 +176,29 @@ pm2 save
 - [ ] Upgrade para t2.medium ou t3.small (mais RAM, build mais rápido)
 - [ ] Configurar PM2 para iniciar automaticamente após restart do servidor:
 ```bash
-  pm2 startup
   pm2 save
 ```
+
+---
+
+## DT-007: Transcrição Dual-Channel com Gemini 2.5 Flash
+**Data:** 10/08/2026
+**Status:** ⏳ STUB — aguardando GOOGLE_API_KEY
+
+### Arquitetura
+
+Teleconsulta encerrada pelo médico ↓ AudioContext merge: médico (canal L) + paciente (canal R) ↓ MediaRecorder → webm/opus dual-channel ↓ POST /api/teleconsulta/transcrever (FormData com audio + salaId) ↓ [SEM GOOGLE_API_KEY] → Salva stub na tabela transcricoes [COM GOOGLE_API_KEY] → Google Speech-to-Text v1 ├─ enableSeparateRecognitionPerChannel: true ├─ model: medical_conversation └─ diarizationConfig: 2 falantes ↓ Mascaramento PII (CPF, RG, tel, email) — LGPD ↓ Gemini 2.5 Flash normaliza → narrativa clínica ↓ Salva em transcricoes (texto mascarado + narrativa)
+
+
+### Para ativar em produção
+1. Configurar `GOOGLE_API_KEY` no `.env` e na Vercel/AWS
+2. O stub desativa automaticamente — detecção via `process.env.GOOGLE_API_KEY`
+3. Habilitar APIs no Google Cloud:
+   - Cloud Speech-to-Text API
+   - Generative Language API (Gemini)
+4. Cotas recomendadas: Speech STT ~1h/mês, Gemini ~500 req/mês
+
+### Nota Sprint 4 — STATUS CONSULTA
+⚠️ Ao iniciar teleconsulta (Sprint 2), status atualiza para 'confirmada'.
+No Sprint 4, ao ENCERRAR, deve mudar para 'realizada'.
+NÃO alterar antes do Sprint 4.
