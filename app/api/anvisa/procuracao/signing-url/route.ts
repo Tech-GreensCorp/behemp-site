@@ -60,9 +60,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: 'Procuração não encontrada' }, { status: 404 });
   }
 
-  const appUrl = env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  // Ao invés de redirecionar para localhost diretamente,
-  // usar uma rota que retorna um HTML com postMessage
+  // Usar URL base do request atual — evita redirect loop entre
+  // behemp-site.vercel.app e URLs de preview da Vercel
+  const requestUrl = new URL(request.url);
+  const appUrl = `${requestUrl.protocol}//${requestUrl.host}`;
   const returnUrl = `${appUrl}/api/anvisa/signing-complete?procuracaoId=${procuracaoId}&event=signing_complete`;
 
   // Baixar PDF do Vercel Blob para reenviar ao DocuSign
