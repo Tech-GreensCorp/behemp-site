@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'X-Frame-Options': 'ALLOWALL',
+      'X-Frame-Options': 'SAMEORIGIN',
       'ngrok-skip-browser-warning': 'true',
     },
   });
