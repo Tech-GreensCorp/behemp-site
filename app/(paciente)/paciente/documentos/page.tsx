@@ -26,9 +26,10 @@ const TIPO_LABELS: Record<string, string> = {
   rg: 'RG',
   receita_medica: 'Receita Médica',
   comprovante_residencia: 'Comprovante de Residência',
-  autorizacao_anvisa: 'Autorização Anvisa',
-  oficio_anvisa: 'Ofício da Anvisa',
+  autorizacao_anvisa: 'Autorização ANVISA',
+  oficio_anvisa: 'Ofício da ANVISA',
   documento_pessoal: 'Documento Pessoal',
+  procuracao_especifica: 'Procuração Específica',
 };
 
 export default function DocumentosPacientePage() {

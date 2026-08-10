@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { prescricoes, users } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import path from 'path';
+import fs from 'fs';
 import { gerarPdfReceituario, type DadosReceituario } from '@/lib/receituario/receituario-pdf';
 
 export async function GET(request: NextRequest) {
@@ -97,6 +99,16 @@ export async function GET(request: NextRequest) {
       hour: '2-digit', minute: '2-digit',
     });
 
+    // Ler o logo oficial e converter para Base64 (mais seguro para serverless/aws)
+    let logoBase64 = undefined;
+    try {
+      const logoPath = path.join(process.cwd(), 'public', 'logo-receita.png');
+      const logoBuffer = fs.readFileSync(logoPath);
+      logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+    } catch (e) {
+      console.warn('Não foi possível carregar a imagem do logo:', e);
+    }
+
     // Montar dados do receituário
     const dadosReceituario: DadosReceituario = {
       medicoNome: `Dr(a). ${medicoUser?.nome ?? 'Médico'}`,
@@ -117,7 +129,7 @@ export async function GET(request: NextRequest) {
       tokenReceita: 'XXXXXXX',  // Substituir por token real quando ICP-Brasil ativo
       codigoAcesso: '0000',     // Substituir por código real quando ICP-Brasil ativo
       assinadoDigitalmente: false,
-      medicoAssinaturaTexto: `por ${medicoUser?.nome ?? 'médico'} em ${emissao}`,
+      logoBase64,
     };
 
     const pdfBuffer = await gerarPdfReceituario(dadosReceituario);

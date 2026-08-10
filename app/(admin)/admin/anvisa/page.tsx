@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, AlertCircle, XCircle, FileCheck } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, AlertCircle, XCircle, FileCheck, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── Tipos ──────────────────────────────────────────────────────
@@ -34,12 +34,30 @@ type Autorizacao = {
   pacienteId: string;
   medicoId: string;
   status: AnvisaStatus;
+  modalidade: 'guiada' | 'representacao' | null;
+  documentos: { tipo: string; enviado: boolean; urlBlob: string | null; nomeArquivo: string | null; validado: boolean }[];
   dataEnvio: string | null;
   dataAprovacao: string | null;
   prazoEstimado: string | null;
   numeroProcesso: string | null;
   observacoesAnvisa: string | null;
   createdAt: string;
+  // Dados do paciente
+  pacienteNome: string;
+  pacienteEmail: string;
+  pacienteCpf: string | null;
+  pacientePatologia: string | null;
+  // Médico
+  medicoNome: string;
+  medicoCrm: string;
+  // Procuração
+  procuracao: {
+    id: string;
+    urlPdfAssinado: string | null;
+    urlPdfGerado: string | null;
+    docusignStatus: string;
+    assinadoEm: string | null;
+  } | null;
 };
 
 const STATUS_CONFIG: Record<AnvisaStatus, { label: string; cor: string; icon: React.ReactNode }> = {
@@ -185,30 +203,123 @@ export default function AdminAnvisaPage() {
         <div className="grid gap-3">
           {filtrados.map((aut) => (
             <Card key={aut.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="flex items-center justify-between gap-4 py-4">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Badge className={cn('gap-1 text-xs shrink-0', STATUS_CONFIG[aut.status].cor)}>
+              <CardContent className="p-5 space-y-4">
+                
+                {/* Header: paciente + status */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-bold text-base text-foreground truncate">
+                      {aut.pacienteNome}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {aut.pacienteEmail}
+                      {aut.pacienteCpf ? ` · CPF: ${aut.pacienteCpf}` : ''}
+                    </p>
+                    {aut.pacientePatologia && (
+                      <p className="text-xs text-muted-foreground">
+                        Patologia: {aut.pacientePatologia}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Médico: {aut.medicoNome}
+                      {aut.medicoCrm ? ` · CRM ${aut.medicoCrm}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge className={cn('gap-1 text-xs', STATUS_CONFIG[aut.status].cor)}>
                       {STATUS_CONFIG[aut.status].icon}
                       {STATUS_CONFIG[aut.status].label}
                     </Badge>
-                    {aut.numeroProcesso && (
-                      <span className="text-xs font-mono text-muted-foreground">{aut.numeroProcesso}</span>
+                    {aut.modalidade && (
+                      <Badge variant="outline" className="text-xs">
+                        {aut.modalidade === 'representacao' ? '🤝 Procuração' : '🧭 Guiada'}
+                      </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    ID: <span className="font-mono">{aut.id}</span>
-                  </p>
-                  {aut.dataEnvio && (
-                    <p className="text-xs text-muted-foreground">
-                      Enviado: {new Date(aut.dataEnvio).toLocaleDateString('pt-BR')}
-                      {aut.prazoEstimado && ` · Prazo: ${aut.prazoEstimado}`}
-                    </p>
-                  )}
                 </div>
-                <Button size="sm" variant="outline" onClick={() => abrirDialog(aut)}>
-                  Atualizar status
-                </Button>
+
+                {/* Checklist de documentos */}
+                {aut.documentos?.length > 0 && (
+                  <div className="rounded-xl bg-muted/30 p-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      Documentos
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {aut.documentos.map((doc) => (
+                        <div key={doc.tipo} className="flex items-center gap-1.5">
+                          {doc.enviado
+                            ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                            : <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          }
+                          <span className="text-xs text-foreground capitalize">
+                            {doc.tipo.replace(/_/g, ' ')}
+                          </span>
+                          {doc.urlBlob && (
+                            <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline ml-auto">
+                              Ver
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Procuração Específica assinada */}
+                {aut.procuracao?.urlPdfAssinado && (
+                  <div className="rounded-xl border border-green-200 bg-green-50/50 p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-green-600 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-green-800">Procuração Específica Assinada</p>
+                        {aut.procuracao.assinadoEm && (
+                          <p className="text-[10px] text-green-700">
+                            Em: {new Date(aut.procuracao.assinadoEm).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <a
+                      href={aut.procuracao.urlPdfAssinado}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-900"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Baixar PDF
+                    </a>
+                  </div>
+                )}
+
+                {/* Datas */}
+                {(aut.dataEnvio || aut.prazoEstimado || aut.numeroProcesso) && (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {aut.numeroProcesso && <p>Protocolo ANVISA: <span className="font-mono font-semibold">{aut.numeroProcesso}</span></p>}
+                    {aut.dataEnvio && <p>Enviado em: {new Date(aut.dataEnvio).toLocaleDateString('pt-BR')}</p>}
+                    {aut.prazoEstimado && <p>Prazo estimado: {aut.prazoEstimado}</p>}
+                  </div>
+                )}
+
+                {/* Ações */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {/* Botão Gov.br — aparece quando tem Procuração assinada */}
+                  {aut.procuracao?.urlPdfAssinado && aut.status !== 'aprovado' && (
+                    <a
+                      href="https://www.gov.br/pt-br/servicos/solicitar-autorizacao-para-importacao-excepcional-de-produtos-a-base-de-canabidiol"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Iniciar no Gov.br
+                    </a>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => abrirDialog(aut)}>
+                    Atualizar status
+                  </Button>
+                </div>
+
               </CardContent>
             </Card>
           ))}

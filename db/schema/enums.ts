@@ -32,6 +32,7 @@ export const documentoTipoEnum = pgEnum('documento_tipo', [
   'autorizacao_anvisa',
   'documento_pessoal',
   'oficio_anvisa',
+  'procuracao_especifica',
 ]);
 
 /** Status da consulta */

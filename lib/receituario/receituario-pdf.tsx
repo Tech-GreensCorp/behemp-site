@@ -15,7 +15,8 @@ import {
   View,
   StyleSheet,
   Link,
-  pdf,
+  renderToBuffer,
+  Image,
 } from '@react-pdf/renderer';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -56,7 +57,8 @@ export interface DadosReceituario {
   tokenReceita?: string;     // ex: XXXXXXX
   codigoAcesso?: string;     // ex: 0000
   assinadoDigitalmente?: boolean;
-  medicoAssinaturaTexto?: string; // "por Dr(a). nome em dd/mm/yyyy - HH:MM"
+  medicoAssinaturaTexto?: string;
+  logoBase64?: string;
 }
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -82,22 +84,11 @@ const s = StyleSheet.create({
 
   // Logo
   logoContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  logoTexto: {
-    fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
-    color: LARANJA,
-    lineHeight: 1,
-  },
-  logoPonto: {
-    fontSize: 22,
-    color: LARANJA,
-  },
-  logoHope: {
-    fontSize: 12,
-    fontFamily: 'Helvetica-Bold',
-    color: PRETO,
+  logoImage: {
+    width: 80, // Ajuste do tamanho oficial
+    height: 'auto',
   },
 
   // Título
@@ -357,17 +348,16 @@ function tipoLabel(tipo: string): string {
   return mapa[tipo] ?? 'RECEITUÁRIO';
 }
 
-// ── Logo Be4Hope (texto estilizado) ──────────────────────────────────────────
+// ── Logo Be4Hope (Imagem) ────────────────────────────────────────────────────
 
-const LogoBeHope = () => (
-  <View style={s.logoContainer}>
-    <Text style={s.logoTexto}>
-      be.<Text style={s.logoPonto}></Text>
-      {'\n'}
-      <Text style={s.logoHope}>4hope</Text>
-    </Text>
-  </View>
-);
+const LogoBeHope = ({ src }: { src?: string }) => {
+  if (!src) return null;
+  return (
+    <View style={s.logoContainer}>
+      <Image src={src} style={s.logoImage} />
+    </View>
+  );
+};
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
@@ -391,7 +381,7 @@ const ReceituarioDocument = ({ dados }: { dados: DadosReceituario }) => {
       <Page size="A4" style={s.page}>
 
         {/* Logo */}
-        <LogoBeHope />
+        <LogoBeHope src={dados.logoBase64} />
 
         {/* Título */}
         <Text style={s.titulo}>{tipoLabel(dados.tipo)}</Text>
@@ -573,7 +563,5 @@ const ReceituarioDocument = ({ dados }: { dados: DadosReceituario }) => {
  * Funciona em qualquer ambiente Node.js sem Chrome.
  */
 export async function gerarPdfReceituario(dados: DadosReceituario): Promise<Buffer> {
-  const blob = await pdf(<ReceituarioDocument dados={dados} />).toBlob();
-  const arrayBuffer = await blob.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  return await renderToBuffer(<ReceituarioDocument dados={dados} />);
 }

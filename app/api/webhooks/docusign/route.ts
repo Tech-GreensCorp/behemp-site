@@ -117,6 +117,60 @@ export async function POST(request: NextRequest) {
               .update(procuracoesEspecificas)
               .set({ urlPdfAssinado: blob.url })
               .where(eq(procuracoesEspecificas.id, procuracao.id));
+
+            // 1. Buscar autorizacaoId e pacienteId da procuração
+            const [procuracaoCompleta] = await db
+              .select({
+                autorizacaoId: procuracoesEspecificas.autorizacaoId,
+                pacienteId: procuracoesEspecificas.pacienteId,
+                urlPdfAssinado: procuracoesEspecificas.urlPdfAssinado,
+                nomeCompleto: procuracoesEspecificas.nomeCompleto,
+              })
+              .from(procuracoesEspecificas)
+              .where(eq(procuracoesEspecificas.id, procuracao.id))
+              .limit(1);
+
+            if (procuracaoCompleta?.autorizacaoId && blob?.url) {
+              const { documentos: docsSchema, autorizacoesAnvisa } = await import('@/db/schema');
+              
+              // 2. Inserir na tabela documentos do paciente
+              await db.insert(docsSchema).values({
+                pacienteId: procuracaoCompleta.pacienteId,
+                tipo: 'procuracao_especifica',
+                nomeArquivo: `procuracao-especifica-assinada-${Date.now()}.pdf`,
+                urlBlob: blob.url,
+                dataEmissao: new Date().toISOString().split('T')[0],
+                dataValidade: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 anos
+              }).catch((e) => { console.error('Erro ao salvar documento:', e) });
+
+              // 3. Atualizar checklist da autorização ANVISA
+              const [autorizacao] = await db
+                .select({ documentos: autorizacoesAnvisa.documentos })
+                .from(autorizacoesAnvisa)
+                .where(eq(autorizacoesAnvisa.id, procuracaoCompleta.autorizacaoId))
+                .limit(1);
+
+              if (autorizacao) {
+                const docs = (autorizacao.documentos as { tipo: string; enviado: boolean; urlBlob: string | null; nomeArquivo: string | null; validado: boolean }[]) ?? [];
+                const docsAtualizados = docs.map((d) =>
+                  d.tipo === 'procuracao_especifica'
+                    ? { ...d, enviado: true, urlBlob: blob.url, nomeArquivo: 'procuracao-especifica-assinada.pdf', validado: true }
+                    : d
+                );
+
+                // Verificar se checklist está completo
+                const todosEnviados = docsAtualizados
+                  .filter((d) => ['receita_medica', 'rg_paciente', 'comprovante_residencia', 'procuracao_especifica'].includes(d.tipo))
+                  .every((d) => d.enviado);
+
+                await db.update(autorizacoesAnvisa)
+                  .set({
+                    documentos: docsAtualizados,
+                    ...(todosEnviados ? { status: 'documentos_enviados' } : {}),
+                  })
+                  .where(eq(autorizacoesAnvisa.id, procuracaoCompleta.autorizacaoId));
+              }
+            }
           }
         } catch (err) {
           console.error('[DocuSign Webhook] Erro ao baixar PDF assinado:', err);
