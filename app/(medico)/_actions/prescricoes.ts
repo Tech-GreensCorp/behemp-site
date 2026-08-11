@@ -65,6 +65,7 @@ export async function criarPrescricao(input: unknown) {
     consultaId: parsed.data.consultaId,
     templateId: parsed.data.templateId,
     tipo: parsed.data.tipo,
+    status: 'emitida',
     medicamentos: parsed.data.medicamentos,
     diagnostico: parsed.data.diagnostico,
     cid: parsed.data.cid,
