@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ erro: 'Acesso negado ao grupo' }, { status: 403 });
       }
     } else if (canal.startsWith('presence-sala-')) {
-      // Para teleconsulta (presence channels exigem presenceData)
+      // Para teleconsulta ou sala de espera virtual (presence channels exigem presenceData)
       const presenceData = {
         user_id: user.id,
         user_info: { id: user.id, clerkId }

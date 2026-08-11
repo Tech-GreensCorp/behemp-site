@@ -21,6 +21,8 @@ import {
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useChatNaoLidas } from '@/lib/hooks/use-chat-nao-lidas';
+import { useTeleconsulta } from '@/components/teleconsulta/TeleconsultaContext';
+
 
 interface NavGroup {
   title: string;
@@ -60,12 +62,15 @@ export function MedicoSidebar() {
   const [collapsed, setCollapsed] = useState(true);
   const { signOut } = useClerk();
   const chatNaoLidas = useChatNaoLidas();
+  const { state: teleconsultaState } = useTeleconsulta();
+  const emChamada = !!teleconsultaState.salaId;
 
   useEffect(() => {
     if (window.innerWidth >= 1024) {
       setCollapsed(false);
     }
   }, []);
+
 
   return (
     <>
@@ -166,17 +171,26 @@ export function MedicoSidebar() {
                           : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground hover:translate-x-0.5',
                       )}
                     >
-                      <Icon size={20} className="shrink-0" />
+                      <Icon size={20} className={cn('shrink-0', item.label === 'Teleconsulta' && emChamada && 'text-red-500')} />
                       {!collapsed && <span>{item.label}</span>}
                       {item.label === 'Chat' && chatNaoLidas > 0 && (
                         <span className={cn(
                           'absolute flex items-center justify-center rounded-full bg-primary font-bold text-primary-foreground shadow-sm transition-all',
-                          collapsed 
-                            ? '-top-1 left-7 h-4 min-w-4 text-[8px]' 
+                          collapsed
+                            ? '-top-1 left-7 h-4 min-w-4 text-[8px]'
                             : 'right-3 h-5 min-w-5 text-[10px] px-1'
                         )}>
                           {chatNaoLidas > 99 ? '99+' : chatNaoLidas}
                         </span>
+                      )}
+                      {/* Badge de chamada ativa na Teleconsulta */}
+                      {item.label === 'Teleconsulta' && emChamada && (
+                        <span className={cn(
+                          'absolute flex items-center justify-center rounded-full bg-red-500 animate-pulse shadow-sm',
+                          collapsed
+                            ? '-top-1 left-7 h-3 w-3'
+                            : 'right-3 h-2 w-2'
+                        )} title="Chamada em andamento" />
                       )}
                     </Link>
                   );

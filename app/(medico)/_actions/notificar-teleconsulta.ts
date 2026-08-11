@@ -140,3 +140,83 @@ export async function iniciarTeleconsulta(consultaId: string) {
     dados: { roomId, salaId },
   };
 }
+
+/**
+ * Cria uma consulta avulsa (encaixe/urgência) e inicia a teleconsulta imediatamente.
+ * Consolida: criação da consulta + criação da sala + notificação do paciente.
+ */
+export async function iniciarConsultaAvulsa(params: {
+  pacienteId: string;
+  tipo?: 'urgencia' | 'encaixe';
+  observacoes?: string;
+}) {
+  const auth = await verificarMedico();
+  if (!auth.autorizado || !auth.clerkId) redirect('/entrar');
+
+  // 1. Criar a consulta com dataHora = agora
+  const { criarConsultaMedico } = await import('@/app/(medico)/_actions/consultas');
+  const consultaRes = await criarConsultaMedico({
+    pacienteId: params.pacienteId,
+    dataHora: new Date().toISOString(),
+    tipo: params.tipo ?? 'encaixe',
+    observacoes: params.observacoes ?? 'Atendimento imediato (encaixe)',
+  });
+
+  if (!consultaRes.sucesso || !consultaRes.dados) {
+    return { sucesso: false, erro: consultaRes.erro ?? 'Erro ao criar consulta' };
+  }
+
+  // 2. Buscar a consulta recém-criada para obter o id
+  const { db } = await import('@/lib/db');
+  const { consultas, pacientes: pacientesSchema, users: usersSchema } = await import('@/db/schema');
+  const { eq, desc } = await import('drizzle-orm');
+
+  // Resolver medicoId
+  const { medicos } = await import('@/db/schema');
+  const [user] = await db.select({ id: usersSchema.id }).from(usersSchema).where(eq(usersSchema.clerkId, auth.clerkId!));
+  const [medico] = await db.select({ id: medicos.id }).from(medicos).where(eq(medicos.userId, user.id));
+  if (!medico) return { sucesso: false, erro: 'Médico não encontrado' };
+
+  const [consultaCriada] = await db
+    .select({ id: consultas.id })
+    .from(consultas)
+    .where(eq(consultas.pacienteId, params.pacienteId))
+    .orderBy(desc(consultas.dataHora))
+    .limit(1);
+
+  if (!consultaCriada) return { sucesso: false, erro: 'Consulta não encontrada após criação' };
+
+  // 3. Iniciar a teleconsulta (cria sala + notifica)
+  return iniciarTeleconsulta(consultaCriada.id);
+}
+
+/**
+ * Retorna os pacientes do médico que estão "online" na sala de espera virtual.
+ * Usa o canal presence do Pusher para verificar presença.
+ * Como o Pusher presence é client-side, esta action retorna os userIds dos pacientes
+ * vinculados ao médico para que o frontend faça a correlação.
+ */
+export async function listarPacientesParaPresenca(): Promise<{
+  sucesso: boolean;
+  dados?: { pacienteId: string; userId: string; nome: string }[];
+  erro?: string;
+}> {
+  const auth = await verificarMedico();
+  if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: 'Não autorizado' };
+
+  const { db } = await import('@/lib/db');
+  const { pacientes, users: usersSchema, medicos } = await import('@/db/schema');
+  const { eq } = await import('drizzle-orm');
+
+  const [user] = await db.select({ id: usersSchema.id }).from(usersSchema).where(eq(usersSchema.clerkId, auth.clerkId!));
+  const [medico] = await db.select({ id: medicos.id }).from(medicos).where(eq(medicos.userId, user.id));
+  if (!medico) return { sucesso: false, erro: 'Médico não encontrado' };
+
+  const lista = await db
+    .select({ pacienteId: pacientes.id, userId: pacientes.userId, nome: usersSchema.nome })
+    .from(pacientes)
+    .innerJoin(usersSchema, eq(pacientes.userId, usersSchema.id))
+    .where(eq(pacientes.medicoId, medico.id));
+
+  return { sucesso: true, dados: lista };
+}
