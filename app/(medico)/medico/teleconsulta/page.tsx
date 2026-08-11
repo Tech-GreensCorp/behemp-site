@@ -6,8 +6,13 @@ import { getPusherClient } from "@/lib/integrations/pusher/client";
 import { registrarConsentimentoLgpd, encerrarTeleconsulta } from "../../_actions/teleconsulta";
 import {
     Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, MonitorOff,
-    Wifi, WifiOff, ChevronLeft, RefreshCw, AlertTriangle, MessageSquare, Send
+    Wifi, WifiOff, ChevronLeft, RefreshCw, AlertTriangle, MessageSquare, Send,
+    User, Pill, Brain, Minimize2, FileText
 } from "lucide-react";
+import { TeleconsultaPip } from '@/components/teleconsulta/TeleconsultaPip';
+import { PainelClinicoLateral } from '@/components/teleconsulta/PainelClinicoLateral';
+import { CopilotClinico } from '@/components/teleconsulta/CopilotClinico';
+import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +45,16 @@ function TeleconsultaContent() {
     const [duration, setDuration] = useState(0);
     const [remoteConnected, setRemoteConnected] = useState(false);
     const [quality, setQuality] = useState<"excellent" | "good" | "poor" | "offline">("offline");
+
+    const [minimizado, setMinimizado] = useState(false);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+    const [showPainel, setShowPainel] = useState(false);
+    const [painelAba, setPainelAba] = useState<'paciente' | 'prontuario' | 'prescricao'>('paciente');
+    const [dadosPainel, setDadosPainel] = useState<DadosPainelTeleconsulta | null>(null);
+
+    const [showCopilot, setShowCopilot] = useState(false);
+    const [transcricaoPronta, setTranscricaoPronta] = useState(false);
 
     const [consentimentoTranscricao, setConsentimentoTranscricao] = useState(false);
     const [transcricaoStatus, setTranscricaoStatus] = useState<"idle" | "enviando" | "processando" | "concluida" | "erro">("idle");
@@ -178,6 +193,7 @@ function TeleconsultaContent() {
             pc.ontrack = (event) => {
                 if (remoteVideoRef.current && event.streams[0]) {
                     remoteVideoRef.current.srcObject = event.streams[0];
+                    setRemoteStream(event.streams[0]);
                     setRemoteConnected(true);
                     setChatMsgs(prev => [...prev, { id: Date.now(), autor: "sistema", texto: "✅ Paciente conectado.", hora: horaFmt() }]);
 
@@ -257,6 +273,13 @@ function TeleconsultaContent() {
         const t = setInterval(() => setDuration(d => d + 1), 1000);
         return () => clearInterval(t);
     }, [phase]);
+
+    useEffect(() => {
+        if (phase !== 'room' || !salaId) return;
+        buscarDadosPainelTeleconsulta(salaId).then((res) => {
+            if (res.sucesso && res.dados) setDadosPainel(res.dados);
+        });
+    }, [phase, salaId]);
 
     const encerrar = async () => {
         pcRef.current?.close();
@@ -341,7 +364,8 @@ function TeleconsultaContent() {
     }
 
     return (
-        <div className="h-screen flex bg-slate-950">
+        <>
+            <div className={`h-screen flex bg-slate-950 ${minimizado ? 'hidden' : ''}`}>
             <div className="flex-1 flex flex-col relative">
                 <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4">
                     <div className="flex items-center gap-2">
@@ -370,12 +394,100 @@ function TeleconsultaContent() {
                     <Button onClick={toggleCam} variant={camOn ? "secondary" : "destructive"} size="icon" className="rounded-full h-12 w-12">
                         {camOn ? <Video /> : <VideoOff />}
                     </Button>
+                    <button
+                      onClick={() => setMinimizado(true)}
+                      title="Minimizar (continuar em segundo plano)"
+                      className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700
+                                 text-white shadow-lg transition-all"
+                    >
+                      <Minimize2 className="h-5 w-5" />
+                    </button>
                     <Button onClick={encerrar} variant="destructive" size="icon" className="rounded-full h-12 w-12">
                         <PhoneOff />
                     </Button>
                 </div>
             </div>
-        </div>
+            </div>
+
+            {/* Botões flutuantes — Menu Rápido Clínico */}
+            {!minimizado && phase === 'room' && (
+              <div className="fixed bottom-32 right-6 z-40 flex flex-col gap-2">
+                {[
+                  { label: 'Paciente', icon: User, aba: 'paciente' },
+                  { label: 'Prontuário', icon: FileText, aba: 'prontuario' },
+                  { label: 'Prescrição', icon: Pill, aba: 'prescricao' },
+                ].map(({ label, icon: Icon, aba }) => (
+                  <button
+                    key={aba}
+                    onClick={() => {
+                      setPainelAba(aba as 'paciente' | 'prontuario' | 'prescricao');
+                      setShowPainel(true);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-card border
+                               border-border shadow-lg hover:bg-accent transition-all text-sm
+                               font-medium text-foreground"
+                  >
+                    <Icon className="h-4 w-4 text-primary" />
+                    {label}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setShowCopilot(v => !v)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl shadow-lg
+                             transition-all text-sm font-medium
+                             ${transcricaoPronta
+                               ? 'bg-violet-600 text-white border border-violet-500'
+                               : 'bg-card border border-border text-foreground hover:bg-accent'
+                             }`}
+                >
+                  <Brain className="h-4 w-4" />
+                  {transcricaoPronta ? 'Revisar Prontuário IA' : 'Copilot Clínico'}
+                  {transcricaoPronta && (
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* PiP Flutuante — quando minimizado */}
+            {minimizado && (
+              <TeleconsultaPip
+                localStream={localStreamRef.current}
+                remoteStream={remoteStream}
+                micOn={micOn}
+                onMaximize={() => setMinimizado(false)}
+                onEncerrar={encerrar}
+                onToggleMic={toggleMic}
+                pacienteNome={dadosPainel?.paciente.nome ?? 'Paciente'}
+                duracao={duration}
+              />
+            )}
+
+            {/* Painel Clínico Lateral */}
+            {dadosPainel && (
+              <PainelClinicoLateral
+                dados={dadosPainel}
+                abaInicial={painelAba}
+                visivel={showPainel}
+                onFechar={() => setShowPainel(false)}
+              />
+            )}
+
+            {/* Copilot Clínico */}
+            {salaId && dadosPainel && (
+              <CopilotClinico
+                salaId={salaId}
+                roomId={roomId as string}
+                pacienteNome={dadosPainel.paciente.nome}
+                pacienteId={dadosPainel.paciente.id}
+                consultaId={dadosPainel.consultaId}
+                visivel={showCopilot}
+                onFechar={() => setShowCopilot(false)}
+                onTranscricaoPronta={() => setTranscricaoPronta(true)}
+              />
+            )}
+        </>
     );
 }
 
