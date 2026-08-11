@@ -267,12 +267,12 @@ export default function AgendaPage() {
         </TabsContent>
 
         {/* ── TAB: NOVA CONSULTA ── */}
-        <TabsContent value="nova" className="mt-4 space-y-4">
-          <Card className="border-0 shadow-sm">
+        <TabsContent value="nova" className="mt-4 space-y-4 overflow-visible">
+          <Card className="border-0 shadow-sm overflow-visible">
             <CardHeader><CardTitle className="flex items-center gap-2 text-lg">
               <Plus size={20} className="text-primary" /> Nova Consulta
             </CardTitle></CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 overflow-visible">
               {/* Paciente */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Paciente</label>
