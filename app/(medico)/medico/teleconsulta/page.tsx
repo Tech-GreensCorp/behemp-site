@@ -352,10 +352,13 @@ function TeleconsultaLobbyContent() {
                 {/* Coluna 3: Atendimento Imediato + Pre-flight */}
                 <div className="space-y-4">
 
-                    {/* Atendimento Imediato */}
-                    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                        <div className="h-1 w-full bg-gradient-to-r from-primary via-orange-400 to-amber-400" />
-                        <div className="p-5">
+                    {/* Atendimento Imediato — overflow-visible para o dropdown aparecer fora do card */}
+                    <div className="bg-card border border-border rounded-2xl shadow-sm relative">
+                        {/* Barra de cor no topo — isolada com overflow-hidden para não vazar */}
+                        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl overflow-hidden">
+                            <div className="h-full w-full bg-gradient-to-r from-primary via-orange-400 to-amber-400" />
+                        </div>
+                        <div className="p-5 pt-6">
                             <h2 className="font-heading text-base font-semibold flex items-center gap-2 mb-1">
                                 <Zap className="h-4 w-4 text-primary" />
                                 Atendimento Imediato
