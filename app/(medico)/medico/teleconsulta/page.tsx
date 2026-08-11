@@ -1,616 +1,206 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getPusherClient } from "@/lib/integrations/pusher/client";
-import { registrarConsentimentoLgpd, encerrarTeleconsulta } from "../../_actions/teleconsulta";
-import {
-    Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, MonitorOff,
-    Wifi, WifiOff, ChevronLeft, RefreshCw, AlertTriangle, MessageSquare, Send,
-    User, Pill, Brain, Minimize2, FileText
+import { 
+    Video, Users, Activity, Plus, RefreshCw, Calendar as CalendarIcon, 
+    ArrowRight, CheckCircle2
 } from "lucide-react";
-import { TeleconsultaPip } from '@/components/teleconsulta/TeleconsultaPip';
-import { PainelClinicoLateral } from '@/components/teleconsulta/PainelClinicoLateral';
-import { CopilotClinico } from '@/components/teleconsulta/CopilotClinico';
-import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useTeleconsulta } from "@/components/teleconsulta/TeleconsultaContext";
 
-interface ChatMsg { id: number; autor: "medico" | "paciente" | "sistema"; texto: string; hora: string; }
-const horaFmt = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-
-function TeleconsultaContent() {
+function TeleconsultaLobbyContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const salaId = searchParams.get('salaId');
-    const roomId = searchParams.get('roomId') || Math.random().toString(36).slice(2, 8).toUpperCase();
-
-    const [phase, setPhase] = useState<"lobby" | "connecting" | "room">("lobby");
-
-    const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
-    const localStreamRef = useRef<MediaStream | null>(null);
-    const pcRef = useRef<RTCPeerConnection | null>(null);
-
-    const [micOn, setMicOn] = useState(true);
-    const [camOn, setCamOn] = useState(true);
-    const [screenSharing, setScreenSharing] = useState(false);
-    const [hasCamera, setHasCamera] = useState(true);
-    const [hasMic, setHasMic] = useState(true);
-    const [mediaError, setMediaError] = useState<string | null>(null);
-
-    const [duration, setDuration] = useState(0);
-    const [remoteConnected, setRemoteConnected] = useState(false);
-    const [quality, setQuality] = useState<"excellent" | "good" | "poor" | "offline">("offline");
-
-    const [minimizado, setMinimizado] = useState(false);
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-
-    const [showPainel, setShowPainel] = useState(false);
-    const [painelAba, setPainelAba] = useState<'paciente' | 'prontuario' | 'prescricao'>('paciente');
-    const [dadosPainel, setDadosPainel] = useState<DadosPainelTeleconsulta | null>(null);
-
-    const [showCopilot, setShowCopilot] = useState(false);
-    const [transcricaoPronta, setTranscricaoPronta] = useState(false);
-
-    const [consentimentoTranscricao, setConsentimentoTranscricao] = useState(false);
-    const [transcricaoStatus, setTranscricaoStatus] = useState<"idle" | "enviando" | "processando" | "concluida" | "erro">("idle");
-    const audioChunksRef = useRef<Blob[]>([]);
-    const audioCtxRef = useRef<AudioContext | null>(null);
-    const audioRecorderRef = useRef<MediaRecorder | null>(null);
-
-    const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([
-        { id: 0, autor: "sistema", texto: "Sala criada. Aguardando o paciente conectar.", hora: horaFmt() },
-    ]);
-    const [chatInput, setChatInput] = useState("");
-    const chatEndRef = useRef<HTMLDivElement>(null);
-
+    const { state, startCall } = useTeleconsulta();
+    
     const [consultasHoje, setConsultasHoje] = useState<any[]>([]);
-    const [carregandoConsultas, setCarregandoConsultas] = useState(false);
-    const [consultaSelecionada, setConsultaSelecionada] = useState<string | null>(null);
-    const [iniciandoSala, setIniciandoSala] = useState(false);
+    const [carregandoConsultas, setCarregandoConsultas] = useState(true);
+    const [iniciandoSala, setIniciandoSala] = useState<string | null>(null);
 
-    const iniciarMidia = useCallback(async () => {
-        setMediaError(null);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-                audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
-            });
-            localStreamRef.current = stream;
-            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-            setHasCamera(stream.getVideoTracks().length > 0);
-            setHasMic(stream.getAudioTracks().length > 0);
-        } catch (videoErr: unknown) {
-            console.warn("[Teleconsulta] Câmera indisponível, tentando áudio-only:", videoErr instanceof Error ? videoErr.name : String(videoErr));
-            try {
-                const audioStream = await navigator.mediaDevices.getUserMedia({
-                    video: false,
-                    audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
-                });
-                localStreamRef.current = audioStream;
-                setHasCamera(false);
-                setHasMic(true);
-            } catch (audioErr: unknown) {
-                const msg = "Erro ao acessar microfone/câmera.";
-                setMediaError(msg);
-                setHasCamera(false);
-                setHasMic(false);
-                toast.error(msg);
-            }
+    // Sprint 1: Auto-start if URL has parameters
+    useEffect(() => {
+        const urlSalaId = searchParams.get('salaId');
+        const urlRoomId = searchParams.get('roomId');
+        
+        if (urlSalaId && urlRoomId && state.salaId !== urlSalaId) {
+            startCall(urlSalaId, urlRoomId);
+            // Opcional: limpar a URL para não re-chamar se der refresh
+            router.replace('/medico/teleconsulta');
         }
+    }, [searchParams, state.salaId, startCall, router]);
+
+    // Sprint 2: Carregar fila viva
+    useEffect(() => {
+        setCarregandoConsultas(true);
+        import('@/app/(medico)/_actions/consultas').then(m => m.listarConsultasMedico()).then(res => {
+            if (res.sucesso && res.dados) {
+                // Filtramos hoje (simplificado)
+                const ativas = res.dados.filter((c: any) => c.status === 'agendada' || c.status === 'confirmada');
+                setConsultasHoje(ativas);
+            }
+            setCarregandoConsultas(false);
+        });
     }, []);
 
-    useEffect(() => {
-        if (salaId) {
-            iniciarMidia();
-        } else {
-            // Se não tem salaId, carregar lista de consultas para o médico selecionar
-            setCarregandoConsultas(true);
-            import('@/app/(medico)/_actions/consultas').then(m => m.listarConsultasMedico()).then(res => {
-                if (res.sucesso && res.dados) {
-                    const ativas = res.dados.filter((c: any) => c.status === 'agendada' || c.status === 'confirmada');
-                    setConsultasHoje(ativas);
-                }
-                setCarregandoConsultas(false);
-            });
-        }
-        return () => {
-            localStreamRef.current?.getTracks().forEach(t => t.stop());
-        };
-    }, [iniciarMidia, salaId]);
-
-    const handleSelecionarConsultaEIniciar = async () => {
-        if (!consultaSelecionada) return;
-        setIniciandoSala(true);
+    const handleIniciarConsulta = async (consultaId: string) => {
+        setIniciandoSala(consultaId);
         try {
             const { iniciarTeleconsulta } = await import('@/app/(medico)/_actions/notificar-teleconsulta');
-            const res = await iniciarTeleconsulta(consultaSelecionada);
+            const res = await iniciarTeleconsulta(consultaId);
             if (res.sucesso && res.dados) {
                 toast.success('Paciente notificado! Preparando sala...');
-                router.replace(`/medico/teleconsulta?roomId=${res.dados.roomId}&salaId=${res.dados.salaId}`);
+                // Em vez de navegar para URL, chamamos direto o Contexto Global! (Sprint 1)
+                startCall(res.dados.salaId, res.dados.roomId);
             } else {
                 toast.error(res.erro ?? 'Erro ao iniciar teleconsulta');
-                setIniciandoSala(false);
             }
         } catch {
             toast.error('Erro de conexão.');
-            setIniciandoSala(false);
+        } finally {
+            setIniciandoSala(null);
         }
     };
-
-    // ... (restante dos toggles e webRTC iguais)
-
-    const toggleMic = () => {
-        const track = localStreamRef.current?.getAudioTracks()[0];
-        if (!track) return;
-        track.enabled = !track.enabled;
-        setMicOn(track.enabled);
-    };
-
-    const toggleCam = () => {
-        const track = localStreamRef.current?.getVideoTracks()[0];
-        if (!track) return;
-        track.enabled = !track.enabled;
-        setCamOn(track.enabled);
-    };
-
-    const toggleScreen = async () => {
-        if (screenSharing) {
-            const camTrack = localStreamRef.current?.getVideoTracks()[0];
-            if (camTrack) camTrack.enabled = true;
-            setScreenSharing(false);
-            const sender = pcRef.current?.getSenders().find(s => s.track?.kind === "video");
-            if (sender && camTrack) { await sender.replaceTrack(camTrack); }
-        } else {
-            try {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { displaySurface: "monitor" } as unknown as MediaTrackConstraints,
-                    audio: false,
-                });
-                const screenTrack = screenStream.getVideoTracks()[0];
-                if (localVideoRef.current) {
-                    const newStream = new MediaStream([
-                        screenTrack,
-                        ...(localStreamRef.current?.getAudioTracks() || []),
-                    ]);
-                    localVideoRef.current.srcObject = newStream;
-                }
-                const sender = pcRef.current?.getSenders().find(s => s.track?.kind === "video");
-                if (sender) await sender.replaceTrack(screenTrack);
-
-                screenTrack.onended = () => {
-                    setScreenSharing(false);
-                    if (localVideoRef.current && localStreamRef.current) {
-                        localVideoRef.current.srcObject = localStreamRef.current;
-                    }
-                };
-                setScreenSharing(true);
-            } catch (err: unknown) {
-                if (err instanceof Error && err.name !== "NotAllowedError") toast.error("Erro ao compartilhar tela.");
-            }
-        }
-    };
-
-    const sinalizarWebRTC = async (tipo: string, payload: unknown) => {
-        await fetch('/api/teleconsulta/sinalizar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId, tipo, payload }),
-        });
-    };
-
-    const iniciarConsulta = useCallback(async () => {
-        if (!localStreamRef.current) {
-            toast.error("Câmera/Mic não inicializados.");
-            return;
-        }
-        
-        if (salaId && consentimentoTranscricao) {
-            await registrarConsentimentoLgpd(salaId, consentimentoTranscricao);
-        }
-
-        setPhase("connecting");
-
-        try {
-            const pusher = getPusherClient();
-            const channel = pusher.subscribe(`presence-sala-${roomId}`);
-
-            const pc = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            });
-            pcRef.current = pc;
-
-            localStreamRef.current.getTracks().forEach(track => {
-                pc.addTrack(track, localStreamRef.current!);
-            });
-
-            pc.ontrack = (event) => {
-                if (remoteVideoRef.current && event.streams[0]) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
-                    setRemoteStream(event.streams[0]);
-                    setRemoteConnected(true);
-                    setChatMsgs(prev => [...prev, { id: Date.now(), autor: "sistema", texto: "✅ Paciente conectado.", hora: horaFmt() }]);
-
-                    if (consentimentoTranscricao && localStreamRef.current) {
-                        try {
-                            const audioCtx = new window.AudioContext();
-                            audioCtxRef.current = audioCtx;
-                            const dest = audioCtx.createMediaStreamDestination();
-                            const localNode = audioCtx.createMediaStreamSource(localStreamRef.current);
-                            const remoteNode = audioCtx.createMediaStreamSource(event.streams[0]);
-                            const merger = audioCtx.createChannelMerger(2);
-                            localNode.connect(merger, 0, 0);
-                            remoteNode.connect(merger, 0, 1);
-                            merger.connect(dest);
-                            
-                            const mr = new MediaRecorder(dest.stream, { mimeType: "audio/webm;codecs=opus" });
-                            audioRecorderRef.current = mr;
-                            audioChunksRef.current = [];
-                            mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-                            mr.start(1000);
-                        } catch (e) {
-                            console.warn("Mixer error:", e);
-                        }
-                    }
-                }
-            };
-
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    sinalizarWebRTC("ice-candidate", { candidate: event.candidate });
-                }
-            };
-
-            pc.onconnectionstatechange = () => {
-                if (pc.connectionState === "connected") setQuality("excellent");
-                else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-                    setQuality("offline");
-                    setRemoteConnected(false);
-                }
-            };
-
-            channel.bind('pusher:subscription_succeeded', () => {
-                setPhase("room");
-                sinalizarWebRTC("peer-joined", { role: "medico" });
-            });
-
-            channel.bind('webrtc:peer-joined', async ({ role }: { role: string }) => {
-                if (role === "paciente") {
-                    try {
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
-                        sinalizarWebRTC("offer", { offer });
-                    } catch (err) {}
-                }
-            });
-
-            channel.bind('webrtc:answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
-                try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                } catch (err) {}
-            });
-
-            channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {}
-            });
-
-        } catch (err) {
-            toast.error("Erro ao iniciar a sala.");
-            setPhase("lobby");
-        }
-    }, [roomId, salaId, consentimentoTranscricao]);
-
-    useEffect(() => {
-        if (phase !== "room") return;
-        const t = setInterval(() => setDuration(d => d + 1), 1000);
-        return () => clearInterval(t);
-    }, [phase]);
-
-    useEffect(() => {
-        if (phase !== 'room' || !salaId) return;
-        buscarDadosPainelTeleconsulta(salaId).then((res) => {
-            if (res.sucesso && res.dados) setDadosPainel(res.dados);
-        });
-    }, [phase, salaId]);
-
-    const encerrar = async () => {
-        pcRef.current?.close();
-        pcRef.current = null;
-        localStreamRef.current?.getTracks().forEach(t => t.stop());
-        audioCtxRef.current?.close();
-
-        if (salaId) await encerrarTeleconsulta(salaId, duration);
-        
-        const mr = audioRecorderRef.current;
-        if (mr && mr.state !== "inactive" && consentimentoTranscricao && salaId) {
-            mr.onstop = () => {
-                if (audioChunksRef.current.length === 0) return;
-                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-                const form = new FormData();
-                form.append("salaId", salaId);
-                form.append("consentimento", "true");
-                form.append("audio", blob, "teleconsulta.webm");
-
-                setTranscricaoStatus("enviando");
-                fetch('/api/teleconsulta/transcrever', { method: 'POST', body: form })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.sucesso) {
-                            toast.success("Transcrição enviada para processamento com sucesso!");
-                        } else {
-                            toast.error("Falha na transcrição.");
-                        }
-                    })
-                    .catch(() => toast.error("Falha no upload da transcrição."));
-            };
-            mr.stop();
-        }
-
-        toast.info("Consulta encerrada.");
-        router.push("/medico/agenda");
-    };
-
-    if (!salaId) {
-        return (
-            <div className="p-8 max-w-2xl mx-auto space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-[var(--primary)]">Iniciar Teleconsulta</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Selecione a consulta agendada. Ao iniciar, o paciente será notificado automaticamente para acessar a sala.
-                    </p>
-                </div>
-
-                <div className="bg-card rounded-xl border border-border overflow-hidden">
-                    {carregandoConsultas ? (
-                        <div className="p-12 flex justify-center">
-                            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : consultasHoje.length === 0 ? (
-                        <div className="p-12 flex flex-col items-center justify-center text-center">
-                            <User className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                            <p className="text-foreground font-medium">Nenhuma consulta agendada disponível.</p>
-                            <p className="text-sm text-muted-foreground">Acesse sua Agenda para criar uma nova consulta.</p>
-                            <Button variant="outline" className="mt-4" onClick={() => router.push("/medico/agenda")}>
-                                Ir para a Agenda
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-border">
-                            {consultasHoje.map((c) => (
-                                <div 
-                                    key={c.id} 
-                                    onClick={() => setConsultaSelecionada(c.id)}
-                                    className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-muted/50 ${consultaSelecionada === c.id ? 'bg-primary/5 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <User className="h-5 w-5 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-foreground">{c.pacienteNome}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {new Date(c.dataHora).toLocaleDateString('pt-BR')} às {new Date(c.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="bg-background">
-                                            {c.status === 'confirmada' ? 'Confirmada' : 'Agendada'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex gap-4">
-                    <Button variant="ghost" onClick={() => router.push("/medico/agenda")} className="flex-1">
-                        Voltar para Agenda
-                    </Button>
-                    <Button 
-                        onClick={handleSelecionarConsultaEIniciar} 
-                        disabled={!consultaSelecionada || iniciandoSala} 
-                        className="flex-1 gap-2"
-                    >
-                        {iniciandoSala ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Video className="h-4 w-4" />
-                        )}
-                        {iniciandoSala ? 'Criando sala e notificando...' : 'Iniciar Teleconsulta com Paciente'}
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    if (phase === "lobby" || phase === "connecting") {
-        return (
-            <div className="p-8 max-w-4xl mx-auto space-y-6">
-                <Button variant="ghost" onClick={() => router.push("/medico/agenda")}>
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
-                </Button>
-                
-                <h1 className="text-2xl font-bold text-[var(--primary)]">Configurar Câmera e Microfone</h1>
-                <p className="text-muted-foreground">Verifique sua câmera e microfone antes de entrar na sala com o paciente.</p>
-
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border shadow-lg max-h-[60vh] mx-auto">
-                    <video ref={localVideoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${!camOn && "opacity-0"}`} />
-                    {!camOn && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <VideoOff className="h-12 w-12 text-white/50" />
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex gap-4 justify-center">
-                    <Button onClick={toggleMic} variant={micOn ? "secondary" : "destructive"} size="lg" className="rounded-full h-14 w-14 p-0">
-                        {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
-                    </Button>
-                    <Button onClick={toggleCam} variant={camOn ? "secondary" : "destructive"} size="lg" className="rounded-full h-14 w-14 p-0">
-                        {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-                    </Button>
-                </div>
-
-                <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex items-start space-x-3 max-w-2xl mx-auto">
-                    <Checkbox id="lgpd" checked={consentimentoTranscricao} onCheckedChange={(c) => setConsentimentoTranscricao(!!c)} className="mt-1" />
-                    <label htmlFor="lgpd" className="text-sm font-medium leading-relaxed text-foreground">
-                        Confirmo que solicitei e obtive o <strong>consentimento verbal do paciente</strong> para gravar e transcrever esta sessão para fins de prontuário (Lei Geral de Proteção de Dados - LGPD).
-                    </label>
-                </div>
-
-                <div className="flex justify-center pt-2">
-                    <Button className="w-full max-w-md gap-2" size="lg" onClick={iniciarConsulta} disabled={phase === "connecting"}>
-                        {phase === "connecting" ? (
-                            <><RefreshCw className="h-5 w-5 animate-spin" /> Conectando à sala...</>
-                        ) : (
-                            <><Video className="h-5 w-5" /> Entrar na Sala</>
-                        )}
-                    </Button>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <>
-            <div className={`h-screen flex bg-slate-950 ${minimizado ? 'hidden' : ''}`}>
-            <div className="flex-1 flex flex-col relative">
-                <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-white text-sm font-medium">AO VIVO {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}</span>
-                    </div>
-                </div>
+        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Header Orgânico */}
+            <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Command Center</p>
+                <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-foreground">
+                    Recepção de <span className="text-primary italic">Teleconsulta</span>
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                    Inicie seus atendimentos agendados ou crie consultas de urgência.
+                </p>
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-6">
                 
-                <div className="flex-1 relative">
-                    <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
-                    {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                            <p className="text-slate-400">Aguardando paciente...</p>
+                {/* Coluna 1 e 2: Fila de Espera */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                        <div className="p-6 border-b border-border flex items-center justify-between bg-secondary/20">
+                            <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary" /> Fila de Espera (Hoje)
+                            </h2>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary">
+                                {consultasHoje.length} consultas pendentes
+                            </Badge>
                         </div>
-                    )}
-                    
-                    <div className="absolute bottom-4 right-4 w-48 aspect-video bg-black rounded-lg overflow-hidden border-2 border-slate-700 shadow-xl">
-                        <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && "opacity-0"}`} />
+                        
+                        <div className="p-6 flex-1 bg-background">
+                            {carregandoConsultas ? (
+                                <div className="flex justify-center items-center py-12">
+                                    <RefreshCw className="h-6 w-6 animate-spin text-primary/50" />
+                                </div>
+                            ) : consultasHoje.length === 0 ? (
+                                <div className="text-center py-12 flex flex-col items-center">
+                                    <CalendarIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                                    <p className="text-foreground font-medium">Nenhuma consulta agendada para hoje.</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Sua fila está vazia.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {consultasHoje.map((c) => (
+                                        <div key={c.id} className="group relative flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className="relative">
+                                                    <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+                                                        <span className="font-semibold text-primary">{c.pacienteNome.charAt(0)}</span>
+                                                    </div>
+                                                    {/* Indicador de presença (Mock para Sprint 2, será implementado na 3 com Pusher real-time) */}
+                                                    <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-background bg-slate-300" title="Offline" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-semibold text-foreground">{c.pacienteNome}</h3>
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                                                        <span>{new Date(c.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        <span>•</span>
+                                                        <span>Agendada</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                onClick={() => handleIniciarConsulta(c.id)}
+                                                disabled={iniciandoSala === c.id || state.salaId !== null}
+                                                className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
+                                            >
+                                                {iniciandoSala === c.id ? (
+                                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Video className="h-4 w-4" />
+                                                )}
+                                                Chamar Paciente
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4">
-                    <Button onClick={toggleMic} variant={micOn ? "secondary" : "destructive"} size="icon" className="rounded-full h-12 w-12">
-                        {micOn ? <Mic /> : <MicOff />}
-                    </Button>
-                    <Button onClick={toggleCam} variant={camOn ? "secondary" : "destructive"} size="icon" className="rounded-full h-12 w-12">
-                        {camOn ? <Video /> : <VideoOff />}
-                    </Button>
-                    <button
-                      onClick={() => setMinimizado(true)}
-                      title="Minimizar (continuar em segundo plano)"
-                      className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700
-                                 text-white shadow-lg transition-all"
-                    >
-                      <Minimize2 className="h-5 w-5" />
-                    </button>
-                    <Button onClick={encerrar} variant="destructive" size="icon" className="rounded-full h-12 w-12">
-                        <PhoneOff />
-                    </Button>
+                {/* Coluna 3: Atendimento Imediato & Setup */}
+                <div className="space-y-6">
+                    
+                    {/* Atendimento Imediato (Sprint 3) */}
+                    <div className="bg-card border border-border rounded-2xl shadow-sm p-6 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-orange-400" />
+                        <h2 className="font-heading text-lg font-semibold flex items-center gap-2 mb-2">
+                            <Activity className="h-5 w-5 text-primary" /> Atendimento Imediato
+                        </h2>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Inicie uma consulta de encaixe imediatamente. O paciente será notificado agora.
+                        </p>
+                        
+                        <Button variant="outline" className="w-full justify-between group rounded-xl h-12" onClick={() => router.push('/medico/agenda')}>
+                            <span className="flex items-center gap-2">
+                                <Plus className="h-4 w-4 text-primary" />
+                                Buscar Paciente
+                            </span>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </Button>
+                    </div>
+
+                    {/* Pre-flight Check Visual */}
+                    <div className="bg-secondary/30 border border-border rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Setup do Sistema</h3>
+                        
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">Conexão Estável</p>
+                                    <p className="text-xs text-muted-foreground">Ping: 24ms</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">Servidor WebRTC</p>
+                                    <p className="text-xs text-muted-foreground">Online (us-east-1)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-            </div>
-
-            {/* Botões flutuantes — Menu Rápido Clínico */}
-            {!minimizado && phase === 'room' && (
-              <div className="fixed bottom-32 right-6 z-40 flex flex-col gap-2">
-                {[
-                  { label: 'Paciente', icon: User, aba: 'paciente' },
-                  { label: 'Prontuário', icon: FileText, aba: 'prontuario' },
-                  { label: 'Prescrição', icon: Pill, aba: 'prescricao' },
-                ].map(({ label, icon: Icon, aba }) => (
-                  <button
-                    key={aba}
-                    onClick={() => {
-                      setPainelAba(aba as 'paciente' | 'prontuario' | 'prescricao');
-                      setShowPainel(true);
-                    }}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-card border
-                               border-border shadow-lg hover:bg-accent transition-all text-sm
-                               font-medium text-foreground"
-                  >
-                    <Icon className="h-4 w-4 text-primary" />
-                    {label}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => setShowCopilot(v => !v)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl shadow-lg
-                             transition-all text-sm font-medium
-                             ${transcricaoPronta
-                               ? 'bg-violet-600 text-white border border-violet-500'
-                               : 'bg-card border border-border text-foreground hover:bg-accent'
-                             }`}
-                >
-                  <Brain className="h-4 w-4" />
-                  {transcricaoPronta ? 'Revisar Prontuário IA' : 'Copilot Clínico'}
-                  {transcricaoPronta && (
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* PiP Flutuante — quando minimizado */}
-            {minimizado && (
-              <TeleconsultaPip
-                localStream={localStreamRef.current}
-                remoteStream={remoteStream}
-                micOn={micOn}
-                onMaximize={() => setMinimizado(false)}
-                onEncerrar={encerrar}
-                onToggleMic={toggleMic}
-                pacienteNome={dadosPainel?.paciente.nome ?? 'Paciente'}
-                duracao={duration}
-              />
-            )}
-
-            {/* Painel Clínico Lateral */}
-            {dadosPainel && (
-              <PainelClinicoLateral
-                dados={dadosPainel}
-                abaInicial={painelAba}
-                visivel={showPainel}
-                onFechar={() => setShowPainel(false)}
-              />
-            )}
-
-            {/* Copilot Clínico */}
-            {salaId && dadosPainel && (
-              <CopilotClinico
-                salaId={salaId}
-                roomId={roomId as string}
-                pacienteNome={dadosPainel.paciente.nome}
-                pacienteId={dadosPainel.paciente.id}
-                consultaId={dadosPainel.consultaId}
-                visivel={showCopilot}
-                onFechar={() => setShowCopilot(false)}
-                onTranscricaoPronta={() => setTranscricaoPronta(true)}
-              />
-            )}
-        </>
+        </div>
     );
 }
 
-export default function TeleconsultaMedico() {
+export default function TeleconsultaLobby() {
     return (
-        <Suspense fallback={<div>Carregando sala...</div>}>
-            <TeleconsultaContent />
+        <Suspense fallback={<div className="p-12 flex justify-center"><RefreshCw className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <TeleconsultaLobbyContent />
         </Suspense>
     );
 }

@@ -8,6 +8,9 @@ import { MedicoSidebar } from '@/components/shared/medico-sidebar';
  * Verifica role via obterRoleComFallback() — publicMetadata → banco → default 'paciente'.
  * Sidebar fixa + área de conteúdo.
  */
+import { TeleconsultaProvider } from '@/components/teleconsulta/TeleconsultaContext';
+import { GlobalTeleconsultaHost } from '@/components/teleconsulta/GlobalTeleconsultaHost';
+
 export default async function MedicoLayout({ children }: { children: ReactNode }) {
   const { user, role } = await obterRoleComFallback();
 
@@ -16,14 +19,17 @@ export default async function MedicoLayout({ children }: { children: ReactNode }
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen">
-      <MedicoSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="px-4 py-8 sm:px-6 lg:px-8">
-          {children}
-        </div>
-      </main>
-    </div>
+    <TeleconsultaProvider>
+      <div className="flex flex-col lg:flex-row min-h-screen">
+        <MedicoSidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="px-4 py-8 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
+      </div>
+      <GlobalTeleconsultaHost />
+    </TeleconsultaProvider>
   );
 }
 
