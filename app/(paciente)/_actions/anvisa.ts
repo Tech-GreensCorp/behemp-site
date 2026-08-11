@@ -273,3 +273,104 @@ export async function confirmarEnvioAnvisa(autorizacaoId: string) {
   revalidatePath('/paciente/anvisa');
   return { sucesso: true, dados: { prazoEstimado } };
 }
+
+// ── Sincronizar Assinatura DocuSign (Fallback do Webhook) ─────
+export async function sincronizarAssinaturaDocuSign(procuracaoId: string) {
+  const perm = await verificarPaciente();
+  if (!perm.autorizado) return { sucesso: false, erro: 'Não autorizado' };
+
+  const { procuracoesEspecificas, pacientes, users } = await import('@/db/schema');
+
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.clerkId, perm.clerkId!)).limit(1);
+  if (!user) return { sucesso: false, erro: 'Usuário não encontrado' };
+
+  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(and(eq(pacientes.userId, user.id), isNull(pacientes.deletedAt))).limit(1);
+  if (!paciente) return { sucesso: false, erro: 'Paciente não encontrado' };
+
+  const [procuracao] = await db
+    .select()
+    .from(procuracoesEspecificas)
+    .where(and(eq(procuracoesEspecificas.id, procuracaoId), eq(procuracoesEspecificas.pacienteId, paciente.id)))
+    .limit(1);
+
+  if (!procuracao) return { sucesso: false, erro: 'Procuração não encontrada' };
+  
+  // Se já foi assinada e salva, não fazer nada
+  if (procuracao.urlPdfAssinado) {
+    return { sucesso: true };
+  }
+
+  if (!procuracao.docusignEnvelopeId) {
+    return { sucesso: false, erro: 'Envelope DocuSign não encontrado' };
+  }
+
+  try {
+    const { downloadPdfAssinado } = await import('@/lib/docusign/docusign-service');
+    const { put } = await import('@vercel/blob');
+
+    const pdfAssinado = await downloadPdfAssinado(procuracao.docusignEnvelopeId);
+    
+    if (pdfAssinado) {
+      const nomeArquivo = `procuracoes/assinadas/${procuracao.id}-assinada-${Date.now()}.pdf`;
+      const blob = await put(nomeArquivo, pdfAssinado, { access: 'public' });
+
+      await db
+        .update(procuracoesEspecificas)
+        .set({ 
+          urlPdfAssinado: blob.url,
+          docusignStatus: 'concluido',
+          assinadoEm: new Date()
+        })
+        .where(eq(procuracoesEspecificas.id, procuracao.id));
+
+      if (procuracao.autorizacaoId) {
+        const { documentos: docsSchema, autorizacoesAnvisa } = await import('@/db/schema');
+        
+        // Inserir na tabela documentos do paciente
+        await db.insert(docsSchema).values({
+          pacienteId: procuracao.pacienteId,
+          tipo: 'procuracao_especifica',
+          nomeArquivo: `procuracao-especifica-assinada-${Date.now()}.pdf`,
+          urlBlob: blob.url,
+          dataEmissao: new Date().toISOString().split('T')[0],
+          dataValidade: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }).catch((e) => { console.error('Erro ao salvar documento:', e) });
+
+        // Atualizar checklist da autorização ANVISA
+        const [autorizacao] = await db
+          .select({ documentos: autorizacoesAnvisa.documentos })
+          .from(autorizacoesAnvisa)
+          .where(eq(autorizacoesAnvisa.id, procuracao.autorizacaoId))
+          .limit(1);
+
+        if (autorizacao) {
+          const docs = (autorizacao.documentos as { tipo: string; enviado: boolean; urlBlob: string | null; nomeArquivo: string | null; validado: boolean }[]) ?? [];
+          const docsAtualizados = docs.map((d) =>
+            d.tipo === 'procuracao_especifica'
+              ? { ...d, enviado: true, urlBlob: blob.url, nomeArquivo: 'procuracao-especifica-assinada.pdf', validado: true }
+              : d
+          );
+
+          const todosEnviados = docsAtualizados
+            .filter((d) => ['receita_medica', 'rg_paciente', 'comprovante_residencia', 'procuracao_especifica'].includes(d.tipo))
+            .every((d) => d.enviado);
+
+          await db.update(autorizacoesAnvisa)
+            .set({
+              documentos: docsAtualizados,
+              ...(todosEnviados ? { status: 'documentos_enviados' } : {}),
+            })
+            .where(eq(autorizacoesAnvisa.id, procuracao.autorizacaoId));
+        }
+      }
+      
+      revalidatePath('/paciente/anvisa');
+      return { sucesso: true };
+    }
+    
+    return { sucesso: false, erro: 'PDF ainda não disponível no DocuSign' };
+  } catch (err) {
+    console.error('[DocuSign Sync] Erro ao sincronizar assinatura:', err);
+    return { sucesso: false, erro: 'Erro interno ao sincronizar assinatura' };
+  }
+}

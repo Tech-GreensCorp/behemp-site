@@ -158,10 +158,24 @@ export function ProcuracaoEspecificaCard({
   };
 
   // Assinatura concluída no modal
-  const handleAssinaturaConcluida = () => {
+  const handleAssinaturaConcluida = async () => {
     setModalSigningAberto(false);
-    setStatus('concluido');
-    toast.success('Procuração Específica assinada com sucesso! A Be4Hope foi notificada.');
+    toast.info('Sincronizando documento assinado com o sistema...');
+    
+    if (procuracaoId) {
+      const { sincronizarAssinaturaDocuSign } = await import('../../_actions/anvisa');
+      const res = await sincronizarAssinaturaDocuSign(procuracaoId);
+      if (res.sucesso) {
+        setStatus('concluido');
+        toast.success('Procuração Específica assinada com sucesso! A Be4Hope foi notificada.');
+      } else {
+        setStatus('enviado'); // revert to enviado so they can try to sync or view later
+        toast.error(res.erro || 'Não foi possível buscar o PDF no DocuSign. Tente novamente mais tarde.');
+      }
+    } else {
+      setStatus('concluido');
+      toast.success('Procuração Específica assinada com sucesso! A Be4Hope foi notificada.');
+    }
   };
 
   return (
