@@ -67,6 +67,14 @@ export async function POST(request: NextRequest) {
       if (!participante) {
         return NextResponse.json({ erro: 'Acesso negado ao grupo' }, { status: 403 });
       }
+    } else if (canal.startsWith('presence-sala-')) {
+      // Para teleconsulta (presence channels exigem presenceData)
+      const presenceData = {
+        user_id: user.id,
+        user_info: { id: user.id, clerkId }
+      };
+      const authResponse = autenticarCanal(socketId, canal, presenceData);
+      return NextResponse.json(authResponse);
     }
 
     const authResponse = autenticarCanal(socketId, canal);

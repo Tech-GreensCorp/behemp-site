@@ -134,10 +134,13 @@ export async function enviarNotificacaoRealtime(params: {
 }
 
 /**
- * Autentica um canal privado do Pusher.
+ * Autentica um canal privado ou presence do Pusher.
  * Deve ser usado no endpoint /api/pusher/auth
  */
-export function autenticarCanal(socketId: string, canal: string) {
+export function autenticarCanal(socketId: string, canal: string, presenceData?: any) {
   const pusher = getPusherServer();
+  if (canal.startsWith('presence-') && presenceData) {
+    return pusher.authorizeChannel(socketId, canal, presenceData);
+  }
   return pusher.authorizeChannel(socketId, canal);
 }
