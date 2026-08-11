@@ -163,7 +163,7 @@ export function ProcuracaoEspecificaCard({
     toast.info('Sincronizando documento assinado com o sistema...');
     
     if (procuracaoId) {
-      const { sincronizarAssinaturaDocuSign } = await import('../../_actions/anvisa');
+      const { sincronizarAssinaturaDocuSign } = await import('@/app/(paciente)/_actions/anvisa');
       const res = await sincronizarAssinaturaDocuSign(procuracaoId);
       if (res.sucesso) {
         setStatus('concluido');

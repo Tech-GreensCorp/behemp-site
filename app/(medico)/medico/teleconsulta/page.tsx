@@ -68,6 +68,11 @@ function TeleconsultaContent() {
     const [chatInput, setChatInput] = useState("");
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    const [consultasHoje, setConsultasHoje] = useState<any[]>([]);
+    const [carregandoConsultas, setCarregandoConsultas] = useState(false);
+    const [consultaSelecionada, setConsultaSelecionada] = useState<string | null>(null);
+    const [iniciandoSala, setIniciandoSala] = useState(false);
+
     const iniciarMidia = useCallback(async () => {
         setMediaError(null);
         try {
@@ -100,11 +105,44 @@ function TeleconsultaContent() {
     }, []);
 
     useEffect(() => {
-        iniciarMidia();
+        if (salaId) {
+            iniciarMidia();
+        } else {
+            // Se não tem salaId, carregar lista de consultas para o médico selecionar
+            setCarregandoConsultas(true);
+            import('@/app/(medico)/_actions/consultas').then(m => m.listarConsultasMedico()).then(res => {
+                if (res.sucesso && res.dados) {
+                    const ativas = res.dados.filter((c: any) => c.status === 'agendada' || c.status === 'confirmada');
+                    setConsultasHoje(ativas);
+                }
+                setCarregandoConsultas(false);
+            });
+        }
         return () => {
             localStreamRef.current?.getTracks().forEach(t => t.stop());
         };
-    }, [iniciarMidia]);
+    }, [iniciarMidia, salaId]);
+
+    const handleSelecionarConsultaEIniciar = async () => {
+        if (!consultaSelecionada) return;
+        setIniciandoSala(true);
+        try {
+            const { iniciarTeleconsulta } = await import('@/app/(medico)/_actions/notificar-teleconsulta');
+            const res = await iniciarTeleconsulta(consultaSelecionada);
+            if (res.sucesso && res.dados) {
+                toast.success('Paciente notificado! Preparando sala...');
+                router.replace(`/medico/teleconsulta?roomId=${res.dados.roomId}&salaId=${res.dados.salaId}`);
+            } else {
+                toast.error(res.erro ?? 'Erro ao iniciar teleconsulta');
+                setIniciandoSala(false);
+            }
+        } catch {
+            toast.error('Erro de conexão.');
+            setIniciandoSala(false);
+        }
+    };
+
+    // ... (restante dos toggles e webRTC iguais)
 
     const toggleMic = () => {
         const track = localStreamRef.current?.getAudioTracks()[0];
@@ -318,6 +356,81 @@ function TeleconsultaContent() {
         router.push("/medico/agenda");
     };
 
+    if (!salaId) {
+        return (
+            <div className="p-8 max-w-2xl mx-auto space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-[var(--primary)]">Iniciar Teleconsulta</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Selecione a consulta agendada. Ao iniciar, o paciente será notificado automaticamente para acessar a sala.
+                    </p>
+                </div>
+
+                <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    {carregandoConsultas ? (
+                        <div className="p-12 flex justify-center">
+                            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : consultasHoje.length === 0 ? (
+                        <div className="p-12 flex flex-col items-center justify-center text-center">
+                            <User className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                            <p className="text-foreground font-medium">Nenhuma consulta agendada disponível.</p>
+                            <p className="text-sm text-muted-foreground">Acesse sua Agenda para criar uma nova consulta.</p>
+                            <Button variant="outline" className="mt-4" onClick={() => router.push("/medico/agenda")}>
+                                Ir para a Agenda
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-border">
+                            {consultasHoje.map((c) => (
+                                <div 
+                                    key={c.id} 
+                                    onClick={() => setConsultaSelecionada(c.id)}
+                                    className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-muted/50 ${consultaSelecionada === c.id ? 'bg-primary/5 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <User className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-foreground">{c.pacienteNome}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {new Date(c.dataHora).toLocaleDateString('pt-BR')} às {new Date(c.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="bg-background">
+                                            {c.status === 'confirmada' ? 'Confirmada' : 'Agendada'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-4">
+                    <Button variant="ghost" onClick={() => router.push("/medico/agenda")} className="flex-1">
+                        Voltar para Agenda
+                    </Button>
+                    <Button 
+                        onClick={handleSelecionarConsultaEIniciar} 
+                        disabled={!consultaSelecionada || iniciandoSala} 
+                        className="flex-1 gap-2"
+                    >
+                        {iniciandoSala ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Video className="h-4 w-4" />
+                        )}
+                        {iniciandoSala ? 'Criando sala e notificando...' : 'Iniciar Teleconsulta com Paciente'}
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     if (phase === "lobby" || phase === "connecting") {
         return (
             <div className="p-8 max-w-4xl mx-auto space-y-6">
@@ -325,10 +438,10 @@ function TeleconsultaContent() {
                     <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
                 
-                <h1 className="text-2xl font-bold text-[var(--primary)]">Teleconsulta</h1>
-                <p className="text-muted-foreground">Verifique sua câmera e microfone antes de entrar.</p>
+                <h1 className="text-2xl font-bold text-[var(--primary)]">Configurar Câmera e Microfone</h1>
+                <p className="text-muted-foreground">Verifique sua câmera e microfone antes de entrar na sala com o paciente.</p>
 
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border shadow-lg max-h-[60vh] mx-auto">
                     <video ref={localVideoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${!camOn && "opacity-0"}`} />
                     {!camOn && (
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -338,27 +451,30 @@ function TeleconsultaContent() {
                 </div>
 
                 <div className="flex gap-4 justify-center">
-                    <Button onClick={toggleMic} variant={micOn ? "secondary" : "destructive"}>
-                        {micOn ? <Mic /> : <MicOff />}
+                    <Button onClick={toggleMic} variant={micOn ? "secondary" : "destructive"} size="lg" className="rounded-full h-14 w-14 p-0">
+                        {micOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
                     </Button>
-                    <Button onClick={toggleCam} variant={camOn ? "secondary" : "destructive"}>
-                        {camOn ? <Video /> : <VideoOff />}
-                    </Button>
-                    <Button onClick={toggleScreen} variant={screenSharing ? "default" : "secondary"}>
-                        {screenSharing ? <MonitorOff /> : <Monitor />}
+                    <Button onClick={toggleCam} variant={camOn ? "secondary" : "destructive"} size="lg" className="rounded-full h-14 w-14 p-0">
+                        {camOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
                     </Button>
                 </div>
 
-                <div className="bg-card p-4 rounded-lg border flex items-center space-x-2">
-                    <Checkbox id="lgpd" checked={consentimentoTranscricao} onCheckedChange={(c) => setConsentimentoTranscricao(!!c)} />
-                    <label htmlFor="lgpd" className="text-sm font-medium leading-none">
-                        Confirmo que tenho o consentimento do paciente para gravar e transcrever esta sessão (LGPD).
+                <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex items-start space-x-3 max-w-2xl mx-auto">
+                    <Checkbox id="lgpd" checked={consentimentoTranscricao} onCheckedChange={(c) => setConsentimentoTranscricao(!!c)} className="mt-1" />
+                    <label htmlFor="lgpd" className="text-sm font-medium leading-relaxed text-foreground">
+                        Confirmo que solicitei e obtive o <strong>consentimento verbal do paciente</strong> para gravar e transcrever esta sessão para fins de prontuário (Lei Geral de Proteção de Dados - LGPD).
                     </label>
                 </div>
 
-                <Button className="w-full" size="lg" onClick={iniciarConsulta} disabled={phase === "connecting"}>
-                    {phase === "connecting" ? "Conectando..." : "Iniciar Sala"}
-                </Button>
+                <div className="flex justify-center pt-2">
+                    <Button className="w-full max-w-md gap-2" size="lg" onClick={iniciarConsulta} disabled={phase === "connecting"}>
+                        {phase === "connecting" ? (
+                            <><RefreshCw className="h-5 w-5 animate-spin" /> Conectando à sala...</>
+                        ) : (
+                            <><Video className="h-5 w-5" /> Entrar na Sala</>
+                        )}
+                    </Button>
+                </div>
             </div>
         );
     }
