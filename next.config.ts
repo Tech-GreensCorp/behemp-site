@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
     },
   },
 
+  typescript: {
+    // !! CRÍTICO PARA A AWS (t2.small - 2GB RAM) !!
+    // O TypeChecking é feito localmente. No servidor, a etapa
+    // consome mais memória do que a máquina possui e causa OOM Crash.
+    ignoreBuildErrors: true,
+  },
+
   images: {
     qualities: [75, 80, 85, 90],
     remotePatterns: [
