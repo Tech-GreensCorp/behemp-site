@@ -1,11 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
 
 interface TeleconsultaState {
   salaId: string | null;
   roomId: string | null;
   isMinimized: boolean;
+  /**
+   * Stream local do médico — armazenado no contexto para que o PiP
+   * acesse o valor real mesmo após navegação (refs não disparam re-render).
+   */
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
 }
 
 interface TeleconsultaContextType {
@@ -13,6 +19,8 @@ interface TeleconsultaContextType {
   startCall: (salaId: string, roomId: string) => void;
   endCall: () => void;
   setMinimized: (minimized: boolean) => void;
+  /** Chamado pelo GlobalTeleconsultaHost quando os streams mudam */
+  setStreams: (local: MediaStream | null, remote: MediaStream | null) => void;
 }
 
 const TeleconsultaContext = createContext<TeleconsultaContextType | undefined>(undefined);
@@ -22,22 +30,28 @@ export function TeleconsultaProvider({ children }: { children: ReactNode }) {
     salaId: null,
     roomId: null,
     isMinimized: false,
+    localStream: null,
+    remoteStream: null,
   });
 
-  const startCall = (salaId: string, roomId: string) => {
-    setState({ salaId, roomId, isMinimized: false });
-  };
+  const startCall = useCallback((salaId: string, roomId: string) => {
+    setState((prev) => ({ ...prev, salaId, roomId, isMinimized: false }));
+  }, []);
 
-  const endCall = () => {
-    setState({ salaId: null, roomId: null, isMinimized: false });
-  };
+  const endCall = useCallback(() => {
+    setState({ salaId: null, roomId: null, isMinimized: false, localStream: null, remoteStream: null });
+  }, []);
 
-  const setMinimized = (isMinimized: boolean) => {
+  const setMinimized = useCallback((isMinimized: boolean) => {
     setState((prev) => ({ ...prev, isMinimized }));
-  };
+  }, []);
+
+  const setStreams = useCallback((local: MediaStream | null, remote: MediaStream | null) => {
+    setState((prev) => ({ ...prev, localStream: local, remoteStream: remote }));
+  }, []);
 
   return (
-    <TeleconsultaContext.Provider value={{ state, startCall, endCall, setMinimized }}>
+    <TeleconsultaContext.Provider value={{ state, startCall, endCall, setMinimized, setStreams }}>
       {children}
     </TeleconsultaContext.Provider>
   );

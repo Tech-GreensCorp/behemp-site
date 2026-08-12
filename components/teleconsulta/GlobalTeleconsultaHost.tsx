@@ -285,7 +285,7 @@ export function GlobalTeleconsultaHost() {
             && remoteVideoRef.current.srcObject !== remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
         }
-    }, [isMinimized, phase, remoteStream]);
+    }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
 
     const encerrar = async () => {
         const mr = audioRecorderRef.current;

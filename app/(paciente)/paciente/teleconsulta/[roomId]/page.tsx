@@ -221,7 +221,7 @@ function TeleconsultaPacienteContent() {
         && localVideoRef.current.srcObject !== localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [phase]);
+  }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
 
 
 
