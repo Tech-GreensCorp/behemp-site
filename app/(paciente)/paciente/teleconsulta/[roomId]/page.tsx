@@ -201,6 +201,14 @@ function TeleconsultaPacienteContent() {
     return () => clearInterval(t);
   }, [phase]);
 
+  // Bug B fix: quando a phase muda para 'room', o elemento <video> do PiP
+  // é um nó novo no DOM. Reatribui o stream para que não fique preto.
+  useEffect(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [phase]);
+
   const encerrar = useCallback(async () => {
     pcRef.current?.close();
     pcRef.current = null;

@@ -50,12 +50,14 @@ export function GlobalTeleconsultaHost() {
     const audioCtxRef = useRef<AudioContext | null>(null);
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
 
-    // FIX: garante que o vídeo local sempre exibe o stream assim que o ref e o stream estiverem prontos
-    useEffect(() => {
-        if (localVideoRef.current && localStreamRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
+    // Callback estável: atribui stream ao <video> SEM disparar re-render desnecessário.
+    // Substitui o useEffect sem deps que causava piscar a cada tick do setInterval.
+    const assignLocalStream = useCallback((stream: MediaStream) => {
+        localStreamRef.current = stream;
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
         }
-    });
+    }, []);
 
     const iniciarMidia = useCallback(async (): Promise<MediaStream | null> => {
         try {
@@ -63,9 +65,7 @@ export function GlobalTeleconsultaHost() {
                 video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
                 audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
             });
-            localStreamRef.current = stream;
-            // Conecta imediatamente ao elemento de vídeo
-            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+            assignLocalStream(stream);
             return stream;
         } catch {
             try {
@@ -73,7 +73,7 @@ export function GlobalTeleconsultaHost() {
                     video: false,
                     audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
                 });
-                localStreamRef.current = audioStream;
+                assignLocalStream(audioStream);
                 setCamOn(false);
                 return audioStream;
             } catch {
@@ -81,7 +81,7 @@ export function GlobalTeleconsultaHost() {
                 return null;
             }
         }
-    }, []);
+    }, [assignLocalStream]);
 
     const sinalizarWebRTC = useCallback(async (tipo: string, payload: unknown) => {
         if (!roomId) return;
