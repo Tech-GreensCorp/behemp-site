@@ -80,7 +80,10 @@ function TeleconsultaPacienteContent() {
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
       localStreamRef.current = stream;
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(console.warn);
+      }
       setCameraOk(true);
     } catch {
       try {

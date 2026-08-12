@@ -75,6 +75,7 @@ export function GlobalTeleconsultaHost() {
         localStreamRef.current = stream;
         if (localVideoRef.current && localVideoRef.current.srcObject !== stream) {
             localVideoRef.current.srcObject = stream;
+            localVideoRef.current.play().catch(console.warn);
         }
     }, []);
 
@@ -293,6 +294,8 @@ export function GlobalTeleconsultaHost() {
         if (phase !== 'room' || !salaId) return;
         buscarDadosPainelTeleconsulta(salaId).then((res) => {
             if (res.sucesso && res.dados) setDadosPainel(res.dados);
+        }).catch((err) => {
+            console.error("[WebRTC] Erro ao buscar dados do painel:", err);
         });
     }, [phase, salaId]);
 
