@@ -30,6 +30,12 @@ export function GlobalTeleconsultaHost() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
 
+    // Problema 1 — guarda de sessão: impede dupla inicialização (StrictMode/remount)
+    const sessionRef = useRef<string | null>(null);
+
+    // Problema 2 — fila de ICE candidates que chegam antes do remoteDescription
+    const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
     const [screenSharing, setScreenSharing] = useState(false);
@@ -51,10 +57,9 @@ export function GlobalTeleconsultaHost() {
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
 
     // Callback estável: atribui stream ao <video> SEM disparar re-render desnecessário.
-    // Substitui o useEffect sem deps que causava piscar a cada tick do setInterval.
     const assignLocalStream = useCallback((stream: MediaStream) => {
         localStreamRef.current = stream;
-        if (localVideoRef.current) {
+        if (localVideoRef.current && localVideoRef.current.srcObject !== stream) {
             localVideoRef.current.srcObject = stream;
         }
     }, []);
@@ -92,8 +97,25 @@ export function GlobalTeleconsultaHost() {
         });
     }, [roomId]);
 
+    // Problema 1 — teardown centralizado: fecha PC, para tracks, fecha áudio,
+    // e desinscreve do canal Pusher (que antes NUNCA era desinscrito).
+    const teardownWebRTC = useCallback(() => {
+        if (roomId) {
+            try {
+                const pusher = getPusherClient();
+                pusher.unsubscribe(`presence-sala-${roomId}`);
+            } catch { /* já desinscrito */ }
+        }
+        pcRef.current?.close();
+        pcRef.current = null;
+        localStreamRef.current?.getTracks().forEach(t => t.stop());
+        localStreamRef.current = null;
+        audioCtxRef.current?.close();
+        audioCtxRef.current = null;
+        pendingCandidatesRef.current = [];
+    }, [roomId]);
+
     const iniciarConsulta = useCallback(async () => {
-        // Garantir que a mídia está pronta ANTES de criar a PeerConnection
         let stream = localStreamRef.current;
         if (!stream) {
             stream = await iniciarMidia();
@@ -117,7 +139,6 @@ export function GlobalTeleconsultaHost() {
             });
             pcRef.current = pc;
 
-            // FIX: adicionar tracks SOMENTE após garantir que o stream existe
             if (stream) {
                 stream.getTracks().forEach(track => {
                     pc.addTrack(track, stream!);
@@ -126,7 +147,9 @@ export function GlobalTeleconsultaHost() {
 
             pc.ontrack = (event) => {
                 if (remoteVideoRef.current && event.streams[0]) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
+                    if (remoteVideoRef.current.srcObject !== event.streams[0]) {
+                        remoteVideoRef.current.srcObject = event.streams[0];
+                    }
                     setRemoteStream(event.streams[0]);
                     setRemoteConnected(true);
 
@@ -178,22 +201,45 @@ export function GlobalTeleconsultaHost() {
                 }
             });
 
+            // Problema 2 — drenar fila de ICE após receber o answer
             channel.bind('webrtc:answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
-                try { await pc.setRemoteDescription(new RTCSessionDescription(answer)); } catch (err) {}
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                    // Drenar candidates que chegaram antes do remoteDescription
+                    for (const c of pendingCandidatesRef.current) {
+                        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* descartado */ }
+                    }
+                    pendingCandidatesRef.current = [];
+                } catch (err) { console.warn('[WebRTC] Erro ao processar answer:', err); }
             });
 
+            // Problema 2 — enfileirar candidates que chegam antes do remoteDescription
             channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (err) {}
+                if (!pc) return;
+                if (!pc.remoteDescription) {
+                    pendingCandidatesRef.current.push(candidate);
+                    return;
+                }
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) {
+                    console.warn('[WebRTC] ICE candidate inválido:', err);
+                }
             });
 
         } catch (err) {
+            console.error('[Teleconsulta] Erro ao iniciar sala:', err);
             toast.error("Erro ao iniciar a sala.");
         }
     }, [roomId, salaId, consentimentoTranscricao, iniciarMidia, sinalizarWebRTC]);
 
-    // Lifecycle: iniciar/encerrar ao mudar salaId
+    // Problema 1 — lifecycle com guarda de sessão e cleanup centralizado
     useEffect(() => {
         if (salaId && roomId) {
+            // Guarda: se já inicializou esta sala, não inicializar de novo (StrictMode/remount)
+            if (sessionRef.current === salaId) return;
+            sessionRef.current = salaId;
+
             setDuration(0);
             setPhase("lobby");
             setRemoteConnected(false);
@@ -202,14 +248,16 @@ export function GlobalTeleconsultaHost() {
             setShowPainel(false);
             setShowCopilot(false);
             iniciarConsulta();
-        } else {
-            pcRef.current?.close();
-            pcRef.current = null;
-            localStreamRef.current?.getTracks().forEach(t => t.stop());
-            localStreamRef.current = null;
-            audioCtxRef.current?.close();
-            setRemoteStream(null);
         }
+
+        // Cleanup roda ao desmontar OU quando salaId vira null (endCall)
+        return () => {
+            if (!salaId) {
+                sessionRef.current = null;
+                teardownWebRTC();
+                setRemoteStream(null);
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [salaId, roomId]);
 
@@ -227,13 +275,6 @@ export function GlobalTeleconsultaHost() {
     }, [phase, salaId]);
 
     const encerrar = async () => {
-        pcRef.current?.close();
-        pcRef.current = null;
-        localStreamRef.current?.getTracks().forEach(t => t.stop());
-        audioCtxRef.current?.close();
-
-        if (salaId) await encerrarTeleconsulta(salaId, duration);
-
         const mr = audioRecorderRef.current;
         if (mr && mr.state !== "inactive" && consentimentoTranscricao && salaId) {
             mr.onstop = () => {
@@ -249,6 +290,11 @@ export function GlobalTeleconsultaHost() {
             };
             mr.stop();
         }
+
+        if (salaId) await encerrarTeleconsulta(salaId, duration);
+
+        teardownWebRTC();
+        sessionRef.current = null;
 
         toast.info("Consulta encerrada.");
         endCall();
@@ -269,15 +315,14 @@ export function GlobalTeleconsultaHost() {
         setCamOn(track.enabled);
     };
 
-    // FIX: Compartilhamento de tela
     const toggleScreen = async () => {
         if (screenSharing) {
-            // Voltar para câmera
             const camTrack = localStreamRef.current?.getVideoTracks()[0];
             if (camTrack) camTrack.enabled = true;
             const sender = pcRef.current?.getSenders().find(s => s.track?.kind === "video");
             if (sender && camTrack) await sender.replaceTrack(camTrack);
-            if (localVideoRef.current && localStreamRef.current) {
+            if (localVideoRef.current && localStreamRef.current
+                && localVideoRef.current.srcObject !== localStreamRef.current) {
                 localVideoRef.current.srcObject = localStreamRef.current;
             }
             setScreenSharing(false);
@@ -300,7 +345,8 @@ export function GlobalTeleconsultaHost() {
 
                 screenTrack.onended = () => {
                     setScreenSharing(false);
-                    if (localVideoRef.current && localStreamRef.current) {
+                    if (localVideoRef.current && localStreamRef.current
+                        && localVideoRef.current.srcObject !== localStreamRef.current) {
                         localVideoRef.current.srcObject = localStreamRef.current;
                     }
                     const originalCam = localStreamRef.current?.getVideoTracks()[0];
@@ -314,7 +360,6 @@ export function GlobalTeleconsultaHost() {
         }
     };
 
-    // Abrir painel clínico (funciona mesmo sem dadosPainel ainda carregado)
     const abrirPainel = (aba: 'paciente' | 'prontuario' | 'prescricao') => {
         setPainelAba(aba);
         setShowPainel(true);
@@ -342,7 +387,7 @@ export function GlobalTeleconsultaHost() {
     return (
         <div className="fixed inset-0 z-50 flex bg-slate-950">
 
-            {/* ── Painel clínico lateral (ESQUERDA) — aparece ao clicar nos botões ── */}
+            {/* ── Painel clínico lateral (ESQUERDA) ── */}
             {dadosPainel && showPainel && (
                 <PainelClinicoLateral
                     dados={dadosPainel}
@@ -397,7 +442,7 @@ export function GlobalTeleconsultaHost() {
                         </div>
                     )}
 
-                    {/* PiP local (médico) — canto INFERIOR ESQUERDO para não sobrepor câmera do paciente */}
+                    {/* PiP local (médico) — canto INFERIOR ESQUERDO */}
                     <div className="absolute bottom-4 left-4 w-44 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-600 shadow-2xl z-10">
                         <video
                             ref={localVideoRef}
@@ -414,7 +459,7 @@ export function GlobalTeleconsultaHost() {
                         <span className="absolute bottom-1 left-1 text-[9px] text-white/70 bg-black/40 rounded px-1">Você</span>
                     </div>
 
-                    {/* ── Botões clínicos — ESQUERDA superior, abaixo do header ── */}
+                    {/* ── Botões clínicos — ESQUERDA superior ── */}
                     {phase === 'room' && (
                         <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
                             {([

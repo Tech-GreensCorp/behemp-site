@@ -28,6 +28,9 @@ function TeleconsultaPacienteContent() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // Problema 2 — fila de ICE candidates que chegam antes do remoteDescription
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -178,6 +181,11 @@ function TeleconsultaPacienteContent() {
     channel.bind('webrtc:offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        // Problema 2 — drenar candidates que chegaram antes do remoteDescription
+        for (const c of pendingCandidatesRef.current) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* descartado */ }
+        }
+        pendingCandidatesRef.current = [];
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sinalizarWebRTC('answer', { answer });
@@ -186,11 +194,16 @@ function TeleconsultaPacienteContent() {
       }
     });
 
+    // Problema 2 — enfileirar candidates que chegam antes do remoteDescription
     channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
+      if (!pc.remoteDescription) {
+        pendingCandidatesRef.current.push(candidate);
+        return;
+      }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (err) {
-        console.warn('[WebRTC] ICE candidate ignorado:', err);
+        console.warn('[WebRTC] ICE candidate inválido:', err);
       }
     });
   }, [sala, roomId]);
@@ -201,13 +214,16 @@ function TeleconsultaPacienteContent() {
     return () => clearInterval(t);
   }, [phase]);
 
-  // Bug B fix: quando a phase muda para 'room', o elemento <video> do PiP
-  // é um nó novo no DOM. Reatribui o stream para que não fique preto.
+  // Problema 3 — PiP preto: na transição lobby→room o React monta um novo nó <video>.
+  // O ref aponta para o novo nó mas o srcObject nunca é reatribuído → preto.
   useEffect(() => {
-    if (localVideoRef.current && localStreamRef.current) {
+    if (localVideoRef.current && localStreamRef.current
+        && localVideoRef.current.srcObject !== localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [phase]);
+
+
 
   const encerrar = useCallback(async () => {
     pcRef.current?.close();
