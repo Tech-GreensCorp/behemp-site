@@ -76,7 +76,7 @@ function TeleconsultaPacienteContent() {
     setMediaError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        video: { facingMode: 'user' },
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
       localStreamRef.current = stream;
@@ -90,6 +90,7 @@ function TeleconsultaPacienteContent() {
         const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         localStreamRef.current = audioStream;
         setCameraOk(true);
+        setCamOn(false);
       } catch {
         setMediaError('Câmera/microfone indisponível. Verifique as permissões.');
         setCameraOk(false);

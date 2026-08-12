@@ -82,7 +82,7 @@ export function GlobalTeleconsultaHost() {
     const iniciarMidia = useCallback(async (): Promise<MediaStream | null> => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                video: { facingMode: "user" },
                 audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
             });
             assignLocalStream(stream);
