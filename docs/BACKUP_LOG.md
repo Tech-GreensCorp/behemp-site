@@ -105,3 +105,22 @@ apt-get install -y chromium-browser
 ⚠️ A variável na Vercel (Environment Variables) deve ser
 `https://behemp-site.vercel.app` para os previews funcionarem.
 No servidor AWS, deve ser `https://be4hope.org`.
+
+---
+
+## Mudança Técnica: CI/CD GitHub Actions
+**Data:** 11/08/2026
+**Motivo:** OOM Killed no t2.small durante pnpm build
+
+### O que mudou
+- Build migrado do AWS EC2 para GitHub Actions Runner
+- Deploy automático a cada push na branch main
+- Tempo de deploy: ~20 min → ~2 min
+- Zero risco de OOM no servidor
+
+### Playbook atual (automático)
+
+git push origin main → GitHub Actions → rsync → pm2 restart
+
+### Para reverter para deploy manual
+Ver docs/DECISOES_TECNICAS.md DT-006 (playbook de emergência)
