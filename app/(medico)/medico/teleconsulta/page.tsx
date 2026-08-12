@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { useTeleconsulta } from "@/components/teleconsulta/TeleconsultaContext";
 import { BuscaPaciente } from "@/components/busca-paciente";
 import { getPusherClient } from "@/lib/integrations/pusher/client";
+import { listarConsultasMedico, listarPacientesMedico } from "@/app/(medico)/_actions/consultas";
+import { listarPacientesParaPresenca, iniciarConsultaAvulsa, iniciarTeleconsulta } from "@/app/(medico)/_actions/notificar-teleconsulta";
 
 interface ConsultaAgendada {
     id: string;
@@ -70,8 +72,8 @@ function TeleconsultaLobbyContent() {
         const carregar = async () => {
             setCarregandoConsultas(true);
             const [consultasRes, pacientesRes] = await Promise.all([
-                import('@/app/(medico)/_actions/consultas').then(m => m.listarConsultasMedico()),
-                import('@/app/(medico)/_actions/consultas').then(m => m.listarPacientesMedico()),
+                listarConsultasMedico(),
+                listarPacientesMedico(),
             ]);
 
             if (consultasRes.sucesso && consultasRes.dados) {
@@ -94,7 +96,6 @@ function TeleconsultaLobbyContent() {
     useEffect(() => {
         const carregarPresenca = async () => {
             try {
-                const { listarPacientesParaPresenca } = await import('@/app/(medico)/_actions/notificar-teleconsulta');
                 const res = await listarPacientesParaPresenca();
                 if (!res.sucesso || !res.dados) return;
 
@@ -176,7 +177,6 @@ function TeleconsultaLobbyContent() {
     const handleIniciarConsulta = async (consultaId: string) => {
         setIniciandoSala(consultaId);
         try {
-            const { iniciarTeleconsulta } = await import('@/app/(medico)/_actions/notificar-teleconsulta');
             const res = await iniciarTeleconsulta(consultaId);
             if (res.sucesso && res.dados) {
                 toast.success('Paciente notificado! Abrindo sala...');
@@ -195,7 +195,6 @@ function TeleconsultaLobbyContent() {
         if (!pacienteSelecionado) return;
         setIniciandoAvulso(true);
         try {
-            const { iniciarConsultaAvulsa } = await import('@/app/(medico)/_actions/notificar-teleconsulta');
             const res = await iniciarConsultaAvulsa({
                 pacienteId: pacienteSelecionado,
                 tipo: 'encaixe',
