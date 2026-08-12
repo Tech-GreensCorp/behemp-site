@@ -73,6 +73,10 @@ jobs:
             # Aplica eventuais migrações do banco
             pnpm db:migrate
             
+            # Copia arquivos estáticos vitais para o standalone (CSS/Imagens)
+            cp -r public .next/standalone/
+            cp -r .next/static .next/standalone/.next/
+            
             # Reinicia o processo com cwd no standalone
             cd .next/standalone
             pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
