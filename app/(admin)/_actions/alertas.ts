@@ -6,8 +6,9 @@ import { verificarAdmin } from '@/lib/auth';
 import { coletarAlertasMedicacao, coletarAlertasLicencas, coletarAlertasMensalidades, PrioridadeAlerta } from '@/lib/alertas/coletor';
 import { gerarHtmlDigestAdmin } from '@/lib/email/alertas';
 import { enviarEmailGenerico } from '@/lib/email/brevo';
-import { eq } from 'drizzle-orm';
+import { eq, sql, and, isNotNull } from 'drizzle-orm';
 import { inngest } from '@/lib/integrations/inngest/client';
+import { dosagens, autorizacoesAnvisa } from '@/db/schema';
 
 export async function buscarResumoAlertas() {
   try {
@@ -19,11 +20,26 @@ export async function buscarResumoAlertas() {
 
     const todos = [...meds, ...lics, ...mens];
 
+    const [totalMedsAtivas] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(dosagens)
+      .where(eq(dosagens.ativa, true));
+
+    const [totalLicsAtivas] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(autorizacoesAnvisa)
+      .where(
+        and(
+          eq(autorizacoesAnvisa.status, 'aprovado'),
+          isNotNull(autorizacoesAnvisa.dataValidade)
+        )
+      );
+
     const resumo = {
       criticos: todos.filter(a => a.prioridade === 'critico').length,
       atencao: todos.filter(a => a.prioridade === 'atencao').length,
-      ativosMed: meds.length,
-      ativosLic: lics.length,
+      ativosMed: Number(totalMedsAtivas?.count || 0),
+      ativosLic: Number(totalLicsAtivas?.count || 0),
       ativosMen: mens.length,
     };
 
