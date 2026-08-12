@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { dosagens, autorizacoesAnvisa, invoices, invoicePaymentShipping, pacientes, medicamentos, users } from '@/db/schema';
 import { eq, and, isNotNull } from 'drizzle-orm';
-import { addDays, isBefore, isSameDay, parseISO } from 'date-fns';
+import { addDays, isBefore, isSameDay, parseISO, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
 export type PrioridadeAlerta = 'critico' | 'atencao' | 'aviso';
@@ -85,27 +85,30 @@ export async function coletarAlertasMedicacao(): Promise<AlertaMedicacao[]> {
     
     // Convertendo YYYY-MM-DD para Date na timezone SP
     const dataFim = toZonedTime(parseISO(dosagem.dataFimPrevista + 'T00:00:00Z'), TZ);
-    
-    for (const marco of marcos) {
-      const dataAlvo = addDays(hoje, marco);
-      if (isSameDay(dataFim, dataAlvo)) {
-        let prioridade: PrioridadeAlerta = 'aviso';
-        if (marco <= 10) prioridade = 'critico';
-        else if (marco <= 30) prioridade = 'atencao';
+    const diasRestantes = differenceInDays(dataFim, hoje);
 
-        alertas.push({
-          tipo: 'medicacao',
-          referenciaId: dosagem.id,
-          pacienteNome: dosagem.pacienteNome,
-          pacienteEmail: dosagem.pacienteEmail,
-          pacienteTelefone: dosagem.pacienteTelefone,
-          medicamento: dosagem.medicamentoNome,
-          diasRestantes: marco,
-          dataFim: dosagem.dataFimPrevista,
-          prioridade,
-          marcoDisparado: marco,
-        });
-      }
+    // Ordena marcos crescente: ex [10, 30, 40]
+    // Encontra o menor marco que seja >= diasRestantes. Ex: dias = 23 -> marco = 30
+    const marcosCrescente = [...marcos].sort((a, b) => a - b);
+    const marcoAtingido = marcosCrescente.find(m => diasRestantes <= m);
+    
+    if (marcoAtingido !== undefined && diasRestantes >= 0) {
+      let prioridade: PrioridadeAlerta = 'aviso';
+      if (marcoAtingido <= 10) prioridade = 'critico';
+      else if (marcoAtingido <= 30) prioridade = 'atencao';
+
+      alertas.push({
+        tipo: 'medicacao',
+        referenciaId: dosagem.id,
+        pacienteNome: dosagem.pacienteNome,
+        pacienteEmail: dosagem.pacienteEmail,
+        pacienteTelefone: dosagem.pacienteTelefone,
+        medicamento: dosagem.medicamentoNome,
+        diasRestantes: diasRestantes,
+        dataFim: dosagem.dataFimPrevista,
+        prioridade,
+        marcoDisparado: marcoAtingido,
+      });
     }
   }
 
@@ -144,25 +147,26 @@ export async function coletarAlertasLicencas(): Promise<AlertaLicenca[]> {
     if (!licenca.dataValidade) continue;
 
     const dataValidade = toZonedTime(parseISO(licenca.dataValidade + 'T00:00:00Z'), TZ);
+    const diasRestantes = differenceInDays(dataValidade, hoje);
 
-    for (const marco of marcos) {
-      const dataAlvo = addDays(hoje, marco);
-      if (isSameDay(dataValidade, dataAlvo)) {
-        let prioridade: PrioridadeAlerta = 'atencao';
-        if (marco <= 30) prioridade = 'critico';
+    const marcosCrescente = [...marcos].sort((a, b) => a - b);
+    const marcoAtingido = marcosCrescente.find(m => diasRestantes <= m);
 
-        alertas.push({
-          tipo: 'licenca_anvisa',
-          referenciaId: licenca.id,
-          pacienteNome: licenca.pacienteNome,
-          pacienteEmail: licenca.pacienteEmail,
-          pacienteTelefone: licenca.pacienteTelefone,
-          diasRestantes: marco,
-          dataValidade: licenca.dataValidade,
-          prioridade,
-          marcoDisparado: marco,
-        });
-      }
+    if (marcoAtingido !== undefined && diasRestantes >= 0) {
+      let prioridade: PrioridadeAlerta = 'atencao';
+      if (marcoAtingido <= 30) prioridade = 'critico';
+
+      alertas.push({
+        tipo: 'licenca_anvisa',
+        referenciaId: licenca.id,
+        pacienteNome: licenca.pacienteNome,
+        pacienteEmail: licenca.pacienteEmail,
+        pacienteTelefone: licenca.pacienteTelefone,
+        diasRestantes: diasRestantes,
+        dataValidade: licenca.dataValidade,
+        prioridade,
+        marcoDisparado: marcoAtingido,
+      });
     }
   }
 
@@ -199,13 +203,14 @@ export async function coletarAlertasMensalidades(): Promise<AlertaMensalidade[]>
     const dataVencimento = toZonedTime(parseISO(inv.paymentDeadline + 'T00:00:00Z'), TZ);
 
     if (isBefore(dataVencimento, hoje)) {
-      const msAtraso = hoje.getTime() - dataVencimento.getTime();
-      const diasAtraso = Math.floor(msAtraso / (1000 * 60 * 60 * 24));
+      const diasAtraso = differenceInDays(hoje, dataVencimento);
 
-      // Dispara 1, 7, 15, 30, 45, 60 dias de atraso (marcos fixos)
+      // Dispara em marcos de atraso. O maior marco atingido
       const marcosAtraso = [1, 7, 15, 30, 45, 60, 90];
+      const marcosDecrescente = [...marcosAtraso].sort((a, b) => b - a);
+      const marcoAtingido = marcosDecrescente.find(m => diasAtraso >= m);
       
-      if (marcosAtraso.includes(diasAtraso)) {
+      if (marcoAtingido !== undefined) {
         let prioridade: PrioridadeAlerta = 'atencao';
         if (diasAtraso > 30) prioridade = 'critico';
 
@@ -218,7 +223,7 @@ export async function coletarAlertasMensalidades(): Promise<AlertaMensalidade[]>
           diasAtraso,
           dataVencimento: inv.paymentDeadline,
           prioridade,
-          marcoDisparado: diasAtraso,
+          marcoDisparado: marcoAtingido,
         });
       }
     }
