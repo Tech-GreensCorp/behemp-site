@@ -3,13 +3,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { dispararVerificacaoManual } from '@/app/(admin)/_actions/alertas';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { RefreshCw, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function DispararManualBtn() {
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
   const router = useRouter();
 
   const handleDisparar = async () => {
@@ -17,8 +16,7 @@ export function DispararManualBtn() {
     try {
       const res = await dispararVerificacaoManual();
       if (res.sucesso) {
-        toast({
-          title: 'Verificação Iniciada!',
+        toast.success('Verificação Iniciada!', {
           description: 'O Inngest está processando os alertas em background.',
         });
         // Atualiza a página após 2s para mostrar os novos resultados, 
@@ -27,17 +25,13 @@ export function DispararManualBtn() {
           router.refresh();
         }, 2000);
       } else {
-        toast({
-          title: 'Erro',
+        toast.error('Erro', {
           description: res.erro,
-          variant: 'destructive',
         });
       }
     } catch {
-      toast({
-        title: 'Erro',
+      toast.error('Erro', {
         description: 'Falha ao disparar verificação.',
-        variant: 'destructive',
       });
     } finally {
       setLoading(false);

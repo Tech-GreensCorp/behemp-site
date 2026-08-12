@@ -590,3 +590,24 @@ export async function enviarRespostaAdmin(
   });
 }
 
+/**
+ * Envia um e-mail genérico (como alertas e digests) aceitando HTML e assunto customizado.
+ */
+export async function enviarEmailGenerico(
+  to: { email: string; name?: string }[],
+  assunto: string,
+  htmlContent: string
+): Promise<void> {
+  const client = criarClienteBrevo();
+
+  await client.transactionalEmails.sendTransacEmail({
+    subject: assunto,
+    htmlContent,
+    sender: {
+      name: process.env.BREVO_FROM_NAME ?? 'Be4Hope',
+      email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org',
+    },
+    to,
+  });
+}
+
