@@ -30,10 +30,16 @@ export function GlobalTeleconsultaHost() {
     const localStreamRef = useRef<MediaStream | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
 
-    // Problema 1 — guarda de sessão: impede dupla inicialização (StrictMode/remount)
-    const sessionRef = useRef<string | null>(null);
+    // Callback ref substitui o useEffect de reatribuição e a guarda de sessionRef
+    const setLocalVideoEl = useCallback((el: HTMLVideoElement | null) => {
+        localVideoRef.current = el;
+        if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+            el.srcObject = localStreamRef.current;
+            el.play().catch(console.warn);
+        }
+    }, []);
 
-    // Problema 2 — fila de ICE candidates que chegam antes do remoteDescription
+    // Fila de ICE candidates que chegam antes do remoteDescription (mantido do BeHemp)
     const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
     const [micOn, setMicOn] = useState(true);
@@ -43,6 +49,14 @@ export function GlobalTeleconsultaHost() {
     const [duration, setDuration] = useState(0);
     const [remoteConnected, setRemoteConnected] = useState(false);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+    const setRemoteVideoEl = useCallback((el: HTMLVideoElement | null) => {
+        remoteVideoRef.current = el;
+        if (el && remoteStream && el.srcObject !== remoteStream) {
+            el.srcObject = remoteStream;
+            el.play().catch(console.warn);
+        }
+    }, [remoteStream]);
 
     const [showPainel, setShowPainel] = useState(false);
     const [painelAba, setPainelAba] = useState<'paciente' | 'prontuario' | 'prescricao'>('paciente');
@@ -237,13 +251,18 @@ export function GlobalTeleconsultaHost() {
         }
     }, [roomId, salaId, consentimentoTranscricao, iniciarMidia, sinalizarWebRTC]);
 
-    // Problema 1 — lifecycle com guarda de sessão e cleanup centralizado
+    // 2.3 BEFOREUNLOAD GUARD (padrão VidAI)
+    useEffect(() => {
+        if (phase !== "room") return;
+        const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    }, [phase]);
+
+    // 2.1 INÍCIO POR CLIQUE, NÃO POR EFFECT (padrão VidAI)
+    // Quando recebe salaId, vai para lobby e inicia mídia local (sem WebRTC)
     useEffect(() => {
         if (salaId && roomId) {
-            // Guarda: se já inicializou esta sala, não inicializar de novo (StrictMode/remount)
-            if (sessionRef.current === salaId) return;
-            sessionRef.current = salaId;
-
             setDuration(0);
             setPhase("lobby");
             setRemoteConnected(false);
@@ -251,13 +270,12 @@ export function GlobalTeleconsultaHost() {
             setDadosPainel(null);
             setShowPainel(false);
             setShowCopilot(false);
-            iniciarConsulta();
+            iniciarMidia();
         }
 
         // Cleanup roda ao desmontar OU quando salaId vira null (endCall)
         return () => {
             if (!salaId) {
-                sessionRef.current = null;
                 teardownWebRTC();
                 setRemoteStream(null);
             }
@@ -277,21 +295,6 @@ export function GlobalTeleconsultaHost() {
             if (res.sucesso && res.dados) setDadosPainel(res.dados);
         });
     }, [phase, salaId]);
-
-    // Etapa 4: reatribui streams quando os nós <video> remontam
-    // (transições isMinimized e mudanças de phase — ex: minimizar→maximizar)
-    useEffect(() => {
-        if (localVideoRef.current && localStreamRef.current
-            && localVideoRef.current.srcObject !== localStreamRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
-            localVideoRef.current.play().catch(console.warn);
-        }
-        if (remoteVideoRef.current && remoteStream
-            && remoteVideoRef.current.srcObject !== remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch(console.warn);
-        }
-    }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
 
     const encerrar = async () => {
         const mr = audioRecorderRef.current;
@@ -319,8 +322,8 @@ export function GlobalTeleconsultaHost() {
         }
 
         teardownWebRTC();
-        sessionRef.current = null;
-
+        setPhase("lobby");
+        clearState();
         toast.info("Consulta encerrada.");
         endCall();
         router.push("/medico/agenda");
@@ -440,37 +443,48 @@ export function GlobalTeleconsultaHost() {
                 {/* Área de vídeo */}
                 <div className="flex-1 relative overflow-hidden">
                     {/* Vídeo remoto (paciente) — fundo principal */}
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    {phase === "room" && (
+                        <video
+                            ref={setRemoteVideoEl}
+                            autoPlay
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                    )}
 
-                    {/* Estado de aguardando */}
+                    {/* Estado de aguardando / Lobby */}
                     {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                            <div className="flex flex-col items-center gap-4 text-center">
-                                {phase === "connecting" ? (
-                                    <>
-                                        <RefreshCw className="h-8 w-8 text-white/50 animate-spin" />
-                                        <p className="text-slate-400 text-sm">Conectando à sala...</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <VideoIcon className="h-10 w-10 text-slate-600" />
-                                        <p className="text-slate-400 text-sm">Aguardando paciente entrar na sala...</p>
-                                        <p className="text-slate-500 text-xs">O paciente foi notificado. Aguarde a conexão.</p>
-                                    </>
-                                )}
-                            </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-0">
+                            {phase === "lobby" ? (
+                                <div className="flex flex-col items-center gap-6 text-center max-w-md p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
+                                    <VideoIcon className="h-16 w-16 text-primary animate-pulse" />
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white mb-2">Pronto para iniciar?</h2>
+                                        <p className="text-slate-400 text-sm">A câmera e o microfone estão prontos. Ao iniciar, a sala será aberta para o paciente.</p>
+                                    </div>
+                                    <Button onClick={iniciarConsulta} size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
+                                        Iniciar Teleconsulta
+                                    </Button>
+                                </div>
+                            ) : phase === "connecting" ? (
+                                <div className="flex flex-col items-center gap-4 text-center">
+                                    <RefreshCw className="h-8 w-8 text-white/50 animate-spin" />
+                                    <p className="text-slate-400 text-sm">Conectando à sala...</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-4 text-center">
+                                    <VideoIcon className="h-10 w-10 text-slate-600" />
+                                    <p className="text-slate-400 text-sm">Aguardando paciente entrar na sala...</p>
+                                    <p className="text-slate-500 text-xs">O paciente foi notificado. Aguarde a conexão.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* PiP local (médico) — canto INFERIOR ESQUERDO */}
-                    <div className="absolute bottom-4 left-4 w-44 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-600 shadow-2xl z-10">
+                    <div className={`absolute w-44 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-600 shadow-2xl z-10 transition-all ${phase === 'lobby' ? 'inset-0 w-full h-full border-none rounded-none' : 'bottom-4 left-4'}`}>
                         <video
-                            ref={localVideoRef}
+                            ref={setLocalVideoEl}
                             autoPlay
                             muted
                             playsInline

@@ -25,6 +25,24 @@ function TeleconsultaPacienteContent() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   
+  const setLocalVideoEl = useCallback((el: HTMLVideoElement | null) => {
+    localVideoRef.current = el;
+    if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+      el.srcObject = localStreamRef.current;
+      el.play().catch(console.warn);
+    }
+  }, []);
+
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  
+  const setRemoteVideoEl = useCallback((el: HTMLVideoElement | null) => {
+    remoteVideoRef.current = el;
+    if (el && remoteStream && el.srcObject !== remoteStream) {
+      el.srcObject = remoteStream;
+      el.play().catch(console.warn);
+    }
+  }, [remoteStream]);
+  
   const audioChunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioRecorderRef = useRef<MediaRecorder | null>(null);
@@ -126,8 +144,8 @@ function TeleconsultaPacienteContent() {
     });
 
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current && event.streams[0]) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      if (event.streams[0]) {
+        setRemoteStream(event.streams[0]);
         setRemoteConnected(true);
         toast.success(`${sala.medicoNome} conectado!`);
 
@@ -214,14 +232,6 @@ function TeleconsultaPacienteContent() {
     return () => clearInterval(t);
   }, [phase]);
 
-  useEffect(() => {
-    if (localVideoRef.current && localStreamRef.current
-        && localVideoRef.current.srcObject !== localStreamRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-      localVideoRef.current.play().catch(console.warn);
-    }
-  }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
-
 
 
   const encerrar = useCallback(async () => {
@@ -268,8 +278,8 @@ function TeleconsultaPacienteContent() {
             </p>
           </div>
 
-          <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
-            <video ref={localVideoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
+          <div className="w-full max-w-sm aspect-video bg-black rounded-xl overflow-hidden border-2 border-[#2D4F3C] mb-8 relative shadow-2xl">
+            <video ref={setLocalVideoEl} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
             {!camOn && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
                 <VideoOff className="h-12 w-12 text-slate-600" />
@@ -331,17 +341,25 @@ function TeleconsultaPacienteContent() {
         </div>
       </div>
       
-      <div className="flex-1 relative bg-black overflow-hidden">
-        <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
-        {!remoteConnected && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4">
-            <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
-            <p className="text-slate-400 font-medium">Aguardando médico...</p>
-          </div>
+      <div className="flex-1 relative bg-slate-950 flex flex-col justify-center items-center">
+        {remoteConnected && remoteStream ? (
+          <video
+            ref={setRemoteVideoEl}
+            autoPlay
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          !remoteConnected && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4">
+              <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
+              <p className="text-slate-400 font-medium">Aguardando médico...</p>
+            </div>
+          )
         )}
         
         <div className="absolute bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
-          <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
+          <video ref={setLocalVideoEl} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
           {!camOn && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
               <VideoOff className="h-6 w-6 text-slate-500" />
