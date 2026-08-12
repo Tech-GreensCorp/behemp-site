@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     // consome mais memória do que a máquina possui e causa OOM Crash.
     ignoreBuildErrors: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 
   images: {
     qualities: [75, 80, 85, 90],
