@@ -67,10 +67,15 @@ jobs:
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
             
+            # Copia o .env para dentro do standalone (Opção A)
+            cp .env .next/standalone/.env
+            
             # Aplica eventuais migrações do banco
             pnpm db:migrate
             
-            # Reinicia o processo — garante que PM2 carrega o build novo limpo
-            pm2 restart behemp-site --update-env || pm2 start pnpm --name "behemp-site" -- run start
+            # Reinicia o processo com cwd no standalone
+            cd .next/standalone
+            pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
+            pm2 save
             pm2 save
 

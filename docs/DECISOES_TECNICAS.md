@@ -309,3 +309,26 @@ pm2 restart all
 - Node.js: 20.x
 - pnpm: v9
 - Deploy via: `easingthemes/ssh-deploy` (rsync) + `appleboy/ssh-action` (SSH)
+
+---
+
+## DT-009: Runtime Standalone na AWS sem Variáveis de Ambiente
+**Data:** 12/08/2026
+**Status:** ✅ Corrigido e em produção
+
+### Problema Resolvido
+O pipeline de CI/CD via GitHub Actions (DT-008) passou a enviar a versão construída via `output: 'standalone'` para o EC2. No entanto, o script PM2 tentava subir a aplicação, mas o Next.js no modo standalone **NÃO lê o arquivo `.env` se ele não estiver explicitamente presente dentro da pasta `.next/standalone`**.
+
+Como o rsync não envia o `.env` (excluído no `deploy.yml`), e o EC2 tem o `.env` apenas na raiz (`~/behemp-site-main/.env`), o standalone inicializava o app com `DATABASE_URL=undefined`.
+
+Consequências do erro:
+- O Drizzle ORM falhava (crashes em `_prepare`) com `TypeError: Cannot convert undefined or null to object`.
+- Esse Erro 500 invisível vazava para o Client (Server Actions não tratadas) disparando os Error Boundaries no React, forçando a UI inteira do médico a desmontar (remount contínuo), o que resultava no *flicker* infinito da câmera.
+
+### Solução (Opção A)
+O arquivo `.github/workflows/deploy.yml` foi atualizado:
+1. Após a clonagem e rsync no EC2, injetamos: `cp .env .next/standalone/.env`
+2. Modificamos o diretório de execução do PM2: `cd .next/standalone`
+3. Reiniciamos com o PM2 carregando o novo diretório e ambiente local: `pm2 restart behemp-site --update-env || pm2 start server.js`
+
+Isso permite que o standalone tenha acesso nativo a todas as secrets de produção (DB, JWT, Pusher, Clerk) sem expô-las no GitHub Actions.
