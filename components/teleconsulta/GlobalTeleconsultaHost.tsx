@@ -274,6 +274,19 @@ export function GlobalTeleconsultaHost() {
         });
     }, [phase, salaId]);
 
+    // Etapa 4: reatribui streams quando os nós <video> remontam
+    // (transições isMinimized e mudanças de phase — ex: minimizar→maximizar)
+    useEffect(() => {
+        if (localVideoRef.current && localStreamRef.current
+            && localVideoRef.current.srcObject !== localStreamRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+        }
+        if (remoteVideoRef.current && remoteStream
+            && remoteVideoRef.current.srcObject !== remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [isMinimized, phase, remoteStream]);
+
     const encerrar = async () => {
         const mr = audioRecorderRef.current;
         if (mr && mr.state !== "inactive" && consentimentoTranscricao && salaId) {
