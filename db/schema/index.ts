@@ -34,6 +34,8 @@ export * from './receituario-templates';
 export * from './prescricoes';
 export * from './teleconsultas';
 export * from './autorizacoes-anvisa';
+export * from './alertas-config';
+export * from './alertas-enviados';
 
 // Relations
 export * from './relations';

@@ -332,3 +332,23 @@ O arquivo `.github/workflows/deploy.yml` foi atualizado:
 3. Reiniciamos com o PM2 carregando o novo diretório e ambiente local: `pm2 restart behemp-site --update-env || pm2 start server.js`
 
 Isso permite que o standalone tenha acesso nativo a todas as secrets de produção (DB, JWT, Pusher, Clerk) sem expô-las no GitHub Actions.
+
+---
+
+## DT-010: Arquitetura da Central de Alertas & Medication Tracker
+**Data:** 12/08/2026
+**Status:** ✅ Em desenvolvimento (Fase 1 - Schema)
+
+### Contexto
+O BeHemp está absorvendo a funcionalidade do antigo plugin WordPress (`be4hope-fixed`) para monitoramento ativo do uso de medicamentos e validade de licenças ANVISA, integrando aos pacientes reais do sistema. O objetivo é criar alertas proativos sem fazer spam aos usuários.
+
+### Schema Adotado
+1. **`medicamentos` (extensão):** Adicionamos campos para especificação técnica precisa, refletindo a tabela de produtos (`marca`, `volumeMl`, `totalGotas`, `cbdMgPorGota`, `thcMgPorGota`, etc). O campo `gotasPorMl` agora é calculado dinamicamente no seed.
+2. **`alertas_config` (singleton):** Uma única linha para gerenciar dias de marcos, horários do digest e preferência de notificação ao paciente, permitindo gestão pela UI administrativa.
+3. **`alertas_enviados` (idempotência):** Chave unificada (`tipo`, `referenciaId`, `marcoDias`, `destinatario`) com constraint `UNIQUE` assegura matematicamente que o mesmo alerta, no mesmo marco de tempo, nunca será disparado duas vezes.
+4. **`autorizacoes_anvisa` (extensão):** Adicionado `dataValidade` para calcular os dias restantes para o vencimento (tipicamente 2 anos no Brasil).
+
+### Próximos Passos
+- Implementar os coletores puros e integrá-los ao Inngest (`digestDiarioAdmin`).
+- Criar templates transacionais no Brevo.
+- Consolidar a visualização na Central de Alertas e Calculadora de Dosagem UI.

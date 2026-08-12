@@ -205,5 +205,24 @@ export const docusignStatusEnum = pgEnum('docusign_status', [
   'concluido',      // todas as partes assinaram
   'recusado',       // paciente recusou assinar
   'expirado',       // envelope expirou sem assinatura
-  'erro',           // erro no envio
+]);
+
+/** Tipo de espectro do medicamento de Cannabis */
+export const tipoEspectroEnum = pgEnum('tipo_espectro', [
+  'isolado',
+  'broad',
+  'full',
+]);
+
+/** Tipo de alerta do motor de alertas */
+export const alertaTipoEnum = pgEnum('alerta_tipo', [
+  'medicacao',
+  'licenca_anvisa',
+  'mensalidade',
+]);
+
+/** Destinatário do alerta enviado */
+export const alertaDestinatarioEnum = pgEnum('alerta_destinatario', [
+  'admin',
+  'paciente',
 ]);

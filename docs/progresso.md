@@ -12,6 +12,9 @@
 | 7 — Interface: Área do paciente | ✅ Concluída | 2026-05-04 |
 | 8 — Interface: Área do admin | ✅ Concluída | 2026-05-04 |
 | 9 — Qualidade e deploy | ✅ Concluída | 2026-05-04 |
+| 10 — Central de Alertas: Schema | ✅ Concluída | 2026-08-12 |
+| 11 — Central de Alertas: Motor | ⏳ Pendente | - |
+| 12 — Central de Alertas: UI Admin | ⏳ Pendente | - |
 
 ---
 

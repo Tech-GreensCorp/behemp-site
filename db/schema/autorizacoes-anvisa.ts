@@ -24,6 +24,7 @@ export const autorizacoesAnvisa = pgTable(
     dataEnvio: timestamp('data_envio', { withTimezone: true }),
     dataAprovacao: timestamp('data_aprovacao', { withTimezone: true }),
     prazoEstimado: date('prazo_estimado'),
+    dataValidade: date('data_validade'),
     observacoesAnvisa: text('observacoes_anvisa'),
     documentos: jsonb('documentos').default([]),
     formulario8833: jsonb('formulario_8833').default({}),
