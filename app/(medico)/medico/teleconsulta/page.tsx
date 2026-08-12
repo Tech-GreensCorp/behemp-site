@@ -71,23 +71,27 @@ function TeleconsultaLobbyContent() {
     useEffect(() => {
         const carregar = async () => {
             setCarregandoConsultas(true);
-            const [consultasRes, pacientesRes] = await Promise.all([
-                listarConsultasMedico(),
-                listarPacientesMedico(),
-            ]);
+            try {
+                const [consultasRes, pacientesRes] = await Promise.all([
+                    listarConsultasMedico(),
+                    listarPacientesMedico(),
+                ]);
 
-            if (consultasRes.sucesso && consultasRes.dados) {
-                const ativas = consultasRes.dados.filter(
-                    (c: any) => c.status === 'agendada' || c.status === 'confirmada'
-                ) as ConsultaAgendada[];
-                setConsultasHoje(ativas);
+                if (consultasRes.sucesso && consultasRes.dados) {
+                    const ativas = consultasRes.dados.filter(
+                        (c: any) => c.status === 'agendada' || c.status === 'confirmada'
+                    ) as ConsultaAgendada[];
+                    setConsultasHoje(ativas);
+                }
+
+                if (pacientesRes.sucesso && pacientesRes.dados) {
+                    setPacientes(pacientesRes.dados);
+                }
+            } catch (err) {
+                console.error("[WebRTC] Erro ao carregar consultas/pacientes:", err);
+            } finally {
+                setCarregandoConsultas(false);
             }
-
-            if (pacientesRes.sucesso && pacientesRes.dados) {
-                setPacientes(pacientesRes.dados);
-            }
-
-            setCarregandoConsultas(false);
         };
         carregar();
     }, []);

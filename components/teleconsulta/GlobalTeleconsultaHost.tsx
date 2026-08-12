@@ -122,7 +122,11 @@ export function GlobalTeleconsultaHost() {
         }
 
         if (salaId && consentimentoTranscricao) {
-            await registrarConsentimentoLgpd(salaId, consentimentoTranscricao);
+            try {
+                await registrarConsentimentoLgpd(salaId, consentimentoTranscricao);
+            } catch (err) {
+                console.error("[WebRTC] Erro ao registrar consentimento LGPD:", err);
+            }
         }
 
         setPhase("connecting");
@@ -280,10 +284,12 @@ export function GlobalTeleconsultaHost() {
         if (localVideoRef.current && localStreamRef.current
             && localVideoRef.current.srcObject !== localStreamRef.current) {
             localVideoRef.current.srcObject = localStreamRef.current;
+            localVideoRef.current.play().catch(console.warn);
         }
         if (remoteVideoRef.current && remoteStream
             && remoteVideoRef.current.srcObject !== remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch(console.warn);
         }
     }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
 
@@ -304,7 +310,13 @@ export function GlobalTeleconsultaHost() {
             mr.stop();
         }
 
-        if (salaId) await encerrarTeleconsulta(salaId, duration);
+        if (salaId) {
+            try {
+                await encerrarTeleconsulta(salaId, duration);
+            } catch (err) {
+                console.error("[WebRTC] Erro ao encerrar teleconsulta no servidor:", err);
+            }
+        }
 
         teardownWebRTC();
         sessionRef.current = null;

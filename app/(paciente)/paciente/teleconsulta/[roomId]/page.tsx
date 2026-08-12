@@ -214,12 +214,11 @@ function TeleconsultaPacienteContent() {
     return () => clearInterval(t);
   }, [phase]);
 
-  // Problema 3 — PiP preto: na transição lobby→room o React monta um novo nó <video>.
-  // O ref aponta para o novo nó mas o srcObject nunca é reatribuído → preto.
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current
         && localVideoRef.current.srcObject !== localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(console.warn);
     }
   }); // sem dependências, com guarda para rodar sempre que montar um <video> novo
 
