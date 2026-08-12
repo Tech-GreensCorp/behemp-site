@@ -30,6 +30,7 @@ jobs:
         # Passar variáveis públicas necessárias para o build
         env:
           NEXT_PUBLIC_APP_URL: "https://be4hope.org"
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run: pnpm build
 
       - name: Sincronizar arquivos para AWS (rsync)
