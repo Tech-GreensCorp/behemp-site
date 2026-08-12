@@ -25,6 +25,7 @@ import { TabDosagem } from './_components/tab-dosagem';
 import { TabGraficos } from './_components/tab-graficos';
 import { TabRelatorios } from './_components/tab-relatorios';
 import { TabPrescricoes } from './_components/tab-prescricoes';
+import { TabRastreio } from './_components/tab-rastreio';
 import {
   Activity,
   CheckCircle2,
@@ -43,6 +44,7 @@ import {
   Users,
   FileSignature,
   X,
+  BellRing,
 } from 'lucide-react';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
@@ -251,7 +253,10 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
             <Activity size={14} /> Evolução
           </TabsTrigger>
           <TabsTrigger value="dosagem" className="gap-1.5">
-            <Pill size={14} /> Dosagem
+            <Pill size={14} /> Hist. Dosagem
+          </TabsTrigger>
+          <TabsTrigger value="rastreio" className="gap-1.5">
+            <BellRing size={14} /> Rastreio (Alertas)
           </TabsTrigger>
           <TabsTrigger value="graficos" className="gap-1.5">
             <LineChart size={14} /> Gráficos
@@ -478,6 +483,9 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
 
         {/* ── DOSAGEM ── */}
         <TabsContent value="dosagem"><TabDosagem pacienteId={id} /></TabsContent>
+
+        {/* ── RASTREIO (ALERTAS) ── */}
+        <TabsContent value="rastreio"><TabRastreio pacienteId={id} /></TabsContent>
 
         {/* ── GRÁFICOS ── */}
         <TabsContent value="graficos"><TabGraficos pacienteId={id} /></TabsContent>
