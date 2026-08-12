@@ -33,6 +33,16 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run: pnpm build
 
+      - name: Limpar .next antigo no servidor antes do deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Remove o build antigo para evitar chunks obsoletos (ChunkLoadError)
+            rm -rf ${{ secrets.TARGET_DIR }}/.next
+
       - name: Sincronizar arquivos para AWS (rsync)
         uses: easingthemes/ssh-deploy@main
         env:
@@ -57,8 +67,10 @@ jobs:
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
             
-            # Aplica eventuais migrações do banco (opcional, remova se preferir fazer manual)
+            # Aplica eventuais migrações do banco
             pnpm db:migrate
             
-            # Reinicia a aplicação
-            pm2 restart all
+            # Reinicia o processo — garante que PM2 carrega o build novo limpo
+            pm2 restart behemp-site --update-env || pm2 start pnpm --name "behemp-site" -- run start
+            pm2 save
+
