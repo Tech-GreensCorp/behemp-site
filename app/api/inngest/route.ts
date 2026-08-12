@@ -4,6 +4,7 @@ import {
   verificarValidadeDocumentos,
   verificarRecompraMedicamentos,
   enviarEmailRecompraAgendado,
+  digestDiarioAdmin,
 } from '@/lib/integrations/inngest';
 
 /**
@@ -19,5 +20,6 @@ export const { GET, POST, PUT } = serve({
     verificarValidadeDocumentos,
     verificarRecompraMedicamentos,
     enviarEmailRecompraAgendado,
+    digestDiarioAdmin,
   ],
 });

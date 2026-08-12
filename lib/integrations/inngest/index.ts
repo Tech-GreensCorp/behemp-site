@@ -4,4 +4,5 @@ export {
   verificarValidadeDocumentos,
   verificarRecompraMedicamentos,
   enviarEmailRecompraAgendado,
+  digestDiarioAdmin,
 } from './functions';

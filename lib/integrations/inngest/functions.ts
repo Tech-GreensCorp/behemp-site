@@ -1,7 +1,10 @@
 import { inngest } from './client';
 import { db } from '@/lib/db';
-import { documentos, dosagens, medicamentos, pacientes, users, notificacoes } from '@/db/schema';
+import { documentos, dosagens, medicamentos, pacientes, users, notificacoes, emailsNotificacao, alertasEnviados, alertasConfig } from '@/db/schema';
 import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
+import { coletarAlertasMedicacao, coletarAlertasLicencas, coletarAlertasMensalidades } from '@/lib/alertas/coletor';
+import { gerarHtmlDigestAdmin, gerarHtmlAlertaPaciente } from '@/lib/email/alertas';
+import { enviarEmailGenerico } from '@/lib/email/brevo';
 
 /**
  * Job: Verificar documentos próximos do vencimento.
@@ -103,101 +106,161 @@ export const verificarValidadeDocumentos = inngest.createFunction(
 );
 
 /**
- * Job: Verificar recompras de medicamentos.
- *
- * Roda diariamente às 9h.
- * Busca dosagens ativas cujo frasco está previsto para acabar nos próximos 10 dias.
+ * @deprecated Use o novo motor de alertas unificado (digestDiarioAdmin).
+ * Mantido apenas por compatibilidade com rotas/cron antigos até a virada completa.
  */
 export const verificarRecompraMedicamentos = inngest.createFunction(
   {
     id: 'verificar-recompra-medicamentos',
-    name: 'Verificar Recompra de Medicamentos',
-    triggers: [{ cron: '0 9 * * *' }],
+    name: 'Verificar Recompra de Medicamentos (Obsoleto)',
+    triggers: [{ cron: '0 9 * * *' }], // Será sobrescrito pelo digestDiarioAdmin na prática, mas mantemos isolado.
   },
   async ({ step }) => {
-    // Step 1: Buscar dosagens com recompra próxima (10 dias)
-    const recomprasPendentes = await step.run(
-      'buscar-recompras-pendentes',
-      async () => {
-        const hoje = new Date();
-        const daqui10dias = new Date();
-        daqui10dias.setDate(hoje.getDate() + 10);
+    return { status: 'obsoleto', substituto: 'digest-diario-admin' };
+  }
+);
 
-        const resultado = await db
-          .select({
-            id: dosagens.id,
-            dataPrevista: dosagens.dataFimPrevista,
-            nomeMedicamento: medicamentos.nome,
-            pacienteId: dosagens.pacienteId,
-            pacienteNome: users.nome,
-            pacienteEmail: users.email,
-            pacienteUserId: pacientes.userId,
-          })
-          .from(dosagens)
-          .innerJoin(medicamentos, eq(dosagens.medicamentoId, medicamentos.id))
-          .innerJoin(pacientes, eq(dosagens.pacienteId, pacientes.id))
-          .innerJoin(users, eq(pacientes.userId, users.id))
-          .where(
-            and(
-              eq(dosagens.ativa, true),
-              lte(dosagens.dataFimPrevista, daqui10dias.toISOString().split('T')[0]),
-              gte(dosagens.dataFimPrevista, hoje.toISOString().split('T')[0]),
-            ),
-          );
+/**
+ * Job: Central de Alertas — Digest Diário para Admins e Alertas Paciente.
+ * Roda diariamente, varre medicação, licenças e mensalidades.
+ * Centraliza e unifica as regras antigas.
+ */
+export const digestDiarioAdmin = inngest.createFunction(
+  {
+    id: 'digest-diario-admin',
+    name: 'Digest Diário de Alertas (Admins)',
+    triggers: [
+      { cron: '0 11 * * *' },
+      { event: 'be4hope/digest.manual' }
+    ],
+  },
+  async ({ step }) => {
+    // 1. Coleta
+    const alertasMedicacao = await step.run('coletar-alertas-medicacao', coletarAlertasMedicacao);
+    const alertasLicenca = await step.run('coletar-alertas-licencas', coletarAlertasLicencas);
+    const alertasMensalidade = await step.run('coletar-alertas-mensalidades', coletarAlertasMensalidades);
 
-        console.log(
-          `[Job] Encontradas ${resultado.length} dosagens com recompra nos próximos 10 dias`,
-        );
+    const todos = [...alertasMedicacao, ...alertasLicenca, ...alertasMensalidade];
+    if (todos.length === 0) {
+      return { status: 'sem-alertas' };
+    }
 
-        return resultado.map((r) => ({
-          id: r.id,
-          pacienteEmail: r.pacienteEmail,
-          pacienteNome: r.pacienteNome,
-          nomeMedicamento: r.nomeMedicamento,
-          dataPrevista: r.dataPrevista,
-          pacienteUserId: r.pacienteUserId,
-        }));
-      },
-    );
-
-    // Step 2: Criar notificações e enviar e-mails
-    for (const recompra of recomprasPendentes) {
-      await step.run(`notificar-recompra-${recompra.id}`, async () => {
-        // Criar notificação no sistema
-        await db.insert(notificacoes).values({
-          userId: recompra.pacienteUserId,
-          titulo: 'Recompra de medicamento',
-          mensagem: `Seu medicamento "${recompra.nomeMedicamento}" está previsto para acabar em ${recompra.dataPrevista}.`,
-          tipo: 'recompra_medicamento',
+    // 2. Filtro de Idempotência
+    const alertasNovos = await step.run('filtrar-idempotencia', async () => {
+      const novos = [];
+      for (const a of todos) {
+        const jaEnviado = await db.query.alertasEnviados.findFirst({
+          where: and(
+            eq(alertasEnviados.tipo, a.tipo),
+            eq(alertasEnviados.referenciaId, a.referenciaId),
+            eq(alertasEnviados.marcoDias, a.marcoDisparado),
+            eq(alertasEnviados.destinatario, 'admin')
+          )
         });
+        if (!jaEnviado) novos.push(a);
+      }
+      return novos;
+    });
 
-        // Enviar e-mail via Brevo
-        try {
-          const { enviarEmailRecompraPaciente } = await import(
-            '@/lib/email/notificacoes'
-          );
+    if (alertasNovos.length === 0) {
+      return { status: 'todos-ja-enviados' };
+    }
 
-          await enviarEmailRecompraPaciente({
-            emailPaciente: recompra.pacienteEmail,
-            nomePaciente: recompra.pacienteNome,
-            nomeMedicamento: recompra.nomeMedicamento,
-            dataPrevista: recompra.dataPrevista,
-          });
-        } catch (error) {
-          console.error(`[Job] Erro ao enviar e-mail para ${recompra.pacienteEmail}:`, error);
-        }
+    const config = await step.run('obter-config', async () => db.query.alertasConfig.findFirst());
+    const notificarPaciente = config?.notificarPaciente ?? true;
 
-        console.log(
-          `[Job] Notificação de recompra enviada para ${recompra.pacienteEmail}`,
+    // 3. Notificar Admin (Digest)
+    await step.run('enviar-digest-admin', async () => {
+      const htmlDigest = gerarHtmlDigestAdmin({
+        alertasMedicacao: alertasNovos.filter(a => a.tipo === 'medicacao') as typeof alertasMedicacao,
+        alertasLicenca: alertasNovos.filter(a => a.tipo === 'licenca_anvisa') as typeof alertasLicenca,
+        alertasMensalidade: alertasNovos.filter(a => a.tipo === 'mensalidade') as typeof alertasMensalidade,
+        adminUrl: 'https://be4hope.org/admin/alertas'
+      });
+
+      if (!htmlDigest) return;
+
+      const admins = await db.query.emailsNotificacao.findMany({
+        where: sql`categoria IN ('administrativo', 'geral')`
+      });
+      
+      const adminEmails = admins.filter(a => a.ativo).map(a => ({ email: a.email, name: a.nome }));
+
+      if (adminEmails.length > 0) {
+        await enviarEmailGenerico(
+          adminEmails,
+          '🚨 Digest de Alertas - Be4Hope',
+          htmlDigest
         );
+
+        // Registra envio Admin
+        for (const a of alertasNovos) {
+          await db.insert(alertasEnviados).values({
+            tipo: a.tipo,
+            referenciaId: a.referenciaId,
+            marcoDias: a.marcoDisparado,
+            destinatario: 'admin',
+          }).onConflictDoNothing();
+        }
+      }
+    });
+
+    // 4. Notificar Paciente (Apenas Medicação)
+    if (notificarPaciente) {
+      await step.run('enviar-alertas-paciente', async () => {
+        const meds = alertasNovos.filter(a => a.tipo === 'medicacao');
+        for (const m of meds) {
+          // Verifica se paciente já foi notificado neste marco
+          const jaEnviado = await db.query.alertasEnviados.findFirst({
+            where: and(
+              eq(alertasEnviados.tipo, m.tipo),
+              eq(alertasEnviados.referenciaId, m.referenciaId),
+              eq(alertasEnviados.marcoDias, m.marcoDisparado),
+              eq(alertasEnviados.destinatario, 'paciente')
+            )
+          });
+
+          if (!jaEnviado) {
+            const mTyped = m as typeof alertasMedicacao[number];
+            const html = gerarHtmlAlertaPaciente({
+              nome: mTyped.pacienteNome,
+              medicamento: mTyped.medicamento,
+              dataTermino: mTyped.dataFim,
+              recompraUrl: 'https://be4hope.org/paciente/recompra',
+            });
+
+            await enviarEmailGenerico(
+              [{ email: m.pacienteEmail, name: m.pacienteNome }],
+              'Aviso de Medicação - Be4Hope',
+              html
+            );
+
+            // Tenta pegar o userId para notificação in-app
+            const pUser = await db.query.users.findFirst({ where: eq(users.email, m.pacienteEmail) });
+            if (pUser) {
+              await db.insert(notificacoes).values({
+                userId: pUser.id,
+                titulo: 'Lembrete de Recompra',
+                mensagem: `O seu medicamento ${mTyped.medicamento} está próximo do fim.`,
+                tipo: 'recompra_medicamento',
+                linkAcao: '/paciente/recompra',
+              });
+            }
+
+            // Registra envio Paciente
+            await db.insert(alertasEnviados).values({
+              tipo: m.tipo,
+              referenciaId: m.referenciaId,
+              marcoDias: m.marcoDisparado,
+              destinatario: 'paciente',
+            }).onConflictDoNothing();
+          }
+        }
       });
     }
 
-    return {
-      recomprasVerificadas: recomprasPendentes.length,
-      timestamp: new Date().toISOString(),
-    };
-  },
+    return { success: true, alertasNovos: alertasNovos.length };
+  }
 );
 
 /**
