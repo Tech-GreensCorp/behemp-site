@@ -14,7 +14,7 @@
 | 9 — Qualidade e deploy | ✅ Concluída | 2026-05-04 |
 | 10 — Central de Alertas: Schema | ✅ Concluída | 2026-08-12 |
 | 11 — Central de Alertas: Motor | ✅ Concluída | 2026-08-12 |
-| 12 — Central de Alertas: UI Admin | ⏳ Pendente | - |
+| 12 — Central de Alertas: UI Admin | ✅ Concluída | 2026-08-12 |
 
 ---
 
