@@ -17,6 +17,7 @@ import {
   Calendar,
   User,
   Video,
+  Package,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -43,6 +44,10 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Agendamento', href: '/medico/agenda', icon: Calendar },
       { label: 'Teleconsulta', href: '/medico/teleconsulta', icon: Video },
     ],
+  },
+  {
+    title: 'Catálogo',
+    items: [{ label: 'Produtos', href: '/medico/produtos', icon: Package }],
   },
   {
     title: 'Mensagens',

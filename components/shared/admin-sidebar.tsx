@@ -22,6 +22,7 @@ import {
   BookOpen,
   Bell,
   Calculator,
+  Package,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -57,6 +58,12 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Chat', href: '/admin/chat', icon: MessageSquare },
       { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
       { label: 'Leads Ebooks', href: '/admin/leads-ebooks', icon: BookOpen },
+    ],
+  },
+  {
+    title: 'Catálogo',
+    items: [
+      { label: 'Produtos', href: '/admin/produtos', icon: Package },
     ],
   },
   {

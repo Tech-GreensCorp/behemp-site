@@ -18,6 +18,8 @@ import { receituarioTemplates } from './receituario-templates';
 import { teleconsultas, transcricoes } from './teleconsultas';
 import { autorizacoesAnvisa } from './autorizacoes-anvisa';
 import { procuracoesEspecificas } from './procuracoes-especificas';
+import { produtos } from './produtos';
+import { produtoArquivos } from './produto-arquivos';
 
 /**
  * Declaração centralizada de todas as relations do Drizzle ORM.
@@ -294,6 +296,23 @@ export const procuracoesEspecificasRelations = relations(procuracoesEspecificas,
   autorizacao: one(autorizacoesAnvisa, {
     fields: [procuracoesEspecificas.autorizacaoId],
     references: [autorizacoesAnvisa.id],
+  }),
+}));
+
+// ── Produtos (Catálogo) ────────────────────────────────────────
+export const produtosRelations = relations(produtos, ({ one, many }) => ({
+  excluidoPorUser: one(users, {
+    fields: [produtos.excluidoPor],
+    references: [users.id],
+  }),
+  arquivos: many(produtoArquivos),
+}));
+
+// ── Arquivos de Produto ─────────────────────────────────────────
+export const produtoArquivosRelations = relations(produtoArquivos, ({ one }) => ({
+  produto: one(produtos, {
+    fields: [produtoArquivos.produtoId],
+    references: [produtos.id],
   }),
 }));
 

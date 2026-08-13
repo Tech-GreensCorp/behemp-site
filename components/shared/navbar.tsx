@@ -22,12 +22,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Menu, LogIn, Calendar, LayoutDashboard, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +84,7 @@ export function Navbar() {
               setActiveHash('');
             }
           },
-          { threshold: 0.2, rootMargin: '-80px 0px -40% 0px' }
+          { threshold: 0.2, rootMargin: '-80px 0px -40% 0px' },
         );
         observer.observe(el);
       }
@@ -117,7 +112,6 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-24 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-
         {/* Left container: Logo & Nav links closer together */}
         <div className="flex items-center gap-12">
           {/* ── Logo ── */}
@@ -160,15 +154,13 @@ export function Navbar() {
                   onClick={handleAnchorClick}
                   className={cn(
                     'relative px-3.5 py-2 text-sm font-medium transition-colors duration-200',
-                    isActive(item.href)
-                      ? 'text-primary'
-                      : 'text-stone-600 hover:text-foreground',
+                    isActive(item.href) ? 'text-primary' : 'hover:text-foreground text-stone-600',
                   )}
                 >
                   {item.label}
                   {/* Sublinhado ativo */}
                   {isActive(item.href) && (
-                    <span className="absolute bottom-1 left-3.5 right-3.5 h-px rounded-full bg-primary" />
+                    <span className="bg-primary absolute right-3.5 bottom-1 left-3.5 h-px rounded-full" />
                   )}
                 </Link>
               );
@@ -191,17 +183,17 @@ export function Navbar() {
             </Button>
           </Link> */}
 
-          {isLoaded && (
-            isSignedIn ? (
+          {isLoaded &&
+            (isSignedIn ? (
               /* Logado: painel discreto + avatar */
               <div className="flex items-center gap-2.5">
                 {/* Separador visual */}
-                <span className="h-5 w-px bg-border" />
+                <span className="bg-border h-5 w-px" />
                 <Link href="/redirect">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium"
                     nativeButton={false}
                   >
                     <LayoutDashboard size={14} />
@@ -218,12 +210,12 @@ export function Navbar() {
               /* Não logado: Registrar-se + Entrar ghost */
               <div className="flex items-center gap-1.5">
                 {/* Separador visual */}
-                <span className="h-5 w-px bg-border" />
+                <span className="bg-border h-5 w-px" />
                 <Link href="/registrar-se">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium"
                     nativeButton={false}
                   >
                     <UserPlus size={14} />
@@ -234,7 +226,7 @@ export function Navbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground h-9 gap-1.5 rounded-full px-3.5 text-sm font-medium"
                     nativeButton={false}
                   >
                     <LogIn size={14} />
@@ -242,17 +234,14 @@ export function Navbar() {
                   </Button>
                 </Link>
               </div>
-            )
-          )}
+            ))}
         </div>
 
         {/* ── Mobile: hamburger ── */}
         <div className="flex items-center gap-2 lg:hidden">
           {/* Avatar pequeno acessível sem abrir o menu */}
           {isLoaded && isSignedIn && (
-            <UserButton
-              appearance={{ elements: { avatarBox: 'h-7 w-7' } }}
-            />
+            <UserButton appearance={{ elements: { avatarBox: 'h-7 w-7' } }} />
           )}
 
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -261,7 +250,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 rounded-full hover:bg-muted flex items-center justify-center"
+                  className="hover:bg-muted flex h-11 w-11 items-center justify-center rounded-full"
                 />
               }
             >
@@ -271,7 +260,7 @@ export function Navbar() {
 
             <SheetContent side="right" className="flex w-[300px] flex-col bg-[#F5F2ED] p-0">
               {/* Faixa decorativa topo — differentiator Organic */}
-              <div className="h-1 w-full bg-primary" />
+              <div className="bg-primary h-1 w-full" />
 
               <div className="flex-1 overflow-y-auto px-6 pt-5 pb-6">
                 <SheetTitle className="mb-6">
@@ -320,28 +309,26 @@ export function Navbar() {
                 </nav>
 
                 {/* Divisor */}
-                <div className="my-5 h-px bg-border" />
+                <div className="bg-border my-5 h-px" />
 
                 {/* CTAs mobile */}
                 <div className="flex flex-col gap-2.5">
-                  {isLoaded && (
-                    isSignedIn ? (
+                  {isLoaded &&
+                    (isSignedIn ? (
                       <>
                         <Link href="/redirect" onClick={() => setMobileOpen(false)}>
                           <Button
                             variant="outline"
-                            className="h-11 w-full gap-2 rounded-full border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
+                            className="border-primary/30 text-primary hover:border-primary hover:bg-primary/5 h-11 w-full gap-2 rounded-full"
                             nativeButton={false}
                           >
                             <LayoutDashboard size={16} />
                             Acessar Painel
                           </Button>
                         </Link>
-                        <div className="flex items-center gap-3 rounded-xl bg-muted/60 px-4 py-2.5">
-                          <UserButton
-                            appearance={{ elements: { avatarBox: 'h-8 w-8' } }}
-                          />
-                          <span className="text-sm font-medium text-foreground">Minha conta</span>
+                        <div className="bg-muted/60 flex items-center gap-3 rounded-xl px-4 py-2.5">
+                          <UserButton appearance={{ elements: { avatarBox: 'h-8 w-8' } }} />
+                          <span className="text-foreground text-sm font-medium">Minha conta</span>
                         </div>
                       </>
                     ) : (
@@ -367,8 +354,7 @@ export function Navbar() {
                           </Button>
                         </Link>
                       </>
-                    )
-                  )}
+                    ))}
 
                   {/* <Link href="/agendamento" onClick={() => setMobileOpen(false)}>
                     <Button
@@ -385,7 +371,6 @@ export function Navbar() {
             </SheetContent>
           </Sheet>
         </div>
-
       </nav>
     </header>
   );

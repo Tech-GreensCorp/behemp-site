@@ -11,6 +11,12 @@ import { NextResponse } from 'next/server';
  *
  * Rotas públicas são acessíveis sem autenticação.
  * Rotas protegidas (/medico, /paciente, /admin) exigem apenas userId válido.
+ *
+ * O catálogo de produtos não é mais público (site institucional, sem venda
+ * direta) — vive apenas em /paciente/produtos e /medico/produtos, dentro das
+ * árvores já protegidas. /api/produtos(.*) também não está na lista de
+ * rotas públicas por causa disso: exige sessão ativa como qualquer outra
+ * rota fora da lista abaixo.
  */
 
 const isPublicRoute = createRouteMatcher([

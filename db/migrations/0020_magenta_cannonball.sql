@@ -1,0 +1,1 @@
+ALTER TYPE "public"."produto_arquivo_categoria" ADD VALUE 'formula' BEFORE 'coa';

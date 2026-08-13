@@ -36,6 +36,8 @@ export * from './teleconsultas';
 export * from './autorizacoes-anvisa';
 export * from './alertas-config';
 export * from './alertas-enviados';
+export * from './produtos';
+export * from './produto-arquivos';
 
 // Relations
 export * from './relations';

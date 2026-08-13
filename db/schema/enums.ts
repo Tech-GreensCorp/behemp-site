@@ -17,11 +17,7 @@ export const pacienteStatusEnum = pgEnum('paciente_status', [
 ]);
 
 /** Tipo de tratamento do paciente */
-export const tratamentoTipoEnum = pgEnum('tratamento_tipo', [
-  'cbd',
-  'thc',
-  'cbd_thc',
-]);
+export const tratamentoTipoEnum = pgEnum('tratamento_tipo', ['cbd', 'thc', 'cbd_thc']);
 
 /** Tipo de documento do paciente */
 export const documentoTipoEnum = pgEnum('documento_tipo', [
@@ -56,11 +52,7 @@ export const notificacaoTipoEnum = pgEnum('notificacao_tipo', [
 ]);
 
 /** Status da recompra de medicamento */
-export const recompraStatusEnum = pgEnum('recompra_status', [
-  'agendada',
-  'pedida',
-  'entregue',
-]);
+export const recompraStatusEnum = pgEnum('recompra_status', ['agendada', 'pedida', 'entregue']);
 
 /** Tipo de grupo de chat */
 export const grupoChatTipoEnum = pgEnum('grupo_chat_tipo', ['direto', 'grupo']);
@@ -82,18 +74,10 @@ export const triagemStatusEnum = pgEnum('triagem_status', [
 ]);
 
 /** Tabagismo do paciente */
-export const tabagismoEnum = pgEnum('tabagismo', [
-  'nunca_fumou',
-  'ex_fumante',
-  'fumante',
-]);
+export const tabagismoEnum = pgEnum('tabagismo', ['nunca_fumou', 'ex_fumante', 'fumante']);
 
 /** Consumo de álcool */
-export const consumoAlcoolEnum = pgEnum('consumo_alcool', [
-  'nao_consome',
-  'regular',
-  'ocasional',
-]);
+export const consumoAlcoolEnum = pgEnum('consumo_alcool', ['nao_consome', 'regular', 'ocasional']);
 
 /** Qualidade do sono */
 export const qualidadeSonoEnum = pgEnum('qualidade_sono_enum', [
@@ -104,11 +88,7 @@ export const qualidadeSonoEnum = pgEnum('qualidade_sono_enum', [
 ]);
 
 /** Tipo de evolução clínica */
-export const evolucaoTipoEnum = pgEnum('evolucao_tipo', [
-  'positiva',
-  'estavel',
-  'negativa',
-]);
+export const evolucaoTipoEnum = pgEnum('evolucao_tipo', ['positiva', 'estavel', 'negativa']);
 
 /** Tipo de invoice médica */
 export const invoiceTipoEnum = pgEnum('invoice_tipo', [
@@ -119,10 +99,7 @@ export const invoiceTipoEnum = pgEnum('invoice_tipo', [
 ]);
 
 /** Status da invoice */
-export const invoiceStatusEnum = pgEnum('invoice_status', [
-  'draft',
-  'completed',
-]);
+export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'completed']);
 
 // ── Receituário / Assinatura ICP-Brasil ───────────────────────
 
@@ -142,16 +119,10 @@ export const prescricaoStatusEnum = pgEnum('prescricao_status', [
 ]);
 
 /** Provedor de assinatura digital ICP-Brasil */
-export const provedorAssinaturaEnum = pgEnum('provedor_assinatura', [
-  'vidaas',
-  'birdid',
-]);
+export const provedorAssinaturaEnum = pgEnum('provedor_assinatura', ['vidaas', 'birdid']);
 
 /** Tipo de estampa do template de receituário */
-export const estampaTipoEnum = pgEnum('estampa_tipo', [
-  'nenhuma',
-  'medico',
-]);
+export const estampaTipoEnum = pgEnum('estampa_tipo', ['nenhuma', 'medico']);
 
 /** Status da teleconsulta */
 export const teleconsultaStatusEnum = pgEnum('teleconsulta_status', [
@@ -192,37 +163,38 @@ export const anvisaDocumentoTipoEnum = pgEnum('anvisa_documento_tipo', [
 
 /** Modalidade da autorização ANVISA escolhida pelo paciente */
 export const anvisaModalidadeEnum = pgEnum('anvisa_modalidade', [
-  'guiada',        // paciente faz sozinho no Gov.br
+  'guiada', // paciente faz sozinho no Gov.br
   'representacao', // Be4Hope faz via Procuração Específica
 ]);
 
 /** Status do envelope DocuSign da Procuração Específica */
 export const docusignStatusEnum = pgEnum('docusign_status', [
-  'nao_enviado',    // ainda não foi enviado
-  'enviado',        // envelope enviado ao paciente
-  'visualizado',    // paciente abriu o email
-  'assinado',       // paciente assinou
-  'concluido',      // todas as partes assinaram
-  'recusado',       // paciente recusou assinar
-  'expirado',       // envelope expirou sem assinatura
+  'nao_enviado', // ainda não foi enviado
+  'enviado', // envelope enviado ao paciente
+  'visualizado', // paciente abriu o email
+  'assinado', // paciente assinou
+  'concluido', // todas as partes assinaram
+  'recusado', // paciente recusou assinar
+  'expirado', // envelope expirou sem assinatura
 ]);
 
 /** Tipo de espectro do medicamento de Cannabis */
-export const tipoEspectroEnum = pgEnum('tipo_espectro', [
-  'isolado',
-  'broad',
-  'full',
-]);
+export const tipoEspectroEnum = pgEnum('tipo_espectro', ['isolado', 'broad', 'full']);
 
 /** Tipo de alerta do motor de alertas */
-export const alertaTipoEnum = pgEnum('alerta_tipo', [
-  'medicacao',
-  'licenca_anvisa',
-  'mensalidade',
-]);
+export const alertaTipoEnum = pgEnum('alerta_tipo', ['medicacao', 'licenca_anvisa', 'mensalidade']);
 
 /** Destinatário do alerta enviado */
-export const alertaDestinatarioEnum = pgEnum('alerta_destinatario', [
-  'admin',
-  'paciente',
+export const alertaDestinatarioEnum = pgEnum('alerta_destinatario', ['admin', 'paciente']);
+
+/**
+ * Categoria de arquivo anexado a um produto do catálogo.
+ * Cada categoria é um slot único por produto (upload substitui o anterior).
+ */
+export const produtoArquivoCategoriaEnum = pgEnum('produto_arquivo_categoria', [
+  'imagem',
+  'formula',
+  'coa',
+  'ficha_tecnica',
+  'ficha_informativa',
 ]);

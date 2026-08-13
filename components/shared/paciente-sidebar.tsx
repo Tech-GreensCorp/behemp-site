@@ -17,6 +17,7 @@ import {
   Calculator,
   ShieldCheck,
   FileText,
+  Package,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -42,6 +43,10 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Autorização ANVISA', href: '/paciente/anvisa', icon: ShieldCheck },
       { label: 'Calculadora', href: '/paciente/calculadora', icon: Calculator },
     ],
+  },
+  {
+    title: 'Catálogo',
+    items: [{ label: 'Produtos', href: '/paciente/produtos', icon: Package }],
   },
   {
     title: 'Mensagens',
