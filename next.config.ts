@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     // consome mais memória do que a máquina possui e causa OOM Crash.
     ignoreBuildErrors: true,
   },
+  // @ts-expect-error type NextConfig mismatch
   eslint: {
     ignoreDuringBuilds: true,
   },

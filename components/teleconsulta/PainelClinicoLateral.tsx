@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle } from 'lucide-react';
+import { X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle, Activity } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
@@ -80,49 +81,205 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
             <div className="flex-1 overflow-y-auto p-5">
               {/* ABA PACIENTE */}
               {aba === 'paciente' && (
-                <div className="space-y-5">
+                <div className="space-y-0">
+                  {/* Banner de Alergias */}
+                  {paciente.alergias && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-3 text-red-900 dark:text-red-200 mb-5">
+                      <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold uppercase mb-0.5">Alerta de Alergia</p>
+                        <p className="text-sm font-medium leading-tight">{paciente.alergias}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Header: Avatar, Nome, Idade, Anvisa */}
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
                       {paciente.nome.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground leading-tight">{paciente.nome}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{totalConsultas} consulta{totalConsultas !== 1 ? 's' : ''} no total</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {dados.sinaisRapidos?.idade != null && <span className="text-xs text-muted-foreground">{dados.sinaisRapidos.idade} anos</span>}
+                        {dados.sinaisRapidos?.idade != null && <span className="text-xs text-muted-foreground text-border">•</span>}
+                        <span className="text-xs text-muted-foreground">{totalConsultas} consulta{totalConsultas !== 1 ? 's' : ''}</span>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> Nascimento
-                      </p>
-                      <p className="text-sm font-medium">{paciente.dataNascimento || 'Não informado'}</p>
+                  {dados.statusAnvisa && dados.statusAnvisa.status !== 'none' && (
+                    <div className="mt-3">
+                      <Badge variant="outline" className={
+                        dados.statusAnvisa.statusVencimento === 'valida' ? 'bg-green-500/10 text-green-700 border-green-500/20' :
+                        dados.statusAnvisa.statusVencimento === 'vencendo' ? 'bg-amber-500/10 text-amber-700 border-amber-500/20' :
+                        'bg-red-500/10 text-red-700 border-red-500/20'
+                      }>
+                        ANVISA: {dados.statusAnvisa.statusVencimento === 'valida' ? 'Válida' : dados.statusAnvisa.statusVencimento === 'vencendo' ? 'Vencendo' : 'Vencida'}
+                      </Badge>
                     </div>
-                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
-                        <Phone className="h-3 w-3" /> Telefone
-                      </p>
-                      <p className="text-sm font-medium">{paciente.telefone || 'Não informado'}</p>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-900 dark:text-orange-200">
-                      <p className="text-[10px] uppercase font-bold mb-1 flex items-center gap-1 opacity-70">
+                  {/* Widget Tratamento Atual */}
+                  {dados.tratamentoAtual ? (
+                    <div className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-3 mt-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-bold text-foreground leading-tight">{dados.tratamentoAtual.medicamentoNome}</h4>
+                        <Badge variant="secondary" className="whitespace-nowrap shrink-0">{dados.tratamentoAtual.gotasPorDia} gotas/dia</Badge>
+                      </div>
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between text-[11px] font-semibold uppercase tracking-wide">
+                          <span className="text-muted-foreground">Progresso</span>
+                          <span className={
+                            dados.tratamentoAtual.statusFrasco === 'ok' ? 'text-green-600' :
+                            dados.tratamentoAtual.statusFrasco === 'atencao' ? 'text-amber-600' : 'text-red-600'
+                          }>
+                            {dados.tratamentoAtual.percentualConsumido}% consumido
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              dados.tratamentoAtual.statusFrasco === 'ok' ? 'bg-green-500' :
+                              dados.tratamentoAtual.statusFrasco === 'atencao' ? 'bg-amber-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${dados.tratamentoAtual.percentualConsumido}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <span className="text-muted-foreground">Término: {dados.tratamentoAtual.dataFimPrevista}</span>
+                        <span className="font-bold">{dados.tratamentoAtual.diasRestantes} dias restantes</span>
+                      </div>
+                      {dados.tratamentoAtual.statusFrasco === 'critico' && (
+                        <div className="mt-3 text-xs text-red-700 bg-red-500/10 rounded-md p-2 text-center font-bold">
+                          Recompra necessária urgente!
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-5 rounded-xl border border-dashed border-border bg-muted/20 flex flex-col items-center justify-center gap-2 mt-5 text-center">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-1">
+                        <Pill className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">Nenhum tratamento ativo</p>
+                      <p className="text-xs text-muted-foreground max-w-[200px]">O paciente não possui dosagens em andamento no momento.</p>
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => window.open(`/medico/pacientes/${paciente.id}?tab=prescricao`, '_blank')}>Registrar tratamento</Button>
+                    </div>
+                  )}
+
+                  {/* Mini-gráficos de Evolução */}
+                  {dados.evolucaoGraficos && dados.evolucaoGraficos.length > 1 ? (
+                    <div className="mt-6 space-y-2">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Activity className="h-4 w-4 text-primary" />
+                        <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Evolução Clínica</h4>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-muted/30 p-2 rounded-lg border border-border/50 flex flex-col items-center">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Dor (0-10)</span>
+                          <div className="h-10 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={dados.evolucaoGraficos}>
+                                <Line type="stepAfter" dataKey="nivelDor" stroke="#ef4444" strokeWidth={2} dot={false} connectNulls />
+                                <YAxis domain={[0, 10]} hide />
+                                <Tooltip contentStyle={{ fontSize: '10px', padding: '2px 4px', borderRadius: '4px' }} labelStyle={{ display: 'none' }} cursor={false} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                        <div className="bg-muted/30 p-2 rounded-lg border border-border/50 flex flex-col items-center">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Sono</span>
+                          <div className="h-10 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={dados.evolucaoGraficos}>
+                                <Line type="monotone" dataKey="qualidadeSono" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls />
+                                <YAxis domain={[1, 4]} hide />
+                                <Tooltip contentStyle={{ fontSize: '10px', padding: '2px 4px', borderRadius: '4px' }} labelStyle={{ display: 'none' }} cursor={false} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                        <div className="bg-muted/30 p-2 rounded-lg border border-border/50 flex flex-col items-center">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Bem-estar</span>
+                          <div className="h-10 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={dados.evolucaoGraficos}>
+                                <Line type="monotone" dataKey="bemEstar" stroke="#22c55e" strokeWidth={2} dot={false} connectNulls />
+                                <YAxis domain={[1, 4]} hide />
+                                <Tooltip contentStyle={{ fontSize: '10px', padding: '2px 4px', borderRadius: '4px' }} labelStyle={{ display: 'none' }} cursor={false} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 space-y-2">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Activity className="h-4 w-4 text-primary" />
+                        <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Evolução Clínica</h4>
+                      </div>
+                      <div className="p-4 rounded-xl border border-dashed border-border bg-muted/20 text-center">
+                        <p className="text-xs text-muted-foreground">Dados insuficientes para gerar gráficos (mín. 2 evoluções).</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sinais Rápidos */}
+                  {dados.sinaisRapidos && (
+                    <div className="mt-6">
+                      <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-3">Sinais Rápidos</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" /> Última Consulta
+                          </p>
+                          <p className="text-sm font-medium text-foreground">{dados.sinaisRapidos.ultimaConsultaData || 'Nenhuma'}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" /> Próxima Consulta
+                          </p>
+                          <p className="text-sm font-medium text-foreground">{dados.sinaisRapidos.proximaConsultaData || 'Não agendada'}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
+                            <FileText className="h-3 w-3" /> Exames Recentes
+                          </p>
+                          {dados.sinaisRapidos.examesRecentes.length > 0 ? (
+                            <ul className="text-[11px] font-medium space-y-1 text-foreground">
+                              {dados.sinaisRapidos.examesRecentes.map((ex, i) => (
+                                <li key={i} className="truncate" title={ex.nomeExame}>{ex.nomeExame}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm font-medium text-foreground">Nenhum</p>
+                          )}
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border/50 relative overflow-hidden flex flex-col">
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Docs Vencendo
+                          </p>
+                          <p className="text-sm font-medium text-foreground">{dados.sinaisRapidos.documentosVencendo > 0 ? `${dados.sinaisRapidos.documentosVencendo} docs` : 'Nenhum'}</p>
+                          {dados.sinaisRapidos.documentosVencendo > 0 && (
+                            <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Patologia Principal */}
+                  <div className="mt-6">
+                    <div className="p-3.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-900 dark:text-orange-200">
+                      <p className="text-[10px] uppercase font-bold mb-1.5 flex items-center gap-1.5 opacity-70 tracking-wider">
                         <Stethoscope className="h-3 w-3" /> Patologia Principal
                       </p>
-                      <p className="text-sm font-medium">{paciente.patologia || 'Nenhuma informada.'}</p>
-                    </div>
-
-                    <div className={`p-3 rounded-xl border ${paciente.alergias ? 'bg-red-500/10 border-red-500/20 text-red-900 dark:text-red-200' : 'bg-muted/40 border-border/50 text-foreground'}`}>
-                      <p className="text-[10px] uppercase font-bold mb-1 flex items-center gap-1 opacity-70">
-                        <AlertTriangle className="h-3 w-3" /> Alergias
-                      </p>
-                      <p className="text-sm font-medium">{paciente.alergias || 'Nenhuma alergia relatada.'}</p>
+                      <p className="text-sm font-medium leading-relaxed">{paciente.patologia || 'Nenhuma patologia informada.'}</p>
                     </div>
                   </div>
 
-                  <Button className="w-full mt-4" variant="outline" onClick={() => window.open(`/medico/pacientes/${paciente.id}`, '_blank')}>
+                  <Button className="w-full mt-6" variant="outline" onClick={() => window.open(`/medico/pacientes/${paciente.id}`, '_blank')}>
                     Ver Prontuário Completo
                   </Button>
                 </div>
