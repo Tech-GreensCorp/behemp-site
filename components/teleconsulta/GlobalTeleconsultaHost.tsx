@@ -163,8 +163,12 @@ export function GlobalTeleconsultaHost() {
 
             const pc = new RTCPeerConnection({
                 iceServers: [
-                    { urls: "stun:stun.l.google.com:19302" },
-                    { urls: "stun:stun1.l.google.com:19302" },
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    // TURN público — necessário para atravessar NAT em produção
+                    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+                    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
                 ],
             });
             pcRef.current = pc;
@@ -291,21 +295,23 @@ export function GlobalTeleconsultaHost() {
         return () => window.removeEventListener("beforeunload", handler);
     }, [phase]);
 
-    // 2.1 INÍCIO POR CLIQUE, NÃO POR EFFECT (padrão VidAI)
-    // Quando recebe salaId, vai para lobby e inicia mídia local (sem WebRTC)
+    // Inicia automaticamente quando salaId/roomId chegam (médico já clicou em "Notificar e Iniciar")
+    // Não exige segundo clique — remove o lobby intermediário desnecessário
     useEffect(() => {
         if (salaId && roomId) {
             setDuration(0);
-            setPhase("lobby");
             setRemoteConnected(false);
             setRemoteStream(null);
             setDadosPainel(null);
             setShowPainel(false);
             setShowCopilot(false);
-            iniciarMidia();
+            // Inicia mídia e em seguida conecta ao WebRTC automaticamente
+            iniciarMidia().then(() => {
+                iniciarConsulta();
+            });
         }
 
-        // Cleanup roda ao desmontar OU quando salaId vira null (endCall)
+        // Cleanup ao desmontar OU quando salaId vira null (endCall)
         return () => {
             if (!salaId) {
                 teardownWebRTC();
@@ -493,7 +499,7 @@ export function GlobalTeleconsultaHost() {
 
                     {/* Estado de aguardando / Lobby — sobrepõe quando paciente não conectado */}
                     {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-[1]">
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-30">
                             {phase === "lobby" ? (
                                 <div className="flex flex-col items-center gap-6 text-center max-w-md p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
                                     <VideoIcon className="h-16 w-16 text-primary animate-pulse" />
