@@ -52,9 +52,20 @@ export function GlobalTeleconsultaHost() {
 
     const setRemoteVideoEl = useCallback((el: HTMLVideoElement | null) => {
         remoteVideoRef.current = el;
+        // Vincula stream imediatamente se já disponível no momento da montagem
         if (el && remoteStream && el.srcObject !== remoteStream) {
             el.srcObject = remoteStream;
             el.play().catch(console.warn);
+        }
+    }, [remoteStream]);
+
+    // Bug fix: callback ref NÃO é re-invocado quando remoteStream muda após montagem.
+    // Este effect garante que o srcObject seja atualizado toda vez que remoteStream muda.
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream
+            && remoteVideoRef.current.srcObject !== remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch(console.warn);
         }
     }, [remoteStream]);
 
@@ -205,18 +216,38 @@ export function GlobalTeleconsultaHost() {
                 }
             };
 
-            channel.bind('pusher:subscription_succeeded', () => {
+            channel.bind('pusher:subscription_succeeded', (members: { count: number }) => {
                 setPhase("room");
+                // Sinaliza presença do médico
                 sinalizarWebRTC("peer-joined", { role: "medico" });
+                // Se o paciente JÁ estava no canal quando o médico entrou (raro mas possível),
+                // o member_added não dispara — verificar count > 1 para criar offer imediatamente.
+                if (members.count > 1) {
+                    pc.createOffer()
+                        .then(offer => pc.setLocalDescription(offer).then(() => sinalizarWebRTC("offer", { offer })))
+                        .catch(err => console.error("[WebRTC] Offer imediato (count>1):", err));
+                }
+            });
+
+            // Paciente entrou no canal DEPOIS do médico — disparar offer
+            channel.bind('pusher:member_added', (member: { id: string; info?: { role?: string } }) => {
+                console.log('[WebRTC] member_added:', member);
+                pc.createOffer()
+                    .then(offer => pc.setLocalDescription(offer).then(() => sinalizarWebRTC("offer", { offer })))
+                    .catch(err => console.error("[WebRTC] Offer em member_added:", err));
             });
 
             channel.bind('webrtc:peer-joined', async ({ role }: { role: string }) => {
+                // Fallback: paciente sinalizou via HTTP (não detectado pelo member_added)
                 if (role === "paciente") {
                     try {
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
-                        sinalizarWebRTC("offer", { offer });
-                    } catch (err) { console.error("Offer error:", err); }
+                        // Não criar offer duplicado se já temos remoteDescription
+                        if (pc.signalingState === 'stable' && !pc.currentRemoteDescription) {
+                            const offer = await pc.createOffer();
+                            await pc.setLocalDescription(offer);
+                            sinalizarWebRTC("offer", { offer });
+                        }
+                    } catch (err) { console.error("[WebRTC] Offer via peer-joined:", err); }
                 }
             });
 
@@ -326,7 +357,12 @@ export function GlobalTeleconsultaHost() {
 
         teardownWebRTC();
         setPhase("lobby");
-        clearState();
+        setRemoteConnected(false);
+        setRemoteStream(null);
+        setDuration(0);
+        setShowPainel(false);
+        setShowCopilot(false);
+        setTranscricaoPronta(false);
         toast.info("Consulta encerrada.");
         endCall();
         router.push("/medico/agenda");
@@ -445,19 +481,19 @@ export function GlobalTeleconsultaHost() {
 
                 {/* Área de vídeo */}
                 <div className="flex-1 relative overflow-hidden">
-                    {/* Vídeo remoto (paciente) — fundo principal */}
-                    {phase === "room" && (
-                        <video
-                            ref={setRemoteVideoEl}
-                            autoPlay
-                            playsInline
-                            className="absolute inset-0 w-full h-full object-cover"
-                        />
-                    )}
+                    {/* Vídeo remoto (paciente) — sempre no DOM para que o ref exista quando o stream chegar */}
+                    <video
+                        ref={setRemoteVideoEl}
+                        autoPlay
+                        playsInline
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                            remoteConnected ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                        }`}
+                    />
 
-                    {/* Estado de aguardando / Lobby */}
+                    {/* Estado de aguardando / Lobby — sobrepõe quando paciente não conectado */}
                     {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-0">
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-[1]">
                             {phase === "lobby" ? (
                                 <div className="flex flex-col items-center gap-6 text-center max-w-md p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
                                     <VideoIcon className="h-16 w-16 text-primary animate-pulse" />
@@ -484,8 +520,12 @@ export function GlobalTeleconsultaHost() {
                         </div>
                     )}
 
-                    {/* PiP local (médico) — canto INFERIOR ESQUERDO */}
-                    <div className={`absolute w-44 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-600 shadow-2xl z-10 transition-all ${phase === 'lobby' ? 'inset-0 w-full h-full border-none rounded-none' : 'bottom-4 left-4'}`}>
+                    {/* PiP local (médico) — canto INFERIOR ESQUERDO em sala, preview em lobby */}
+                    <div className={`absolute bg-black overflow-hidden border-2 border-slate-600 shadow-2xl z-10 transition-all ${
+                        phase === 'lobby'
+                            ? 'inset-0 w-full h-full border-none rounded-none'
+                            : 'bottom-4 left-4 w-44 aspect-video rounded-xl'
+                    }`}>
                         <video
                             ref={setLocalVideoEl}
                             autoPlay
@@ -498,7 +538,9 @@ export function GlobalTeleconsultaHost() {
                                 <VideoOff className="h-6 w-6 text-slate-500" />
                             </div>
                         )}
-                        <span className="absolute bottom-1 left-1 text-[9px] text-white/70 bg-black/40 rounded px-1">Você</span>
+                        {phase !== 'lobby' && (
+                            <span className="absolute bottom-1 left-1 text-[9px] text-white/70 bg-black/40 rounded px-1">Você</span>
+                        )}
                     </div>
 
                     {/* ── Botões clínicos — ESQUERDA superior ── */}

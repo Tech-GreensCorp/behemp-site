@@ -42,6 +42,16 @@ function TeleconsultaPacienteContent() {
       el.play().catch(console.warn);
     }
   }, [remoteStream]);
+
+  // Bug fix: callback ref NÃO é re-invocado quando remoteStream muda após a montagem.
+  // Este effect garante que o srcObject seja atualizado toda vez que remoteStream muda.
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream
+      && remoteVideoRef.current.srcObject !== remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(console.warn);
+    }
+  }, [remoteStream]);
   
   const audioChunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -346,20 +356,21 @@ function TeleconsultaPacienteContent() {
       </div>
       
       <div className="flex-1 relative bg-slate-950 flex flex-col justify-center items-center">
-        {remoteConnected && remoteStream ? (
-          <video
-            ref={setRemoteVideoEl}
-            autoPlay
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          !remoteConnected && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4">
-              <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
-              <p className="text-slate-400 font-medium">Aguardando médico...</p>
-            </div>
-          )
+      {/* Vídeo remoto (médico) — sempre no DOM para que o ref exista quando o stream chegar */}
+        <video
+          ref={setRemoteVideoEl}
+          autoPlay
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            remoteConnected ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        />
+
+        {!remoteConnected && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4 z-[1]">
+            <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
+            <p className="text-slate-400 font-medium">Aguardando médico...</p>
+          </div>
         )}
         
         <div className="absolute bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
