@@ -101,7 +101,6 @@ export async function buscarDadosPainelTeleconsulta(
         cpf: pacientes.cpf,
         telefone: users.telefone,
         patologia: pacientes.patologia,
-        alergias: sql<string | null>`null`.as('alergias'), // Campo movido para anamneses
         endereco: pacientes.endereco,
       })
       .from(pacientes)
@@ -256,7 +255,11 @@ export async function buscarDadosPainelTeleconsulta(
 
     // Anamnese e Triagem
     const [ultimaAnamnese] = await db
-      .select({ queixa: anamneses.queixaPrincipal, historia: anamneses.historiaDoencaAtual })
+      .select({ 
+        queixa: anamneses.queixaPrincipal, 
+        historia: anamneses.historiaDoencaAtual,
+        alergias: anamneses.alergias
+      })
       .from(anamneses)
       .where(and(
         eq(anamneses.pacienteId, sala.pacienteId),
@@ -309,7 +312,7 @@ export async function buscarDadosPainelTeleconsulta(
           cpf: pacienteData.cpf,
           telefone: pacienteData.telefone,
           patologia: pacienteData.patologia,
-          alergias: pacienteData.alergias,
+          alergias: ultimaAnamnese?.alergias ?? null,
           endereco: pacienteData.endereco,
         },
         ultimaPrescricao: ultimaPrescricaoFormatada,
