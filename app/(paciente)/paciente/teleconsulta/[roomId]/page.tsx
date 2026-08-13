@@ -129,10 +129,13 @@ function TeleconsultaPacienteContent() {
   };
 
   const sinalizarWebRTC = async (tipo: string, payload: unknown) => {
+    const pusher = getPusherClient();
+    const socketId = pusher.connection.socket_id ?? undefined;
     await fetch('/api/teleconsulta/sinalizar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, tipo, payload }),
+      // Etapa 1: enviar socketId para excluir eco no servidor
+      body: JSON.stringify({ roomId, tipo, payload, socketId }),
     });
   };
 
@@ -202,8 +205,10 @@ function TeleconsultaPacienteContent() {
       }
     };
 
+    // Etapa 3.4: logar todas as transições
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
+      console.log(`[WebRTC][paciente] connectionState: ${s}`);
       if (s === 'disconnected' || s === 'failed') {
         setRemoteConnected(false);
       }
@@ -216,8 +221,13 @@ function TeleconsultaPacienteContent() {
 
     channel.bind('webrtc:offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
       try {
+        // Etapa 3.3: paciente é polite/answerer — aceita re-offer com rollback (glare-safe)
+        if (pc.signalingState !== 'stable') {
+          console.warn('[WebRTC][paciente] Glare detectado — aplicando rollback');
+          await pc.setLocalDescription({ type: 'rollback' } as RTCSessionDescriptionInit);
+        }
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        // Problema 2 — drenar candidates que chegaram antes do remoteDescription
+        // Drenar candidates enfileirados antes do offer
         for (const c of pendingCandidatesRef.current) {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* descartado */ }
         }
@@ -225,8 +235,9 @@ function TeleconsultaPacienteContent() {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sinalizarWebRTC('answer', { answer });
+        console.log('[WebRTC][paciente] Answer enviado');
       } catch (err) {
-        console.error('[WebRTC] Erro ao processar offer:', err);
+        console.error('[WebRTC][paciente] Erro ao processar offer:', err);
       }
     });
 

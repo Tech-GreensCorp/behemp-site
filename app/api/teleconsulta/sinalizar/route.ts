@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ erro: 'Não autenticado' }, { status: 401 });
 
   const body = await request.json();
-  const { roomId, tipo, payload } = body;
+  const { roomId, tipo, payload, socketId } = body;
 
   if (!roomId || !tipo || !payload) {
     return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
@@ -21,9 +21,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: 'Tipo inválido' }, { status: 400 });
   }
 
-  // Disparar evento Pusher no canal da sala
   const pusherServer = getPusherServer();
-  await pusherServer.trigger(`presence-sala-${roomId}`, `webrtc:${tipo}`, payload);
+
+  // Etapa 1: excluir o remetente do broadcast (elimina eco de offer/answer/ICE).
+  // socket_id é o socket do cliente que está sinalizando; Pusher não devolve o
+  // evento para ele. socketId é opcional — sem ele comporta como antes.
+  const triggerOpts = socketId ? { socket_id: socketId as string } : undefined;
+  await pusherServer.trigger(`presence-sala-${roomId}`, `webrtc:${tipo}`, payload, triggerOpts);
 
   return NextResponse.json({ sucesso: true });
 }

@@ -116,32 +116,58 @@ export function GlobalTeleconsultaHost() {
 
     const sinalizarWebRTC = useCallback(async (tipo: string, payload: unknown) => {
         if (!roomId) return;
+        const pusher = getPusherClient();
+        const socketId = pusher.connection.socket_id ?? undefined;
         await fetch('/api/teleconsulta/sinalizar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId, tipo, payload }),
+            // Etapa 1: enviar socketId para exclusão de eco no servidor
+            body: JSON.stringify({ roomId, tipo, payload, socketId }),
         });
     }, [roomId]);
 
-    // Problema 1 — teardown centralizado: fecha PC, para tracks, fecha áudio,
-    // e desinscreve do canal Pusher (que antes NUNCA era desinscrito).
+    // Teardown centralizado: para recorder, unbind_all antes de unsubscribe,
+    // fecha PC, para tracks, fecha AudioContext.
+    // É IDEMPOTENTE — pode ser chamado múltiplas vezes sem efeito colateral.
     const teardownWebRTC = useCallback(() => {
+        // Parar gravação de áudio se ativa
+        const mr = audioRecorderRef.current;
+        if (mr && mr.state !== 'inactive') {
+            mr.onstop = null; // evita processar áudio ao encerrar limpeza
+            mr.stop();
+        }
+        audioRecorderRef.current = null;
+        audioCtxRef.current?.close();
+        audioCtxRef.current = null;
+
+        // Desvincular todos os handlers antes de desinscrever do canal
         if (roomId) {
             try {
                 const pusher = getPusherClient();
+                const channel = pusher.channel(`presence-sala-${roomId}`);
+                channel?.unbind_all();
                 pusher.unsubscribe(`presence-sala-${roomId}`);
             } catch { /* já desinscrito */ }
         }
+
         pcRef.current?.close();
         pcRef.current = null;
+        makingOfferRef.current = false;
         localStreamRef.current?.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
-        audioCtxRef.current?.close();
-        audioCtxRef.current = null;
         pendingCandidatesRef.current = [];
     }, [roomId]);
 
+    // Lock para evitar dupla criação de offer (StrictMode, clique duplo, múltiplos gatilhos)
+    const makingOfferRef = useRef(false);
+
     const iniciarConsulta = useCallback(async () => {
+        // Etapa 2.2: guarda de reentrada — aborta se já existe sessão ativa
+        if (pcRef.current) {
+            console.warn('[WebRTC][medico] Sessão já ativa — ignorando');
+            return;
+        }
+
         let stream = localStreamRef.current;
         if (!stream) {
             stream = await iniciarMidia();
@@ -151,11 +177,11 @@ export function GlobalTeleconsultaHost() {
             try {
                 await registrarConsentimentoLgpd(salaId, consentimentoTranscricao);
             } catch (err) {
-                console.error("[WebRTC] Erro ao registrar consentimento LGPD:", err);
+                console.error('[WebRTC][medico] Erro LGPD:', err);
             }
         }
 
-        setPhase("connecting");
+        setPhase('connecting');
 
         try {
             const pusher = getPusherClient();
@@ -165,7 +191,6 @@ export function GlobalTeleconsultaHost() {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    // TURN público — necessário para atravessar NAT em produção
                     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
                     { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
                     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
@@ -174,16 +199,11 @@ export function GlobalTeleconsultaHost() {
             pcRef.current = pc;
 
             if (stream) {
-                stream.getTracks().forEach(track => {
-                    pc.addTrack(track, stream!);
-                });
+                stream.getTracks().forEach(track => pc.addTrack(track, stream!));
             }
 
             pc.ontrack = (event) => {
-                if (remoteVideoRef.current && event.streams[0]) {
-                    if (remoteVideoRef.current.srcObject !== event.streams[0]) {
-                        remoteVideoRef.current.srcObject = event.streams[0];
-                    }
+                if (event.streams[0]) {
                     setRemoteStream(event.streams[0]);
                     setRemoteConnected(true);
 
@@ -198,92 +218,92 @@ export function GlobalTeleconsultaHost() {
                             localNode.connect(merger, 0, 0);
                             remoteNode.connect(merger, 0, 1);
                             merger.connect(dest);
-                            const mr = new MediaRecorder(dest.stream, { mimeType: "audio/webm;codecs=opus" });
+                            const mr = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
                             audioRecorderRef.current = mr;
                             audioChunksRef.current = [];
                             mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
                             mr.start(1000);
-                        } catch (e) {
-                            console.warn("Mixer error:", e);
-                        }
+                        } catch (e) { console.warn('[medico] Mixer error:', e); }
                     }
                 }
             };
 
             pc.onicecandidate = (event) => {
-                if (event.candidate) sinalizarWebRTC("ice-candidate", { candidate: event.candidate });
+                if (event.candidate) sinalizarWebRTC('ice-candidate', { candidate: event.candidate });
             };
 
+            // Etapa 3.4: logar TODAS as transições para diagnóstico
             pc.onconnectionstatechange = () => {
-                if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+                console.log(`[WebRTC][medico] connectionState: ${pc.connectionState}`);
+                if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
                     setRemoteConnected(false);
                 }
             };
 
+            // Etapa 3.1: único gatilho de offer com lock — médico é SEMPRE o offerer
+            const criarOffer = async () => {
+                if (!pcRef.current || makingOfferRef.current) return;
+                if (pc.signalingState !== 'stable' || pc.currentRemoteDescription) return;
+                makingOfferRef.current = true;
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    sinalizarWebRTC('offer', { offer });
+                    console.log('[WebRTC][medico] Offer enviado');
+                } catch (err) {
+                    console.error('[WebRTC][medico] criarOffer erro:', err);
+                } finally {
+                    makingOfferRef.current = false;
+                }
+            };
+
             channel.bind('pusher:subscription_succeeded', (members: { count: number }) => {
-                setPhase("room");
-                // Sinaliza presença do médico
-                sinalizarWebRTC("peer-joined", { role: "medico" });
-                // Se o paciente JÁ estava no canal quando o médico entrou (raro mas possível),
-                // o member_added não dispara — verificar count > 1 para criar offer imediatamente.
-                if (members.count > 1) {
-                    pc.createOffer()
-                        .then(offer => pc.setLocalDescription(offer).then(() => sinalizarWebRTC("offer", { offer })))
-                        .catch(err => console.error("[WebRTC] Offer imediato (count>1):", err));
+                setPhase('room');
+                sinalizarWebRTC('peer-joined', { role: 'medico' });
+                console.log('[WebRTC][medico] subscription_succeeded, members.count:', members.count);
+                // Paciente já estava no canal quando o médico entrou
+                if (members.count > 1) criarOffer();
+            });
+
+            // Paciente entrou após o médico
+            channel.bind('pusher:member_added', (member: { id: string }) => {
+                console.log('[WebRTC][medico] member_added:', member.id);
+                criarOffer();
+            });
+
+            // Fallback: peer-joined via HTTP (raro com eco eliminado)
+            channel.bind('webrtc:peer-joined', ({ role }: { role: string }) => {
+                if (role === 'paciente') {
+                    console.log('[WebRTC][medico] peer-joined paciente — tentando offer');
+                    criarOffer();
                 }
             });
 
-            // Paciente entrou no canal DEPOIS do médico — disparar offer
-            channel.bind('pusher:member_added', (member: { id: string; info?: { role?: string } }) => {
-                console.log('[WebRTC] member_added:', member);
-                pc.createOffer()
-                    .then(offer => pc.setLocalDescription(offer).then(() => sinalizarWebRTC("offer", { offer })))
-                    .catch(err => console.error("[WebRTC] Offer em member_added:", err));
-            });
-
-            channel.bind('webrtc:peer-joined', async ({ role }: { role: string }) => {
-                // Fallback: paciente sinalizou via HTTP (não detectado pelo member_added)
-                if (role === "paciente") {
-                    try {
-                        // Não criar offer duplicado se já temos remoteDescription
-                        if (pc.signalingState === 'stable' && !pc.currentRemoteDescription) {
-                            const offer = await pc.createOffer();
-                            await pc.setLocalDescription(offer);
-                            sinalizarWebRTC("offer", { offer });
-                        }
-                    } catch (err) { console.error("[WebRTC] Offer via peer-joined:", err); }
-                }
-            });
-
-            // Problema 2 — drenar fila de ICE após receber o answer
+            // Etapa 3.2: drenar fila de ICE após receber answer
             channel.bind('webrtc:answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                    // Drenar candidates que chegaram antes do remoteDescription
+                    console.log('[WebRTC][medico] Answer aplicado');
                     for (const c of pendingCandidatesRef.current) {
                         try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* descartado */ }
                     }
                     pendingCandidatesRef.current = [];
-                } catch (err) { console.warn('[WebRTC] Erro ao processar answer:', err); }
+                } catch (err) { console.warn('[WebRTC][medico] Erro answer:', err); }
             });
 
-            // Problema 2 — enfileirar candidates que chegam antes do remoteDescription
+            // Etapa 3.2: enfileirar candidates que chegam antes do remoteDescription
             channel.bind('webrtc:ice-candidate', async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-                if (!pc) return;
                 if (!pc.remoteDescription) {
                     pendingCandidatesRef.current.push(candidate);
                     return;
                 }
-                try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {
-                    console.warn('[WebRTC] ICE candidate inválido:', err);
-                }
+                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+                catch (err) { console.warn('[WebRTC][medico] ICE inválido:', err); }
             });
 
         } catch (err) {
-            console.error('[Teleconsulta] Erro ao iniciar sala:', err);
-            toast.error("Erro ao iniciar a sala.");
+            console.error('[Teleconsulta][medico] Erro ao iniciar sala:', err);
+            toast.error('Erro ao iniciar a sala.');
         }
     }, [roomId, salaId, consentimentoTranscricao, iniciarMidia, sinalizarWebRTC]);
 
@@ -295,28 +315,29 @@ export function GlobalTeleconsultaHost() {
         return () => window.removeEventListener("beforeunload", handler);
     }, [phase]);
 
-    // Inicia automaticamente quando salaId/roomId chegam (médico já clicou em "Notificar e Iniciar")
-    // Não exige segundo clique — remove o lobby intermediário desnecessário
+    // Etapa 2.1: lifecycle effect — SOMENTE reset de estado + iniciarMidia (preview do lobby).
+    // PROIBIDO chamar iniciarConsulta aqui. WebRTC é iniciado EXCLUSIVAMENTE pelo botão.
+    //
+    // Nota StrictMode (dev): React monta→cleanup→monta novamente. Como o effect só
+    // inicia MÍDIA (não WebRTC), o cleanup para os tracks e o 2º mount refaz iniciarMidia
+    // de forma segura — nunca cria RTCPeerConnection duplicada.
     useEffect(() => {
-        if (salaId && roomId) {
-            setDuration(0);
-            setRemoteConnected(false);
-            setRemoteStream(null);
-            setDadosPainel(null);
-            setShowPainel(false);
-            setShowCopilot(false);
-            // Inicia mídia e em seguida conecta ao WebRTC automaticamente
-            iniciarMidia().then(() => {
-                iniciarConsulta();
-            });
-        }
+        if (!salaId || !roomId) return;
 
-        // Cleanup ao desmontar OU quando salaId vira null (endCall)
+        setDuration(0);
+        setPhase('lobby');
+        setRemoteConnected(false);
+        setRemoteStream(null);
+        setDadosPainel(null);
+        setShowPainel(false);
+        setShowCopilot(false);
+        iniciarMidia();
+
+        // Etapa 2.3: cleanup sempre derruba a sessão — sem checar salaId
+        // (closure antiga pode ter salaId diferente do estado atual)
         return () => {
-            if (!salaId) {
-                teardownWebRTC();
-                setRemoteStream(null);
-            }
+            teardownWebRTC();
+            setRemoteStream(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [salaId, roomId]);
