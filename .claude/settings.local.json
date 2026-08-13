@@ -11,7 +11,18 @@
       "Bash(pnpm db:generate)",
       "Bash(pnpm db:migrate)",
       "Bash(pnpm exec *)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(ls -la \"C:/Users/Greens/AppData/Local/Temp/claude/C--Users-Greens-Documents-behemp-site/a2bbe503-60ac-43f4-a2b7-a03346d577e5/scratchpad\" 2>/dev/null; echo \"---\"; find \"C:/Users/Greens/AppData/Local/Temp/claude\" -iname \"*.png\" -newer \"C:/Users/Greens/Documents/behemp-site/package.json\" 2>/dev/null | head -30)",
+      "Bash(find \"C:/Users/Greens/Documents/behemp-site\" -maxdepth 3 -newer \"C:/Users/Greens/Documents/behemp-site/CLAUDE.md\" \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \\\\\\) 2>/dev/null; echo \"---downloads---\"; ls -la \"C:/Users/Greens/Downloads\" 2>/dev/null | head -20)",
+      "Bash(grep -iE '\\\\.\\(png|jpg|jpeg|webp|avif\\)$')",
+      "Bash(sort -k6,7)",
+      "Bash(cp \"C:/Users/Greens/Downloads/3f099665-406d-4862-bbe6-d3562b39b046.jpg\" \"C:/Users/Greens/Documents/behemp-site/public/images/farmacia/produto-tarja-preta.jpg\")",
+      "Bash(cp \"C:/Users/Greens/Downloads/5d26e6cb-3cce-49a7-bedd-71767d05a18c.jpg\" \"C:/Users/Greens/Documents/behemp-site/public/images/farmacia/produto-tarja-vermelha.jpg\")",
+      "Bash(mkdir -p \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/_lib\" \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/_components\" \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/marketplace/_components\" \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/produtos/[id]\")",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies.next\\)\")",
+      "Bash(mkdir -p \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/produtos/[id]/_components\")",
+      "Bash(npx eslint *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

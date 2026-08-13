@@ -17,6 +17,7 @@ import {
   Calculator,
   ShieldCheck,
   FileText,
+  Store,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -36,6 +37,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Minha Saúde',
     items: [
+      { label: 'Nossa Farmácia', href: '/paciente/farmacia', icon: Store },
       { label: 'Medicamentos', href: '/paciente/medicamentos', icon: Pill },
       { label: 'Prescrições', href: '/paciente/prescricoes', icon: FileText },
       { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart },
