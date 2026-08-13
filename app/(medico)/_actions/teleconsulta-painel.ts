@@ -96,6 +96,7 @@ export async function buscarDadosPainelTeleconsulta(
       .select({
         id: pacientes.id,
         nome: users.nome,
+        email: users.email,
         dataNascimento: pacientes.dataNascimento,
         cpf: pacientes.cpf,
         telefone: users.telefone,
@@ -267,7 +268,7 @@ export async function buscarDadosPainelTeleconsulta(
     const [ultimaTriagem] = await db
       .select({ dados: triagens.dados })
       .from(triagens)
-      .where(isNull(triagens.medicoClerkId)) // exemplo simplificado
+      .where(eq(triagens.emailContato, pacienteData.email))
       .orderBy(desc(triagens.createdAt))
       .limit(1);
 
