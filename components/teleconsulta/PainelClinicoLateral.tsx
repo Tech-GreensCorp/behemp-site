@@ -6,23 +6,58 @@ import { X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle, A
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
+import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
+import { renovarUltimaPrescricao, type DadosFormRenovar } from '@/app/(medico)/_actions/prescricao-inline';
+import { PrescricaoInlineWizard } from './PrescricaoInlineWizard';
+import { toast } from 'sonner';
 
 interface PainelClinicoLateralProps {
   dados: DadosPainelTeleconsulta;
+  salaId: string;
   abaInicial: 'paciente' | 'prontuario' | 'prescricao';
   visivel: boolean;
   onFechar: () => void;
 }
 
-export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: PainelClinicoLateralProps) {
+export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, visivel, onFechar }: PainelClinicoLateralProps) {
   const [aba, setAba] = useState<'paciente' | 'prontuario' | 'prescricao'>(abaInicial);
+  const [dadosLocais, setDadosLocais] = useState(initialDados);
+
+  // Estados do Wizard
+  const [wizardAberto, setWizardAberto] = useState(false);
+  const [dadosWizard, setDadosWizard] = useState<DadosFormRenovar | null>(null);
+  const [loadingRenovar, setLoadingRenovar] = useState(false);
 
   useEffect(() => {
     if (visivel) setAba(abaInicial);
   }, [visivel, abaInicial]);
 
+  // Atualiza dadosLocais se as props mudarem
+  useEffect(() => {
+    setDadosLocais(initialDados);
+  }, [initialDados]);
+
+  const dados = dadosLocais;
   const { paciente, ultimaEvolucao, ultimaPrescricao, totalConsultas } = dados;
+
+  const handleRefetch = async () => {
+    const res = await buscarDadosPainelTeleconsulta(salaId);
+    if (res.sucesso && res.dados) {
+      setDadosLocais(res.dados);
+    }
+  };
+
+  const handleRenovarClick = async () => {
+    setLoadingRenovar(true);
+    const res = await renovarUltimaPrescricao(salaId);
+    if (res.sucesso && res.dados) {
+      setDadosWizard(res.dados);
+      setWizardAberto(true);
+    } else {
+      toast.error(res.erro || 'Erro ao buscar prescrição anterior');
+    }
+    setLoadingRenovar(false);
+  };
 
   return (
     <AnimatePresence>
@@ -46,17 +81,31 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
             className="fixed top-4 bottom-4 right-4 w-[380px] z-40
                        flex flex-col bg-background rounded-2xl border border-border shadow-2xl overflow-hidden"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2 font-semibold">
-                {aba === 'paciente' && <><User className="h-4 w-4 text-primary" /> Dados do Paciente</>}
-                {aba === 'prontuario' && <><FileText className="h-4 w-4 text-primary" /> Prontuário</>}
-                {aba === 'prescricao' && <><Pill className="h-4 w-4 text-primary" /> Prescrições</>}
-              </div>
-              <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+            {/* Se o wizard de prescrição estiver aberto e estivermos na aba prescricao, ele assume todo o painel */}
+            {aba === 'prescricao' && wizardAberto ? (
+              <PrescricaoInlineWizard
+                salaId={salaId}
+                pacienteNome={paciente.nome}
+                dadosIniciais={dadosWizard}
+                onConcluir={() => {
+                  setWizardAberto(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setWizardAberto(false)}
+              />
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
+                  <div className="flex items-center gap-2 font-semibold">
+                    {aba === 'paciente' && <><User className="h-4 w-4 text-primary" /> Dados do Paciente</>}
+                    {aba === 'prontuario' && <><FileText className="h-4 w-4 text-primary" /> Prontuário</>}
+                    {aba === 'prescricao' && <><Pill className="h-4 w-4 text-primary" /> Prescrições</>}
+                  </div>
+                  <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
 
             {/* Abas Tab */}
             <div className="flex px-2 pt-2 gap-1 bg-muted/30 border-b border-border">
@@ -353,11 +402,19 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
                     </div>
                   )}
 
-                  <div className="pt-4 border-t border-border mt-4">
+                  <div className="pt-4 border-t border-border mt-4 flex flex-col gap-2">
                     <Button className="w-full bg-primary hover:bg-primary/90 text-white gap-2" 
-                      onClick={() => window.open(`/medico/pacientes/${paciente.id}?tab=prescricao`, '_blank')}>
+                      onClick={() => { setDadosWizard(null); setWizardAberto(true); }}>
                       <Pill className="h-4 w-4" /> Nova Prescrição
                     </Button>
+                    
+                    {ultimaPrescricao && (
+                      <Button className="w-full gap-2" variant="outline" onClick={handleRenovarClick} disabled={loadingRenovar}>
+                        <FileText className="h-4 w-4" /> 
+                        {loadingRenovar ? 'Carregando...' : 'Renovar Última'}
+                      </Button>
+                    )}
+                    
                     <p className="text-[10px] text-muted-foreground text-center mt-2 leading-relaxed">
                       A nova prescrição será associada automaticamente a esta teleconsulta.
                     </p>
@@ -365,6 +422,8 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
                 </div>
               )}
             </div>
+              </>
+            )}
           </motion.aside>
         </>
       )}

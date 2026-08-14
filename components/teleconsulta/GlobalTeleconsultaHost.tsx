@@ -485,6 +485,7 @@ export function GlobalTeleconsultaHost() {
             {dadosPainel && showPainel && (
                 <PainelClinicoLateral
                     dados={dadosPainel}
+                    salaId={salaId}
                     abaInicial={painelAba}
                     visivel={showPainel}
                     onFechar={() => setShowPainel(false)}
