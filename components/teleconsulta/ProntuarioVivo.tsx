@@ -16,7 +16,8 @@ import { ptBR } from 'date-fns/locale';
 interface ProntuarioVivoProps {
   salaId: string;
   pacienteNome: string;
-  onFechar: () => void;
+  onFechar: () => void; // Voltar à aba Prontuário
+  onFecharPainel: () => void; // Fechar o Drawer todo
   onToggleExpand: () => void;
   isExpanded: boolean;
 }
@@ -52,7 +53,7 @@ const COLORS = {
   anamnese: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
 };
 
-export function ProntuarioVivo({ salaId, pacienteNome, onFechar, onToggleExpand, isExpanded }: ProntuarioVivoProps) {
+export function ProntuarioVivo({ salaId, pacienteNome, onFechar, onFecharPainel, onToggleExpand, isExpanded }: ProntuarioVivoProps) {
   const [eventos, setEventos] = useState<EventoProntuario[]>([]);
   const [filtro, setFiltro] = useState<TipoEventoProntuario | 'todos'>('todos');
   const [busca, setBusca] = useState('');
@@ -226,17 +227,26 @@ export function ProntuarioVivo({ salaId, pacienteNome, onFechar, onToggleExpand,
     <div className="flex flex-col h-full bg-background relative">
       {/* HEADER */}
       <div className="px-5 py-4 border-b border-border bg-muted/30 sticky top-0 z-10 flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" /> Histórico Completo
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">{pacienteNome}</p>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onFechar} 
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+            title="Voltar ao prontuário"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </button>
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> Histórico Completo
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{pacienteNome}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onToggleExpand} className="text-xs h-8">
             {isExpanded ? 'Recolher' : 'Expandir'}
           </Button>
-          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+          <button onClick={onFecharPainel} title="Fechar painel" className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>

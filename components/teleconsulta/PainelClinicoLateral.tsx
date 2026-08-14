@@ -10,6 +10,9 @@ import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/a
 import { renovarUltimaPrescricao, type DadosFormRenovar } from '@/app/(medico)/_actions/prescricao-inline';
 import { PrescricaoInlineWizard } from './PrescricaoInlineWizard';
 import { ProntuarioVivo } from './ProntuarioVivo';
+import { EvolucaoRapidaForm } from './EvolucaoRapidaForm';
+import { AnamneseInlineForm } from './AnamneseInlineForm';
+import { buscarAnamneseAtual } from '@/app/(medico)/_actions/documentacao-clinica';
 import { toast } from 'sonner';
 
 interface PainelClinicoLateralProps {
@@ -30,10 +33,23 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
   const [loadingRenovar, setLoadingRenovar] = useState(false);
   const [prontuarioVivoAberto, setProntuarioVivoAberto] = useState(false);
   const [prontuarioExpandido, setProntuarioExpandido] = useState(false);
+  const [evolucaoAberta, setEvolucaoAberta] = useState(false);
+  const [anamneseAberta, setAnamneseAberta] = useState(false);
+  const [anamneseAtual, setAnamneseAtual] = useState<any>(null);
+  const [loadingAnamnese, setLoadingAnamnese] = useState(false);
+  const [hasAnamnese, setHasAnamnese] = useState(false);
 
   useEffect(() => {
-    if (visivel) setAba(abaInicial);
-  }, [visivel, abaInicial]);
+    if (visivel) {
+      setAba(abaInicial);
+      // Checar rápido se já tem anamnese para o botão exibir corretamente
+      buscarAnamneseAtual(salaId).then(res => {
+        if (res.sucesso && res.dados) {
+          setHasAnamnese(true);
+        }
+      });
+    }
+  }, [visivel, abaInicial, salaId]);
 
   // Atualiza dadosLocais se as props mudarem
   useEffect(() => {
@@ -60,6 +76,19 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
       toast.error(res.erro || 'Erro ao buscar prescrição anterior');
     }
     setLoadingRenovar(false);
+  };
+
+  const handlePreencherAnamnese = async () => {
+    setLoadingAnamnese(true);
+    const res = await buscarAnamneseAtual(salaId);
+    if (res.sucesso) {
+      setAnamneseAtual(res.dados);
+      setHasAnamnese(!!res.dados);
+      setAnamneseAberta(true);
+    } else {
+      toast.error(res.erro || 'Falha ao carregar anamnese atual');
+    }
+    setLoadingAnamnese(false);
   };
 
   return (
@@ -92,8 +121,28 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                   setProntuarioVivoAberto(false);
                   setProntuarioExpandido(false);
                 }}
+                onFecharPainel={onFechar}
                 isExpanded={prontuarioExpandido}
                 onToggleExpand={() => setProntuarioExpandido(!prontuarioExpandido)}
+              />
+            ) : aba === 'prontuario' && evolucaoAberta ? (
+              <EvolucaoRapidaForm
+                salaId={salaId}
+                onConcluir={() => {
+                  setEvolucaoAberta(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setEvolucaoAberta(false)}
+              />
+            ) : aba === 'prontuario' && anamneseAberta ? (
+              <AnamneseInlineForm
+                salaId={salaId}
+                dadosIniciais={anamneseAtual}
+                onConcluir={() => {
+                  setAnamneseAberta(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setAnamneseAberta(false)}
               />
             ) : aba === 'prescricao' && wizardAberto ? (
               <PrescricaoInlineWizard
@@ -370,9 +419,20 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                     </div>
                   )}
                   
-                  <Button className="w-full mt-2" variant="outline" onClick={() => setProntuarioVivoAberto(true)}>
-                    Ver Histórico Completo
-                  </Button>
+                  {/* HUB DOCUMENTAR */}
+                  <div className="pt-4 border-t border-border mt-4 flex flex-col gap-2">
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-white gap-2" 
+                      onClick={() => setEvolucaoAberta(true)}>
+                      <Activity className="h-4 w-4" /> Nova Evolução
+                    </Button>
+                    <Button className="w-full gap-2" variant="outline" onClick={handlePreencherAnamnese} disabled={loadingAnamnese}>
+                      <FileText className="h-4 w-4" /> 
+                      {loadingAnamnese ? 'Carregando...' : (hasAnamnese ? 'Editar Anamnese' : '📋 Preencher Anamnese')}
+                    </Button>
+                    <Button className="w-full mt-2 gap-2" variant="secondary" onClick={() => setProntuarioVivoAberto(true)}>
+                      <Calendar className="h-4 w-4" /> Ver Histórico Completo
+                    </Button>
+                  </div>
                 </div>
               )}
 
