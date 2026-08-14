@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
 import { renovarUltimaPrescricao, type DadosFormRenovar } from '@/app/(medico)/_actions/prescricao-inline';
 import { PrescricaoInlineWizard } from './PrescricaoInlineWizard';
+import { ProntuarioVivo } from './ProntuarioVivo';
 import { toast } from 'sonner';
 
 interface PainelClinicoLateralProps {
@@ -23,10 +24,12 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
   const [aba, setAba] = useState<'paciente' | 'prontuario' | 'prescricao'>(abaInicial);
   const [dadosLocais, setDadosLocais] = useState(initialDados);
 
-  // Estados do Wizard
+  // Estados do Wizard e Timeline
   const [wizardAberto, setWizardAberto] = useState(false);
   const [dadosWizard, setDadosWizard] = useState<DadosFormRenovar | null>(null);
   const [loadingRenovar, setLoadingRenovar] = useState(false);
+  const [prontuarioVivoAberto, setProntuarioVivoAberto] = useState(false);
+  const [prontuarioExpandido, setProntuarioExpandido] = useState(false);
 
   useEffect(() => {
     if (visivel) setAba(abaInicial);
@@ -78,11 +81,21 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-4 bottom-4 right-4 w-[380px] z-40
-                       flex flex-col bg-background rounded-2xl border border-border shadow-2xl overflow-hidden"
+            className={`fixed top-4 bottom-4 right-4 z-40 flex flex-col bg-background rounded-2xl border border-border shadow-2xl overflow-hidden transition-all duration-300 ${prontuarioVivoAberto && prontuarioExpandido ? 'w-[calc(100%-2rem)] md:w-[640px]' : 'w-[380px]'}`}
           >
-            {/* Se o wizard de prescrição estiver aberto e estivermos na aba prescricao, ele assume todo o painel */}
-            {aba === 'prescricao' && wizardAberto ? (
+            {/* Se a timeline de prontuário estiver aberta, ela assume o painel */}
+            {aba === 'prontuario' && prontuarioVivoAberto ? (
+              <ProntuarioVivo
+                salaId={salaId}
+                pacienteNome={paciente.nome}
+                onFechar={() => {
+                  setProntuarioVivoAberto(false);
+                  setProntuarioExpandido(false);
+                }}
+                isExpanded={prontuarioExpandido}
+                onToggleExpand={() => setProntuarioExpandido(!prontuarioExpandido)}
+              />
+            ) : aba === 'prescricao' && wizardAberto ? (
               <PrescricaoInlineWizard
                 salaId={salaId}
                 pacienteNome={paciente.nome}
@@ -357,7 +370,7 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                     </div>
                   )}
                   
-                  <Button className="w-full mt-2" variant="outline" onClick={() => window.open(`/medico/pacientes/${paciente.id}`, '_blank')}>
+                  <Button className="w-full mt-2" variant="outline" onClick={() => setProntuarioVivoAberto(true)}>
                     Ver Histórico Completo
                   </Button>
                 </div>
