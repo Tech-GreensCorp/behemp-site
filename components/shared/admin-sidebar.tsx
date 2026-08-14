@@ -22,6 +22,7 @@ import {
   BookOpen,
   Bell,
   Calculator,
+  Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -37,7 +38,10 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Geral',
-    items: [{ label: 'Visão Geral', href: '/admin', icon: LayoutDashboard }],
+    items: [
+      { label: 'Visão Geral', href: '/admin', icon: LayoutDashboard },
+      { label: 'Nossa Farmácia', href: '/paciente/farmacia', icon: Store },
+    ],
   },
   {
     title: 'Controle',

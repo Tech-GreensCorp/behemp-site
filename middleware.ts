@@ -42,9 +42,16 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(
   async (auth, req) => {
+    // Repassa o pathname atual via header para os layouts (Server Components
+    // não recebem o pathname da requisição por padrão). Usado por
+    // (paciente)/layout.tsx para liberar /paciente/farmacia a qualquer role.
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-pathname', req.nextUrl.pathname);
+    const nextWithPathname = { request: { headers: requestHeaders } };
+
     // Rotas públicas: passa sem verificação
     if (isPublicRoute(req)) {
-      return NextResponse.next();
+      return NextResponse.next(nextWithPathname);
     }
 
     // Rotas protegidas: apenas verifica se o usuário tem sessão ativa
@@ -55,7 +62,7 @@ export default clerkMiddleware(
       return redirectToSignIn();
     }
 
-    return NextResponse.next();
+    return NextResponse.next(nextWithPathname);
   },
   {
     // Tolera até 30s de diferença de relógio do sistema (clock skew)

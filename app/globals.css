@@ -174,6 +174,26 @@
   --leaf: #62B07F;
 }
 
+/* ═══════════════════════════════════════════════════
+   Nossa Farmácia — identidade visual azul (escopo local)
+   Sobrescreve apenas os tokens de cor dentro da área da
+   Farmácia (via .farmacia-theme). Sidebar/header e o
+   resto da plataforma permanecem na paleta laranja/verde.
+   ═══════════════════════════════════════════════════ */
+
+.farmacia-theme {
+  --primary: #2955F5;
+  --primary-foreground: #FFFFFF;
+  --primary-soft: #EAF0FF;
+  --ring: #2955F5;
+  --secondary: #101B3D;
+  --secondary-foreground: #FFFFFF;
+}
+
+.farmacia-theme .text-accent-italic {
+  color: var(--primary);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

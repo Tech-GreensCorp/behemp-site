@@ -55,7 +55,7 @@ export default async function ProdutoDetalhePage({ params }: { params: Promise<{
       </div>
 
       {/* ── Conteúdo principal ── */}
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 animate-fade-up delay-75">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12 animate-fade-up delay-75">
         <div className="lg:sticky lg:top-8 lg:self-start">
           <Card className="relative aspect-square overflow-hidden rounded-2xl border border-border/20 bg-primary-soft p-0 shadow-sm sm:rounded-3xl">
             <Image
@@ -102,11 +102,11 @@ export default async function ProdutoDetalhePage({ params }: { params: Promise<{
                 </p>
               )}
               {disponivel ? (
-                <p className="font-display text-3xl font-bold text-primary">
+                <p className="font-display text-2xl font-bold text-primary sm:text-3xl">
                   {formatarPreco(produto.preco)}
                 </p>
               ) : (
-                <p className="font-display text-2xl font-bold text-foreground">Sob consulta</p>
+                <p className="font-display text-xl font-bold text-foreground sm:text-2xl">Sob consulta</p>
               )}
             </div>
             {produto.precoOriginal && disponivel && (
@@ -146,7 +146,7 @@ export default async function ProdutoDetalhePage({ params }: { params: Promise<{
           <h2 className="font-display text-lg font-bold text-foreground sm:text-xl">
             Você também pode gostar
           </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
             {relacionados.map((relacionado) => (
               <ProdutoCard key={relacionado.id} produto={relacionado} />
             ))}

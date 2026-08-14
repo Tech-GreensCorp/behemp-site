@@ -67,7 +67,7 @@ export default async function MarketplacePage({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 animate-fade-up delay-150 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 animate-fade-up delay-150 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {resultado.itens.map((produto) => (
               <ProdutoCard key={produto.id} produto={produto} />
             ))}

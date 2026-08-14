@@ -74,7 +74,7 @@ export function MarketplaceFiltros({
         )}
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <button
           onClick={() => aplicarFiltro({ categoria: '' })}
           className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-bold transition-all ${

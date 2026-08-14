@@ -22,7 +22,12 @@
       "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies.next\\)\")",
       "Bash(mkdir -p \"C:/Users/Greens/Documents/behemp-site/app/\\(paciente\\)/paciente/farmacia/produtos/[id]/_components\")",
       "Bash(npx eslint *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "PowerShell(cd \"C:\\\\Users\\\\Dryelle Ebelin\\\\Documents\\\\behemp-site\"; $env:PATH = \"C:\\\\Program Files\\\\nodejs;\" + $env:PATH; node node_modules\\\\typescript\\\\bin\\\\tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 150)",
+      "Bash(git stash *)",
+      "PowerShell(cd \"C:\\\\Users\\\\Dryelle Ebelin\\\\Documents\\\\behemp-site\"; $env:PATH = \"C:\\\\Program Files\\\\nodejs;\" + $env:PATH; node node_modules\\\\typescript\\\\bin\\\\tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 100)",
+      "Bash(mkdir -p /tmp/baseline_check)",
+      "Bash(git show *)"
     ]
   }
 }
