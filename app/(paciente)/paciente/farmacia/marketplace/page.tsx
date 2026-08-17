@@ -35,20 +35,22 @@ export default async function MarketplacePage({
 
   return (
     <div className="space-y-6">
-      <div className="animate-fade-up">
+      <div className="animate-fade-up space-y-3">
         <Link
           href="/paciente/farmacia"
-          className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+          className="inline-flex items-center gap-1.5 text-xs leading-none font-semibold text-muted-foreground transition-colors hover:text-primary"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Nossa Farmácia
+          <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
+          <span>Nossa Farmácia</span>
         </Link>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          {categoriaInfo ? categoriaInfo.nome : 'Todos os produtos'}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {categoriaInfo ? categoriaInfo.descricao : 'Explore o catálogo completo da Nossa Farmácia.'}
-        </p>
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {categoriaInfo ? categoriaInfo.nome : 'Todos os produtos'}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {categoriaInfo ? categoriaInfo.descricao : 'Explore o catálogo completo da Nossa Farmácia.'}
+          </p>
+        </div>
       </div>
 
       <div className="animate-fade-up delay-75">
