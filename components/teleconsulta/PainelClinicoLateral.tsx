@@ -6,23 +6,90 @@ import { X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle, A
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
+import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
+import { renovarUltimaPrescricao, type DadosFormRenovar } from '@/app/(medico)/_actions/prescricao-inline';
+import { PrescricaoInlineWizard } from './PrescricaoInlineWizard';
+import { ProntuarioVivo } from './ProntuarioVivo';
+import { EvolucaoRapidaForm } from './EvolucaoRapidaForm';
+import { AnamneseInlineForm } from './AnamneseInlineForm';
+import { buscarAnamneseAtual } from '@/app/(medico)/_actions/documentacao-clinica';
+import { toast } from 'sonner';
 
 interface PainelClinicoLateralProps {
   dados: DadosPainelTeleconsulta;
+  salaId: string;
   abaInicial: 'paciente' | 'prontuario' | 'prescricao';
   visivel: boolean;
   onFechar: () => void;
 }
 
-export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: PainelClinicoLateralProps) {
+export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, visivel, onFechar }: PainelClinicoLateralProps) {
   const [aba, setAba] = useState<'paciente' | 'prontuario' | 'prescricao'>(abaInicial);
+  const [dadosLocais, setDadosLocais] = useState(initialDados);
+
+  // Estados do Wizard e Timeline
+  const [wizardAberto, setWizardAberto] = useState(false);
+  const [dadosWizard, setDadosWizard] = useState<DadosFormRenovar | null>(null);
+  const [loadingRenovar, setLoadingRenovar] = useState(false);
+  const [prontuarioVivoAberto, setProntuarioVivoAberto] = useState(false);
+  const [prontuarioExpandido, setProntuarioExpandido] = useState(false);
+  const [evolucaoAberta, setEvolucaoAberta] = useState(false);
+  const [anamneseAberta, setAnamneseAberta] = useState(false);
+  const [anamneseAtual, setAnamneseAtual] = useState<any>(null);
+  const [loadingAnamnese, setLoadingAnamnese] = useState(false);
+  const [hasAnamnese, setHasAnamnese] = useState(false);
 
   useEffect(() => {
-    if (visivel) setAba(abaInicial);
-  }, [visivel, abaInicial]);
+    if (visivel) {
+      setAba(abaInicial);
+      // Checar rápido se já tem anamnese para o botão exibir corretamente
+      buscarAnamneseAtual(salaId).then(res => {
+        if (res.sucesso && res.dados) {
+          setHasAnamnese(true);
+        }
+      });
+    }
+  }, [visivel, abaInicial, salaId]);
 
+  // Atualiza dadosLocais se as props mudarem
+  useEffect(() => {
+    setDadosLocais(initialDados);
+  }, [initialDados]);
+
+  const dados = dadosLocais;
   const { paciente, ultimaEvolucao, ultimaPrescricao, totalConsultas } = dados;
+
+  const handleRefetch = async () => {
+    const res = await buscarDadosPainelTeleconsulta(salaId);
+    if (res.sucesso && res.dados) {
+      setDadosLocais(res.dados);
+    }
+  };
+
+  const handleRenovarClick = async () => {
+    setLoadingRenovar(true);
+    const res = await renovarUltimaPrescricao(salaId);
+    if (res.sucesso && res.dados) {
+      setDadosWizard(res.dados);
+      setWizardAberto(true);
+    } else {
+      toast.error(res.erro || 'Erro ao buscar prescrição anterior');
+    }
+    setLoadingRenovar(false);
+  };
+
+  const handlePreencherAnamnese = async () => {
+    setLoadingAnamnese(true);
+    const res = await buscarAnamneseAtual(salaId);
+    if (res.sucesso) {
+      setAnamneseAtual(res.dados);
+      setHasAnamnese(!!res.dados);
+      setAnamneseAberta(true);
+    } else {
+      toast.error(res.erro || 'Falha ao carregar anamnese atual');
+    }
+    setLoadingAnamnese(false);
+  };
 
   return (
     <AnimatePresence>
@@ -43,20 +110,64 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-4 bottom-4 right-4 w-[380px] z-40
-                       flex flex-col bg-background rounded-2xl border border-border shadow-2xl overflow-hidden"
+            className={`fixed top-4 bottom-4 right-4 z-40 flex flex-col bg-background rounded-2xl border border-border shadow-2xl overflow-hidden transition-all duration-300 ${prontuarioVivoAberto && prontuarioExpandido ? 'w-[calc(100%-2rem)] md:w-[640px]' : 'w-[380px]'}`}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2 font-semibold">
-                {aba === 'paciente' && <><User className="h-4 w-4 text-primary" /> Dados do Paciente</>}
-                {aba === 'prontuario' && <><FileText className="h-4 w-4 text-primary" /> Prontuário</>}
-                {aba === 'prescricao' && <><Pill className="h-4 w-4 text-primary" /> Prescrições</>}
-              </div>
-              <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+            {/* Se a timeline de prontuário estiver aberta, ela assume o painel */}
+            {aba === 'prontuario' && prontuarioVivoAberto ? (
+              <ProntuarioVivo
+                salaId={salaId}
+                pacienteNome={paciente.nome}
+                onFechar={() => {
+                  setProntuarioVivoAberto(false);
+                  setProntuarioExpandido(false);
+                }}
+                onFecharPainel={onFechar}
+                isExpanded={prontuarioExpandido}
+                onToggleExpand={() => setProntuarioExpandido(!prontuarioExpandido)}
+              />
+            ) : aba === 'prontuario' && evolucaoAberta ? (
+              <EvolucaoRapidaForm
+                salaId={salaId}
+                onConcluir={() => {
+                  setEvolucaoAberta(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setEvolucaoAberta(false)}
+              />
+            ) : aba === 'prontuario' && anamneseAberta ? (
+              <AnamneseInlineForm
+                salaId={salaId}
+                dadosIniciais={anamneseAtual}
+                onConcluir={() => {
+                  setAnamneseAberta(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setAnamneseAberta(false)}
+              />
+            ) : aba === 'prescricao' && wizardAberto ? (
+              <PrescricaoInlineWizard
+                salaId={salaId}
+                pacienteNome={paciente.nome}
+                dadosIniciais={dadosWizard}
+                onConcluir={() => {
+                  setWizardAberto(false);
+                  handleRefetch();
+                }}
+                onCancelar={() => setWizardAberto(false)}
+              />
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
+                  <div className="flex items-center gap-2 font-semibold">
+                    {aba === 'paciente' && <><User className="h-4 w-4 text-primary" /> Dados do Paciente</>}
+                    {aba === 'prontuario' && <><FileText className="h-4 w-4 text-primary" /> Prontuário</>}
+                    {aba === 'prescricao' && <><Pill className="h-4 w-4 text-primary" /> Prescrições</>}
+                  </div>
+                  <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
 
             {/* Abas Tab */}
             <div className="flex px-2 pt-2 gap-1 bg-muted/30 border-b border-border">
@@ -308,9 +419,20 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
                     </div>
                   )}
                   
-                  <Button className="w-full mt-2" variant="outline" onClick={() => window.open(`/medico/pacientes/${paciente.id}`, '_blank')}>
-                    Ver Histórico Completo
-                  </Button>
+                  {/* HUB DOCUMENTAR */}
+                  <div className="pt-4 border-t border-border mt-4 flex flex-col gap-2">
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-white gap-2" 
+                      onClick={() => setEvolucaoAberta(true)}>
+                      <Activity className="h-4 w-4" /> Nova Evolução
+                    </Button>
+                    <Button className="w-full gap-2" variant="outline" onClick={handlePreencherAnamnese} disabled={loadingAnamnese}>
+                      <FileText className="h-4 w-4" /> 
+                      {loadingAnamnese ? 'Carregando...' : (hasAnamnese ? 'Editar Anamnese' : '📋 Preencher Anamnese')}
+                    </Button>
+                    <Button className="w-full mt-2 gap-2" variant="secondary" onClick={() => setProntuarioVivoAberto(true)}>
+                      <Calendar className="h-4 w-4" /> Ver Histórico Completo
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -353,11 +475,19 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
                     </div>
                   )}
 
-                  <div className="pt-4 border-t border-border mt-4">
+                  <div className="pt-4 border-t border-border mt-4 flex flex-col gap-2">
                     <Button className="w-full bg-primary hover:bg-primary/90 text-white gap-2" 
-                      onClick={() => window.open(`/medico/pacientes/${paciente.id}?tab=prescricao`, '_blank')}>
+                      onClick={() => { setDadosWizard(null); setWizardAberto(true); }}>
                       <Pill className="h-4 w-4" /> Nova Prescrição
                     </Button>
+                    
+                    {ultimaPrescricao && (
+                      <Button className="w-full gap-2" variant="outline" onClick={handleRenovarClick} disabled={loadingRenovar}>
+                        <FileText className="h-4 w-4" /> 
+                        {loadingRenovar ? 'Carregando...' : 'Renovar Última'}
+                      </Button>
+                    )}
+                    
                     <p className="text-[10px] text-muted-foreground text-center mt-2 leading-relaxed">
                       A nova prescrição será associada automaticamente a esta teleconsulta.
                     </p>
@@ -365,6 +495,8 @@ export function PainelClinicoLateral({ dados, abaInicial, visivel, onFechar }: P
                 </div>
               )}
             </div>
+              </>
+            )}
           </motion.aside>
         </>
       )}

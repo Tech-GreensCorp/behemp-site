@@ -162,32 +162,12 @@ export async function iniciarConsultaAvulsa(params: {
     observacoes: params.observacoes ?? 'Atendimento imediato (encaixe)',
   });
 
-  if (!consultaRes.sucesso || !consultaRes.dados) {
-    return { sucesso: false, erro: consultaRes.erro ?? 'Erro ao criar consulta' };
+  if (!consultaRes.sucesso || !consultaRes.dados?.id) {
+    return { sucesso: false, erro: consultaRes.erro ?? 'Falha ao obter consulta criada' };
   }
 
-  // 2. Buscar a consulta recém-criada para obter o id
-  const { db } = await import('@/lib/db');
-  const { consultas, pacientes: pacientesSchema, users: usersSchema } = await import('@/db/schema');
-  const { eq, desc } = await import('drizzle-orm');
-
-  // Resolver medicoId
-  const { medicos } = await import('@/db/schema');
-  const [user] = await db.select({ id: usersSchema.id }).from(usersSchema).where(eq(usersSchema.clerkId, auth.clerkId!));
-  const [medico] = await db.select({ id: medicos.id }).from(medicos).where(eq(medicos.userId, user.id));
-  if (!medico) return { sucesso: false, erro: 'Médico não encontrado' };
-
-  const [consultaCriada] = await db
-    .select({ id: consultas.id })
-    .from(consultas)
-    .where(eq(consultas.pacienteId, params.pacienteId))
-    .orderBy(desc(consultas.dataHora))
-    .limit(1);
-
-  if (!consultaCriada) return { sucesso: false, erro: 'Consulta não encontrada após criação' };
-
-  // 3. Iniciar a teleconsulta (cria sala + notifica)
-  return iniciarTeleconsulta(consultaCriada.id);
+  // 2. Iniciar a teleconsulta (cria sala + notifica)
+  return iniciarTeleconsulta(consultaRes.dados.id);
 }
 
 /**

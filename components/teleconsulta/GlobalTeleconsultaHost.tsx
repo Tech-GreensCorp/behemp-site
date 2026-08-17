@@ -281,6 +281,10 @@ export function GlobalTeleconsultaHost() {
 
             // Etapa 3.2: drenar fila de ICE após receber answer
             channel.bind('webrtc:answer', async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
+                if (pc.signalingState === 'stable') {
+                    console.warn('[WebRTC][medico] Answer duplicado ignorado (stable)');
+                    return;
+                }
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
                     console.log('[WebRTC][medico] Answer aplicado');
@@ -485,6 +489,7 @@ export function GlobalTeleconsultaHost() {
             {dadosPainel && showPainel && (
                 <PainelClinicoLateral
                     dados={dadosPainel}
+                    salaId={salaId}
                     abaInicial={painelAba}
                     visivel={showPainel}
                     onFechar={() => setShowPainel(false)}

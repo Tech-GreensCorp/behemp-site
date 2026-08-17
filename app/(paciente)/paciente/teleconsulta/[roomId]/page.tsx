@@ -221,6 +221,11 @@ function TeleconsultaPacienteContent() {
 
     channel.bind('webrtc:offer', async ({ offer }: { offer: RTCSessionDescriptionInit }) => {
       try {
+        if (pc.currentRemoteDescription && pc.currentRemoteDescription.sdp === offer.sdp) {
+          console.warn('[WebRTC][paciente] Offer duplicado ignorado');
+          return;
+        }
+
         // Etapa 3.3: paciente é polite/answerer — aceita re-offer com rollback (glare-safe)
         if (pc.signalingState !== 'stable') {
           console.warn('[WebRTC][paciente] Glare detectado — aplicando rollback');
