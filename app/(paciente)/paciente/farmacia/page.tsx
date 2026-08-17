@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Droplet,
   Pill,
-  Sparkles,
   Gift,
   Tag,
   Package,
@@ -32,8 +31,6 @@ export const metadata: Metadata = {
 const ICONES_CATEGORIA: Record<CategoriaProdutoSlug, typeof Droplet> = {
   'oleos-sublinguais': Droplet,
   'capsulas-softgels': Pill,
-  'cosmeticos-dermocosmeticos': Sparkles,
-  'kits-combos': Gift,
   'outros-produtos': Package,
 };
 
@@ -110,7 +107,7 @@ export default function FarmaciaPage() {
     <div className="space-y-10 sm:space-y-14">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden rounded-2xl border border-border/20 bg-white shadow-sm sm:rounded-3xl animate-fade-up">
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-0">
+        <div className="relative grid gap-8 lg:grid-cols-2 lg:gap-0">
           <div className="flex flex-col justify-center gap-5 p-6 sm:p-10 lg:p-12">
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-foreground">
               Saúde. <span className="text-primary">Acesso.</span> Cuidado.
@@ -186,10 +183,31 @@ export default function FarmaciaPage() {
               </div>
             </Card>
           </div>
+
+          {/* ── Selo de parceria: visível apenas no desktop, centralizado entre o texto e a foto ── */}
+          <div className="hidden lg:absolute lg:left-1/2 lg:top-[22%] lg:z-10 lg:flex lg:-translate-x-1/2 lg:-translate-y-1/2 lg:items-center lg:justify-center">
+            <div className="flex items-center gap-11">
+              <Image
+                src="/images/farmacia/logo-pharma-one.png"
+                alt="Pharma One"
+                width={440}
+                height={440}
+                className="h-28 w-auto object-contain"
+              />
+              <span className="text-7xl font-thin text-muted-foreground/30">×</span>
+              <Image
+                src="/logo.png"
+                alt="Be4Hope"
+                width={280}
+                height={94}
+                className="h-20 w-auto object-contain"
+              />
+            </div>
+          </div>
         </div>
 
         {/* ── Faixa de categorias ── */}
-        <div className="grid grid-cols-2 gap-px border-t border-border/20 bg-border/20 sm:grid-cols-5">
+        <div className="grid grid-cols-1 gap-px border-t border-border/20 bg-border/20 sm:grid-cols-3">
           {categorias.map((categoria) => {
             const Icone = ICONES_CATEGORIA[categoria.slug];
             return (
@@ -297,13 +315,14 @@ export default function FarmaciaPage() {
 
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full border border-border/20 bg-white shadow-sm sm:h-24 sm:w-24">
-              <span className="font-display text-[13px] font-black uppercase leading-tight text-foreground sm:text-sm">
-                Pharma
-              </span>
-              <span className="font-display text-[13px] font-black uppercase leading-tight text-primary sm:text-sm">
-                One
-              </span>
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-border/20 bg-white p-3 shadow-sm sm:h-24 sm:w-24">
+              <Image
+                src="/images/farmacia/logo-pharma-one.png"
+                alt="Pharma One"
+                width={240}
+                height={240}
+                className="h-auto w-full object-contain"
+              />
             </div>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Heart className="h-4 w-4" />

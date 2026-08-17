@@ -27,7 +27,11 @@
       "Bash(git stash *)",
       "PowerShell(cd \"C:\\\\Users\\\\Dryelle Ebelin\\\\Documents\\\\behemp-site\"; $env:PATH = \"C:\\\\Program Files\\\\nodejs;\" + $env:PATH; node node_modules\\\\typescript\\\\bin\\\\tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 100)",
       "Bash(mkdir -p /tmp/baseline_check)",
-      "Bash(git show *)"
+      "Bash(git show *)",
+      "mcp__visualize__read_me",
+      "Bash(cp \"C:/Users/Greens/Downloads/logo-phama.png\" \"C:/Users/Greens/Documents/behemp-site/public/images/farmacia/logo-pharma-one.png\" && ls -la \"C:/Users/Greens/Documents/behemp-site/public/images/farmacia\")",
+      "Bash(python3 -c \"import PIL; print\\('PIL ok'\\)\")",
+      "Bash(node -e \"require.resolve\\('sharp'\\)\")"
     ]
   }
 }

@@ -6,12 +6,7 @@
  * sem precisar alterar os componentes que consomem `listarProdutos` / `obterProdutoPorId`.
  */
 
-export type CategoriaProdutoSlug =
-  | 'oleos-sublinguais'
-  | 'capsulas-softgels'
-  | 'cosmeticos-dermocosmeticos'
-  | 'kits-combos'
-  | 'outros-produtos';
+export type CategoriaProdutoSlug = 'oleos-sublinguais' | 'capsulas-softgels' | 'outros-produtos';
 
 export interface CategoriaProduto {
   slug: CategoriaProdutoSlug;
@@ -45,16 +40,6 @@ export const CATEGORIAS: CategoriaProduto[] = [
     slug: 'capsulas-softgels',
     nome: 'Cápsulas e Softgels',
     descricao: 'Dosagem prática e discreta em cápsulas gelatinosas.',
-  },
-  {
-    slug: 'cosmeticos-dermocosmeticos',
-    nome: 'Cosméticos e Dermocosméticos',
-    descricao: 'Cuidados tópicos com canabinoides para pele e corpo.',
-  },
-  {
-    slug: 'kits-combos',
-    nome: 'Kits e Combos',
-    descricao: 'Combinações pensadas para cada etapa do tratamento.',
   },
   {
     slug: 'outros-produtos',
@@ -334,190 +319,6 @@ const CAPSULAS: Produto[] = [
   }),
 ];
 
-const COSMETICOS: Produto[] = [
-  produto({
-    nome: 'Greens LIFE Sérum Facial CBD 200mg',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Sérum facial com CBD para uso diário.',
-    descricao:
-      'Sérum de uso tópico formulado com CBD, indicado para a rotina de cuidados faciais diários.',
-    preco: 159.9,
-    destaques: ['30ml', 'Uso tópico', 'Rotina diária'],
-  }),
-  produto({
-    nome: 'Greens LIFE Creme Corporal CBD 500mg',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Hidratação corporal com CBD.',
-    descricao: 'Creme corporal hidratante com CBD, para uso diário em todo o corpo.',
-    preco: 129.9,
-    destaques: ['200g', 'Uso corporal', 'Hidratação'],
-  }),
-  produto({
-    nome: 'Greens LIFE Gel Tópico CBD 300mg Alívio Muscular',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Gel de aplicação local para desconforto muscular.',
-    descricao:
-      'Gel tópico com CBD para aplicação local, indicado para desconforto muscular pontual.',
-    preco: 149.9,
-    badges: ['Mais vendido'],
-    destaques: ['100g', 'Aplicação local', 'Efeito refrescante'],
-  }),
-  produto({
-    nome: 'Greens LIFE Bálsamo Labial CBD',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Hidratação labial com CBD.',
-    descricao: 'Bálsamo labial hidratante formulado com CBD.',
-    preco: 39.9,
-    destaques: ['4,5g', 'Hidratação labial'],
-  }),
-  produto({
-    nome: 'Greens LIFE Óleo Capilar CBD',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Óleo para cuidados capilares com CBD.',
-    descricao: 'Óleo capilar com CBD, para uso nos cuidados de rotina dos fios.',
-    preco: 89.9,
-    destaques: ['60ml', 'Uso capilar'],
-  }),
-  produto({
-    nome: 'Greens LIFE Loção Hidratante CBD 400mg',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Loção corporal de rápida absorção.',
-    descricao: 'Loção hidratante corporal com CBD e rápida absorção.',
-    preco: 119.9,
-    destaques: ['250ml', 'Rápida absorção'],
-  }),
-  produto({
-    nome: 'Greens LIFE Creme Antissinais CBD + Colágeno',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Cuidado facial com CBD e colágeno.',
-    descricao: 'Creme facial formulado com CBD e colágeno, para a rotina de cuidados da pele.',
-    preco: 189.9,
-    badges: ['Novo'],
-    destaques: ['50g', 'CBD + Colágeno', 'Uso facial'],
-  }),
-  produto({
-    nome: 'Greens LIFE Protetor Solar CBD FPS 50',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Proteção solar com CBD, FPS 50.',
-    descricao: 'Protetor solar facial FPS 50 com CBD na formulação.',
-    preco: 99.9,
-    destaques: ['50g', 'FPS 50', 'Uso facial'],
-  }),
-  produto({
-    nome: 'Greens LIFE Sabonete Facial CBD',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Limpeza facial suave com CBD.',
-    descricao: 'Sabonete líquido facial com CBD, para limpeza diária da pele.',
-    preco: 69.9,
-    destaques: ['150ml', 'Limpeza facial'],
-  }),
-  produto({
-    nome: 'Greens LIFE Roll-on Relaxante CBD',
-    marca: 'Greens LIFE',
-    categoria: 'cosmeticos-dermocosmeticos',
-    descricaoCurta: 'Aplicador roll-on para aplicação pontual.',
-    descricao: 'Roll-on com CBD para aplicação pontual em momentos de tensão.',
-    preco: 79.9,
-    destaques: ['10ml', 'Aplicador roll-on'],
-  }),
-];
-
-const KITS: Produto[] = [
-  produto({
-    nome: 'Kit Primeiros Passos Be4Hope',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Óleo 1500mg + guia de uso para quem está começando.',
-    descricao:
-      'Combo pensado para pacientes em início de tratamento, com óleo full spectrum 1500mg e material de apoio sobre titulação de dose.',
-    preco: 319.9,
-    precoOriginal: 359.8,
-    badges: ['Indicado para início'],
-    destaques: ['Óleo 1500mg Full Spectrum', 'Guia de titulação', 'Suporte da equipe'],
-  }),
-  produto({
-    nome: 'Kit Sono Tranquilo',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Óleo com CBN e cápsula noturna.',
-    descricao: 'Combinação de óleo com CBN e cápsula noturna para o protocolo de suporte ao sono.',
-    preco: 549.9,
-    precoOriginal: 619.8,
-    destaques: ['Óleo CBN 1500mg', 'Cápsula noturna CBN', 'Uso noturno'],
-  }),
-  produto({
-    nome: 'Kit Bem-Estar Completo',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Óleo, cápsulas e sérum facial em um único combo.',
-    descricao: 'Combo completo com óleo full spectrum, cápsulas de manutenção e sérum facial.',
-    preco: 599.9,
-    precoOriginal: 649.7,
-    badges: ['Mais completo'],
-    destaques: ['Óleo Full Spectrum', 'Cápsulas 25mg', 'Sérum Facial CBD'],
-  }),
-  produto({
-    nome: 'Kit Dermocosméticos Essenciais',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Sérum, creme corporal e bálsamo labial.',
-    descricao: 'Kit com os itens de cuidado tópico mais procurados da linha Greens LIFE.',
-    preco: 279.9,
-    precoOriginal: 329.7,
-    destaques: ['Sérum Facial', 'Creme Corporal', 'Bálsamo Labial'],
-  }),
-  produto({
-    nome: 'Kit Casal Be4Hope',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Dois óleos de manutenção para uso compartilhado.',
-    descricao: 'Combo com dois frascos de óleo full spectrum, pensado para famílias com mais de um paciente.',
-    preco: 559.9,
-    precoOriginal: 599.8,
-    destaques: ['2x Óleo 1500mg Full Spectrum', 'Economia na compra em conjunto'],
-  }),
-  produto({
-    nome: 'Kit Recompra Trimestral',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Estoque de três meses do óleo de manutenção.',
-    descricao: 'Três frascos do óleo de manutenção para reduzir a frequência de novos pedidos.',
-    preco: 799.9,
-    precoOriginal: 899.7,
-    badges: ['Economia'],
-    destaques: ['3x Óleo 1500mg', 'Reposição trimestral'],
-  }),
-  produto({
-    nome: 'Kit Alívio Muscular',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Gel, roll-on e óleo para desconforto muscular.',
-    descricao: 'Combo tópico com gel, roll-on e óleo, para rotina de cuidado muscular.',
-    preco: 289.9,
-    precoOriginal: 329.7,
-    destaques: ['Gel Tópico CBD', 'Roll-on Relaxante', 'Óleo de Massagem'],
-  }),
-  produto({
-    nome: 'Kit Iniciante Broad Spectrum',
-    marca: 'Be4Hope',
-    categoria: 'kits-combos',
-    descricaoCurta: 'Óleo broad spectrum + cápsulas de apoio.',
-    descricao: 'Combo para pacientes com restrição a THC, com óleo e cápsulas broad/isolado.',
-    preco: 489.9,
-    precoOriginal: 549.8,
-    destaques: ['Óleo Broad Spectrum 1500mg', 'Cápsulas Isolado 10mg'],
-  }),
-];
-
 const OUTROS: Produto[] = [
   produto({
     nome: 'Greens Pet Óleo CBD 1000mg',
@@ -615,7 +416,7 @@ const OUTROS: Produto[] = [
   }),
 ];
 
-export const PRODUTOS: Produto[] = [...OLEOS, ...CAPSULAS, ...COSMETICOS, ...KITS, ...OUTROS];
+export const PRODUTOS: Produto[] = [...OLEOS, ...CAPSULAS, ...OUTROS];
 
 export function listarCategorias(): CategoriaProduto[] {
   return CATEGORIAS;

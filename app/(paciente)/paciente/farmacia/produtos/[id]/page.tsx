@@ -57,13 +57,13 @@ export default async function ProdutoDetalhePage({ params }: { params: Promise<{
       {/* ── Conteúdo principal ── */}
       <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12 animate-fade-up delay-75">
         <div className="lg:sticky lg:top-8 lg:self-start">
-          <Card className="relative aspect-square overflow-hidden rounded-2xl border border-border/20 bg-primary-soft p-0 shadow-sm sm:rounded-3xl">
+          <Card className="relative aspect-square overflow-hidden rounded-2xl border border-border/20 bg-white p-0 shadow-sm sm:rounded-3xl">
             <Image
               src={produto.imagem}
               alt={produto.nome}
               fill
               sizes="(min-width: 1024px) 45vw, 90vw"
-              className="object-contain p-10 sm:p-14"
+              className="object-contain p-6 sm:p-10 lg:p-14"
               priority
             />
             {produto.badges[0] && (
@@ -94,7 +94,7 @@ export default async function ProdutoDetalhePage({ params }: { params: Promise<{
             </p>
           </div>
 
-          <div className="flex items-end gap-3 border-y border-border/20 py-5">
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2 border-y border-border/20 py-5">
             <div>
               {produto.precoOriginal && (
                 <p className="text-sm text-muted-foreground/60 line-through">
