@@ -136,15 +136,16 @@ async function sincronizarPerfilUsuario(data: ClerkUserCreatedData) {
 async function processarNovoUsuario(data: ClerkUserCreatedData) {
   const clerkId = data.id;
   const email = data.email_addresses?.[0]?.email_address;
-  const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || email.split('@')[0];
-  const metadataPhone = (data.unsafe_metadata?.phone as string) || (data.public_metadata?.phone as string);
-  const telefone = data.phone_numbers?.[0]?.phone_number || metadataPhone || null;
-  const role = (data.public_metadata?.role as string) || 'paciente';
 
   if (!email) {
     console.warn('[Webhook Clerk] Usuário sem email, ignorando:', clerkId);
     return;
   }
+
+  const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || email.split('@')[0];
+  const metadataPhone = (data.unsafe_metadata?.phone as string) || (data.public_metadata?.phone as string);
+  const telefone = data.phone_numbers?.[0]?.phone_number || metadataPhone || null;
+  const role = (data.public_metadata?.role as string) || 'paciente';
 
   console.log(`[Webhook Clerk] Processando novo usuário: ${email} (role: ${role})`);
 
@@ -181,7 +182,11 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
         roleEfetivo = userComRole.role;
       }
     } else {
-      // Criar user no banco
+      // Criar user no banco. onConflictDoNothing cobre a corrida com o fallback
+      // de /redirect (que também cria o registro no primeiro acesso pós-login
+      // caso o webhook ainda não tenha rodado) — sem isso, um conflito de e-mail
+      // derruba o insert, lança exceção e aborta o fluxo ANTES de notificar os
+      // admins, mesmo que o registro já exista (criado pelo outro caminho).
       const [novoUser] = await db
         .insert(users)
         .values({
@@ -191,8 +196,27 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
           role: role as 'admin' | 'medico' | 'paciente',
           telefone,
         })
+        .onConflictDoNothing({ target: users.email })
         .returning({ id: users.id });
-      userId = novoUser.id;
+
+      if (novoUser) {
+        userId = novoUser.id;
+      } else {
+        // Conflito: outro processo criou esse e-mail entre o SELECT e o INSERT acima.
+        const [existente] = await db
+          .select({ id: users.id, role: users.role })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (!existente) {
+          throw new Error(`Conflito ao criar usuário, mas registro não encontrado: ${email}`);
+        }
+
+        await db.update(users).set({ clerkId }).where(eq(users.id, existente.id));
+        userId = existente.id;
+        roleEfetivo = existente.role;
+      }
     }
 
     // Sincronizar publicMetadata.role no Clerk usando o role EFETIVO do banco.
@@ -220,12 +244,17 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
         .limit(1);
 
       if (!pacienteExistente) {
-        await db.insert(pacientes).values({
-          userId,
-          medicoId: null,
-          status: 'aguardando_consulta',
-          jornadaFase: 'acolhimento',
-        });
+        // onConflictDoNothing pela mesma razão do insert de users acima:
+        // o fallback de /redirect pode criar esse registro na mesma janela.
+        await db
+          .insert(pacientes)
+          .values({
+            userId,
+            medicoId: null,
+            status: 'aguardando_consulta',
+            jornadaFase: 'acolhimento',
+          })
+          .onConflictDoNothing({ target: pacientes.userId });
       }
 
       // 3. Notificar todos os admins
