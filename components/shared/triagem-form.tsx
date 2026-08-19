@@ -740,39 +740,45 @@ export function TriagemForm({ medicoClerkId, onSuccess, compact = false }: Triag
     if (!validarPassoAtual()) return;
     setEnviando(true);
 
-    /* Monta os dados consolidados (texto + checkboxes) */
-    const dadosCompletos: Record<string, unknown> = { ...dados };
-    for (const [key, values] of Object.entries(checkboxes)) {
-      dadosCompletos[key] = values.join(', ');
-    }
+    try {
+      /* Monta os dados consolidados (texto + checkboxes) */
+      const dadosCompletos: Record<string, unknown> = { ...dados };
+      for (const [key, values] of Object.entries(checkboxes)) {
+        dadosCompletos[key] = values.join(', ');
+      }
 
-    /* Arquivo: converte para Base64 para armazenar no JSON */
-    if (arquivo) {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(arquivo);
+      /* Arquivo: converte para Base64 para armazenar no JSON */
+      if (arquivo) {
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error ?? new Error('Falha ao ler o arquivo'));
+          reader.readAsDataURL(arquivo);
+        });
+        dadosCompletos['relatorio_medico_arquivo'] = base64;
+        dadosCompletos['relatorio_medico_nome'] = arquivo.name;
+      }
+
+      const resultado = await criarTriagem({
+        dados: dadosCompletos,
+        nomeContato: dados.nome_paciente || undefined,
+        emailContato: dados.email || undefined,
+        telefoneContato: dados.telefone || undefined,
+        medicoClerkId: medicoClerkId || undefined,
       });
-      dadosCompletos['relatorio_medico_arquivo'] = base64;
-      dadosCompletos['relatorio_medico_nome'] = arquivo.name;
-    }
 
-    const resultado = await criarTriagem({
-      dados: dadosCompletos,
-      nomeContato: dados.nome_paciente || undefined,
-      emailContato: dados.email || undefined,
-      telefoneContato: dados.telefone || undefined,
-      medicoClerkId: medicoClerkId || undefined,
-    });
-
-    setEnviando(false);
-
-    if (resultado.sucesso) {
-      setEnviado(true);
-      toast.success('Triagem enviada com sucesso!');
-      onSuccess?.();
-    } else {
-      toast.error(resultado.erro || 'Erro ao enviar triagem');
+      if (resultado.sucesso) {
+        setEnviado(true);
+        toast.success('Triagem enviada com sucesso!');
+        onSuccess?.();
+      } else {
+        toast.error(resultado.erro || 'Erro ao enviar triagem');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar triagem:', error);
+      toast.error('Não foi possível enviar a triagem. Verifique sua conexão e tente novamente.');
+    } finally {
+      setEnviando(false);
     }
   }
 
