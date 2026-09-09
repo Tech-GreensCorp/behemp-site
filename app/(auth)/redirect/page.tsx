@@ -1,8 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { users, pacientes } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { users, pacientes, autorizacoesAnvisa } from '@/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 
 /**
  * Página de redirecionamento pós-login — Server Component.
@@ -160,6 +160,28 @@ export default async function AuthRedirectPage() {
   // Redireciona para o dashboard conforme o role
   if (role === 'admin') redirect('/admin');
   if (role === 'medico') redirect('/medico');
+
+  // Paciente sem processo de autorização ANVISA iniciado: leva direto para lá
+  if (registro) {
+    const [paciente] = await db
+      .select({ id: pacientes.id })
+      .from(pacientes)
+      .where(and(eq(pacientes.userId, registro.id), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (paciente) {
+      const [autorizacao] = await db
+        .select({ id: autorizacoesAnvisa.id })
+        .from(autorizacoesAnvisa)
+        .where(
+          and(eq(autorizacoesAnvisa.pacienteId, paciente.id), isNull(autorizacoesAnvisa.deletedAt)),
+        )
+        .limit(1);
+
+      if (!autorizacao) redirect('/paciente/anvisa');
+    }
+  }
+
   redirect('/paciente');
 }
 
