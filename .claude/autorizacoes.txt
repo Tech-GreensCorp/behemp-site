@@ -1,0 +1,233 @@
+# Autorizações explícitas de escopo — behemp-site
+#
+# Este arquivo é a única forma de liberar o que os hooks de .claude/hooks/ bloqueiam.
+# Autorização é POR ESCRITO e aparece no diff — foi decidido assim de propósito.
+#
+# Formato:
+#   path:<prefixo ou trecho do caminho>    libera ESCRITA naquele caminho
+#   git:<trecho exato do comando>          libera aquele comando destrutivo
+#
+# Regra: cada linha nasce com um comentário acima dizendo QUEM autorizou, QUANDO e
+# POR QUE. Linha sem justificativa é para ser removida na próxima revisão.
+#
+# ── Autorizado pelo dono em 19/08/2026 · CUMPRIDA em 19/08/2026 ─────────────────
+# Remover a pasta do kit de documentação depois de integrado ao repositório.
+# A pasta não era versionada, então a remoção não deixou rastro em git.
+# Mantida aqui como registro de quem autorizou o quê — é a razão de este arquivo existir.
+# ⚠️ Também é o caso que o guarda `hooks-de-escopo` usa para provar que autorização por
+#    escrito libera o bloqueio. Remover esta linha faz o guarda ficar vermelho.
+git:git rm -r docs/kit-claude-code
+
+# ── Autorizado pelo dono em 20/08/2026, na execução da Sprint 0 ─────────────────
+# Ligar o portão de qualidade ao CI. Sem isto, o Item 3 da Prioridade 1 fica aberto:
+# lint, type-check e teste NÃO rodam antes do deploy, e o único portão real é o build
+# falhar. O dono escolheu o desenho "ci.yml + enxerto no deploy.yml" entre 4 opções
+# comparadas, porque push direto em main não passa por PR — se o portão só existisse
+# no ci.yml, um push em main deployaria sem passar por ele.
+#
+# PERIGO MEDIDO de mexer no deploy.yml:
+#   · é o pipeline de produção (DT-008); push em main dispara deploy com db:migrate
+#     sem rollback num servidor de 2 GB
+#   · o enxerto entra ANTES do build, portanto antes do rsync e antes da migration:
+#     se falhar, NADA chega ao servidor e NENHUMA migration é aplicada
+#   · steps existentes não são alterados nem reordenados — só precedidos
+#   · o YAML foi validado por parser antes de escrever
+# CUSTO DE DEIXAR: todo PR e todo push seguem sem portão; os 35 casos de guarda e o
+# portão de baseline não rodam antes do deploy, e guarda que não roda é documentação.
+#
+# Granularidade deliberada: dois caminhos EXATOS, não o diretório inteiro. Autorizar
+# `.github/workflows/` liberaria qualquer workflow futuro sem nova decisão.
+path:.github/workflows/ci.yml
+path:.github/workflows/deploy.yml
+
+# ── Autorizado pelo dono em 20/08/2026, na auditoria da Sprint 1 ────────────────
+# Corrigir a CLASSE de defeito do Item 11 do 04-LISTA-DE-AFAZERES: autorização por papel
+# sem escopo de objeto (OWASP API1 / BOLA). 7 ocorrências + 4 de auditoria + 1 de
+# consentimento. O dono escolheu "todas as 7", com helper único, entre 4 opções.
+#
+# POR QUE: `app/api/pusher/auth/route.ts:72-80` autoriza qualquer usuário autenticado em
+# QUALQUER sala de teleconsulta, e `sinalizar/route.ts` aceita roomId arbitrário do body.
+# Juntos permitem assistir a consulta médica alheia. Em `aprovar-narrativa`, qualquer
+# médico escreve evolução clínica no prontuário de qualquer paciente.
+#
+# PERIGO MEDIDO de mexer nos dois arquivos protegidos abaixo:
+#   · são ACTIONS de teleconsulta, não telas — 5 funções no total
+#   · a teleconsulta NUNCA foi usada de verdade (DO-02), então não há uso clínico a
+#     quebrar; o risco real é REGRESSÃO: um `where` a mais que passe a negar acesso
+#     legítimo
+#   · mitigação exigida: guarda por função nasce VERMELHO antes da correção, com os 3
+#     controles que já funcionam (criarSalaTeleconsulta, buscarSalaPorRoomId,
+#     transcricao/route) como casos que devem continuar PASSANDO
+#   · nenhuma migration, nenhuma mudança de schema, nenhuma mudança de UI
+# CUSTO DE DEIXAR: dado clínico de videoconsulta exposto a qualquer usuário autenticado.
+path:app/(medico)/_actions/teleconsulta.ts
+path:app/(paciente)/_actions/teleconsulta.ts
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 1 ─────────────────────────────
+# Tirar do código a credencial pública do TURN de terceiro (openrelay.metered.ca, senha
+# `openrelayproject`) e passar o endereço a vir de variável de ambiente, com credencial
+# EFÊMERA gerada no servidor. Provedor escolhido pelo dono entre 4 opções comparadas com
+# preço: Cloudflare Realtime TURN (Item 8 do 04-LISTA-DE-AFAZERES).
+#
+# POR QUE: quando a conexão direta falha, TODA a mídia da consulta médica — áudio e vídeo
+# de médico e paciente — atravessa hoje o relay gratuito de um terceiro sem contrato de
+# operador, sem SLA, com credencial que é pública na internet.
+#
+# PERIGO MEDIDO de mexer na página do paciente:
+#   · o array de iceServers está em 2 arquivos; este é um deles (linhas 156-158)
+#   · a teleconsulta NUNCA foi usada de verdade (DO-02) — não há uso clínico a quebrar
+#   · ⚠️ REGRESSÃO FUNCIONAL ACEITA: sem as variáveis de ambiente configuradas, a chamada
+#     passa a usar só STUN. Conexões que HOJE só funcionam via relay vão falhar até a conta
+#     Cloudflare ser provisionada. É deliberado: melhor falhar do que atravessar relay de
+#     estranho com dado de saúde.
+#   · nenhuma migration, nenhuma mudança de schema, nenhuma mudança de layout
+# CUSTO DE DEIXAR: mídia de consulta médica em relay de terceiro sem contrato, e credencial
+# pública versionada no repositório.
+path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 2 ─────────────────────────────
+# (1) Criar a casa do módulo de IA clínica dentro de `app/(medico)` — nome `ia-clinica`,
+#     escolhido pelo dono entre 4 opções. Base: `DO-11` ("a área nova mora dentro de
+#     (medico), não há sexto route group"). Alinha com lib/ia-clinica/ e __fixtures__/ia-clinica/.
+# (2) Gerar a migration dos campos e enums novos. **Gerar, não aplicar** — o dono escolheu
+#     "gerar agora, aplicar depois": `pnpm db:generate` escreve SQL + snapshot + journal, e
+#     `pnpm db:migrate` só roda no deploy, quando ele mandar.
+#
+# PERIGO MEDIDO da migration:
+#   · é **aditiva**: CREATE TYPE de 2 enums novos + ALTER TABLE ADD COLUMN de 7 colunas
+#     nullable em `teleconsultas`
+#   · nenhuma coluna removida, nenhum tipo alterado, nada renomeado — linhas existentes
+#     seguem válidas sem backfill
+#   · ⚠️ `pnpm db:migrate` roda contra produção sem rollback num servidor de 2 GB (Item 1 do
+#     04-LISTA-DE-AFAZERES). É por isso que gerar e aplicar são passos separados aqui
+#   · sem esta migration, o código do consentimento NÃO funciona: as colunas não existem
+# CUSTO DE DEIXAR: o consentimento LGPD implementado na Sprint 1 fica inerte, e o módulo da
+# Sprint 2 não tem onde morar.
+path:app/(medico)/medico/ia-clinica
+# ⚠️ ESTREITADA em 20/08/2026, logo após a migration ser gerada.
+# A autorização era `path:db/migrations` — o diretório inteiro. O guarda `hooks-de-escopo`
+# ficou VERMELHO no caso "migration gerada", porque a proteção de todas as migrations havia
+# deixado de valer. O guarda estava certo: autorização ampla que sobrevive ao trabalho é
+# autorização esquecida. Restrita aos arquivos QUE ESTA migration produziu.
+path:db/migrations/0018_nifty_xavin.sql
+path:db/migrations/meta/0018_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 3 ─────────────────────────────
+# Gerar a migration das tabelas da anamnese-baseline. Condição literal do dono:
+#   "contanto que não subamos para main ou para neon, temos que tomar cuidado pois estamos
+#    em uma branch de desenvolvimento e temos que garantir a compatibilidade para quando
+#    (eu mandar) subirmos a main e dps fazermos a reconciliação com banco neon"
+#
+# 🛑 O QUE ESTA AUTORIZAÇÃO **NÃO** COBRE: rodar `pnpm db:migrate`, e push em `main`.
+#    Ambos permanecem bloqueados. O arquivo existe na branch e não tocou banco nenhum.
+#
+# COMPATIBILIDADE VERIFICADA (é o que o dono pediu para garantir):
+#   · 100% ADITIVA: 2 CREATE TABLE + 6 CREATE TYPE + 8 ADD CONSTRAINT (FKs das tabelas NOVAS)
+#   · ZERO `DROP`, ZERO `ALTER COLUMN`, ZERO `SET NOT NULL`
+#   · NENHUMA tabela existente é alterada — só as duas novas
+#   · journal contíguo de 0 a 19, sem lacuna
+#   → um banco que não tenha estas tabelas as recebe sem risco; um que já as tenha falha no
+#     CREATE, o que é falha VISÍVEL, não corrupção silenciosa
+#
+# ⚠️ O RISCO REAL DA RECONCILIAÇÃO, e ele não é desta migration:
+#   Se o Neon de produção tiver divergido do snapshot local (mudança feita à mão, migration
+#   aplicada fora do journal), `db:migrate` pode falhar no meio — e não há rollback (Item 1).
+#   Procedimento antes de aplicar está em `docs/03-CHECKLIST-MESTRE.md`.
+path:db/migrations/0019_cheerful_ricochet.sql
+path:db/migrations/meta/0019_snapshot.json
+
+# ── Modelo, para copiar ─────────────────────────────────────────────────────────
+# Autorizado por {{quem}} em {{dd/mm/aaaa}} — {{por que, e qual o perigo medido}}
+# path:app/(admin)/admin/exemplo
+
+# ── Autorizado pelo dono em 24/08/2026, na Sprint 5 (item 7 da fila) ────────────
+# Frase literal: "PODE SEGUIR COM AS IMPLEMENTAÇÕES", dita depois de responder as três
+# perguntas de regra de negócio que travavam o desenho (DO-46, DO-47, DO-48). O escopo
+# autorizado é o da Sprint 5: a cadeia conduta -> {prescrição, dosagem} -> titulação.
+#
+# POR QUE cada caminho, e não `app/(medico)/` inteiro:
+#   · a Sprint 2 já mostrou que autorização ampla sobrevive ao trabalho e vira autorização
+#     esquecida — foi por isso que `path:db/migrations` foi ESTREITADA naquele dia
+#   · o grosso do código novo mora em `components/conduta/` e `lib/conduta/`, que NÃO são
+#     protegidos: só as páginas finas e as actions precisam de autorização
+#
+# PERIGO MEDIDO, por caminho:
+#   · `_actions/conduta.ts` e `medico/titulacao/` são ARQUIVOS NOVOS — não há
+#     comportamento em produção a quebrar. Nascem com escopo de objeto
+#     (`lib/auth/escopo-paciente.ts`), que as 8 actions existentes NÃO têm (04 Item 13.5)
+#   · `tab-dosagem.tsx` é tela EM PRODUÇÃO com dado clínico já digitado. A mudança é
+#     SUBTRATIVA e deliberada (DO-48): saem "Novo Ajuste", "Editar" e "Excluir"; o
+#     histórico já digitado continua visível e íntegro. Nenhuma linha do banco é tocada,
+#     nenhuma action é removida do módulo — só deixa de ser chamada por esta tela
+#   · `pacientes/[id]/page.tsx` recebe UMA linha: a aba "Dosagem" passa a montar o
+#     componente novo. Nenhuma aba é removida, nenhuma reordenada
+#   · ⚠️ NÃO cobre `prescricoes.medicamentos` (JSONB do Item 4), `lib/receituario/`,
+#     assinatura, SNCR, nem as 8 actions defeituosas do 04 Item 13 — tudo isso segue
+#     catalogado e sem autorização
+# CUSTO DE DEIXAR: a Sprint 5 não sai do papel, e cada linha nova de dosagem continua
+# entrando em texto livre, num formato que nunca sustentará CAN-03 nem CAN-04.
+path:app/(medico)/_actions/conduta.ts
+path:app/(medico)/medico/titulacao
+path:app/(medico)/medico/pacientes/[id]/_components/tab-dosagem.tsx
+path:app/(medico)/medico/pacientes/[id]/page.tsx
+
+# ── Autorizado pelo dono em 24/08/2026, na Sprint 5 ─────────────────────────────
+# Gerar a migration das colunas da cadeia da conduta. Mesma condição das Sprints 2 e 3:
+# GERAR, NÃO APLICAR. `pnpm db:migrate` NÃO foi rodado e continua exigindo ordem expressa.
+#
+# 🛑 O QUE ESTA AUTORIZAÇÃO NÃO COBRE: rodar `pnpm db:migrate`, e push em `main`.
+#
+# COMPATIBILIDADE VERIFICADA — 100% ADITIVA, medida no SQL gerado:
+#   · 4x ADD COLUMN, todas NULLABLE
+#       medicamentos.teor_thc_percentual        (a casa do teor, DO-46 — nasce vazia)
+#       itens_ajuste_dosagem.medicamento_id     (liga ao catálogo, CAN-03)
+#       itens_ajuste_dosagem.dosagem_anterior_id
+#       itens_ajuste_dosagem.nova_dosagem_id    (ligam as duas cadeias, ADR-0012 D-01)
+#   · 3x ADD CONSTRAINT — FKs das colunas NOVAS, nenhuma sobre coluna existente
+#   · 1x CREATE INDEX sobre coluna nova
+#   · ZERO DROP · ZERO ALTER COLUMN · ZERO SET NOT NULL · ZERO RENAME (conferido por grep)
+#   → linha existente fica com as três colunas nulas e continua válida. É EXATAMENTE o que o
+#     `DO-48` exige: o histórico legado em texto livre continua legível e íntegro.
+#
+# PERIGO MEDIDO: baixo para o schema, e o risco real não é desta migration — é o mesmo da
+# Sprint 3: se o Neon de produção tiver divergido do snapshot local, `db:migrate` pode falhar
+# no meio, e não há rollback (Item 1 do 04). Por isso gerar e aplicar seguem separados.
+path:db/migrations/0023_wise_zombie.sql
+path:db/migrations/meta/0023_snapshot.json
+
+# ── Ampliação da autorização da Sprint 5 — 24/08/2026 ──────────────────────────
+# Os entregáveis 3 (ponte conduta -> prescrição, ADR-0005 D-04) e 12 (o anterior no histórico
+# em DUAS superfícies, DO-44 b) exigem a aba de prescrições do prontuário — a "segunda
+# superfície" é literalmente o "historico de prescrições dentro do nome do paciente" da frase
+# do dono. Mesma autorização, mesmo escopo: "PODE SEGUIR COM AS IMPLEMENTAÇÕES".
+#
+# PERIGO MEDIDO em tab-prescricoes.tsx:
+#   · a mudança é ADITIVA: um bloco de leitura com os ajustes de dose, ABAIXO da lista que já
+#     existe. Nenhum campo do formulário de prescrição é alterado, nenhuma action trocada
+#   · NÃO toca `criarPrescricao`, nem o JSONB `prescricoes.medicamentos` (Item 4), nem
+#     `lib/receituario/`, nem assinatura, nem SNCR — a ponte CHAMA o fluxo existente, como a
+#     ADR-0005 D-04 exige, e não o reescreve
+#   · o guarda `a-conduta-avisa-e-nao-decide` já cobra que a action de conduta NÃO escreva em
+#     `prescricoes` nem importe `lib/receituario/`
+# CUSTO DE DEIXAR: a conduta morre sem virar documento legal, que é o objetivo declarado da
+# sprint, e o DO-44 (b) fica cumprido pela metade.
+path:app/(medico)/medico/pacientes/[id]/_components/tab-prescricoes.tsx
+
+# ── Autorizado pelo dev Davi em 25/08/2026, cartões 16 e 17 do Trello ──────────
+# "o que nos faremos agora é colocar em a fazer e ja começar a fazer os cartões 16, 17, 18 e 19
+#  pois eles fecham a sprint 5" — GERAR, NÃO APLICAR EM PRODUÇÃO. `pnpm db:migrate` rodou apenas
+# contra o Postgres LOCAL (localhost:5436), conferido antes; o Neon segue intocado.
+#
+# COMPATIBILIDADE VERIFICADA — 100% ADITIVA, medida no SQL gerado (grep por DROP/ALTER COLUMN/
+# SET NOT NULL/RENAME retorna ZERO):
+#   · 1x CREATE TABLE `rascunhos_revisao_ia` (tabela NOVA — E7/DO-41, rascunho no servidor)
+#   · 5x ADD COLUMN em `revisoes_ia`, todas NULLABLE (E3/DO-40, a divergência alimenta o RAG)
+#   · FKs e índices apenas sobre colunas/tabelas NOVAS
+#   → linha existente de `revisoes_ia` continua válida sem backfill
+#
+# 🔴 `ingerido_no_corpus_em` NASCE E FICA VAZIA de propósito: `GAP-16` (base legal do uso
+#    secundário) bloqueia a INGESTÃO no corpus, não a construção dos campos (ADR-0011 D-02).
+#    O guarda `divergencia-alimenta-o-rag-sem-ingerir` impede que alguém a preencha antes.
+path:db/migrations/0024_strong_komodo.sql
+path:db/migrations/meta/0024_snapshot.json

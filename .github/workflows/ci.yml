@@ -1,0 +1,62 @@
+# Portão de qualidade — roda ANTES do merge, não no deploy.
+#
+# POR QUE ESTE ARQUIVO EXISTE, SEPARADO DO deploy.yml
+# `main` É produção: push em main dispara deploy.yml, que faz rsync e roda `pnpm db:migrate`
+# no banco de produção sem rollback (DT-006, DT-008). Um portão que só roda no push de main
+# descobre o problema quando o deploy JÁ começou. O portão precisa rodar no PR, onde a
+# correção ainda é barata.
+#
+# O QUE ELE NÃO FAZ: exigir zero erro. O repositório tem 210 erros de lint e 360 arquivos
+# fora do Prettier, medidos por execução em 20/08/2026 (docs/03-CHECKLIST-MESTRE.md).
+# Portão que exige zero reprova todo PR e é desligado na primeira semana — o mesmo modo de
+# falha da Regra 2 de docs/TECNICA-DOS-GUARDAS.md. Ele exige apenas que os números NÃO
+# PIOREM; o teto está em baseline.json e só se baixa.
+#
+# Criado na Sprint 0, autorizado pelo dono em 20/08/2026 (.claude/autorizacoes.txt).
+name: Portão de qualidade
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main # em main o portão roda dentro do deploy.yml, antes de qualquer efeito
+
+concurrency:
+  group: portao-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portao:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # Node 20: Vitest 4 exige ^20 || ^22 || >=24. O .nvmrc do repo diz 18 e está
+      # catalogado como divergência no 03-CHECKLIST-MESTRE.md — não se corrige aqui.
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --no-frozen-lockfile
+
+      # Portão ABSOLUTO: o type-check está em 0 erros desde 20/08/2026, medido sem `.next`
+      # presente — as mesmas condições deste job. Qualquer erro novo reprova, sem tolerância.
+      - name: Type-check (portão absoluto — zero erro)
+        run: pnpm typecheck
+
+      # Os guardas estruturais. 35 casos, ~1 s.
+      - name: Guardas
+        run: pnpm test
+
+      # Portão RELATIVO: falha só se lint ou Prettier piorarem em relação a baseline.json.
+      - name: Baseline não piorou
+        run: node scripts/conferir-baseline.mjs

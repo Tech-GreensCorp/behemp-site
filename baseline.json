@@ -1,0 +1,31 @@
+{
+  "_comentario": [
+    "Tetos de tolerância do portão de CI. Conferidos por scripts/conferir-baseline.mjs.",
+    "Medidos por execução em 20/08/2026, na Sprint 0. Ver docs/03-CHECKLIST-MESTRE.md.",
+    "REGRA: teto só se BAIXA. Subir um número aqui é afrouxar o portão, e aparece no diff",
+    "para que a decisão seja consciente e de quem manda — nunca efeito colateral de um PR.",
+    "",
+    "EXCEÇÃO REGISTRADA, 20/08/2026: prettier_arquivos subiu de 350 para 352.",
+    "Motivo: o número havia CAÍDO porque eu formatei GlobalTeleconsultaHost.tsx e a página do",
+    "paciente por inteiro — inflando o diff em ~1.400 linhas de reordenação de classe Tailwind",
+    "em arquivos de PRODUÇÃO. O dono vetou ('alterar essas coisas é mudança de padrão já",
+    "existente e pode dar problema para mim'), e a formatação foi desfeita, preservando só as",
+    "mudanças de conteúdo: de +755/-644 para +46/-22 no host, e de +206/-100 para +34/-17 na",
+    "página do paciente. O teto voltar a 352 é restaurar o estado de produção, não aceitar",
+    "dívida nova. Os dois arquivos já estavam fora do Prettier antes de qualquer mudança minha.",
+    "",
+    "APERTADO em 24/08/2026: 352 -> 351. Um arquivo saiu da lista porque docs/TECNICA-DOS-GUARDAS.md foi formatado -- doc criada nesta sequencia de sprints, nao arquivo de producao. Nenhum arquivo de producao foi reformatado.",
+    "APERTADO em 24/08/2026 (2a vez): 351 -> 350. Saiu o docs/02-CATALOGO-DE-REGRAS.md, doc desta sequencia de sprints. Nenhum arquivo de producao reformatado -- os que seguem fora (host da teleconsulta, actions, snapshots de migration) continuam intocados de proposito, DO-35.",
+    "APERTADO em 24/08/2026 (3a vez): saiu docs/sprints/SPRINT-5 e outras docs desta sequencia, formatadas ao serem editadas. Nenhum arquivo de producao reformatado (DO-35).",
+    "APERTADO em 25/08/2026, na Sprint 5: lint_erros 210 -> 206. O numero CAIU porque tab-dosagem.tsx foi reescrito por decisao do dono (DO-48: a tela antiga vira somente leitura), e a versao antiga carregava `any` e estado nao tipado. Nao houve supressao de regra nem reformatacao de arquivo de producao: o arquivo mudou de conteudo por ordem expressa. prettier_arquivos permanece 348 -- os arquivos de producao que seguem fora (medico-sidebar.tsx, db/schema/medicamentos.ts, host da teleconsulta, 24 snapshots de migration) continuam intocados de proposito, DO-35.",
+    "APERTADO em 25/08/2026, cartoes 16-19: prettier_arquivos 348 -> 323. O numero CAIU 25 porque `db/migrations/meta/*.json` entrou no .prettierignore -- sao snapshots GERADOS pelo drizzle-kit, nunca editados a mao, e os 25 ja estavam TODOS fora do Prettier antes. Nao e afrouxamento: tira do portao arquivo que ninguem escreve, e impede que cada migration nova empurre o teto (ja havia empurrado 3 vezes). Nenhum arquivo de producao foi reformatado (DO-35).",
+    "APERTADO em 25/08/2026: prettier_arquivos 323 -> 322, ao montar o SeloDeUrgencia no PainelHipoteses (o arquivo entrou em conformidade ao ser editado). Nenhuma reformatacao de arquivo de producao (DO-35)."
+  ],
+  "medido_em": "2026-08-20",
+  "tetos": {
+    "lint_erros": 206,
+    "lint_warnings": 130,
+    "prettier_arquivos": 322,
+    "typecheck_erros": 0
+  }
+}

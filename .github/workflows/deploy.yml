@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
@@ -26,11 +26,25 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --no-frozen-lockfile
 
+      # ── PORTÃO (enxertado na Sprint 0, 20/08/2026 — autorizado em .claude/autorizacoes.txt)
+      # Fica ANTES do build e, principalmente, antes do rsync e do `pnpm db:migrate`.
+      # Se falhar aqui, nada chega ao servidor e nenhuma migration é aplicada em produção.
+      # Push direto em main não passa por PR, então o portão do ci.yml não o cobre — é por
+      # isso que os mesmos três checks aparecem nos dois workflows.
+      - name: Type-check (portão absoluto — zero erro)
+        run: pnpm typecheck
+
+      - name: Guardas
+        run: pnpm test
+
+      - name: Baseline não piorou
+        run: node scripts/conferir-baseline.mjs
+
       - name: Build do projeto (Next.js)
         # Passar variáveis públicas necessárias para o build
         env:
-          NEXT_PUBLIC_APP_URL: "https://be4hope.org"
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+          NEXT_PUBLIC_APP_URL: 'https://be4hope.org'
+          DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
         run: pnpm build
 
       - name: Limpar .next antigo no servidor antes do deploy
@@ -47,13 +61,13 @@ jobs:
         uses: easingthemes/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ARGS: "-rltgoDzvO --delete"
-          SOURCE: "./"
+          ARGS: '-rltgoDzvO --delete'
+          SOURCE: './'
           REMOTE_HOST: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: ${{ secrets.TARGET_DIR }}
           # Excluir arquivos que não precisam ser enviados
-          EXCLUDE: "/node_modules/, /.git/, /.github/, /.env, /pnpm-lock.yaml"
+          EXCLUDE: '/node_modules/, /.git/, /.github/, /.env, /pnpm-lock.yaml'
 
       - name: Reiniciar Servidor (PM2)
         uses: appleboy/ssh-action@v1.0.3
@@ -63,23 +77,22 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ secrets.TARGET_DIR }}
-            
+
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
-            
+
             # Copia o .env para dentro do standalone (Opção A)
             cp .env .next/standalone/.env
-            
+
             # Aplica eventuais migrações do banco
             pnpm db:migrate
-            
+
             # Copia arquivos estáticos vitais para o standalone (CSS/Imagens)
             cp -r public .next/standalone/
             cp -r .next/static .next/standalone/.next/
-            
+
             # Reinicia o processo com cwd no standalone
             cd .next/standalone
             pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
             pm2 save
             pm2 save
-
