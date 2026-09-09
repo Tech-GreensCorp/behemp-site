@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { solicitacaoCadastroOrigemEnum, solicitacaoCadastroStatusEnum } from './enums';
@@ -54,6 +54,29 @@ export const solicitacoesCadastro = pgTable(
     email: text('email'),
     /** E.164, sempre. O sufixo `@s.whatsapp.net` é removido antes de gravar. */
     telefone: text('telefone'),
+
+    // ── O que o paciente preencheu no formulário ────────────────────────────────
+    /**
+     * Só dígitos, sem pontuação. Validado por dígito verificador antes de gravar —
+     * CPF sintaticamente impossível não entra, porque ele vai parar na prescrição.
+     */
+    cpf: text('cpf'),
+    /**
+     * O paciente já faz tratamento com cannabis?
+     *
+     * ⚠️ TRÊS ESTADOS, não dois: `true`, `false` e **`null` (não respondeu)**. Um
+     * boolean `notNull().default(false)` afirmaria "não faz tratamento" sobre quem
+     * apenas não chegou nessa parte do formulário — e é justamente essa resposta que
+     * muda a conduta do médico na primeira consulta.
+     */
+    jaFazTratamento: boolean('ja_faz_tratamento'),
+    /**
+     * O que ele escreveu sobre o tratamento atual, em texto livre.
+     *
+     * 🔴 DADO SENSÍVEL DE SAÚDE (LGPD art. 11). Não vai para log, não vai para
+     * notificação, e não sai desta tabela nem da ficha do paciente.
+     */
+    tratamentoAtual: text('tratamento_atual'),
 
     // ── O link ──────────────────────────────────────────────────────────────────
     /** SHA-256 do token. O valor cru só existe na resposta que vai ao paciente. */
