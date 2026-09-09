@@ -1189,3 +1189,70 @@ PM2) grava `access_log` com a URL completa por padrão. Nenhuma linha de TypeScr
 
 ⚠️ **Não corrigido nesta tarefa** — é infraestrutura, está fora do escopo pedido, e exige
 autorização (`CLAUDE.md`, seção de escopo). **Fica catalogado com o perigo medido.**
+
+---
+
+## Item 20 — ✅ A tela de cadastro do link do WhatsApp, construída em 09/09/2026
+
+**O que foi pedido:** a tela que a Dryelle ia construir passou a ser nossa. Campos definidos
+pelo dono: **nome, CPF, telefone, e-mail, senha** e _"já faz tratamento?"_ com caixa de texto
+quando a resposta é sim. Motivo declarado: _"imagine o paciente que chegou na Greens ou na
+BeHemp e não possui receita, ele teria que fazer a nossa teleconsulta"_. O mesmo link serve os
+dois negócios — _"o WhatsApp da Greens vai enviar o link que criaremos da BeHemp"_.
+
+### O que existe no disco
+
+| camada                                                          | arquivo                                                                     |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| a tela (Server Component, valida o token antes de pintar campo) | `app/(auth)/cadastro/[token]/page.tsx`                                      |
+| o formulário (client, duas etapas do Clerk)                     | `app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx`        |
+| a action que grava                                              | `app/_actions/cadastro-por-link.ts`                                         |
+| validação de CPF por dígito verificador                         | `lib/validacao/cpf.ts`                                                      |
+| guarda                                                          | `__tests__/guardas/cadastro-por-link-abre-sem-conta.test.ts` — **32 casos** |
+| migration                                                       | `0027_magenta_shockwave.sql` — 5 `ADD COLUMN`, **zero destrutivo**          |
+
+**Fluxo:** dados + senha → conta no Clerk (e-mail é o login) → código de 6 dígitos → sessão →
+ficha gravada → **agendar teleconsulta**.
+
+**Visual:** aurora de três manchas em movimento lento usando **só** `--primary`, `--secondary` e
+`--color-peach`; sombra em duas camadas; validação com retorno imediato por campo; medidor de
+força de senha; a caixa de texto do tratamento cresce por `grid-rows` quando a resposta é "sim".
+Sem `framer-motion` (proibição 3) e sem cor nova. O CSS da aurora fica **no arquivo da página**,
+via `<style precedence>` do React 19 — decoração de uma tela não engorda o design system global.
+Respeita `prefers-reduced-motion`.
+
+---
+
+## Item 21 — 🔴 CORRIGIDO: o middleware bloquearia a integração inteira em produção
+
+**Descoberto em 09/09/2026**, ao construir a tela. É o defeito mais grave desta frente, e o
+mais fácil de não ver.
+
+**O problema.** O middleware do Clerk protege tudo por padrão, e seu matcher declara
+_"sempre roda para API routes"_. Nem `/cadastro/{token}` nem **`/api/chatpro/*`** estavam na
+lista de rotas públicas (`middleware.ts:16-45`).
+
+| quem                  | o que aconteceria em produção                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| o paciente            | clica no link do WhatsApp → cai no **login** → para se cadastrar, precisaria já estar cadastrado |
+| o servidor do ChatPro | chama `/bot-link` → recebe **redirect** → o bot registra falha e transfere para a triagem humana |
+| quem depurasse        | **não veria nada no log da aplicação** — a requisição nunca chega à rota                         |
+
+🔴 **E os 31 testes ao vivo passaram verdes.** O `.env` de desenvolvimento está **sem as chaves
+do Clerk** (`CLERK_SECRET_KEY` e `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` ausentes, medido), e sem
+elas o middleware não bloqueia nada. Nenhuma execução local acusaria: foi preciso **ler** o
+middleware.
+
+**A regra que sai daí:** _teste que passa por ausência de configuração não testou nada._ Mesma
+família do que o greens-corp viveu — 72 horas de log vazio que pareciam "não configurado" e
+eram "o fluxo nunca chegou".
+
+**Corrigido:** `'/cadastro(.*)'` e `'/api/chatpro(.*)'` na lista pública, cada um com o motivo
+escrito ao lado. Não ficam desprotegidos — o token de 64 hex é a credencial do `/cadastro`, e as
+rotas do ChatPro têm autenticação própria (segredo em tempo constante, token no caminho,
+`CRON_SECRET`). Provado por sabotagem, com um caso de **CONTROLE** que fica vermelho se alguém
+"resolver" liberando `/medico`, `/admin` ou `/paciente`.
+
+⚠️ **O que isto sugere e NÃO foi feito:** varrer as demais rotas de API do repositório
+procurando outras que dependam do middleware sem estar na lista — ou que estejam na lista sem
+precisar. É trabalho próprio, fora do escopo desta tarefa, e exige autorização.

@@ -162,6 +162,58 @@ Dois defeitos que só apareceram em produção lá, registrados em
    grava a URL inteira. Nosso código nunca imprime a URL completa (o guarda cobre), mas **o
    nginx/proxy à frente não é código nosso**. Catalogado no `04`.
 
+### 5.4 — 🔴 O defeito mais grave do módulo, achado só em 09/09 ao construir a tela
+
+O middleware do Clerk protege **tudo** por padrão, e seu matcher declara explicitamente
+_"sempre roda para API routes"_. Nem `/cadastro/{token}` nem **`/api/chatpro/*`** estavam na
+lista de rotas públicas. Em produção isso significaria:
+
+| quem                  | o que aconteceria                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------- |
+| o paciente            | clica no link do WhatsApp → cai na tela de **login** → e para se cadastrar precisaria já estar cadastrado |
+| o servidor do ChatPro | chama `/bot-link` → recebe **redirect** → o bot registra falha e transfere para triagem                   |
+| quem for depurar      | **não vê nada no log**, porque a requisição nunca chega à rota                                            |
+
+🔴 **E os 31 testes ao vivo passaram verdes.** O `.env` de desenvolvimento está **sem as
+chaves do Clerk**, e sem elas o middleware não bloqueia coisa alguma. Nenhuma execução local
+acusaria — foi preciso **ler** o middleware.
+
+**A regra que sai daí, e vale muito além deste módulo:** _teste que passa por ausência de
+configuração não testou nada._ É a mesma família do que o greens-corp viveu com as 72 horas de
+log vazio que pareciam "não configurado" e eram "o fluxo nunca chegou".
+
+**Corrigido** com as duas rotas na lista pública — e elas não ficam desprotegidas: o token de
+64 hex é a credencial do `/cadastro`, e as rotas do ChatPro têm autenticação própria (segredo
+em tempo constante, token no caminho, `CRON_SECRET`). O guarda
+`cadastro-por-link-abre-sem-conta` fixa as duas, **e tem um caso de CONTROLE** que fica
+vermelho se alguém "resolver" liberando `/medico`, `/admin` ou `/paciente`.
+
+### 5.5 — A tela do cadastro passou a ser nossa (09/09/2026)
+
+A ADR dizia que a tela era da Dryelle. O dono decidiu que **nós a construímos**, e definiu os
+campos: nome, CPF, telefone, e-mail, senha, e a pergunta _"já faz tratamento?"_ com caixa de
+texto quando a resposta é sim. O contrato em
+`docs/chatpro/CONTRATO-DA-PAGINA-DE-CADASTRO.md` continua valendo — virou a descrição do que
+foi construído.
+
+**Três decisões que saíram daí:**
+
+- **D-09 — o e-mail é o login, e a senha é do paciente.** A conta nasce no Clerk pelo próprio
+  navegador, com confirmação por código de 6 dígitos. **Rejeitado: criar conta sem
+  verificar o e-mail** — é por ele que chegam consulta e prescrição, e um endereço digitado
+  errado só apareceria quando algo importante não chegasse.
+- **D-10 — a ficha clínica só é gravada DEPOIS da sessão existir.** Invertido, uma falha na
+  verificação deixaria no banco um paciente **sem dono**, invisível para ele e para o médico.
+  Do jeito atual, falhar não deixa resíduo: o link continua válido.
+- **D-11 — "já faz tratamento" tem TRÊS estados**: sim, não e **não informado**. Um
+  `notNull().default(false)` afirmaria "não faz tratamento" sobre quem se cadastrou por outro
+  caminho e nunca respondeu — e é justamente essa resposta que muda a conduta do médico na
+  primeira consulta. **Rejeitado: boolean obrigatório com default.**
+
+E o destino, decidido pelo dono: **agendar a teleconsulta**. O link serve os dois negócios —
+_"o WhatsApp da Greens vai enviar o link que criaremos da BeHemp"_ — então a tela é uma só,
+aqui, com a identidade da BeHemp.
+
 **Fontes.** Primárias lidas: `greens-corp-backend/docs/chatpro/{HERANCA-CHATPRO-DAVI-DRYELLE,
 MAPA-DE-CAMPOS,COMO-CONFIGURAR-NO-PAINEL,CONTRATO-API}.md` e `docs/adr/ADR-0001..0005` de lá —
 integração **em produção, provada ponta a ponta em 08/09/2026**. Mapeamento de campos **medido

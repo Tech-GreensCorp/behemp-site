@@ -514,13 +514,13 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 
 **O que falta, e é do dono, não do código:**
 
-| #   | pendência                                                                                                                 | dono              | bloqueia                                |
-| --- | ------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------- |
-| 1   | Configurar o painel do ChatPro — guia pronto em [`COMO-CONECTAR-NO-PAINEL.md`](chatpro/COMO-CONECTAR-NO-PAINEL.md)        | dono              | o link chegar ao paciente               |
-| 2   | A tela `/cadastro/{token}` — contrato em [`CONTRATO-DA-PAGINA-DE-CADASTRO.md`](chatpro/CONTRATO-DA-PAGINA-DE-CADASTRO.md) | **Dryelle**       | o paciente concluir o cadastro          |
-| 3   | Ligar o cron de `/api/chatpro/processar`                                                                                  | dono/deploy       | o funil se mover (nada se perde até lá) |
-| 4   | Migration `0026` no Neon — só rodou no Postgres **local**                                                                 | deploy            | tudo, em produção                       |
-| 5   | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                 | chefia + jurídico | operação com paciente real              |
+| #        | pendência                                                                                                                                                                                        | dono              | bloqueia                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | --------------------------------------- |
+| 1        | Configurar o painel do ChatPro — guia pronto em [`COMO-CONECTAR-NO-PAINEL.md`](chatpro/COMO-CONECTAR-NO-PAINEL.md)                                                                               | dono              | o link chegar ao paciente               |
+| ~~2~~ ✅ | A tela `/cadastro/{token}` — **construída em 09/09/2026** por decisão do dono: nome, CPF, telefone, e-mail, senha e a pergunta sobre tratamento em curso. Fica em `app/(auth)/cadastro/[token]/` | —                 | —                                       |
+| 3        | Ligar o cron de `/api/chatpro/processar`                                                                                                                                                         | dono/deploy       | o funil se mover (nada se perde até lá) |
+| 4        | Migration `0026` no Neon — só rodou no Postgres **local**                                                                                                                                        | deploy            | tudo, em produção                       |
+| 5        | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                                                                                        | chefia + jurídico | operação com paciente real              |
 
 ### Trabalho próprio que precede itens da lista
 

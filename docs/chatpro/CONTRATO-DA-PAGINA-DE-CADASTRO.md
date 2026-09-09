@@ -1,7 +1,14 @@
 # O contrato da página `/cadastro/{token}` — para quem constrói a tela
 
-> **Para a Dryelle.** O backend do link único está pronto e testado. Este documento é tudo o que
-> a página precisa saber — **não é necessário ler o código da integração** para construí-la.
+> 🔴 **ATUALIZADO EM 09/09/2026 — a tela foi construída por nós**, por decisão do dono. O
+> documento deixou de ser especificação para quem ia construir e passou a descrever **o que
+> existe no disco**: `app/(auth)/cadastro/[token]/`.
+>
+> O que a tela pede: **nome completo · CPF · telefone · e-mail · senha** e a pergunta
+> _"já faz tratamento com cannabis medicinal?"_, com caixa de texto quando a resposta é sim.
+> Ao concluir, o paciente vai **agendar a teleconsulta** — que é o motivo de ele estar ali.
+>
+> O mesmo link serve os dois negócios: o WhatsApp da Greens envia este endereço da BeHemp.
 >
 > O caminho é configurável por `CHATPRO_CADASTRO_PATH` (hoje `/cadastro`). Se a tela ficar em
 > outro caminho, muda-se a variável e o bot passa a montar o link novo — **sem alterar código**.

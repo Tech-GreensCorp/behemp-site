@@ -129,6 +129,10 @@ criar conta nem procurar onde enviar cada documento.
 consegue confirmar quem é o paciente. "Falhar" aqui significa "um humano assume", não "o paciente
 fica sem resposta".
 
+ℹ️ **A tela de destino já existe** — `/cadastro/{token}`, construída em 09/09/2026. O link do
+bot leva direto a ela, com nome, e-mail e telefone pré-preenchidos. Ela pede o que falta (CPF,
+senha e a pergunta sobre tratamento em curso) e termina no agendamento da teleconsulta.
+
 ## Passo 5 · Cadastrar o webhook
 
 `Configurações → Desenvolvedor` → Webhook
