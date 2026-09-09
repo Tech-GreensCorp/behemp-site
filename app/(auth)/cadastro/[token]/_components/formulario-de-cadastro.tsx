@@ -116,6 +116,19 @@ export function FormularioDeCadastro({
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
 
+  /**
+   * O Clerk normalmente carrega em menos de um segundo. Passados oito, ou a chave
+   * pública não está configurada no ambiente, ou a rede do paciente não alcança o
+   * serviço. Nos dois casos ele precisa ouvir isso — em vez de encarar um botão
+   * "Preparando…" que nunca muda.
+   */
+  const [demorouParaCarregar, setDemorouParaCarregar] = useState(false);
+  useEffect(() => {
+    if (isLoaded) return;
+    const t = setTimeout(() => setDemorouParaCarregar(true), 8000);
+    return () => clearTimeout(t);
+  }, [isLoaded]);
+
   const campoCodigo = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (etapa === 'codigo') campoCodigo.current?.focus();
@@ -492,14 +505,29 @@ export function FormularioDeCadastro({
             </Secao>
 
             {erro && <Aviso texto={erro} />}
+            {demorouParaCarregar && !isLoaded && (
+              <Aviso texto="O serviço de contas não respondeu. Recarregue a página — se continuar assim, fale com a gente pelo WhatsApp." />
+            )}
 
             <div className="space-y-4">
               <Button
                 type="submit"
-                disabled={carregando || !podeEnviar}
+                /*
+                  🔴 `!isLoaded` ENTRA NO DISABLED, e não só no early-return do handler.
+                  Sem isto o botão fica clicável enquanto o Clerk não terminou de carregar
+                  — o paciente clica, nada acontece, e ele conclui que o site está quebrado.
+                  Um clique sem resposta é pior que um botão desabilitado, porque não diz
+                  que está esperando.
+                */
+                disabled={!isLoaded || carregando || !podeEnviar}
                 className="h-12 w-full rounded-xl text-base transition-transform duration-200 active:scale-[0.985]"
               >
-                {carregando ? (
+                {!isLoaded ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Preparando…
+                  </>
+                ) : carregando ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
                     Criando sua conta…
