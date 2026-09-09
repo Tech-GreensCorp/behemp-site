@@ -127,6 +127,55 @@
       "when": 1786562563276,
       "tag": "0017_nosy_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787568481228,
+      "tag": "0018_nifty_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787575588750,
+      "tag": "0019_cheerful_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787581132843,
+      "tag": "0020_free_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787581582831,
+      "tag": "0021_motionless_madelyne_pryor",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787581642831,
+      "tag": "0022_reconciliar_medico_ordem",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787600542856,
+      "tag": "0023_wise_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787673293164,
+      "tag": "0024_strong_komodo",
+      "breakpoints": true
     }
   ]
 }

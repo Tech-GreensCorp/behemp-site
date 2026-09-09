@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import {
+  Brain,
   LayoutDashboard,
   Route,
   Users,
@@ -15,6 +16,7 @@ import {
   Menu,
   MessageSquare,
   Calendar,
+  Pill,
   User,
   Video,
 } from 'lucide-react';
@@ -42,6 +44,12 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Triagem', href: '/medico/triagem', icon: FileCheck },
       { label: 'Agendamento', href: '/medico/agenda', icon: Calendar },
       { label: 'Teleconsulta', href: '/medico/teleconsulta', icon: Video },
+      // Sprint 2 (20/08/2026) — a casa do módulo de IA clínica. Fica em Atendimento porque é
+      // onde o médico decide, não em ferramenta separada. `DO-11` + nome escolhido pelo dono.
+      { label: 'IA Clínica', href: '/medico/ia-clinica', icon: Brain },
+      // Sprint 5 (24/08/2026) — a visão GERAL da conduta e titulação. É o *filtro* do `DO-44`
+      // (c); a visão padrão continua sendo a do paciente, na aba do prontuário.
+      { label: 'Titulação', href: '/medico/titulacao', icon: Pill },
     ],
   },
   {
