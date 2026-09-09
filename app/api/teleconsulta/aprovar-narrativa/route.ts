@@ -1,38 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
-import { evolucoes, users, medicos, teleconsultas } from '@/db/schema';
+import { evolucoes, teleconsultas } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { garantirDonoDaSala } from '@/lib/auth/escopo-sala';
+import { registrarAuditoria } from '@/lib/utils/audit';
+
+// 🔴 CORRIGIDO EM 20/08/2026 — Item 11 de docs/04-LISTA-DE-AFAZERES.md.
+// Antes, este handler recebia `pacienteId` DO BODY e inseria uma evolução clínica com ele,
+// conferindo apenas que o autor era *algum* médico. Ou seja: qualquer médico escrevia
+// evolução clínica, com texto livre, no prontuário de qualquer paciente. Sem Zod e sem
+// auditoria. Agora o paciente é derivado DA SALA, e a sala tem de ser do médico logado.
+
+const corpoSchema = z.object({
+  salaId: z.string().min(1).max(64),
+  narrativaAprovada: z.string().min(1).max(50_000),
+});
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ erro: 'Não autenticado' }, { status: 401 });
+  let bruto: unknown;
+  try {
+    bruto = await request.json();
+  } catch {
+    return NextResponse.json({ erro: 'Corpo inválido' }, { status: 400 });
+  }
 
-  const { salaId, narrativaAprovada, pacienteId, consultaId } = await request.json();
+  const parsed = corpoSchema.safeParse(bruto);
+  if (!parsed.success) {
+    return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
+  }
+  const { salaId, narrativaAprovada } = parsed.data;
 
-  // Buscar médico
-  const [user] = await db.select({ id: users.id })
-    .from(users).where(eq(users.clerkId, userId)).limit(1);
-  if (!user) return NextResponse.json({ erro: 'Não autorizado' }, { status: 403 });
+  // Escopo de objeto: a sala tem de ser deste médico.
+  const escopo = await garantirDonoDaSala({ salaId });
+  if (!escopo.ok) {
+    return NextResponse.json({ erro: escopo.erro }, { status: escopo.status });
+  }
 
-  const [medico] = await db.select({ id: medicos.id })
-    .from(medicos).where(eq(medicos.userId, user.id)).limit(1);
-  if (!medico) return NextResponse.json({ erro: 'Médico não encontrado' }, { status: 403 });
+  // Aprovar narrativa é ato clínico assinado: só o médico da consulta o pratica. Admin
+  // administra a plataforma, não assina evolução no prontuário.
+  if (escopo.sala.papel !== 'medico') {
+    return NextResponse.json({ erro: 'Apenas o médico da consulta pode aprovar' }, { status: 403 });
+  }
 
-  // Salvar como evolução clínica (tipo: positiva por padrão)
-  await db.insert(evolucoes).values({
-    pacienteId,
-    criadoPor: medico.id,
-    data: new Date().toISOString(),
-    conteudo: `[NARRATIVA IA - APROVADA PELO MÉDICO]\n\n${narrativaAprovada}`,
-    tipo: 'positiva',
+  // pacienteId e medicoId vêm DA SALA — nunca do cliente.
+  const [evolucao] = await db
+    .insert(evolucoes)
+    .values({
+      pacienteId: escopo.sala.pacienteId,
+      criadoPor: escopo.sala.medicoId,
+      data: new Date().toISOString(),
+      conteudo: `[NARRATIVA IA - APROVADA PELO MÉDICO]\n\n${narrativaAprovada}`,
+      tipo: 'positiva',
+    })
+    .returning();
+
+  // Comportamento preservado da versão anterior: aprovar a narrativa encerra a sala.
+  // ⚠️ É efeito colateral não óbvio — o comentário original dizia "Ajustado para atualizar
+  // algum campo válido", o que indica intenção perdida. Mudar isso é regra de negócio, e
+  // está catalogado, não decidido aqui.
+  await db
+    .update(teleconsultas)
+    .set({ status: 'encerrada' })
+    .where(eq(teleconsultas.id, escopo.sala.salaId));
+
+  // Auditoria com QUEM e de onde — via o helper que o resto do repositório já usa.
+  await registrarAuditoria({
+    userId: escopo.sala.userId,
+    acao: 'criar',
+    entidade: 'evolucoes',
+    entidadeId: evolucao?.id,
+    dadosDepois: { origem: 'narrativa-ia-aprovada', teleconsultaId: escopo.sala.salaId },
   });
-
-  // Atualizar transcrição como aprovada
-  await db.update(teleconsultas)
-    .set({ status: 'encerrada' }) // Ajustado para atualizar algum campo válido
-    .where(eq(teleconsultas.id, salaId))
-    .catch(() => {});
 
   return NextResponse.json({ sucesso: true });
 }

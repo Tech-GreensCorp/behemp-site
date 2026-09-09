@@ -40,6 +40,13 @@ const envSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email().optional(),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
 
+  // ── Retransmissão de mídia da teleconsulta (Cloudflare Realtime TURN) ──
+  // Escolhido pelo dono em 20/08/2026 (Item 8 do 04-LISTA-DE-AFAZERES). Opcionais de
+  // propósito: sem elas, a videochamada usa só STUN e o cliente avisa que não há
+  // retransmissão — em vez de cair no relay público de terceiro que havia antes.
+  CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
+  CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
+
   // ── Chat em Tempo Real (Pusher) ───────────────────────────────
   NEXT_PUBLIC_PUSHER_KEY: z.string().optional(),
   NEXT_PUBLIC_PUSHER_CLUSTER: z.string().optional(),

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { teleconsultas, transcricoes, logsAuditoria } from '@/db/schema';
 import { verificarMedico } from '@/lib/auth/permissions';
+import { garantirDonoDaSala } from '@/lib/auth/escopo-sala';
+import { registrarAuditoria } from '@/lib/utils/audit';
 import { redirect } from 'next/navigation';
 import { eq, and, isNull } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -55,27 +57,42 @@ export async function criarSalaTeleconsulta(consultaId?: string) {
 }
 
 // Registrar consentimento LGPD
+// 🔴 CORRIGIDO EM 20/08/2026 — Item 11 de docs/04-LISTA-DE-AFAZERES.md. `verificarMedico`
+// autoriza o PAPEL; o `where` aceitava qualquer `salaId`, então um médico alterava o
+// consentimento LGPD de sala alheia. Agora o escopo do objeto é verificado.
 export async function registrarConsentimentoLgpd(salaId: string, aceite: boolean) {
-  const perm = await verificarMedico();
-  if (!perm.autorizado) redirect('/entrar');
+  const escopo = await garantirDonoDaSala({ salaId });
+  if (!escopo.ok) return { sucesso: false, erro: escopo.erro };
+  if (escopo.sala.papel !== 'medico') {
+    return { sucesso: false, erro: 'Apenas o médico da consulta registra o consentimento' };
+  }
 
   await db.update(teleconsultas)
     .set({ consentimentoLgpd: aceite, consentimentoEm: new Date() })
-    .where(eq(teleconsultas.id, salaId));
+    .where(eq(teleconsultas.id, escopo.sala.salaId));
 
-  await db.insert(logsAuditoria).values({
-    acao: aceite ? 'LGPD_ACEITE' : 'LGPD_RECUSA',
+  // Auditoria com QUEM e de onde, pelo helper que o resto do repositório já usa. Antes era
+  // insert direto sem `userId`, e com `.catch(() => {})` — registro que podia nunca nascer.
+  await registrarAuditoria({
+    userId: escopo.sala.userId,
+    acao: 'atualizar',
     entidade: 'teleconsultas',
-    entidadeId: salaId,
-  }).catch(() => {});
+    entidadeId: escopo.sala.salaId,
+    dadosDepois: { consentimentoLgpd: aceite },
+  });
 
   return { sucesso: true };
 }
 
 // Encerrar teleconsulta e salvar duração
+// 🔴 CORRIGIDO EM 20/08/2026 — Item 11. Sem escopo de objeto, qualquer médico encerrava a
+// consulta de outro e marcava a consulta vinculada como `realizada`.
 export async function encerrarTeleconsulta(salaId: string, duracaoSegundos: number) {
-  const perm = await verificarMedico();
-  if (!perm.autorizado) redirect('/entrar');
+  const escopo = await garantirDonoDaSala({ salaId });
+  if (!escopo.ok) return { sucesso: false, erro: escopo.erro };
+  if (escopo.sala.papel !== 'medico') {
+    return { sucesso: false, erro: 'Apenas o médico da consulta pode encerrar' };
+  }
 
   // 1. Atualizar teleconsulta → encerrada
   await db.update(teleconsultas)
@@ -84,7 +101,7 @@ export async function encerrarTeleconsulta(salaId: string, duracaoSegundos: numb
       encerradaEm: new Date(),
       duracaoSegundos,
     })
-    .where(eq(teleconsultas.id, salaId));
+    .where(eq(teleconsultas.id, escopo.sala.salaId));
 
   // 2. CORREÇÃO SPRINT 4: atualizar consulta vinculada → realizada
   // Buscar consultaId da teleconsulta
@@ -127,12 +144,14 @@ export async function encerrarTeleconsulta(salaId: string, duracaoSegundos: numb
     }
   }
 
-  // 4. Log de auditoria
-  await db.insert(logsAuditoria).values({
-    acao: 'ENCERRAR',
+  // 4. Log de auditoria — com autor e IP
+  await registrarAuditoria({
+    userId: escopo.sala.userId,
+    acao: 'atualizar',
     entidade: 'teleconsultas',
-    entidadeId: salaId,
-  }).catch(() => {});
+    entidadeId: escopo.sala.salaId,
+    dadosDepois: { status: 'encerrada', duracaoSegundos },
+  });
 
   revalidatePath('/medico/agenda');
   revalidatePath('/medico/consultas');

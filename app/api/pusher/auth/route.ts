@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { autenticarCanal } from '@/lib/integrations/pusher';
+import { garantirDonoDaSala } from '@/lib/auth/escopo-sala';
 import { db } from '@/lib/db';
 import { users, participantesGrupo } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
+
+/** Canal literal da fila de espera — não é o código de uma sala. */
+const CANAL_SALA_DE_ESPERA = 'presence-sala-espera';
 
 /**
  * Endpoint de autenticação do Pusher.
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar userId do banco a partir do clerkId
     const [user] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, role: users.role })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
@@ -67,18 +71,41 @@ export async function POST(request: NextRequest) {
       if (!participante) {
         return NextResponse.json({ erro: 'Acesso negado ao grupo' }, { status: 403 });
       }
-    } else if (canal.startsWith('presence-sala-')) {
-      // Para teleconsulta ou sala de espera virtual (presence channels exigem presenceData)
+    } else if (canal === CANAL_SALA_DE_ESPERA) {
+      // Sala de espera virtual: é a lista de quem está aguardando, e quem a consome é o
+      // médico (app/(medico)/medico/teleconsulta/page.tsx). Paciente não entra aqui — veria
+      // a presença de outros pacientes.
+      // ⚠️ Este ramo vem ANTES do de teleconsulta de propósito: 'espera' tem 6 caracteres,
+      // o mesmo tamanho de um roomId, e seria tratado como código de sala.
+      if (user.role !== 'medico' && user.role !== 'admin') {
+        return NextResponse.json({ erro: 'Acesso negado' }, { status: 403 });
+      }
       const presenceData = {
         user_id: user.id,
-        user_info: { id: user.id, clerkId }
+        user_info: { id: user.id, clerkId },
       };
-      const authResponse = autenticarCanal(socketId, canal, presenceData);
-      return NextResponse.json(authResponse);
+      return NextResponse.json(autenticarCanal(socketId, canal, presenceData));
+    } else if (canal.startsWith('presence-sala-')) {
+      // Canal de uma teleconsulta específica. 🔴 Até 20/08/2026 este ramo autorizava
+      // QUALQUER usuário autenticado em QUALQUER sala — e, combinado com
+      // /api/teleconsulta/sinalizar, permitia assistir a consulta médica alheia.
+      // Item 11 de docs/04-LISTA-DE-AFAZERES.md.
+      const roomId = canal.slice('presence-sala-'.length);
+      const escopo = await garantirDonoDaSala({ roomId });
+      if (!escopo.ok) {
+        return NextResponse.json({ erro: escopo.erro }, { status: escopo.status });
+      }
+      const presenceData = {
+        user_id: user.id,
+        user_info: { id: user.id, clerkId },
+      };
+      return NextResponse.json(autenticarCanal(socketId, canal, presenceData));
     }
 
-    const authResponse = autenticarCanal(socketId, canal);
-    return NextResponse.json(authResponse);
+    // 🔴 O DEFAULT NEGA. Até 20/08/2026 este ponto autorizava qualquer nome de canal que
+    // não casasse nenhum prefixo conhecido — fail-open. Canal novo agora precisa de um ramo
+    // com a sua regra de acesso, escrito de propósito.
+    return NextResponse.json({ erro: 'Canal não reconhecido' }, { status: 403 });
   } catch (error) {
     console.error('[Pusher Auth] Erro:', error);
     return NextResponse.json(
