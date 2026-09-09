@@ -66,23 +66,20 @@ export async function iniciarAutorizacaoAnvisa(prescricaoId?: string) {
     prescricao = presc;
   }
 
-  // BLOQUEIO — sem prescrição válida, não pode iniciar
-  if (!prescricao) {
-    return {
-      sucesso: false,
-      erro: 'sem_prescricao',
-      mensagem: 'Você precisa ter uma consulta realizada e uma prescrição emitida pelo seu médico antes de iniciar o processo ANVISA.',
-    };
-  }
+  // Trava de "prescrição obrigatória" removida temporariamente (ajuste urgente de produção).
+  // Sem prescricao, o processo segue com medicoId/prescricaoId nulos — caso de validação
+  // adequado para esse fluxo será tratado separadamente.
 
-  // 4. Verificar se já existe processo em aberto para esta prescrição
+  // 4. Verificar se já existe processo em aberto para esta prescrição (ou, sem prescrição, para o paciente)
   const [existente] = await db
     .select({ id: autorizacoesAnvisa.id, status: autorizacoesAnvisa.status })
     .from(autorizacoesAnvisa)
     .where(
       and(
-        eq(autorizacoesAnvisa.prescricaoId, prescricao.id),
         eq(autorizacoesAnvisa.pacienteId, paciente.id),
+        prescricao
+          ? eq(autorizacoesAnvisa.prescricaoId, prescricao.id)
+          : isNull(autorizacoesAnvisa.prescricaoId),
         isNull(autorizacoesAnvisa.deletedAt),
       ),
     )
@@ -101,8 +98,8 @@ export async function iniciarAutorizacaoAnvisa(prescricaoId?: string) {
     .insert(autorizacoesAnvisa)
     .values({
       pacienteId: paciente.id,
-      medicoId: prescricao.medicoId,
-      prescricaoId: prescricao.id,
+      medicoId: prescricao?.medicoId ?? null,
+      prescricaoId: prescricao?.id ?? null,
       status: 'pendente',
       documentos: checklistInicial,
     })
