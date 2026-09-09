@@ -176,6 +176,20 @@
       "when": 1787673293164,
       "tag": "0024_strong_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788976483630,
+      "tag": "0025_sudden_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788977541235,
+      "tag": "0026_bumpy_red_hulk",
+      "breakpoints": true
     }
   ]
 }

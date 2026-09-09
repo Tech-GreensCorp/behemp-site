@@ -46,3 +46,7 @@ export * from './medidas-desfecho';
 export * from './rastreio-uso-cannabis';
 export * from './revisoes-ia';
 export * from './rascunhos-revisao-ia';
+export * from './solicitacoes-cadastro';
+export * from './chatpro-eventos';
+export * from './chatpro-diretorio';
+export * from './chatpro-sessoes';

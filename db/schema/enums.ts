@@ -283,3 +283,60 @@ export const adesaoRelatadaEnum = pgEnum('adesao_relatada', [
   'interrompeu',
   'nao_iniciou',
 ]);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHATPRO — o paciente que chega pelo WhatsApp (09/09/2026)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * De onde nasceu a solicitação de cadastro.
+ *
+ * Distinguir a origem não é telemetria: é o que permite responder "por que este paciente
+ * não recebeu o link" sem adivinhar. `chatpro_start_nao_verificado` é o caso em que a
+ * identidade do contato NÃO pôde ser confirmada na API do ChatPro — e por isso o nome não
+ * é pré-preenchido no formulário.
+ */
+export const solicitacaoCadastroOrigemEnum = pgEnum('solicitacao_cadastro_origem', [
+  'painel_admin',
+  'chatpro_bot',
+  'chatpro_start',
+  'chatpro_start_nao_verificado',
+  'chatpro_webhook',
+]);
+
+/** Onde a solicitação está. `link_gerado` é o estado em que ela nasce. */
+export const solicitacaoCadastroStatusEnum = pgEnum('solicitacao_cadastro_status', [
+  'link_gerado',
+  'link_acessado',
+  'enviada',
+  'expirada',
+  'cancelada',
+]);
+
+/**
+ * Estado de um evento do webhook na fila.
+ *
+ * `descartado` é diferente de `falhou`: descartado é a decisão deliberada de não processar
+ * (evento fora da janela de tempo, contato não confirmado na API, tipo sem interesse);
+ * falhou é erro nosso, e é reprocessável.
+ */
+export const chatproEventoStatusEnum = pgEnum('chatpro_evento_status', [
+  'pendente',
+  /**
+   * Estado do CLAIM ATÔMICO. Sem ele, duas execuções concorrentes do processador
+   * listam os mesmos pendentes e processam o evento duas vezes — defeito real
+   * observado no greens-corp (armadilha 7), onde 4 etapas de funil foram gravadas
+   * onde deviam existir 3. A transição `pendente -> processando` acontece dentro
+   * de `FOR UPDATE SKIP LOCKED`, então quem perder a corrida simplesmente não vê a linha.
+   */
+  'processando',
+  'processado',
+  'descartado',
+  'falhou',
+]);
+
+/** Os dois catálogos que o ChatPro expõe e que chegam como UUID nos webhooks. */
+export const chatproDiretorioTipoEnum = pgEnum('chatpro_diretorio_tipo', [
+  'departamento',
+  'motivo_encerramento',
+]);

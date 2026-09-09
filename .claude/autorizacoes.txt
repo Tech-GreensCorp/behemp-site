@@ -231,3 +231,40 @@ path:app/(medico)/medico/pacientes/[id]/_components/tab-prescricoes.tsx
 #    O guarda `divergencia-alimenta-o-rag-sem-ingerir` impede que alguém a preencha antes.
 path:db/migrations/0024_strong_komodo.sql
 path:db/migrations/meta/0024_snapshot.json
+
+# ── Autorizado pelo dev Davi em 09/09/2026, integração ChatPro ─────────────────
+# "pode commitar mas ainda não puxe pra main" + "precisamos fazer isso hoje". Gerar a
+# migration das duas tabelas do ChatPro. Aplicada APENAS no Postgres local (localhost:5436),
+# conferido antes; o Neon segue intocado e `pnpm db:migrate` em produção continua exigindo
+# ordem expressa.
+#
+# COMPATIBILIDADE — 100% ADITIVA (grep por DROP/ALTER COLUMN/SET NOT NULL/RENAME = ZERO):
+#   · 3x CREATE TYPE (origem e status da solicitação, status do evento)
+#   · 2x CREATE TABLE — `solicitacoes_cadastro` e `chatpro_eventos`, ambas NOVAS
+#   · 7x índices sobre as tabelas novas
+#   → nenhuma tabela existente é tocada; nada precisa de backfill
+#
+# 🔴 POR QUE UMA TABELA DE LINK NOVA, e não reuso: diferente do greens-corp — onde a ADR-0005
+#    decidiu reusar `MedicationRequest` porque o mecanismo de token JÁ existia — a BeHemp não
+#    tem NENHUMA entidade com token, validade e protocolo (medido: grep por tokenHash/accessUrl
+#    em db/, lib/ e app/ não retorna nada do domínio). Aqui a tabela É o mecanismo, e passa a
+#    ser o único: nenhum outro token de acesso público deve nascer no sistema.
+path:db/migrations/0025_sudden_forge.sql
+path:db/migrations/meta/0025_snapshot.json
+
+# ── Mesma autorização, segunda migration (09/09/2026) ─────────────────────────
+# A 0026 completa o módulo: o processador de eventos precisa do estado intermediário do
+# claim atômico, e da projeção da conversa.
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 1x CREATE TYPE  — `chatpro_diretorio_tipo`
+#   · 1x ALTER TYPE ... ADD VALUE 'processando' — acréscimo a enum, não remove valor algum
+#   · 2x CREATE TABLE — `chatpro_diretorio` e `chatpro_sessoes`, ambas NOVAS
+#   · 1x FK de `chatpro_sessoes.solicitacao_id` → `solicitacoes_cadastro.id` (ON DELETE SET NULL,
+#        aponta para tabela criada na 0025; nenhuma tabela pré-existente é referenciada)
+#   · 4x índices sobre as tabelas novas
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0025_sudden_forge.sql
+path:db/migrations/0026_bumpy_red_hulk.sql
+path:db/migrations/meta/0025_snapshot.json
+path:db/migrations/meta/0026_snapshot.json
