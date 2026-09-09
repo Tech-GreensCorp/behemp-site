@@ -1,0 +1,551 @@
+{
+  "grafo": {
+    "dominio": "teleconsulta",
+    "urgencia": "vermelho",
+    "confianca": 78,
+    "parcial": false,
+    "tituloPrincipal": "Síndrome coronariana aguda (SCA / IAM)",
+    "sindrome": {
+      "titulo": "Síndrome coronariana aguda (dor torácica anginosa em esforço)"
+    },
+    "achados": [
+      {
+        "id": "ach-1",
+        "titulo": "Dor torácica em aperto com irradiação para MSE + sudores…",
+        "resumo": "Dor torácica em aperto com irradiação para MSE + sudorese fria — suspeita de síndrome coronariana aguda, risco de infarto agudo do miocárdio",
+        "proveniencia": "red_flag",
+        "dominio": "alarme",
+        "ancoraSecao": "panorama-red-flags",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga"
+      },
+      {
+        "id": "ach-2",
+        "titulo": "Encaminhamento imediato: eletrocardiograma e avaliação p…",
+        "resumo": "Encaminhamento imediato: eletrocardiograma e avaliação presencial urgentes",
+        "proveniencia": "red_flag",
+        "dominio": "alarme",
+        "ancoraSecao": "panorama-red-flags",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      },
+      {
+        "id": "ach-3",
+        "titulo": "dor torácica em aperto irradiada para o membro superior…",
+        "resumo": "dor torácica em aperto irradiada para o membro superior esquerdo",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "ftlcx7"
+      },
+      {
+        "id": "ach-4",
+        "titulo": "desencadeada por esforço (subir escada)",
+        "resumo": "desencadeada por esforço (subir escada)",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1f2snb3"
+      },
+      {
+        "id": "ach-5",
+        "titulo": "sudorese fria e dispneia associadas",
+        "resumo": "sudorese fria e dispneia associadas",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1fvwf6z"
+      },
+      {
+        "id": "ach-6",
+        "titulo": "náusea associada",
+        "resumo": "náusea associada",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1l98gf5"
+      },
+      {
+        "id": "ach-7",
+        "titulo": "fatores de risco: hipertensão, diabetes e tabagismo de l…",
+        "resumo": "fatores de risco: hipertensão, diabetes e tabagismo de longa data",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1b5ujlq"
+      },
+      {
+        "id": "ach-8",
+        "titulo": "dor torácica intensa de início recente",
+        "resumo": "dor torácica intensa de início recente",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fa1otst"
+      },
+      {
+        "id": "ach-9",
+        "titulo": "paciente hipertenso",
+        "resumo": "paciente hipertenso",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f17bfefq"
+      },
+      {
+        "id": "ach-10",
+        "titulo": "desconforto retroesternal",
+        "resumo": "desconforto retroesternal",
+        "proveniencia": "episodio_atual",
+        "dominio": "evidencia",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fxwvfps"
+      }
+    ],
+    "hipoteses": [
+      {
+        "id": "hip-1",
+        "slot": 1,
+        "titulo": "Síndrome coronariana aguda (SCA / IAM)",
+        "cid": "I24.9",
+        "probabilidade": 78,
+        "dont_miss": true,
+        "gravidade": "critica",
+        "ancoraSecao": "panorama-hipoteses"
+      },
+      {
+        "id": "hip-2",
+        "slot": 2,
+        "titulo": "Dissecção aórtica",
+        "cid": "I71.0",
+        "probabilidade": 12,
+        "dont_miss": true,
+        "gravidade": "critica",
+        "ancoraSecao": "panorama-hipoteses"
+      },
+      {
+        "id": "hip-3",
+        "slot": 3,
+        "titulo": "Doença do refluxo gastroesofágico",
+        "cid": "K21.9",
+        "probabilidade": 8,
+        "gravidade": "baixa",
+        "ancoraSecao": "panorama-hipoteses"
+      }
+    ],
+    "arestas": [
+      {
+        "de": "ach-1",
+        "para": "sindrome",
+        "tipo": "lacuna",
+        "rotulo": "Alarme",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga"
+      },
+      {
+        "de": "ach-2",
+        "para": "sindrome",
+        "tipo": "lacuna",
+        "rotulo": "Alarme",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      },
+      {
+        "de": "sindrome",
+        "para": "hip-1",
+        "tipo": "sindrome",
+        "fonte_campo": "sindrome_principal",
+        "fonte_id": "fwdv3rg"
+      },
+      {
+        "de": "sindrome",
+        "para": "hip-2",
+        "tipo": "sindrome",
+        "fonte_campo": "sindrome_principal",
+        "fonte_id": "fwdv3rg"
+      },
+      {
+        "de": "sindrome",
+        "para": "hip-3",
+        "tipo": "sindrome",
+        "fonte_campo": "sindrome_principal",
+        "fonte_id": "fwdv3rg"
+      },
+      {
+        "de": "ach-3",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "ftlcx7"
+      },
+      {
+        "de": "ach-4",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1f2snb3"
+      },
+      {
+        "de": "ach-5",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1fvwf6z"
+      },
+      {
+        "de": "ach-6",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1l98gf5"
+      },
+      {
+        "de": "ach-7",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1b5ujlq"
+      },
+      {
+        "de": "ach-8",
+        "para": "hip-2",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fa1otst"
+      },
+      {
+        "de": "ach-9",
+        "para": "hip-2",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f17bfefq"
+      },
+      {
+        "de": "ach-10",
+        "para": "hip-3",
+        "tipo": "suporta",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fxwvfps"
+      },
+      {
+        "de": "ach-1",
+        "para": "hip-3",
+        "tipo": "lacuna",
+        "rotulo": "Não explicado",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga"
+      },
+      {
+        "de": "ach-2",
+        "para": "hip-1",
+        "tipo": "lacuna",
+        "rotulo": "Não explicado",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      },
+      {
+        "de": "ach-2",
+        "para": "hip-2",
+        "tipo": "lacuna",
+        "rotulo": "Não explicado",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      },
+      {
+        "de": "ach-2",
+        "para": "hip-3",
+        "tipo": "lacuna",
+        "rotulo": "Não explicado",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      },
+      {
+        "de": "auditor",
+        "para": "hip-1",
+        "tipo": "auditor",
+        "fonte_campo": "avaliacao_seguranca",
+        "fonte_id": "f11ohlmq"
+      }
+    ],
+    "auditor": {
+      "titulo": "Auditor de segurança",
+      "resumo": "Internação ou urgência indicada",
+      "detalhes": [
+        "Internação ou urgência indicada",
+        "Quadro compatível com SCA em paciente de alto risco cardiovascular; conduta tempo-dependente."
+      ]
+    },
+    "conduta": {
+      "exames": [
+        "Eletrocardiograma (ECG) de 12 derivações — Estratificação imediata de SCA (supra/infra de ST)",
+        "Troponina de alta sensibilidade (curva) — Confirma injúria miocárdica",
+        "Radiografia de tórax — Diferencial (dissecção, congestão)"
+      ],
+      "proximoPassoHitl": "Selecione a hipótese clínica e clique em Revisar prescrição"
+    },
+    "alertasOcultos": [],
+    "schema_version": "1.0.4-s13",
+    "timeline": [
+      {
+        "ordem": 1,
+        "evento": "Dor torácica em aperto com irradiação para MSE + sudorese fria — suspeita de síndrome coronariana aguda, risco de infarto agudo do miocárdio",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga",
+        "impacto_hipoteses": {
+          "hip-3": "lacuna"
+        }
+      },
+      {
+        "ordem": 2,
+        "evento": "Encaminhamento imediato: eletrocardiograma e avaliação presencial urgentes",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh",
+        "impacto_hipoteses": {
+          "hip-1": "lacuna",
+          "hip-2": "lacuna",
+          "hip-3": "lacuna"
+        }
+      },
+      {
+        "ordem": 3,
+        "evento": "dor torácica em aperto irradiada para o membro superior esquerdo",
+        "fonte_campo": "evidencias",
+        "fonte_id": "ftlcx7",
+        "impacto_hipoteses": {
+          "hip-1": "reforca"
+        }
+      },
+      {
+        "ordem": 4,
+        "evento": "desencadeada por esforço (subir escada)",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1f2snb3",
+        "impacto_hipoteses": {
+          "hip-1": "reforca"
+        }
+      },
+      {
+        "ordem": 5,
+        "evento": "sudorese fria e dispneia associadas",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1fvwf6z",
+        "impacto_hipoteses": {
+          "hip-1": "reforca"
+        }
+      },
+      {
+        "ordem": 6,
+        "evento": "náusea associada",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1l98gf5",
+        "impacto_hipoteses": {
+          "hip-1": "reforca"
+        }
+      },
+      {
+        "ordem": 7,
+        "evento": "fatores de risco: hipertensão, diabetes e tabagismo de longa data",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f1b5ujlq",
+        "impacto_hipoteses": {
+          "hip-1": "reforca"
+        }
+      },
+      {
+        "ordem": 8,
+        "evento": "dor torácica intensa de início recente",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fa1otst",
+        "impacto_hipoteses": {
+          "hip-2": "reforca"
+        }
+      },
+      {
+        "ordem": 9,
+        "evento": "paciente hipertenso",
+        "fonte_campo": "evidencias",
+        "fonte_id": "f17bfefq",
+        "impacto_hipoteses": {
+          "hip-2": "reforca"
+        }
+      },
+      {
+        "ordem": 10,
+        "evento": "desconforto retroesternal",
+        "fonte_campo": "evidencias",
+        "fonte_id": "fxwvfps",
+        "impacto_hipoteses": {
+          "hip-3": "reforca"
+        }
+      }
+    ],
+    "achados_inconclusivos": [
+      {
+        "texto": "Dor torácica em aperto com irradiação para MSE + sudorese fria — suspeita de síndrome coronariana aguda, risco de infarto agudo do miocárdio",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga",
+        "hipoteses_afetadas": ["hip-3"]
+      },
+      {
+        "texto": "Encaminhamento imediato: eletrocardiograma e avaliação presencial urgentes",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh",
+        "hipoteses_afetadas": ["hip-1", "hip-2", "hip-3"]
+      }
+    ],
+    "completude": {
+      "nivel": "parcial",
+      "inconclusivos": 2,
+      "red_flags_nao_explicadas": 2,
+      "motivos": [
+        "2 achado(s) sem suporta/contradiz definido",
+        "2 sinal(is) de alarme sem hipótese que explique"
+      ]
+    },
+    "salvaguardas_deterministicas": []
+  },
+  "blocos": [
+    {
+      "locutor": "Médico",
+      "texto": "Bom dia, o que o senhor está sentindo?",
+      "inicio_s": 3,
+      "fim_s": 6
+    },
+    {
+      "locutor": "Paciente",
+      "texto": "Doutor, tô sentindo um aperto no peito que vai pro braço esquerdo desde ontem à noite.",
+      "inicio_s": 7,
+      "fim_s": 14
+    },
+    {
+      "locutor": "Médico",
+      "texto": "Esse aperto apareceu fazendo algum esforço?",
+      "inicio_s": 15,
+      "fim_s": 18
+    },
+    {
+      "locutor": "Paciente",
+      "texto": "Apareceu quando subi a escada, e junto vem um suor frio e uma falta de ar.",
+      "inicio_s": 19,
+      "fim_s": 26
+    },
+    {
+      "locutor": "Paciente",
+      "texto": "Eu tenho pressão alta, sou diabético e fumo já faz uns trinta anos.",
+      "inicio_s": 27,
+      "fim_s": 34
+    },
+    {
+      "locutor": "Médico",
+      "texto": "O senhor sente enjoo, vontade de vomitar?",
+      "inicio_s": 35,
+      "fim_s": 38
+    },
+    {
+      "locutor": "Paciente",
+      "texto": "Sinto sim, um enjoo. Não tive febre nenhuma.",
+      "inicio_s": 39,
+      "fim_s": 43
+    }
+  ],
+  "analiseIA": {
+    "nivel_urgencia": "vermelho",
+    "sindrome_principal": "Síndrome coronariana aguda (dor torácica anginosa em esforço)",
+    "diagnostico_provavel": "Síndrome coronariana aguda (SCA)",
+    "confianca": 78,
+    "hipoteses_ranqueadas": [
+      {
+        "slot": 1,
+        "titulo": "Síndrome coronariana aguda (SCA / IAM)",
+        "cid": "I24.9",
+        "probabilidade": 78,
+        "gravidade": "critica",
+        "dont_miss": true,
+        "confianca_evidencia": "alta",
+        "evidencias": [
+          "dor torácica em aperto irradiada para o membro superior esquerdo",
+          "desencadeada por esforço (subir escada)",
+          "sudorese fria e dispneia associadas",
+          "náusea associada",
+          "fatores de risco: hipertensão, diabetes e tabagismo de longa data"
+        ]
+      },
+      {
+        "slot": 2,
+        "titulo": "Dissecção aórtica",
+        "cid": "I71.0",
+        "probabilidade": 12,
+        "gravidade": "critica",
+        "dont_miss": true,
+        "confianca_evidencia": "baixa",
+        "evidencias": ["dor torácica intensa de início recente", "paciente hipertenso"]
+      },
+      {
+        "slot": 3,
+        "titulo": "Doença do refluxo gastroesofágico",
+        "cid": "K21.9",
+        "probabilidade": 8,
+        "gravidade": "baixa",
+        "confianca_evidencia": "baixa",
+        "evidencias": ["desconforto retroesternal"]
+      }
+    ],
+    "red_flags": [
+      "Dor torácica em aperto com irradiação para MSE + sudorese fria — suspeita de síndrome coronariana aguda, risco de infarto agudo do miocárdio",
+      "Encaminhamento imediato: eletrocardiograma e avaliação presencial urgentes"
+    ],
+    "avaliacao_seguranca": {
+      "nivel_perigo": "critico",
+      "encaminhamento_urgente": true,
+      "justificativa_seguranca": "Quadro compatível com SCA em paciente de alto risco cardiovascular; conduta tempo-dependente."
+    },
+    "encaminhar_para": "Emergência / cardiologia (avaliação presencial imediata)",
+    "tratamento": {
+      "recomendacoes": [
+        "Encaminhamento imediato à emergência (dor torácica de alto risco)",
+        "AAS 300 mg VO em dose de ataque se ausência de contraindicação, ainda no trajeto"
+      ],
+      "medicamentos": [
+        {
+          "nome": "Ácido acetilsalicílico (AAS)",
+          "dose": "300 mg",
+          "frequencia": "dose única de ataque",
+          "duracao": "única",
+          "via": "VO"
+        },
+        {
+          "nome": "Dinitrato de isossorbida",
+          "dose": "5 mg",
+          "frequencia": "sublingual se dor mantida (até 3x)",
+          "duracao": "sintomático",
+          "via": "SL"
+        }
+      ]
+    },
+    "exames_recomendados_detalhados": [
+      {
+        "exame": "Eletrocardiograma (ECG) de 12 derivações",
+        "justificativa": "Estratificação imediata de SCA (supra/infra de ST)",
+        "urgencia": "emergência"
+      },
+      {
+        "exame": "Troponina de alta sensibilidade (curva)",
+        "justificativa": "Confirma injúria miocárdica",
+        "urgencia": "emergência"
+      },
+      {
+        "exame": "Radiografia de tórax",
+        "justificativa": "Diferencial (dissecção, congestão)",
+        "urgencia": "investigação"
+      }
+    ],
+    "alertas_interacao": [
+      "AAS + anticoagulante: risco hemorrágico — verificar uso prévio",
+      "Nitrato contraindicado se uso de inibidor de PDE5 (sildenafila) nas últimas 24–48h"
+    ],
+    "orientacoes_paciente": [
+      "Procurar pronto-socorro AGORA; não dirigir — chamar SAMU (192) se piora",
+      "Não fazer esforço até avaliação"
+    ]
+  }
+}

@@ -27,6 +27,11 @@ const isPublicRoute = createRouteMatcher([
   '/politica-de-privacidade',
   '/termos-de-uso',
   '/redirect',
+  // Previsualização de layout — SÓ existe fora de produção.
+  // A própria rota faz `notFound()` quando NODE_ENV=production, então liberá-la aqui não abre
+  // nada em produção: lá ela não existe. Sem esta linha, o middleware manda para o Clerk antes
+  // de a rota poder responder — foi o que aconteceu em 20/08/2026.
+  ...(process.env.NODE_ENV === 'production' ? [] : ['/preview(.*)']),
   // Arquivos de SEO — NUNCA devem ser interceptados pelo auth
   '/robots.txt',
   '/sitemap.xml',

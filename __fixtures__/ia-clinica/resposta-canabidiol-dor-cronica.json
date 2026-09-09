@@ -1,0 +1,322 @@
+{
+  "_LEIA": [
+    "FIXTURE ILUSTRATIVO — conteúdo clínico NÃO validado. Criado em 24/08/2026 para o preview.",
+    "",
+    "POR QUE ELE EXISTE: os outros dois fixtures são do VidAI real (cardiologia). Eles provam que",
+    "o contrato é o do motor de verdade, e continuam servindo para isso. Mas não dá para pendurar",
+    "recomendação de canabidiol numa hipótese de dissecção aórtica — seria clinicamente absurdo, e",
+    "uma tela de exemplo absurda ensina a coisa errada a quem a aprova.",
+    "",
+    "🔴 O QUE ESTE ARQUIVO NÃO É: catálogo de produtos da Be4Hope, nem recomendação terapêutica.",
+    "GAP-03 (origem do corpus de canabidiol e quem o valida) está ABERTO. Por isso toda entrada",
+    "aqui tem procedencia 'inferido_ia' e referencia null: é exatamente como a tela deve mostrar",
+    "algo que o modelo produziu e nenhum farmacêutico assinou. Quando o corpus existir, o motor",
+    "passa a emitir 'catalogo_validado' com referência — e a tela muda de rótulo sozinha.",
+    "",
+    "SEM DOSE, DE PROPÓSITO: IMD-01 vs IMD-02 no docs/02-CATALOGO-DE-REGRAS.md. Listar opções",
+    "informa; dizer quanto dar dirige. Nenhum campo de mg existe no contrato.",
+    "",
+    "Zero PII: paciente fictício, sem nome, sem documento, sem data real de nascimento.",
+    "",
+    "CORRIGIDO em 24/08/2026: a primeira versao deste arquivo usava 'relato_paciente', 'medida_registrada' e 'lab_importado' -- tres valores de proveniencia que NAO existem no contrato. A tela quebrou com \"can't access property 'icone'\" porque PROVENIENCIA[valor] deu undefined. O import do JSON usa `as never`, entao o TypeScript nao checou nada. Licao: fixture e entrada nao verificada, e agora o guarda contrato-da-ia-e-a-unica-fonte valida todo enum de todo fixture contra o contrato.",
+    "O quarto valor invalido era urgencia: 'rotina' -- UrgenciaAnalise so tem verde|amarelo|vermelho|normal|atencao|critico|ok. Agora 'verde'.",
+    "E o quinto: 'sindrome.status' tambem era invencao minha. O contrato declara sindrome: { titulo, resumo? } -- sem status -- e os dois fixtures reais do VidAI nao tem esse campo. Removido. Inventar campo no CONTRATO para acomodar erro de fixture seria contaminar a fonte da verdade com um engano meu."
+  ],
+  "grafo": {
+    "dominio": "anamnese",
+    "urgencia": "verde",
+    "confianca": 71,
+    "parcial": true,
+    "tituloPrincipal": "Dor crônica de perfil neuropático, refratária a primeira linha",
+    "sindrome": {
+      "titulo": "Dor crônica de perfil neuropático em membros inferiores, com insônia associada"
+    },
+    "schema_version": "1.0.4-s13",
+    "achados": [
+      {
+        "id": "ach-1",
+        "titulo": "Dor em queimação distal, simétrica, pior à noite",
+        "resumo": "Dor em queimação nos pés, simétrica, com piora noturna e alodínia ao toque do lençol — padrão sugestivo de dor neuropática periférica",
+        "proveniencia": "episodio_atual",
+        "dominio": "subjetivo",
+        "fonte_campo": "queixa_principal",
+        "fonte_id": "qp-01"
+      },
+      {
+        "id": "ach-2",
+        "titulo": "Escala de dor 8/10 no baseline",
+        "resumo": "Dor 8/10 na medida de desfecho inicial, com qualidade de vida global 3/10",
+        "proveniencia": "episodio_atual",
+        "dominio": "objetivo",
+        "fonte_campo": "medidas_desfecho",
+        "fonte_id": "md-01"
+      },
+      {
+        "id": "ach-3",
+        "titulo": "Falha a gabapentina e amitriptilina",
+        "resumo": "Uso prévio de gabapentina e amitriptilina em dose plena por mais de 8 semanas, sem resposta sustentada",
+        "proveniencia": "historico_validado",
+        "dominio": "contexto",
+        "fonte_campo": "medicacoes_previas",
+        "fonte_id": "mp-01"
+      },
+      {
+        "id": "ach-4",
+        "titulo": "Qualidade de sono 3/10, latência aumentada",
+        "resumo": "Insônia de início, atribuída pelo paciente à dor noturna",
+        "proveniencia": "episodio_atual",
+        "dominio": "subjetivo",
+        "fonte_campo": "medidas_desfecho",
+        "fonte_id": "md-02"
+      },
+      {
+        "id": "ach-5",
+        "titulo": "Primeiro contato com canabinoide",
+        "resumo": "Nunca usou produto à base de Cannabis — sem referência de tolerabilidade individual",
+        "proveniencia": "episodio_atual",
+        "dominio": "contexto",
+        "fonte_campo": "rastreio_uso_cannabis",
+        "fonte_id": "ruc-01"
+      },
+      {
+        "id": "ach-6",
+        "titulo": "HbA1c 8,9% — diabetes em controle insuficiente",
+        "resumo": "Controle glicêmico insuficiente, causa provável da neuropatia e fator que limita a resposta a qualquer analgesia",
+        "proveniencia": "exame_lab",
+        "dominio": "lab",
+        "fonte_campo": "exames",
+        "fonte_id": "ex-01"
+      },
+      {
+        "id": "ach-7",
+        "titulo": "Relato de episódio ansioso prévio com substância psicoativa",
+        "resumo": "Refere crise de ansiedade intensa após uso recreativo de Cannabis na adolescência",
+        "proveniencia": "red_flag",
+        "dominio": "alarme",
+        "fonte_campo": "antecedentes",
+        "fonte_id": "ant-01"
+      },
+      {
+        "id": "ach-8",
+        "titulo": "Sem investigação de causa não diabética",
+        "resumo": "B12, função tireoidiana e eletroneuromiografia não realizadas",
+        "proveniencia": "inferido_ia",
+        "dominio": "evidencia",
+        "fonte_campo": "lacunas",
+        "fonte_id": "lac-01"
+      }
+    ],
+    "hipoteses": [
+      {
+        "id": "hip-1",
+        "slot": 1,
+        "titulo": "Polineuropatia diabética dolorosa",
+        "cid": "E11.4",
+        "probabilidade": 71,
+        "gravidade": "moderada",
+        "confianca_evidencia": "media",
+        "resumo": "Padrão distal simétrico com piora noturna, alodínia e HbA1c 8,9% sustentam causa metabólica. A falha a duas primeiras linhas justifica considerar canabinoide como adjuvante.",
+        "ancoraSecao": "panorama-hipoteses",
+        "medicamentos": [
+          {
+            "id": "med-1-1",
+            "rank": 1,
+            "nome": "Extrato full spectrum equilibrado — CBD com THC em baixa proporção",
+            "proporcao": "CBD:THC 20:1",
+            "via": "oral (sublingual)",
+            "porQue": "É a opção com melhor equilíbrio entre efeito analgésico e tolerabilidade para quem nunca usou canabinoide. A fração de THC contribui para o componente neuropático, e a proporção alta de CBD limita o efeito psicoativo — que aqui é a preocupação principal, pelo ach-7.",
+            "ressalvas": [
+              "Paciente relata crise ansiosa prévia com Cannabis (ach-7): qualquer fração de THC exige conversa explícita sobre isso",
+              "Primeiro uso (ach-5): não há referência individual de tolerabilidade"
+            ],
+            "confianca_evidencia": "media",
+            "procedencia": "inferido_ia",
+            "referencia": null
+          },
+          {
+            "id": "med-1-2",
+            "rank": 2,
+            "nome": "CBD isolado — óleo",
+            "proporcao": "CBD apenas (sem THC)",
+            "via": "oral (sublingual)",
+            "porQue": "Vem em segundo por segurança, não por eficácia: elimina o risco psicoativo que o ach-7 levanta. A contrapartida é evidência mais fraca em dor neuropática quando usado isolado, o que pode custar semanas de titulação sem resposta.",
+            "ressalvas": [
+              "Evidência isolada em dor neuropática é menos consistente que a de formulações com THC"
+            ],
+            "confianca_evidencia": "baixa",
+            "procedencia": "inferido_ia",
+            "referencia": null
+          },
+          {
+            "id": "med-1-3",
+            "rank": 3,
+            "nome": "Extrato com THC em proporção intermediária",
+            "proporcao": "CBD:THC 1:1",
+            "via": "oral (sublingual)",
+            "porQue": "Reservado para caso de resposta insuficiente às duas opções acima. Aparece na lista para que a sequência fique visível, não como escolha inicial.",
+            "ressalvas": [
+              "Fração de THC significativamente maior — contraindicada como primeira escolha diante do ach-7",
+              "Exige orientação sobre direção de veículos e atividade laboral"
+            ],
+            "confianca_evidencia": "baixa",
+            "procedencia": "inferido_ia",
+            "referencia": null
+          }
+        ]
+      },
+      {
+        "id": "hip-2",
+        "slot": 2,
+        "titulo": "Síndrome fibromiálgica com componente de dor nociplástica",
+        "cid": "M79.7",
+        "probabilidade": 34,
+        "gravidade": "moderada",
+        "confianca_evidencia": "baixa",
+        "resumo": "A insônia e a desproporção entre intensidade referida e achado objetivo abrem esta possibilidade. Não explica a distribuição distal simétrica nem a HbA1c alterada.",
+        "ancoraSecao": "panorama-hipoteses",
+        "medicamentos": [
+          {
+            "id": "med-2-1",
+            "rank": 1,
+            "nome": "CBD isolado — óleo, uso noturno",
+            "proporcao": "CBD apenas (sem THC)",
+            "via": "oral (sublingual)",
+            "porQue": "Se a hipótese fibromiálgica pesar mais, o alvo passa a ser sono e dor difusa em vez de dor neuropática — e aí o CBD isolado sai da segunda posição para a primeira, porque o benefício esperado sobre sono não depende de THC.",
+            "ressalvas": [
+              "Não endereça o componente distal simétrico, que esta hipótese não explica"
+            ],
+            "confianca_evidencia": "baixa",
+            "procedencia": "inferido_ia",
+            "referencia": null
+          },
+          {
+            "id": "med-2-2",
+            "rank": 2,
+            "nome": "Extrato full spectrum equilibrado",
+            "proporcao": "CBD:THC 20:1",
+            "via": "oral (sublingual)",
+            "porQue": "Alternativa se o sono não responder ao CBD isolado, aceitando o risco que o ach-7 sinaliza.",
+            "ressalvas": ["Mesma ressalva de ansiedade prévia do ach-7"],
+            "confianca_evidencia": "baixa",
+            "procedencia": "inferido_ia",
+            "referencia": null
+          }
+        ]
+      },
+      {
+        "id": "hip-3",
+        "slot": 3,
+        "titulo": "Neuropatia carencial ou tóxica não investigada",
+        "cid": "G62.9",
+        "probabilidade": 22,
+        "gravidade": "moderada",
+        "confianca_evidencia": "baixa",
+        "resumo": "B12, tireoide e ENMG não foram feitos (ach-8). Se a causa for carencial, tratar a carência muda o prognóstico mais que qualquer analgésico — e por isso esta hipótese não tem medicamento sugerido.",
+        "ancoraSecao": "panorama-hipoteses",
+        "medicamentos": []
+      }
+    ],
+    "arestas": [
+      {
+        "de": "ach-1",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "rotulo": "Padrão distal simétrico"
+      },
+      {
+        "de": "ach-2",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "rotulo": "Intensidade no baseline"
+      },
+      {
+        "de": "ach-3",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "rotulo": "Refratariedade a 1ª linha"
+      },
+      {
+        "de": "ach-6",
+        "para": "hip-1",
+        "tipo": "suporta",
+        "rotulo": "Causa metabólica provável"
+      },
+      {
+        "de": "ach-8",
+        "para": "hip-1",
+        "tipo": "contradiz",
+        "rotulo": "Causa alternativa não excluída"
+      },
+      {
+        "de": "ach-4",
+        "para": "hip-2",
+        "tipo": "suporta",
+        "rotulo": "Insônia associada"
+      },
+      {
+        "de": "ach-1",
+        "para": "hip-2",
+        "tipo": "contradiz",
+        "rotulo": "Distribuição não difusa"
+      },
+      {
+        "de": "ach-6",
+        "para": "hip-2",
+        "tipo": "contradiz",
+        "rotulo": "Explicação metabólica presente"
+      },
+      {
+        "de": "ach-8",
+        "para": "hip-3",
+        "tipo": "suporta",
+        "rotulo": "Investigação ausente"
+      },
+      {
+        "de": "ach-7",
+        "para": "sindrome",
+        "tipo": "lacuna",
+        "rotulo": "Alarme"
+      },
+      {
+        "de": "ach-5",
+        "para": "sindrome",
+        "tipo": "auditor",
+        "rotulo": "Primeiro uso"
+      }
+    ],
+    "auditor": [
+      "Primeiro uso de canabinoide — orientar sobre efeito adverso esperado e via de contato"
+    ],
+    "conduta": [],
+    "alertasOcultos": [],
+    "timeline": [],
+    "achados_inconclusivos": [
+      {
+        "id": "ach-7",
+        "titulo": "Relato de episódio ansioso prévio com substância psicoativa",
+        "motivo": "Nenhuma hipótese explica, e pesa contra a opção de primeira linha"
+      },
+      {
+        "id": "ach-8",
+        "titulo": "Sem investigação de causa não diabética",
+        "motivo": "Lacuna diagnóstica — muda a conduta se positiva"
+      }
+    ],
+    "completude": {
+      "nivel": "parcial",
+      "inconclusivos": 2,
+      "red_flags_nao_explicadas": 1,
+      "motivos": [
+        "2 achado(s) sem suporta/contradiz definido",
+        "1 sinal(is) de alarme sem hipótese que explique",
+        "investigação de causa não diabética ausente (B12, TSH, ENMG)"
+      ]
+    },
+    "salvaguardas_deterministicas": [
+      "Primeiro uso de canabinoide: orientação de segurança obrigatória",
+      "Relato de reação ansiosa prévia: revisar antes de qualquer formulação com THC"
+    ]
+  },
+  "blocos": [],
+  "analiseIA": null
+}
