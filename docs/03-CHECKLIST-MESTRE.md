@@ -506,6 +506,22 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | 15       | **Item 6** — store privado nos 10+ uploads existentes                                                                                | —                                                                                          | autorização                                                |
 | 16       | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                   | —                                                                                          | ler a RDC 873/2024 primeiro · autorização                  |
 
+### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
+
+| item                                                                                                   | estado                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Integração ChatPro** — link único de cadastro entregue pelo WhatsApp, com nome completo **e e-mail** | ✅ **código pronto e testado**. [ADR-0015](adr/ADR-0015-o-chatpro-entrega-o-link-e-o-webhook-nunca-e-verdade.md) · diagnóstico no [`04` Item 18](04-LISTA-DE-AFAZERES.md) |
+
+**O que falta, e é do dono, não do código:**
+
+| #   | pendência                                                                                                                 | dono              | bloqueia                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------- |
+| 1   | Configurar o painel do ChatPro — guia pronto em [`COMO-CONECTAR-NO-PAINEL.md`](chatpro/COMO-CONECTAR-NO-PAINEL.md)        | dono              | o link chegar ao paciente               |
+| 2   | A tela `/cadastro/{token}` — contrato em [`CONTRATO-DA-PAGINA-DE-CADASTRO.md`](chatpro/CONTRATO-DA-PAGINA-DE-CADASTRO.md) | **Dryelle**       | o paciente concluir o cadastro          |
+| 3   | Ligar o cron de `/api/chatpro/processar`                                                                                  | dono/deploy       | o funil se mover (nada se perde até lá) |
+| 4   | Migration `0026` no Neon — só rodou no Postgres **local**                                                                 | deploy            | tudo, em produção                       |
+| 5   | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                 | chefia + jurídico | operação com paciente real              |
+
 ### Trabalho próprio que precede itens da lista
 
 🔴 **Transcrever normas** ([`02`](02-CATALOGO-DE-REGRAS.md)):

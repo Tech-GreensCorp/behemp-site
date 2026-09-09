@@ -1100,3 +1100,92 @@ QA** é a situação de risco, e corrigir depois seria correr o risco primeiro.
 travas antes do primeiro `insert`. Nasce vermelho nos dois atuais — por isso entra **junto** com
 a correção, e não antes (`.claude/rules/seguranca-lgpd.md`: guarda que acusa violação conhecida e
 não corrigida é guarda que alguém desliga).
+
+---
+
+## Item 18 — ✅ Integração ChatPro, implementada e testada em 09/09/2026
+
+**O que foi pedido:** replicar na BeHemp a integração com o ChatPro que já roda **validada em
+produção** no `greens-corp` (_"O QUE ESTÁ LÁ JÁ ESTÁ VALIDADO O USO"_), com uma diferença de
+fluxo: aqui o bot coleta **nome completo + e-mail**, e lá só o nome. Ao final, o link leva à
+página de cadastro que a **Dryelle** está construindo.
+
+**Decisões:** `docs/adr/ADR-0015`. **Configuração manual:** `docs/chatpro/COMO-CONECTAR-NO-PAINEL.md`.
+**Contrato da tela:** `docs/chatpro/CONTRATO-DA-PAGINA-DE-CADASTRO.md`.
+
+### O que existe no disco
+
+| camada                               | arquivo                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| normalização de telefone             | `lib/chatpro/telefone.ts`                                                                            |
+| segredo em tempo constante           | `lib/chatpro/segredo.ts`                                                                             |
+| cliente da CHAT API                  | `lib/chatpro/cliente.ts`                                                                             |
+| texto da mensagem (puro)             | `lib/chatpro/mensagem-do-link.ts`                                                                    |
+| núcleo: cria/reaproveita solicitação | `lib/chatpro/solicitacao.ts`                                                                         |
+| tradução de UUID → nome              | `lib/chatpro/diretorio.ts`                                                                           |
+| consumo da fila de eventos           | `lib/chatpro/processador.ts`                                                                         |
+| validação do token do link           | `lib/chatpro/token-de-cadastro.ts`                                                                   |
+| rotas                                | `app/api/chatpro/{bot-link,intake,start,processar}/`, `webhook/[pathToken]/`, `solicitacao/[token]/` |
+| tabelas                              | `solicitacoes_cadastro`, `chatpro_eventos`, `chatpro_diretorio`, `chatpro_sessoes`                   |
+| migrations                           | `0025_sudden_forge.sql`, `0026_bumpy_red_hulk.sql` — **zero destrutivo**                             |
+
+### Como foi provado
+
+**31 testes ao vivo** contra o servidor local, com o banco conferido a cada passo: segredo
+ausente/errado/certo, reaproveitamento de protocolo com token novo, paciente novo, contato não
+identificado, intake JSON, nome de uma palavra, webhook com token errado/certo, limpeza de
+conteúdo clínico, processamento do lote, vínculo conversa↔solicitação, contador de mensagens, e
+os quatro estados de recusa do link.
+
+**417 casos em 12 guardas**, verdes. Os dois do ChatPro somam **95 casos** e foram provados por
+**18 sabotagens**, todas acusadas. `pnpm build` exit **0**, com as 6 rotas presentes.
+
+### 🔴 O que NÃO foi feito, e por quê
+
+| #   | o que                             | por quê                                                                                             |
+| --- | --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | A tela `/cadastro/{token}`        | é trabalho da **Dryelle**. O que entreguei é o contrato que ela consome                             |
+| 2   | Migration aplicada no **Neon**    | só rodou no Postgres local (`localhost:5436`). Produção é decisão de deploy                         |
+| 3   | Configuração do painel do ChatPro | tarefa do dono — o guia está pronto no `COMO-CONECTAR-NO-PAINEL.md`                                 |
+| 4   | Cron do processador ligado        | idem. Enquanto não estiver, eventos acumulam em `pendente` — nada se perde, mas o funil não se move |
+| 5   | Teste com WhatsApp real           | exige URL pública e as credenciais do passo 1                                                       |
+
+---
+
+## Item 19 — 🔴 CATALOGADO: PII na query string chega ao log do proxy, que não é código nosso
+
+**Descoberto em 09/09/2026**, lendo o que o greens-corp aprendeu com paciente real
+(`HERANCA-CHATPRO-DAVI-DRYELLE.md`, atualizado em 08/09/2026 — "defeito novo 2").
+
+**O problema.** O bloco "Requisição externa" do ChatPro chama por **GET com query string**. Lá a
+query carrega `name` e `number`; **na BeHemp carrega também `email`**:
+
+```
+/api/chatpro/bot-link?name=Joana+Ribeiro+Alves&email=joana@exemplo.com&sessionId=…
+```
+
+Lá, o log da aplicação mascarava (`+559****4822`) e **o log HTTP genérico gravou a URL inteira em
+texto puro**, em arquivo. Viola a regra de nunca registrar telefone em log, e é dado pessoal do
+art. 11 gravado em disco.
+
+**O nosso estado, medido:** nenhum arquivo de `app/api/chatpro/` ou `lib/chatpro/` imprime
+`request.url`, `nextUrl.href` ou a query — conferido por varredura, e o guarda
+`chatpro-nao-confia-no-que-chega` mantém isso (o caso quebra se telefone ou e-mail aparecer em
+bloco de `console.*`).
+
+**O que continua exposto, e é fora do código:** o **nginx/proxy à frente** (DT-006/DT-008: EC2 +
+PM2) grava `access_log` com a URL completa por padrão. Nenhuma linha de TypeScript impede isso.
+
+**O perigo de mexer:** baixo em código (não há o que mudar), médio em infraestrutura — mexer em
+`access_log` afeta o diagnóstico de todas as rotas, não só desta.
+
+**As saídas, em ordem de custo:**
+
+| #   | saída                                                        | custo              | efeito                                               |
+| --- | ------------------------------------------------------------ | ------------------ | ---------------------------------------------------- |
+| 1   | `access_log off;` **só** no `location /api/chatpro/bot-link` | baixo              | resolve o caso, mantém o resto                       |
+| 2   | formato de log sem `$query_string` para esse location        | baixo              | idem, preservando o `path`                           |
+| 3   | mudar o canal para POST                                      | **não disponível** | o bloco do painel chama por GET; não é escolha nossa |
+
+⚠️ **Não corrigido nesta tarefa** — é infraestrutura, está fora do escopo pedido, e exige
+autorização (`CLAUDE.md`, seção de escopo). **Fica catalogado com o perigo medido.**
