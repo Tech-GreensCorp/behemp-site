@@ -534,9 +534,16 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 (a lista de campos de 09/09 precisa ser reconferida), o aceite existir no fluxo do intake, e o
 segredo compartilhado estar nos dois `.env`.
 
-**Fila combinada com o dono, nesta ordem:** ADR do handoff Greens→BeHemp (esta) → ADR do ChatPro
-da BeHemp → ADR do ChatPro da Greens usando o link da BeHemp. As duas últimas cobrem o paciente
-**sem receita válida ou sem ANVISA**.
+**As três ADRs estão escritas** (09/09/2026), e a ordem de EXECUÇÃO está no `04` Item 23:
+
+| #   | ADR      | o quê                                                                         | espelho no greens-corp |
+| --- | -------- | ----------------------------------------------------------------------------- | ---------------------- |
+| 1   | **0016** | cadastro da Greens chega por back-channel · **e o retorno automático** (D-09) | ADR-0027               |
+| 2   | **0017** | o bot da BeHemp oferece o link quando falta receita nossa ou ANVISA           | —                      |
+| 3   | **0018** | o bot da Greens usa o link da BeHemp e devolve o paciente                     | ADR-0028               |
+
+🔴 **O canal de VOLTA (0016 D-09) vem antes da 0018**, senão a 0018 cria um segundo caminho de
+retorno — que é o rejeitado R-05 dela.
 
 ### Trabalho próprio que precede itens da lista
 

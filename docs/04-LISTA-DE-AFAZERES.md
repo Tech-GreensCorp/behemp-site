@@ -1294,3 +1294,66 @@ Espelho do lado da Greens: `greens-corp-backend/docs/adr/ADR-0027`.
 saúde entre empresas exige URL assinada na origem, validação de MIME e tamanho no destino, store
 **privado** e prazo de retenção — e o `Item 6` registra que este repositório já tem 10+ uploads em
 store público, defeito conhecido e não corrigido. Código novo não repete isso.
+
+---
+
+## Item 23 — 📋 As três portas de entrada, e o caminho de volta (ADR-0016, 0017, 0018)
+
+**Decidido em 09/09/2026.** Três formas de o mesmo paciente chegar, um só corredor depois — e,
+para quem veio da Greens, um **retorno automático** com o que ficou pronto aqui.
+
+```
+              PACIENTE SEM RECEITA NOSSA / SEM ANVISA
+                              │
+     ┌────────────────────────┼────────────────────────┐
+  formulário               WhatsApp                 WhatsApp
+  da GREENS                da BEHEMP                da GREENS
+     │ ADR-0016               │ ADR-0017              │ ADR-0018
+     └────────────────────────┼────────────────────────┘
+                              ▼
+       solicitacoes_cadastro · mesma tela · mesma procuração
+                              ▼
+                  receita emitida / ANVISA concluída
+                              │
+                              ▼  (só para quem veio da Greens)
+              ADR-0016 D-09 · retorno automático ──► Greens
+```
+
+### Ordem de execução, e o porquê dela
+
+| #   | item                                               | por que nesta posição                                                     |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | **ADR-0016 ida** — recebe o cadastro da Greens     | é o único fluxo cujas duas pontas estão paradas hoje                      |
+| 2   | **ADR-0016 D-09 volta** — devolve receita e ANVISA | a ADR-0018 **depende** deste canal; construí-lo aqui evita construir dois |
+| 3   | **ADR-0017** — gatilho do bot da BeHemp            | a mecânica já está pronta (ADR-0015); falta só a regra de quando ofertar  |
+| 4   | **ADR-0018** — bot da Greens com link da BeHemp    | precisa do canal de volta (2) e da regra de gatilho (3)                   |
+
+🔴 **O item 2 antes do 4 é o que evita retrabalho.** Se a ADR-0018 fosse implementada primeiro,
+ela criaria seu próprio caminho de volta — e teríamos duas rotas fazendo a mesma coisa, que é o
+R-05 daquela ADR.
+
+### Bloqueios, por item
+
+| item          | bloqueado por                                                                    | dono           |
+| ------------- | -------------------------------------------------------------------------------- | -------------- |
+| ADR-0016      | atualização do formulário da Greens · aceite no intake · segredo nos dois `.env` | Dryelle / dono |
+| ADR-0016 D-09 | segredo **do sentido de volta** (diferente do de ida)                            | dono           |
+| ADR-0017      | nada técnico — a mecânica está no PR #36                                         | —              |
+| ADR-0018      | o canal de volta pronto · credenciais da conta de ChatPro **da Greens**          | nós / dono     |
+
+### 🔴 Duas regras que valem nas três, e não são técnicas
+
+**1. Quem confere a receita é gente.** Manual, no painel da BeHemp, depois do envio de tudo
+(ADR-0017 D-02). O dono declarou que virá IA ou orquestração — e quando vier, entra como decisão
+própria, não como descoberta.
+
+**2. A tela nunca diz que a receita é inválida.** A regra real é "só serve receita do nosso
+receituário", e ela é **interna**. Receita de outro médico é **legalmente válida**: uma tela que
+diga o contrário faz afirmação falsa sobre o ato de outro profissional. O que a tela diz — e é
+verdade — é _"em análise"_ e _"você precisa de uma avaliação com um médico parceiro"_. Vale **nos
+dois sistemas**, e pesa mais na Greens, que fala com o paciente primeiro.
+
+### O que fica de fora das três, declarado
+
+**Os arquivos** (fase 2, nas duas direções): manifesto agora, blob depois.
+**A automação da conferência** (ADR-0017 §5): declarada como futura, com dono e sem data.

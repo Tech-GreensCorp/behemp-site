@@ -144,6 +144,76 @@ Depois da procuração, um botão devolve o paciente ao **login da Greens**. Ele
 tratamento continua lá, e terminar num beco é como se perde alguém no meio de um processo de
 duas empresas.
 
+### D-09 — 🔴 O CAMINHO DE VOLTA: o que ficou pronto aqui volta para a Greens sozinho
+
+**Decisão do dono em 09/09/2026:** _"volta pra greens pois se ele veio pra greens é porque quer
+um medicamento; após ter tudo necessário, nosso outro webhook tem que jogar o que faltava da
+Greens, seja receituário ou ANVISA, para lá automaticamente — ele já ter como comprar seu
+medicamento que está na receita. **O foco é automatizar o que dá.**"_
+
+O par de sistemas tem **duas direções**, e a ADR cobre as duas:
+
+```
+IDA    Greens ──► BeHemp    o cadastro do paciente        (D-01 a D-08)
+VOLTA  BeHemp ──► Greens    a receita e a ANVISA prontas  (D-09)
+```
+
+**O gatilho da volta é o documento ficar pronto aqui**, não o paciente pedir. Ele veio buscar
+medicamento; se precisar voltar e avisar que a receita saiu, a automação não serviu para nada.
+
+| o que fica pronto aqui                 | o que a Greens ganha                              |
+| -------------------------------------- | ------------------------------------------------- |
+| receita emitida pelo nosso receituário | a pendência de prescrição do pedido dele se fecha |
+| autorização da ANVISA concluída        | a pendência de ANVISA se fecha                    |
+
+**Mesma técnica da ida, direção invertida:** POST assinado com HMAC, id de evento para
+idempotência, janela de tempo. O que **não** repete é o token de tela — aqui não há paciente
+navegando, é sistema falando com sistema.
+
+⚠️ **O documento em si continua sendo referência, não cópia, nesta fase.** A volta avisa _"a
+receita do paciente X está pronta, protocolo Y"_; buscar o arquivo é o mesmo trabalho de blob que
+a fase 2 resolve nas duas direções.
+
+**Rejeitado: esperar o paciente pedir.** É o oposto de automatizar o que dá.
+**Rejeitado: a Greens ficar perguntando de tempos em tempos.** É o polling que o webhook existe
+para eliminar — e multiplica chamada para descobrir que nada mudou.
+
+### D-10 — Quem valida a receita é uma PESSOA, no painel da BeHemp
+
+**Decisão do dono em 09/09/2026:** a conferência é **manual, pelo site da BeHemp, depois que o
+paciente enviou tudo**. Não é o bot, não é regra automática. _"Futuramente terá uma IA ou um
+código orquestrado que validará isso"_ — e até lá, **quem decide é gente**.
+
+Isso é a mesma família da Proibição 2 do `CLAUDE.md`: em matéria clínica o sistema **informa**,
+a pessoa **decide**. O sistema organiza a fila de conferência e registra quem decidiu o quê.
+
+**Rejeitado: derivar automaticamente a validade.** Não temos o dado que sustentaria a conta, e um
+sistema que declara sozinho a validade de um documento clínico assume uma responsabilidade que é
+do médico.
+
+### D-11 — 🔴 A REGRA REAL E A LINGUAGEM DA TELA SÃO COISAS DIFERENTES
+
+**A regra de negócio, dita pelo dono:** _"o que invalida uma receita é ela não vir do nosso
+receituário; qualquer um que não é, é inválido — **porém não podemos falar isso explicitamente e
+não convém**"_.
+
+Esta ADR é documentação interna, então registra a regra como ela é. **A tela não repete isso**, e
+há um motivo que protege a empresa, além da conveniência comercial:
+
+⚠️ **Uma receita de outro médico é LEGALMENTE VÁLIDA.** Ela não serve ao nosso fluxo — que é
+coisa diferente. Uma tela que diga _"sua receita é inválida"_ sobre um documento legalmente
+válido faz uma **afirmação falsa** sobre o ato de outro profissional. Isso é risco, não
+discrição.
+
+**O que a tela diz, e é verdade:** _"seu documento está em análise pela nossa equipe"_ ·
+_"para seguir, você precisa de uma avaliação com um médico parceiro"_. Nenhuma dessas frases
+mente, nenhuma julga o documento de fora, e as duas levam o paciente ao mesmo lugar — a
+teleconsulta.
+
+**Rejeitado: a tela dizer "receita inválida".** Afirma falsidade sobre documento de terceiro.
+**Rejeitado: a tela explicar que só aceitamos receita nossa.** É o que o dono pediu para não
+dizer, e a frase acima entrega o mesmo resultado sem a declaração.
+
 ---
 
 ## §3 — O que fica rejeitado
