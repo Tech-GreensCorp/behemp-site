@@ -159,6 +159,26 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
   });
 });
 
+describe('o fluxo customizado reserva o lugar do CAPTCHA', () => {
+  it('🔴 o formulário tem o elemento `clerk-captcha`', () => {
+    // Sem ele o Clerk avisa no console e cai para o CAPTCHA invisível, que decide
+    // sozinho se o cadastro passa — sem dar ao paciente forma de provar que é humano.
+    // Em fluxo customizado quem reserva o lugar é o desenvolvedor.
+    expect(codigo(FORM), 'o elemento do CAPTCHA sumiu do formulário').toMatch(/id="clerk-captcha"/);
+  });
+
+  it('o elemento vem ANTES do botão de envio', () => {
+    // Abaixo da dobra, o desafio aparece onde o paciente não vê, e ele conclui que o
+    // botão parou de funcionar.
+    const t = codigo(FORM);
+    const captcha = t.indexOf('id="clerk-captcha"');
+    const botao = t.indexOf('Criar conta e agendar consulta');
+    expect(captcha).toBeGreaterThan(-1);
+    expect(botao).toBeGreaterThan(-1);
+    expect(captcha, 'o CAPTCHA foi parar depois do botão').toBeLessThan(botao);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4. A PERGUNTA CLÍNICA TEM TRÊS ESTADOS, NÃO DOIS
 // ═══════════════════════════════════════════════════════════════════════════════

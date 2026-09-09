@@ -504,6 +504,18 @@ export function FormularioDeCadastro({
               </fieldset>
             </Secao>
 
+            {/*
+              🔴 ONDE O CLERK DESENHA O CAPTCHA. Sem este elemento no DOM, o
+              `signUp.create` avisa no console que não achou `clerk-captcha` e cai para o
+              CAPTCHA invisível — que decide sozinho, sem dar ao paciente nenhuma forma de
+              provar que é humano. Num fluxo customizado como este, é o desenvolvedor que
+              precisa reservar o lugar; o `/registrar-se` já fazia isso e este formulário
+              não fazia.
+              Fica ANTES do botão de propósito: quando o desafio aparece, ele precisa estar
+              visível na tela, não abaixo da dobra.
+            */}
+            <div id="clerk-captcha" className="empty:hidden" />
+
             {erro && <Aviso texto={erro} />}
             {demorouParaCarregar && !isLoaded && (
               <Aviso texto="O serviço de contas não respondeu. Recarregue a página — se continuar assim, fale com a gente pelo WhatsApp." />

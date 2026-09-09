@@ -21,11 +21,16 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * O WhatsApp do atendimento. Vem de configuração porque o número muda (e porque a Greens
- * usa o dela): um número cravado no código vira suporte perdido no dia em que trocar.
- * Sem a variável, o botão leva ao `wa.me` genérico — que ao menos abre o aplicativo.
+ * O WhatsApp do atendimento.
+ *
+ * ⚠️ REUSA `NEXT_PUBLIC_WHATSAPP_BEHEMP`, que já existe e já é usada em
+ * `patologias-picker.tsx` e na recompra do paciente — com o MESMO fallback delas. Uma
+ * variável nova só para esta tela criaria dois números de atendimento configuráveis em
+ * lugares diferentes, e no dia em que o número mudasse alguém trocaria um e esqueceria
+ * o outro.
  */
-const LINK_DO_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_URL || 'https://wa.me/';
+const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
+const LINK_DO_WHATSAPP = `https://wa.me/${WHATSAPP}`;
 
 /**
  * A TELA QUE O PACIENTE ABRE AO CLICAR NO LINK DO WHATSAPP.
