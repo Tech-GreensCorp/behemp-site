@@ -522,6 +522,22 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | 4        | Migration `0026` no Neon — só rodou no Postgres **local**                                                                                                                                        | deploy            | tudo, em produção                       |
 | 5        | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                                                                                        | chefia + jurídico | operação com paciente real              |
 
+### 📋 Handoff Greens → BeHemp (decidido em 09/09/2026)
+
+| item                                                    | estado                                             |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| **ADR-0016** — back-channel assinado, só o token na URL | ✅ escrita, com pesquisa fundamentada              |
+| **ADR-0027** no `greens-corp` — o lado de quem envia    | ✅ escrita (espelho; a fonte do contrato é a 0016) |
+| Implementação                                           | 📋 **bloqueada** — ver `04` Item 22                |
+
+🔴 **Não começar a implementar antes de:** a Dryelle subir a atualização do formulário da Greens
+(a lista de campos de 09/09 precisa ser reconferida), o aceite existir no fluxo do intake, e o
+segredo compartilhado estar nos dois `.env`.
+
+**Fila combinada com o dono, nesta ordem:** ADR do handoff Greens→BeHemp (esta) → ADR do ChatPro
+da BeHemp → ADR do ChatPro da Greens usando o link da BeHemp. As duas últimas cobrem o paciente
+**sem receita válida ou sem ANVISA**.
+
 ### Trabalho próprio que precede itens da lista
 
 🔴 **Transcrever normas** ([`02`](02-CATALOGO-DE-REGRAS.md)):

@@ -1256,3 +1256,41 @@ rotas do ChatPro têm autenticação própria (segredo em tempo constante, token
 ⚠️ **O que isto sugere e NÃO foi feito:** varrer as demais rotas de API do repositório
 procurando outras que dependam do middleware sem estar na lista — ou que estejam na lista sem
 precisar. É trabalho próprio, fora do escopo desta tarefa, e exige autorização.
+
+---
+
+## Item 22 — 📋 Handoff do cadastro da Greens → BeHemp (ADR-0016)
+
+**Decidido em 09/09/2026**, com rodadas de pesquisa antes: os dados vão por back-channel
+assinado e só o token viaja com o paciente. Decisões, rejeitados e fontes em
+[ADR-0016](adr/ADR-0016-o-cadastro-da-greens-chega-por-back-channel-e-so-o-token-viaja.md).
+Espelho do lado da Greens: `greens-corp-backend/docs/adr/ADR-0027`.
+
+### 🔴 Bloqueado por (não começar antes)
+
+| #   | o quê                                                                                                                                           | dono    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | **A atualização do formulário da Greens** — a Dryelle vai subir. A lista de campos de 09/09 precisa ser reconferida antes de congelar o payload | Dryelle |
+| 2   | O **aceite** do paciente no fluxo do intake (base legal da transferência) — já está sendo tratado lá                                            | Dryelle |
+| 3   | O segredo compartilhado `GREENS_HANDOFF_SECRET` nos dois `.env`                                                                                 | dono    |
+
+### Entregáveis — lado BeHemp (quem recebe)
+
+| #   | entregável                                                                                                                                  | aceite                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1   | `lib/parceiros/assinatura.ts` — HMAC-SHA256 sobre `id + timestamp + corpo`, comparação em tempo constante, janela de **300 s**              | recusa assinatura errada, corpo alterado e carimbo fora da janela   |
+| 2   | `POST /api/parceiros/greens/cadastro` — valida, cria `solicitacoes_cadastro` com `origem = 'greens_handoff'`, devolve `{ token, expiraEm }` | id repetido devolve o **mesmo** token, não cria segunda solicitação |
+| 3   | Enum `solicitacaoCadastroOrigemEnum` + `'greens_handoff'`, e as colunas do manifesto de documentos                                          | migration aditiva; nenhuma coluna obrigatória sem default           |
+| 4   | A rota do middleware liberada (`/api/parceiros(.*)`)                                                                                        | **não esquecer** — foi o `Item 21`, e o sintoma é log vazio         |
+| 5   | Tela `/continuar/{token}` — dados preenchidos e editáveis, senha, código de 6 dígitos, `clerk-captcha`                                      | e-mail que já tem conta vai para o login (D-07)                     |
+| 6   | Pendências dos 5 documentos visíveis e **não bloqueantes**                                                                                  | conclui o cadastro com zero documento                               |
+| 7   | Encaminhar para `/paciente/anvisa` (a procuração **já existe**, não se cria)                                                                | chega na procuração logado                                          |
+| 8   | Botão de volta ao **login da Greens** ao fim da procuração                                                                                  |                                                                     |
+| 9   | Os 4 guardas do §4 da ADR                                                                                                                   | nascem vermelhos, provados por sabotagem                            |
+
+### O que fica de fora, declarado
+
+**A cópia dos arquivos** (fase 2). Fase 1 move dados de texto e o manifesto. Copiar blob de
+saúde entre empresas exige URL assinada na origem, validação de MIME e tamanho no destino, store
+**privado** e prazo de retenção — e o `Item 6` registra que este repositório já tem 10+ uploads em
+store público, defeito conhecido e não corrigido. Código novo não repete isso.

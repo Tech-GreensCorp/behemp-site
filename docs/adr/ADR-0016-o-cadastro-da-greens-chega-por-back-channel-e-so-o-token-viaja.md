@@ -1,0 +1,200 @@
+# ADR-0016 — O cadastro da Greens chega por back-channel, e só o token viaja com o paciente
+
+> **Status:** 📋 **proposta** — 09/09/2026.
+> **Espelho:** `greens-corp-backend/docs/adr/ADR-0027`. Esta aqui é a **fonte do contrato** —
+> quem recebe define o formato. A do lado da Greens descreve o que cabe a quem envia e aponta
+> para cá, conforme `ORGANIZACAO-MULTI-REPO.md` §5: _"nunca uma cópia do conteúdo"_.
+> **Contexto:** o paciente preenche o formulário de intake da Greens (`/patient-access/{token}`).
+> Ao final, um modal oferece conhecer a Be4Hope — e hoje esse botão faz `window.open` para
+> `https://be4hope.org/`, **sem levar dado nenhum** (`ExternalRedirectModal.tsx:36`). Ele chega
+> aqui como um desconhecido e recomeça do zero um cadastro que acabou de preencher.
+> **Decisão:** os dados vão de **servidor a servidor**, assinados; com o paciente viaja **apenas
+> um token opaco de uso único**. Aqui ele só define a senha e confirma o código do e-mail, e
+> segue direto para a procuração da ANVISA.
+
+---
+
+## §1 — O caminho, inteiro
+
+```
+GREENS                                          BEHEMP
+──────                                          ──────
+paciente conclui o intake
+        │
+   [ modal / página "sobre a Be4Hope" ]
+        │  ele escolhe continuar
+        ▼
+   POST /api/parceiros/greens/cadastro   ──────►  valida HMAC + janela de tempo
+   (dados + manifesto de documentos)              cria `solicitacoes_cadastro`
+   header: assinatura, timestamp, id               origem = 'greens_handoff'
+        ◄──────────────────────────────────────   devolve { token, expiraEm }
+        │
+   redireciona o paciente
+   para .../continuar/{token}            ──────►  tela: CONFIRA seus dados
+                                                  + crie sua senha
+                                                  + código de 6 dígitos no e-mail
+                                                          │
+                                                          ▼
+                                                  conta criada, ficha gravada
+                                                          │
+                                                          ▼
+                                                  /paciente/anvisa  (procuração)
+                                                          │
+                                                          ▼
+                                                  "voltar para a Greens" → login de lá
+```
+
+## §2 — As decisões
+
+### D-01 — Os dados vão por back-channel; na URL só o token
+
+O paciente carrega um **identificador opaco**, nunca o conteúdo. Nome, e-mail, telefone, RG e
+cidade trafegam servidor-a-servidor, sob TLS, e nunca aparecem em URL.
+
+**Rejeitado: mandar os dados na query string.** A OWASP classifica isso como _information
+exposure_, e o ponto que decide é que **HTTPS não resolve**: a URL é gravada no histórico do
+navegador, no log do servidor e em **qualquer proxy no caminho** — e a URL ainda pode vazar pelo
+cabeçalho `Referer` ao seguir um link externo.
+
+⚠️ Esta não é uma preocupação teórica aqui: o `Item 19` do `04` cataloga exatamente esse
+vazamento no canal do ChatPro, que é `GET` com `name` e `email` na query por imposição do painel.
+Onde **nós** controlamos os dois lados, não repetimos o que somos obrigados a aceitar de terceiro.
+
+**Rejeitado: JWT assinado na URL com os dados dentro.** Resolve a adulteração e **não resolve a
+exposição** — o payload de um JWT é Base64, não cifra. Continua indo para o log do proxy, legível.
+
+### D-02 — A chamada é assinada com HMAC-SHA256 sobre corpo + timestamp + id
+
+Cabeçalhos: assinatura, carimbo de tempo e identificador único do evento. A verificação é em
+**tempo constante**, e a janela de tolerância é de **300 segundos** — o valor do Standard
+Webhooks, que Stripe e Svix adotam.
+
+**Rejeitado: mTLS.** É mais forte, e exige emissão, distribuição, rotação e monitoramento de
+validade de certificado entre duas empresas com deploys independentes. Um certificado vencido
+derruba a integração inteira num sábado. HMAC entrega autenticidade **e** integridade sem
+infraestrutura nova.
+
+**Rejeitado: allowlist de IP como controle principal.** Vira apenas mais uma camada: não prova
+integridade do corpo, e o IP de saída de uma VPS muda em recriação de instância.
+
+🔴 **E a diferença central em relação à [ADR-0015](ADR-0015-o-chatpro-entrega-o-link-e-o-webhook-nunca-e-verdade.md):**
+o ChatPro **não assina** os webhooks — a documentação não menciona HMAC, segredo de corpo nem
+IPs, então lá foi preciso inventar a confirmação reversa. Aqui **nós escrevemos os dois lados**,
+e ter assinatura é decisão nossa. Onde dá para provar, prova-se.
+
+### D-03 — Reusa `solicitacoes_cadastro`; não nasce um segundo mecanismo de token
+
+A tabela criada para o ChatPro passa a receber `origem = 'greens_handoff'`. Mesmo protocolo,
+mesmo hash de token, mesma validade, mesmo uso único.
+
+**Rejeitado: tabela própria para o handoff.** A ADR-0015 §1 registra que a BeHemp não tinha
+mecanismo de link com token e que `solicitacoes_cadastro` **passa a ser o único**. Dois
+mecanismos concorrentes significam duas regras de expiração, duas de uso único, e uma delas
+esquecida na próxima mudança.
+
+### D-04 — O token é de uso único, curto, e o conteúdo só existe no nosso banco
+
+Token opaco de 256 bits, guardado **apenas como SHA-256** — o mesmo desenho do ChatPro. Validade
+**curta** (o paciente está com a tela aberta, não vai voltar dias depois).
+
+⚠️ **`Referrer-Policy: strict-origin-when-cross-origin` já está global** em
+`next.config.ts:64` — medido. Em navegação cross-origin ele envia só a origem, **não o path com o
+token**, que é exatamente a mitigação que a OWASP pede. **Preservar.** Se alguém afrouxar para
+`unsafe-url`, o token passa a vazar para todo site externo que o paciente abrir.
+
+### D-05 — Aqui ele só confirma, cria senha e valida o e-mail
+
+Os campos chegam preenchidos e **editáveis**. Ele não redigita o que já digitou.
+
+**O e-mail vem da Greens e ainda assim recebe código de 6 dígitos.** Não é desconfiança do
+parceiro: é que o e-mail vira o **login** desta conta e o canal por onde chegam consulta,
+procuração e prescrição. Um endereço com erro de digitação só se revela quando algo importante
+não chega — e aí o paciente já perdeu a consulta.
+
+### D-06 — O que não veio fica pendente, e pendência não bloqueia
+
+São **cinco** documentos do lado da Greens: receita médica, laudo médico (**opcional**),
+comprovante de residência, autorização da ANVISA e documento de identidade.
+
+A transferência traz um **manifesto**: quais existem lá e quais faltam. A ficha nasce com essas
+pendências visíveis, e **nenhuma delas impede** criar a conta ou seguir para a procuração.
+
+**Rejeitado: exigir os documentos antes de concluir.** O paciente que chega sem receita é
+justamente quem mais precisa da teleconsulta. Bloqueá-lo na porta é recusar quem o produto existe
+para atender.
+
+⚠️ **A CÓPIA DOS ARQUIVOS FICA PARA UMA SEGUNDA FASE, e isto é escolha declarada.** Fase 1 move
+dados de texto e o manifesto. Copiar blob de saúde entre duas empresas exige URL assinada de vida
+curta na origem, validação de MIME e tamanho no destino, store privado e prazo de retenção — e o
+`Item 6` do `04` registra que este repositório **já tem 10+ uploads em store público**, defeito
+conhecido e não corrigido. Código novo não repete isso, e resolvê-lo é trabalho próprio.
+
+### D-07 — E-mail que já tem conta aqui vai para o login
+
+A tela reconhece, diz que a conta existe e leva ao login; depois de entrar, ele segue para a
+procuração normalmente. Decisão do dono em 09/09/2026.
+
+**Rejeitado: atualizar a ficha existente com o que veio de fora.** Seria dado de outro sistema
+sobrescrevendo o cadastro de alguém **sem essa pessoa estar autenticada** — quem controla a conta
+é quem prova ser dono dela.
+
+### D-08 — Ao terminar, o caminho de volta é explícito
+
+Depois da procuração, um botão devolve o paciente ao **login da Greens**. Ele veio de lá, o
+tratamento continua lá, e terminar num beco é como se perde alguém no meio de um processo de
+duas empresas.
+
+---
+
+## §3 — O que fica rejeitado
+
+| #    | rejeitado                                     | motivo                                                                           |
+| ---- | --------------------------------------------- | -------------------------------------------------------------------------------- |
+| R-01 | dados na query string                         | OWASP: histórico, log de servidor, proxy e `Referer` — HTTPS não resolve         |
+| R-02 | JWT com os dados na URL                       | Base64 não é cifra: resolve adulteração, não exposição                           |
+| R-03 | mTLS                                          | certificado entre duas empresas com deploy independente; vencimento derruba tudo |
+| R-04 | allowlist de IP como controle principal       | não prova integridade e o IP muda ao recriar instância                           |
+| R-05 | tabela de token própria                       | a ADR-0015 fixou `solicitacoes_cadastro` como o único mecanismo                  |
+| R-06 | confiar no e-mail sem confirmar               | ele é o login e o canal da consulta                                              |
+| R-07 | exigir os 5 documentos para concluir          | barra justamente quem mais precisa da teleconsulta                               |
+| R-08 | sobrescrever ficha existente com dado de fora | atualização sem o dono autenticado                                               |
+
+## §4 — Como se prova
+
+| guarda                                        | fica vermelho quando                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `handoff-da-greens-nao-viaja-na-url`          | dado pessoal aparecer em query string, ou o `Referrer-Policy` sair de `strict-origin`/`no-referrer`                            |
+| `handoff-da-greens-e-assinado`                | a verificação de HMAC sumir, deixar de ser em tempo constante, a janela de tempo cair, ou a deduplicação por id do evento sair |
+| `handoff-nao-cria-segundo-mecanismo-de-token` | nascer outra tabela com token/validade/uso único fora de `solicitacoes_cadastro`                                               |
+| `pendencia-de-documento-nao-bloqueia`         | a conclusão do cadastro passar a exigir documento                                                                              |
+
+Todos nascem vermelhos e se provam por sabotagem (`docs/TECNICA-DOS-GUARDAS.md`).
+
+---
+
+## §5 — Fontes
+
+**Lidas.** OWASP, _Information exposure through query strings in URL_ — a URL é gravada em
+histórico, log de servidor e proxies, e **HTTPS não muda isso**; recomenda corpo de POST e
+`Referrer-Policy` restritiva quando há links externos. _Standard Webhooks_ / Stripe / Svix —
+HMAC-SHA256 sobre id + timestamp + corpo, tolerância de **300 s**, e idempotência pela chave do
+evento. Comparativos de autenticação servidor-a-servidor (Apache APISIX, API7, SSOJet) — HMAC
+entrega autenticidade e integridade sem gestão de certificado; **mTLS é mais forte e exige
+infraestrutura contínua**. OpenID Connect / WSO2 sobre **back-channel × front-channel** — o
+front-channel atravessa "um ambiente de navegador potencialmente hostil"; o back-channel é
+ponto a ponto sob TLS.
+
+**Medidas no código, não presumidas.** `ExternalRedirectModal.tsx:36` (hoje abre a Be4Hope sem
+dado). Campos do intake da Greens em `PatientIntakeFlow.tsx`: `patientName`, `patientEmail`,
+`patientPhone`, `rg`, `city`, `prescription`, `proofOfAddress`, `anvisaAuthorization`.
+`next.config.ts:64` (`Referrer-Policy: strict-origin-when-cross-origin`, já ativo).
+`app/(paciente)/paciente/anvisa/` (a procuração com DocuSign **já existe** — não se cria).
+
+⚠️ **A Dryelle vai subir uma atualização do formulário da Greens.** A lista de campos acima é o
+estado de 09/09/2026 e **precisa ser reconferida contra a versão nova** antes de congelar o
+contrato do payload. A base legal da transferência **já está sendo tratada por ela** — esta ADR
+decide a **técnica**, não o consentimento.
+
+**Princípios e fase:** D-01/D-02/D-04 **D** (regra e resiliência), fase 7 · D-03 **A**
+(arquitetura, não duplicar mecanismo), fase 3 · D-05/D-06/D-07/D-08 **B** (produto e caminho do
+usuário), fase 6.
