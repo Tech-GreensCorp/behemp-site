@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSignUp } from '@clerk/nextjs/legacy';
 import {
@@ -27,6 +28,7 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  FileText,
   Loader2,
   Lock,
   Mail,
@@ -47,6 +49,10 @@ import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
 interface Props {
   token: string;
   protocolo: string;
+  /** O que o parceiro ainda não tem. Aparece como aviso — nunca bloqueia (ADR-0016 D-06). */
+  pendencias?: { chave: string; rotulo: string; opcional: boolean }[];
+  /** Destino de volta, já conferido contra a lista de origens permitidas. */
+  urlDeRetorno?: string | null;
   nomeInicial: string | null;
   emailInicial: string | null;
   telefoneInicial: string | null;
@@ -94,6 +100,8 @@ function traduzirErro(err: unknown): string {
 export function FormularioDeCadastro({
   token,
   protocolo,
+  pendencias = [],
+  urlDeRetorno = null,
   nomeInicial,
   emailInicial,
   telefoneInicial,
@@ -115,6 +123,14 @@ export function FormularioDeCadastro({
   const [jaFazTratamento, setJaFazTratamento] = useState<boolean | null>(null);
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
+  /**
+   * 🔴 D-07 — o e-mail já tem conta aqui.
+   *
+   * Antes isto era só uma mensagem de erro do Clerk, e o paciente ficava PRESO: lia
+   * "já existe uma conta" e não tinha para onde ir. A mensagem sem caminho é pior que
+   * o erro, porque parece que o sistema quebrou.
+   */
+  const [jaTemConta, setJaTemConta] = useState(false);
 
   /**
    * O Clerk normalmente carrega em menos de um segundo. Passados oito, ou a chave
@@ -182,6 +198,8 @@ export function FormularioDeCadastro({
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setEtapa('codigo');
     } catch (err) {
+      const e = err as { errors?: { code?: string }[] };
+      if (e?.errors?.[0]?.code === 'form_identifier_exists') setJaTemConta(true);
       setErro(traduzirErro(err));
     } finally {
       setCarregando(false);
@@ -258,7 +276,7 @@ export function FormularioDeCadastro({
         )}
       >
         {etapa === 'pronto' ? (
-          <Concluido />
+          <Concluido urlDeRetorno={urlDeRetorno} />
         ) : etapa === 'codigo' ? (
           <form onSubmit={confirmarCodigo} className="space-y-6">
             <div className="text-center">
@@ -436,6 +454,41 @@ export function FormularioDeCadastro({
               </div>
             </Secao>
 
+            {pendencias.length > 0 && (
+              <>
+                <Separador />
+                <Secao titulo="O que ainda vamos precisar" icone={FileText}>
+                  {/*
+                    🔴 AVISO, NUNCA BLOQUEIO (ADR-0016 D-06). Quem chega sem receita é
+                    justamente quem mais precisa da teleconsulta; barrá-lo aqui seria
+                    recusar quem o produto existe para atender. Aparece para ele saber o
+                    que virá, não para impedi-lo de continuar.
+                  */}
+                  <div className="border-border bg-muted/40 rounded-xl border px-4 py-3.5">
+                    <ul className="space-y-2">
+                      {pendencias.map((p) => (
+                        <li key={p.chave} className="flex items-start gap-2.5 text-sm">
+                          <span className="bg-primary/50 mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
+                          <span className="text-muted-foreground">
+                            {p.rotulo}
+                            {p.opcional && (
+                              <span className="text-muted-foreground/70 ml-1.5 text-xs">
+                                (opcional)
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="border-border/60 text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+                      Nada disso impede você de continuar agora. Você envia depois, com calma, pela
+                      sua área — e o médico já pode te atender antes.
+                    </p>
+                  </div>
+                </Secao>
+              </>
+            )}
+
             <Separador />
 
             <Secao titulo="Sobre o seu tratamento" icone={Sparkles}>
@@ -516,7 +569,19 @@ export function FormularioDeCadastro({
             */}
             <div id="clerk-captcha" className="empty:hidden" />
 
-            {erro && <Aviso texto={erro} />}
+            {jaTemConta ? (
+              <div className="animate-fade-in border-secondary/25 bg-secondary/5 space-y-3 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
+                  continuar de onde parou.
+                </p>
+                <Button className="h-11 w-full rounded-xl" render={<Link href="/entrar" />}>
+                  Entrar na minha conta
+                </Button>
+              </div>
+            ) : (
+              erro && <Aviso texto={erro} />
+            )}
             {demorouParaCarregar && !isLoaded && (
               <Aviso texto="O serviço de contas não respondeu. Recarregue a página — se continuar assim, fale com a gente pelo WhatsApp." />
             )}
@@ -753,7 +818,7 @@ function Aviso({ texto }: { texto: string }) {
   );
 }
 
-function Concluido() {
+function Concluido({ urlDeRetorno }: { urlDeRetorno: string | null }) {
   return (
     <div className="animate-fade-up py-8 text-center">
       <div className="bg-secondary/10 mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl">
@@ -764,6 +829,28 @@ function Concluido() {
         Estamos abrindo sua agenda para você escolher o horário da teleconsulta.
       </p>
       <Loader2 size={22} className="text-primary mx-auto mt-6 animate-spin" />
+
+      {/*
+        🔴 D-08 — o caminho de volta. Ele veio de outro site porque quer comprar
+        medicamento, e a compra acontece lá. Terminar sem porta de saída é perder alguém
+        no meio de um processo que atravessa duas empresas.
+
+        A URL já foi conferida contra a lista de origens permitidas quando foi GRAVADA.
+        Validar de novo aqui espalharia a checagem por toda tela que a use — e bastaria
+        uma esquecer para virar redirecionamento aberto.
+      */}
+      {urlDeRetorno && (
+        <div className="border-border/60 mt-8 border-t pt-6">
+          <Button
+            variant="ghost"
+            className="h-11 rounded-xl"
+            render={<a href={urlDeRetorno} rel="noopener noreferrer" />}
+          >
+            <ArrowLeft size={16} />
+            Voltar para continuar minha compra
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

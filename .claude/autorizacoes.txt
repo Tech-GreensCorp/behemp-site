@@ -293,3 +293,10 @@ path:db/migrations/meta/0027_snapshot.json
 #   → aplicada APENAS no Postgres local; Neon intocado.
 path:db/migrations/0028_plain_pretty_boy.sql
 path:db/migrations/meta/0028_snapshot.json
+
+# ── Mesma autorização, D-06/D-07/D-08 da ADR-0016 (09/09/2026) ────────────────
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x ADD COLUMN anuláveis: documentos_do_parceiro (jsonb), url_de_retorno (text)
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0029_colorful_zarek.sql
+path:db/migrations/meta/0029_snapshot.json

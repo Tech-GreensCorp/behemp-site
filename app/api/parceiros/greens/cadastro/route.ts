@@ -36,6 +36,10 @@ const esquema = z.object({
   telefone: z.string().trim().max(40).optional().nullable(),
   cpf: z.string().trim().max(20).optional().nullable(),
   pedidoDoParceiro: z.string().trim().max(64).optional().nullable(),
+  /** Quais dos 5 documentos o parceiro JÁ tem. O que faltar vira pendência não bloqueante. */
+  documentos: z.array(z.string()).max(20).optional().nullable(),
+  /** Para onde devolver o paciente. Conferida contra a lista de origens permitidas. */
+  urlDeRetorno: z.string().trim().max(500).optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -118,6 +122,8 @@ export async function POST(request: Request) {
       telefone: analise.data.telefone,
       cpf: analise.data.cpf,
       pedidoDoParceiro: analise.data.pedidoDoParceiro,
+      documentos: analise.data.documentos,
+      urlDeRetorno: analise.data.urlDeRetorno,
     });
 
     console.info('[parceiros] handoff recebido', {

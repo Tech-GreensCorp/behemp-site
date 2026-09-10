@@ -18,8 +18,10 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { pendenciasDe, normalizarManifesto } from '../../lib/parceiros/documentos';
+import { urlDeRetornoPermitida } from '../../lib/parceiros/retorno';
 import {
   assinar,
   lerCabecalhos,
@@ -352,5 +354,148 @@ describe('a rota é alcançável e não vaza dado pessoal', () => {
     // A mensagem do Postgres carrega o valor da coluna que violou a constraint — e as
     // colunas aqui são e-mail, telefone e CPF.
     expect(codigo(ROTA)).toMatch(/erro instanceof Error \? erro\.name/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. O RETORNO NÃO PODE VIRAR REDIRECIONAMENTO ABERTO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('a URL de retorno é conferida por ORIGEM, nunca por prefixo', () => {
+  const ANTES = process.env.PARCEIRO_ORIGENS_DE_RETORNO;
+  beforeEach(() => {
+    process.env.PARCEIRO_ORIGENS_DE_RETORNO = 'https://greens-corp.com,https://app.greens-corp.com';
+  });
+  afterEach(() => {
+    process.env.PARCEIRO_ORIGENS_DE_RETORNO = ANTES;
+  });
+
+  it.each(['https://greens-corp.com/login', 'https://app.greens-corp.com/checkout?x=1'])(
+    'aceita origem permitida: %s',
+    (u) => {
+      expect(urlDeRetornoPermitida(u)).not.toBeNull();
+    },
+  );
+
+  it('🔴 recusa domínio que COMEÇA com o permitido', () => {
+    // `https://greens-corp.com.evil.tld` começa com o nosso domínio e não é ele.
+    // Comparar prefixo de string é a forma clássica de errar isto.
+    expect(urlDeRetornoPermitida('https://greens-corp.com.evil.tld/roubar')).toBeNull();
+  });
+
+  it('🔴 recusa subdomínio não listado', () => {
+    expect(urlDeRetornoPermitida('https://qualquer.greens-corp.com/x')).toBeNull();
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>', 'http://greens-corp.com/login'])(
+    'recusa esquema perigoso ou inseguro: %s',
+    (u) => {
+      // `javascript:` e `data:` passam pelo construtor de URL e executam se chegarem a
+      // um href. E http:// simples entregaria o paciente por um canal sem TLS.
+      expect(urlDeRetornoPermitida(u)).toBeNull();
+    },
+  );
+
+  it('🔴 recusa http:// MESMO se a origem estiver na lista', () => {
+    /**
+     * Este caso existe porque uma SABOTAGEM passou verde: remover a checagem de protocolo
+     * não mudava nada, já que a lista de origens (todas https) sozinha recusava
+     * `javascript:` e `http://`. Os testes anteriores cobriam o COMPORTAMENTO, não a
+     * LINHA — eram vacuosos.
+     *
+     * Com um `http://` na lista, a checagem de protocolo vira a única defesa. É o cenário
+     * de alguém pôr um endereço de desenvolvimento na variável e ele vazar para produção.
+     */
+    process.env.PARCEIRO_ORIGENS_DE_RETORNO = 'http://greens-corp.com,https://greens-corp.com';
+    expect(urlDeRetornoPermitida('http://greens-corp.com/login')).toBeNull();
+    // CONTROLE: o https da mesma lista continua passando — senão o caso acima seria
+    // satisfeito por uma função que recusa tudo.
+    expect(urlDeRetornoPermitida('https://greens-corp.com/login')).not.toBeNull();
+  });
+
+  it('🔴 sem lista configurada, NADA é aceito', () => {
+    // Falha fechada: redirecionamento aberto é pior que botão de volta ausente.
+    process.env.PARCEIRO_ORIGENS_DE_RETORNO = '';
+    expect(urlDeRetornoPermitida('https://greens-corp.com/login')).toBeNull();
+  });
+
+  it('🔴 TODA gravação de urlDeRetorno passa pela validação', () => {
+    /**
+     * ⚠️ A primeira versão deste caso checava se `urlDeRetornoPermitida(` aparecia no
+     * arquivo — e uma sabotagem passou VERDE: existem DOIS pontos que gravam o campo (o
+     * insert e o reaproveitamento), e derrubar um deixava o outro satisfazendo o regex.
+     *
+     * É a sexta vez que uma checagem deste repositório confunde MENÇÃO com USO. A
+     * correção é a mesma de sempre: contar os pontos, não procurar a palavra.
+     *
+     * Validar na exibição em vez de na gravação espalharia a checagem por toda tela que
+     * use o campo — e bastaria uma esquecer para virar redirecionamento aberto.
+     */
+    const t = codigo(HANDOFF);
+    const gravacoes = [...t.matchAll(/urlDeRetorno:/g)];
+    expect(gravacoes.length, 'nenhuma gravação de urlDeRetorno encontrada').toBeGreaterThan(0);
+
+    for (const m of gravacoes) {
+      const trecho = t.slice(m.index, m.index + 90);
+      expect(trecho, `gravação sem validação: ${trecho.split('\n')[0]}`).toMatch(
+        /urlDeRetorno:\s*urlDeRetornoPermitida\(/,
+      );
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. PENDÊNCIA DE DOCUMENTO NÃO BLOQUEIA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('o manifesto vira aviso, nunca trava', () => {
+  it('quem não mandou nada tem os cinco como pendência', () => {
+    expect(pendenciasDe([])).toHaveLength(5);
+    expect(pendenciasDe(null)).toHaveLength(5);
+  });
+
+  it('o que o parceiro tem sai da lista', () => {
+    const p = pendenciasDe(['receita_medica', 'documento_identidade']);
+    expect(p.map((x) => x.chave).sort()).toEqual([
+      'autorizacao_anvisa',
+      'comprovante_residencia',
+      'laudo_medico',
+    ]);
+  });
+
+  it('o laudo é o único marcado como opcional', () => {
+    const p = pendenciasDe([]);
+    expect(p.filter((x) => x.opcional).map((x) => x.chave)).toEqual(['laudo_medico']);
+  });
+
+  it('documento desconhecido é descartado, não derruba a chamada', () => {
+    // Um documento novo do lado deles não pode quebrar o cadastro de um paciente aqui.
+    expect(normalizarManifesto(['receita_medica', 'coisa_nova', 42, null])).toEqual([
+      'receita_medica',
+    ]);
+    expect(normalizarManifesto('não é array')).toEqual([]);
+  });
+
+  it('🔴 a tela diz que a pendência NÃO impede continuar', () => {
+    const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
+    expect(fonte(FORM)).toMatch(/Nada disso impede você de continuar/);
+  });
+
+  it('🔴 nenhuma pendência entra na condição que libera o envio', () => {
+    // Se `pendencias` aparecesse no `podeEnviar`, a falta de um documento passaria a
+    // bloquear o cadastro — o oposto da D-06.
+    const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
+    const t = codigo(FORM).replace(/\s+/g, ' ');
+    const bloco = t.slice(t.indexOf('const podeEnviar'), t.indexOf('const podeEnviar') + 300);
+    expect(/pendencias/.test(bloco), 'pendência virou bloqueio').toBe(false);
+  });
+
+  it('🔴 quem já tem conta recebe um CAMINHO, não só uma mensagem', () => {
+    // Antes isto era só um texto de erro do Clerk: o paciente lia "já existe uma conta"
+    // e ficava preso, sem para onde ir.
+    const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
+    const t = fonte(FORM);
+    expect(t).toMatch(/jaTemConta/);
+    expect(t).toMatch(/Entrar na minha conta/);
   });
 });

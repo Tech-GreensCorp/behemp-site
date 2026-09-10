@@ -10,6 +10,8 @@ import {
 } from '@/lib/chatpro/solicitacao';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { somenteDigitosDoCpf } from '@/lib/validacao/cpf';
+import { normalizarManifesto } from './documentos';
+import { urlDeRetornoPermitida } from './retorno';
 
 /**
  * RECEBE O CADASTRO QUE VEIO DO PARCEIRO.
@@ -38,6 +40,10 @@ export interface EntradaDoHandoff {
   cpf?: string | null;
   /** O id do pedido no sistema do parceiro, quando houver. */
   pedidoDoParceiro?: string | null;
+  /** Manifesto: quais dos 5 documentos o parceiro já tem. */
+  documentos?: string[] | null;
+  /** Para onde devolver o paciente ao terminar. Conferida antes de gravar. */
+  urlDeRetorno?: string | null;
 }
 
 export interface ResultadoDoHandoff {
@@ -104,6 +110,12 @@ export class ServicoDeHandoff {
           ...(entrada.nomeCompleto?.trim() ? { nomeCompleto: entrada.nomeCompleto.trim() } : {}),
           ...(entrada.cpf ? { cpf: somenteDigitosDoCpf(entrada.cpf) } : {}),
           ...(entrada.pedidoDoParceiro ? { pedidoDoParceiro: entrada.pedidoDoParceiro } : {}),
+          ...(entrada.documentos
+            ? { documentosDoParceiro: normalizarManifesto(entrada.documentos) }
+            : {}),
+          ...(urlDeRetornoPermitida(entrada.urlDeRetorno)
+            ? { urlDeRetorno: urlDeRetornoPermitida(entrada.urlDeRetorno) }
+            : {}),
         })
         .where(eq(solicitacoesCadastro.id, existente.id));
       return this.reemitir(existente.id, existente.protocolo, false);
@@ -128,6 +140,11 @@ export class ServicoDeHandoff {
         parceiro: entrada.parceiro,
         eventoDoParceiro: entrada.eventoId,
         pedidoDoParceiro: entrada.pedidoDoParceiro?.trim() || null,
+        documentosDoParceiro: normalizarManifesto(entrada.documentos),
+        // 🔴 Conferida contra a lista de origens ANTES de gravar. Guardar primeiro e
+        // validar na hora de exibir espalharia a checagem por toda tela que a use — e
+        // bastaria uma esquecer para virar redirecionamento aberto.
+        urlDeRetorno: urlDeRetornoPermitida(entrada.urlDeRetorno),
         canalDeEntrega: 'parceiro_redirect',
       })
       .returning({ id: solicitacoesCadastro.id });

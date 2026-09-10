@@ -23,6 +23,10 @@ export interface SolicitacaoValidada {
   email: string | null;
   telefone: string | null;
   expiraEm: Date;
+  /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
+  documentosDoParceiro: string[] | null;
+  /** Destino de volta, JÁ conferido contra a lista de origens quando foi gravado. */
+  urlDeRetorno: string | null;
 }
 
 export interface SolicitacaoRecusada {
@@ -77,6 +81,8 @@ export async function validarTokenDeCadastro(
     email: linha.email,
     telefone: linha.telefone,
     expiraEm: linha.expiraEm,
+    documentosDoParceiro: linha.documentosDoParceiro ?? null,
+    urlDeRetorno: linha.urlDeRetorno ?? null,
   };
 }
 

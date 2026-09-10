@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { solicitacaoCadastroOrigemEnum, solicitacaoCadastroStatusEnum } from './enums';
@@ -121,6 +121,32 @@ export const solicitacoesCadastro = pgTable(
      * localizar o pedido de lá. Confundir os dois faz a volta procurar no lugar errado.
      */
     pedidoDoParceiro: text('pedido_do_parceiro'),
+    /**
+     * O MANIFESTO dos documentos que o parceiro já tem — e, por ausência, dos que faltam
+     * (ADR-0016 D-06). São cinco: receita médica, laudo (opcional), comprovante de
+     * residência, autorização da ANVISA e documento de identidade.
+     *
+     * 🔴 GUARDA O QUE EXISTE LÁ, NÃO OS ARQUIVOS. A cópia dos blobs é fase 2: mover
+     * documento de saúde entre duas empresas exige URL assinada na origem, validação no
+     * destino, store privado e prazo de retenção — e o Item 6 registra que este
+     * repositório ainda tem 10+ uploads em store público.
+     *
+     * ⚠️ PENDÊNCIA NÃO BLOQUEIA. Quem chega sem receita é justamente quem mais precisa da
+     * teleconsulta; barrá-lo na porta é recusar quem o produto existe para atender.
+     */
+    documentosDoParceiro: jsonb('documentos_do_parceiro').$type<string[]>(),
+    /**
+     * Para onde devolver o paciente quando ele terminar aqui (ADR-0016 D-08).
+     *
+     * Ele veio da Greens porque quer comprar medicamento, e a compra acontece lá.
+     * Terminar sem caminho de volta é perder alguém no meio de um processo de duas
+     * empresas.
+     *
+     * ⚠️ VALIDADA CONTRA UMA LISTA DE ORIGENS PERMITIDAS antes de virar link. Aceitar
+     * URL arbitrária de um parceiro é redirecionamento aberto — a vítima confia no nosso
+     * domínio e aterrissa onde o atacante quiser.
+     */
+    urlDeRetorno: text('url_de_retorno'),
 
     /**
      * Como o link chegou ao paciente: `bot_reply` (a resposta virou mensagem),

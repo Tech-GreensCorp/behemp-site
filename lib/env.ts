@@ -51,6 +51,14 @@ const envSchema = z.object({
   PARCEIRO_GREENS_SEGREDO_SAIDA: z.string().optional(),
   /** Base da API da Greens, para o retorno. */
   PARCEIRO_GREENS_API_URL: z.string().url().optional(),
+  /**
+   * Origens para as quais podemos devolver o paciente, separadas por vírgula.
+   * Ex.: `https://greens-corp.com,https://app.greens-corp.com`
+   *
+   * ⚠️ Vazio = nenhum retorno é aceito. Falha fechada de propósito: um redirecionamento
+   * aberto é pior que um botão de volta ausente.
+   */
+  PARCEIRO_ORIGENS_DE_RETORNO: z.string().optional(),
 
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
