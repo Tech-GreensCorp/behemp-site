@@ -381,6 +381,18 @@ nada: está tudo na `main`. O que faltava era o processo executar o que já lhe 
 Diagnóstico completo, risco medido e o que ficou de fora: `docs/04-LISTA-DE-AFAZERES.md`
 Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
 
+### ⚪ Achado de 10/09/2026 — o índice de ADRs está 11 entradas atrás
+
+`docs/adr/README.md` lista até a **0007**. As ADRs **0008 a 0018** existem em disco e não estão
+lá. Quem consultar o índice para saber se algo já foi decidido vai concluir que não foi.
+
+**O custo já apareceu:** ao responder sobre o wizard da IA clínica, eu li o documento que
+descreve o VidAI e não a ADR-0004 que decidiu o que fazer com ele — e afirmei ao dono que
+faltava implementar algo que tinha sido **rejeitado com fundamento**. Índice incompleto não é
+desorganização: é decisão perdida.
+
+Correção: uma linha por ADR, e o status conferido contra o arquivo. Trabalho próprio.
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
