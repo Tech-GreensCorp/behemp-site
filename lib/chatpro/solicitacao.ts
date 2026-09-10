@@ -55,7 +55,7 @@ export interface ResultadoDoLink {
 }
 
 /** Horas de validade do link. 168 = 7 dias. */
-function validadeEmHoras(): number {
+export function validadeEmHoras(): number {
   const bruto = Number(process.env.CHATPRO_LINK_TTL_HORAS);
   return Number.isFinite(bruto) && bruto > 0 ? bruto : 168;
 }
@@ -80,7 +80,7 @@ function urlBase(): string {
  * 32 bytes aleatórios em hexadecimal = 64 caracteres. O valor cru sai daqui uma única vez,
  * dentro da resposta que vai ao paciente; o banco guarda só o hash.
  */
-function gerarToken(): { token: string; hash: string } {
+export function gerarToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString('hex');
   return { token, hash: createHash('sha256').update(token).digest('hex') };
 }
@@ -97,7 +97,7 @@ export function hashDoToken(token: string): string {
  * simultâneas podem calcular o mesmo valor — o índice único da coluna recusa a segunda, e
  * quem chama tenta de novo.
  */
-async function proximoProtocolo(): Promise<string> {
+export async function proximoProtocolo(): Promise<string> {
   const [linha] = await db
     .select({ protocolo: solicitacoesCadastro.protocolo })
     .from(solicitacoesCadastro)
@@ -109,7 +109,7 @@ async function proximoProtocolo(): Promise<string> {
   return `SOL-${String(proximo).padStart(6, '0')}`;
 }
 
-function montarLink(token: string): string {
+export function montarLink(token: string): string {
   return `${urlBase()}${caminhoDoFormulario()}/${token}`;
 }
 

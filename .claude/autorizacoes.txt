@@ -281,3 +281,15 @@ path:db/migrations/meta/0026_snapshot.json
 #   → aplicada APENAS no Postgres local; Neon intocado.
 path:db/migrations/0027_magenta_shockwave.sql
 path:db/migrations/meta/0027_snapshot.json
+
+# ── Autorizado pelo dono em 09/09/2026, handoff Greens → BeHemp (ADR-0016) ────
+# "nos fechamos tudo daqui da behemp em relação a primeira adr"
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN/SET NOT NULL = ZERO):
+#   · 1x ALTER TYPE ADD VALUE 'greens_handoff' — acréscimo a enum, não remove valor
+#   · 3x ADD COLUMN anuláveis: parceiro, evento_do_parceiro, pedido_do_parceiro
+#   · 1x índice COMUM (não único) sobre evento_do_parceiro — unique faria reentrega
+#        de webhook virar 500, mesmo motivo do behempReferralId da Greens
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0028_plain_pretty_boy.sql
+path:db/migrations/meta/0028_snapshot.json

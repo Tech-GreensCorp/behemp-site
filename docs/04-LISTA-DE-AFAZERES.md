@@ -1357,3 +1357,69 @@ dois sistemas**, e pesa mais na Greens, que fala com o paciente primeiro.
 
 **Os arquivos** (fase 2, nas duas direções): manifesto agora, blob depois.
 **A automação da conferência** (ADR-0017 §5): declarada como futura, com dono e sem data.
+
+---
+
+## Item 24 — ✅ Lado BeHemp da ADR-0016 (ida), implementado em 09/09/2026
+
+**O que foi feito:** a ponta que **recebe** o cadastro que vem da Greens. A ponta que envia é
+trabalho de lá (ADR-0027), e o caminho de volta (D-09) é item próprio.
+
+### O contrato, que estava escondido no schema da Greens
+
+O `§6.1` bloqueou esta implementação até o `CONTRATO §4/§6` ser cruzado. Ele **não existe como
+documento** — é citado no schema e nunca foi escrito. O schema é a fonte, e especifica:
+
+| campo (lá)         | o que fixa                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `behempReferralId` | `VarChar(64)`, **nosso** id · _"é por ele que o webhook da Behemp localiza a solicitação"_ |
+| — não é `@unique`  | deliberado: unique faria reentrega de webhook virar erro 500                               |
+| `behempJourney`    | `!= NONE` → **Mercado Pago com desconto collab**; `NONE` → Cannect                         |
+
+🔴 **Isso muda o peso do handoff:** ele não decide só um cadastro — decide **o gateway e o preço
+de uma compra**. A idempotência deixou de ser higiene e virou requisito de dinheiro.
+
+### O que existe no disco
+
+| camada                         | arquivo                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| HMAC + janela de 300 s         | `lib/parceiros/assinatura.ts`                                                    |
+| recebe, idempotente por evento | `lib/parceiros/handoff.ts`                                                       |
+| rota                           | `app/api/parceiros/greens/cadastro/route.ts`                                     |
+| rota liberada do Clerk         | `middleware.ts` — `'/api/parceiros(.*)'`                                         |
+| campos                         | `parceiro`, `evento_do_parceiro`, `pedido_do_parceiro` + origem `greens_handoff` |
+| migration                      | `0028_plain_pretty_boy.sql` — **zero destrutivo**                                |
+| guarda                         | `handoff-do-parceiro-e-assinado-e-idempotente` — **29 casos**, 13 sabotagens     |
+
+### Como foi provado, ao vivo
+
+| #   | teste                                                        | resultado                                           |
+| --- | ------------------------------------------------------------ | --------------------------------------------------- |
+| 1–3 | sem assinatura · assinatura errada · fora da janela (10 min) | **401** nos três                                    |
+| 4   | assinatura correta                                           | **200** com `referralId` (cuid2, cabe nos 64)       |
+| 5   | 🔴 **reenvio do mesmo evento**                               | **mesmo** `referralId` e protocolo, `reenvio: true` |
+| 6   | corpo adulterado com assinatura do original                  | **401**                                             |
+| 7   | `eventoId` do corpo divergindo do cabeçalho                  | **422 EVENTO_DIVERGENTE**                           |
+| 8   | sem e-mail nem telefone                                      | **422 CONTATO_INSUFICIENTE**                        |
+| 9   | banco após o reenvio                                         | **1 linha**, não duas                               |
+| 10  | o paciente abre o link                                       | nome, e-mail e telefone da Greens pré-preenchidos   |
+
+### 🔴 Dois defeitos que o próprio processo pegou
+
+**1. O corpo sobrescrevia o `eventoId` do cabeçalho.** O `...analise.data` vinha **depois** do
+`eventoId` — o oposto do que o comentário ao lado afirmava. O `tsc` acusou (`TS2783`).
+**Corrigido eliminando a classe:** campo a campo, sem spread. Trocar a ordem resolveria o caso de
+hoje; proibir o spread impede que um campo novo no corpo, amanhã, alcance parâmetro que ninguém
+listou de propósito. O guarda cobra a ausência do spread, não a ordem.
+
+**2. O container do Postgres estava parado** e o `db:migrate` falhava com erro que não diz isso.
+Já catalogado antes; repetiu.
+
+### O que fica de fora, declarado
+
+| #   | o quê                                         | por quê                          |
+| --- | --------------------------------------------- | -------------------------------- |
+| 1   | O **caminho de volta** (ADR-0016 D-09)        | item próprio; precede a ADR-0018 |
+| 2   | A ponta que **envia**, na Greens              | ADR-0027, trabalho de lá         |
+| 3   | Cópia dos 5 arquivos                          | fase 2, nas duas direções        |
+| 4   | `PARCEIRO_GREENS_SEGREDO_ENTRADA` em produção | segue com o dono                 |

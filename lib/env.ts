@@ -39,6 +39,19 @@ const envSchema = z.object({
    */
   CHATPRO_START_SEM_CONFIRMACAO: z.string().optional(),
 
+  // ── Parceiros (ADR-0016) ───────────────────────────────────────────────────
+  /** Segredo do HMAC das chamadas que a Greens faz PARA CÁ (handoff de cadastro). */
+  PARCEIRO_GREENS_SEGREDO_ENTRADA: z.string().optional(),
+  /**
+   * Segredo do HMAC das chamadas que NÓS fazemos PARA A GREENS (retorno de receita/ANVISA).
+   *
+   * ⚠️ DIFERENTE do de entrada, de propósito: um por direção. Vazar um não compromete o
+   * outro, e rotacionar um não exige parar as duas pontas ao mesmo tempo.
+   */
+  PARCEIRO_GREENS_SEGREDO_SAIDA: z.string().optional(),
+  /** Base da API da Greens, para o retorno. */
+  PARCEIRO_GREENS_API_URL: z.string().url().optional(),
+
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),

@@ -324,6 +324,56 @@ instrução mandaria abandonar o trabalho de uma tarde.
 Li `git status`, vi arquivos que não eram meus, e **concluí autoria** — que o `git status` não
 informa. Autoria se lê no histórico ou se pergunta; não se deduz de um arquivo estar modificado.
 
+## §7 — ✅ DESBLOQUEADO em 09/09/2026 — o contrato, lido no schema
+
+O §6.1 bloqueou a implementação até o `CONTRATO §4/§6` ser cruzado. Ele foi procurado e
+**não existe como documento** — é citado no schema da Greens e nunca foi escrito. Então a fonte
+é o próprio schema, e ele especifica o suficiente:
+
+| o que o schema fixa | valor                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `behempReferralId`  | `VarChar(64)` — **nosso** id, do ponto de vista deles                                  |
+| para que serve      | _"é por ele que **o webhook da Behemp localiza a solicitação**"_                       |
+| unicidade           | **não é `@unique`**, de propósito: um unique faria reentrega de webhook virar erro 500 |
+| `behempJourney`     | `SENT_TO_BEHEMP` na ida · `CAME_FROM_BEHEMP` na volta                                  |
+| efeito no dinheiro  | `!= NONE` → **Mercado Pago com desconto collab**; `NONE` → Cannect                     |
+
+### D-12 — O `referralId` é o `id` da nossa solicitação, e vai na resposta da ida
+
+```
+Greens ──POST assinado──►  BeHemp cria solicitacoes_cadastro
+       ◄── { token, expiraEm, referralId }
+                              │
+       grava behempReferralId = referralId
+             behempJourney    = SENT_TO_BEHEMP
+```
+
+E na volta o caminho se fecha: mandamos o `referralId`, e a Greens acha a solicitação por ele.
+
+**Por que o `id` (cuid2, 24 caracteres) e não o `protocolo`.** O protocolo é **sequencial**
+(`SOL-000123`): quem tiver um consegue adivinhar os vizinhos. Como este id atravessa a fronteira
+entre duas empresas e é a chave que localiza um pedido, ele precisa ser opaco. Cabe folgado nos
+64 caracteres.
+
+**Rejeitado: mandar o `protocolo`.** Sequencial e adivinhável.
+**Rejeitado: a Greens gerar o id.** O schema diz que o id é _"do outro lado"_ — quem cria o
+registro é quem o nomeia, senão duas partes geram chave para a mesma coisa.
+
+### D-13 — 🔴 ESTE HANDOFF MEXE NO PREÇO, E ISSO MUDA O PESO DELE
+
+Descoberto no schema, não estava na versão original desta ADR: `behempJourney != NONE` roteia o
+pagamento para **Mercado Pago com desconto collab**; `NONE` vai para a Cannect.
+
+⚠️ **Consequência:** um handoff duplicado, perdido ou disparado por engano não erra só um
+cadastro — **erra o gateway e o desconto de uma compra**. É por isso que a idempotência por id de
+evento (D-02) deixa de ser boa prática e passa a ser requisito de dinheiro.
+
+E é por isso que o `behempReferralId` **não é `@unique`** lá: a reentrega precisa ser absorvida
+em silêncio, não virar erro.
+
+**Rejeitado: tratar o handoff como "só cadastro".** Era o que esta ADR fazia antes de ler o
+schema.
+
 ## §5 — Fontes
 
 **Lidas.** OWASP, _Information exposure through query strings in URL_ — a URL é gravada em

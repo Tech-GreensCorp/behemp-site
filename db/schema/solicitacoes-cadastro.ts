@@ -95,6 +95,33 @@ export const solicitacoesCadastro = pgTable(
     chatproLeadId: text('chatpro_lead_id'),
     /** UUID da conversa. Muda a cada atendimento; serve para reconstituir o caminho. */
     chatproSessionId: text('chatpro_session_id'),
+    // ── Contrato com o parceiro (ADR-0016 §7) ──────────────────────────────────
+    /**
+     * Qual parceiro encaminhou este paciente. `null` = veio direto pela BeHemp.
+     *
+     * Existe separado de `origem` porque as duas respondem perguntas diferentes: `origem`
+     * diz por qual MECANISMO a solicitação nasceu (bot, formulário, painel), e este diz
+     * de QUEM ela veio. Um parceiro novo amanhã não deve exigir um valor novo de enum.
+     */
+    parceiro: text('parceiro'),
+    /**
+     * O id do evento que trouxe este cadastro — a chave de idempotência do handoff.
+     *
+     * 🔴 É POR ELE QUE UM REENVIO NÃO VIRA SEGUNDA SOLICITAÇÃO. E aqui isso não é só
+     * higiene: do lado da Greens, `behempJourney != NONE` roteia o pagamento para o
+     * Mercado Pago **com desconto collab**. Um handoff duplicado erraria o gateway e o
+     * preço de uma compra, não só um cadastro.
+     */
+    eventoDoParceiro: text('evento_do_parceiro'),
+    /**
+     * O id do pedido no sistema do parceiro, quando ele manda um.
+     *
+     * ⚠️ NÃO é o nosso `id`. O caminho de volta usa o NOSSO id como `behempReferralId`
+     * lá (ADR-0016 D-12); este campo é a direção contrária — o que eles nos deram para
+     * localizar o pedido de lá. Confundir os dois faz a volta procurar no lugar errado.
+     */
+    pedidoDoParceiro: text('pedido_do_parceiro'),
+
     /**
      * Como o link chegou ao paciente: `bot_reply` (a resposta virou mensagem),
      * `start_redirect` (ele clicou numa URL e caiu no formulário) ou `manual` (atendente
@@ -115,5 +142,13 @@ export const solicitacoesCadastro = pgTable(
     index('solicitacoes_cadastro_lead_idx').on(t.chatproLeadId),
     index('solicitacoes_cadastro_telefone_idx').on(t.telefone),
     index('solicitacoes_cadastro_status_idx').on(t.status),
+    /**
+     * A chave de idempotência do handoff. Índice COMUM, não único — de propósito, e pelo
+     * mesmo motivo que o `behempReferralId` da Greens não é `@unique`: reentrega de
+     * webhook precisa ser absorvida em silêncio, não virar erro 500. A unicidade é
+     * garantida pela consulta antes do insert, que sabe o que fazer com a colisão
+     * (devolver o mesmo token) — coisa que uma constraint não sabe.
+     */
+    index('solicitacoes_cadastro_evento_parceiro_idx').on(t.eventoDoParceiro),
   ],
 );

@@ -63,6 +63,15 @@ const isPublicRoute = createRouteMatcher([
    * o log da aplicação não mostraria nada — porque a requisição nunca chegaria à rota.
    */
   '/api/chatpro(.*)',
+  /**
+   * 🔴 O HANDOFF DOS PARCEIROS TAMBÉM NÃO USA CLERK.
+   * Quem chama é o servidor da Greens, não um navegador com sessão. A autenticação é
+   * HMAC-SHA256 sobre id + timestamp + corpo, com janela de 300 s — mais forte que uma
+   * sessão de navegador, porque prova também a INTEGRIDADE do corpo.
+   * Sem esta linha, a chamada receberia um redirect para a tela de login e o log da
+   * aplicação não mostraria nada: foi exatamente o que aconteceu com o ChatPro (Item 21).
+   */
+  '/api/parceiros(.*)',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',

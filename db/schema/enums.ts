@@ -302,6 +302,11 @@ export const solicitacaoCadastroOrigemEnum = pgEnum('solicitacao_cadastro_origem
   'chatpro_start',
   'chatpro_start_nao_verificado',
   'chatpro_webhook',
+  /**
+   * O paciente preencheu o formulário de intake NA GREENS e escolheu continuar aqui.
+   * Os dados chegaram por back-channel assinado; com ele veio só o token (ADR-0016).
+   */
+  'greens_handoff',
 ]);
 
 /** Onde a solicitação está. `link_gerado` é o estado em que ela nasce. */
