@@ -49,7 +49,8 @@ const pool = new pg.Pool({
   connectionString: url,
   // O Neon exige TLS. `rejectUnauthorized: false` é o que o driver do Neon usa por padrão;
   // aqui é explícito para o certificado da AWS não derrubar a conexão.
-  ssl: url.includes('localhost') || url.includes('127.0.0.1') ? false : { rejectUnauthorized: false },
+  ssl:
+    url.includes('localhost') || url.includes('127.0.0.1') ? false : { rejectUnauthorized: false },
   max: 1,
 });
 
