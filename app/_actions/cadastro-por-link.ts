@@ -193,6 +193,9 @@ export async function concluirCadastroPorLink(
         email: emailConfirmado,
         telefone,
         cpf,
+        // 🔴 Fecha o ciclo: é por aqui que o aviso de volta descobre de qual parceiro
+        // este paciente veio, quando a receita dele ficar pronta.
+        pacienteId,
         jaFazTratamento: dados.jaFazTratamento,
         tratamentoAtual: dados.jaFazTratamento ? dados.tratamentoAtual?.trim() || null : null,
       })

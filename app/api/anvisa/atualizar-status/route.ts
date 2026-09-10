@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { notificarParceiro } from '@/lib/parceiros/notificar';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
@@ -45,6 +46,19 @@ export async function POST(request: NextRequest) {
     .set(dadosUpdate)
     .where(eq(autorizacoesAnvisa.id, autorizacaoId))
     .returning({ pacienteId: autorizacoesAnvisa.pacienteId });
+
+  /**
+   * 🔴 AVISA O PARCEIRO QUE A AUTORIZAÇÃO SAIU (ADR-0016 D-09).
+   *
+   * Só quando o status é `aprovado`: os demais são etapas do processo, e avisar a cada
+   * mudança encheria o funil do parceiro de ruído — ele quer saber que TERMINOU.
+   *
+   * `notificarParceiro` nunca lança, e só enfileira. A atualização de status não pode
+   * falhar porque um parceiro está fora do ar.
+   */
+  if (status === 'aprovado' && atualizado?.pacienteId) {
+    await notificarParceiro({ pacienteId: atualizado.pacienteId, tipo: 'anvisa_concluida' });
+  }
 
   // Notificar paciente via Pusher
   if (atualizado?.pacienteId) {

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { parceiroEventosSaida, solicitacoesCadastro } from '@/db/schema';
@@ -21,10 +21,16 @@ import { parceiroEventosSaida, solicitacoesCadastro } from '@/db/schema';
 export type TipoDeAviso = 'receita_emitida' | 'anvisa_concluida';
 
 export async function notificarParceiro(params: {
-  solicitacaoId: string;
+  /** Um dos dois. `pacienteId` é o que os pontos clínicos têm em mãos. */
+  solicitacaoId?: string;
+  pacienteId?: string;
   tipo: TipoDeAviso;
 }): Promise<{ enfileirado: boolean; motivo?: string }> {
   try {
+    if (!params.solicitacaoId && !params.pacienteId) {
+      return { enfileirado: false, motivo: 'sem_identificador' };
+    }
+
     const [solicitacao] = await db
       .select({
         id: solicitacoesCadastro.id,
@@ -32,7 +38,17 @@ export async function notificarParceiro(params: {
         protocolo: solicitacoesCadastro.protocolo,
       })
       .from(solicitacoesCadastro)
-      .where(eq(solicitacoesCadastro.id, params.solicitacaoId))
+      .where(
+        and(
+          params.solicitacaoId
+            ? eq(solicitacoesCadastro.id, params.solicitacaoId)
+            : eq(solicitacoesCadastro.pacienteId, params.pacienteId!),
+          isNull(solicitacoesCadastro.deletedAt),
+        ),
+      )
+      // Se o paciente tiver mais de uma solicitação, vale a mais recente — é a que
+      // corresponde ao encaminhamento vigente.
+      .orderBy(desc(solicitacoesCadastro.createdAt))
       .limit(1);
 
     // Paciente que não veio de parceiro nenhum não gera aviso — é a maioria.

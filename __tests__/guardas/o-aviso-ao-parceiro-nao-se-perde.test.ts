@@ -245,3 +245,81 @@ describe('o cron é protegido e o aviso não carrega prontuário', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. OS GATILHOS — LIGADOS, E INCAPAZES DE DERRUBAR O ATO CLÍNICO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PRESCRICOES = 'app/(medico)/_actions/prescricoes.ts';
+const ANVISA = 'app/api/anvisa/atualizar-status/route.ts';
+
+describe('o aviso é disparado onde deve, e não atrapalha quem o dispara', () => {
+  it('🔴 a receita emitida dispara o aviso', () => {
+    // Sem isto a fila nunca recebe nada: o caminho de volta fica pronto e mudo.
+    expect(codigo(PRESCRICOES), 'o gatilho da receita sumiu').toMatch(
+      /notificarParceiro\(\{[^}]*tipo: 'receita_emitida'/,
+    );
+  });
+
+  it('🔴 a ANVISA aprovada dispara o aviso', () => {
+    expect(codigo(ANVISA), 'o gatilho da ANVISA sumiu').toMatch(
+      /notificarParceiro\(\{[^}]*tipo: 'anvisa_concluida'/,
+    );
+  });
+
+  it('🔴 a ANVISA só avisa quando APROVADO, não a cada mudança de status', () => {
+    /**
+     * `em_analise`, `pendencia_documental` e `rejeitado` são etapas do processo. Avisar a
+     * cada uma encheria o funil do parceiro de ruído — ele quer saber que TERMINOU.
+     */
+    const t = codigo(ANVISA).replace(/\s+/g, ' ');
+    expect(t).toMatch(/if \(status === 'aprovado'[^)]*\)[\s\S]{0,140}notificarParceiro/);
+  });
+
+  it('🔴 nenhum dos dois gatilhos está dentro de try/catch PRÓPRIO', () => {
+    /**
+     * Parece contraintuitivo exigir a AUSÊNCIA de try/catch — mas é o ponto.
+     *
+     * `notificarParceiro` já não lança: o try/catch mora dentro dela, e o guarda acima
+     * prova isso. Envolvê-la de novo no ponto de chamada esconderia uma futura mudança
+     * que a fizesse lançar: o erro seria engolido no lugar errado, e ninguém saberia que
+     * a garantia foi perdida.
+     *
+     * A proteção precisa estar em UM lugar só, e é onde ela é testada.
+     */
+    for (const [nome, arq] of [
+      ['prescrições', PRESCRICOES],
+      ['anvisa', ANVISA],
+    ] as const) {
+      const t = codigo(arq);
+      const i = t.indexOf('notificarParceiro(');
+      expect(i, `${nome}: chamada não encontrada`).toBeGreaterThan(-1);
+      // Os 200 caracteres antes da chamada não podem abrir um try.
+      const antes = t.slice(Math.max(0, i - 200), i);
+      const abriuTry = antes.lastIndexOf('try {');
+      const fechou = antes.lastIndexOf('}');
+      expect(
+        abriuTry > fechou,
+        `${nome}: a chamada foi envolvida em try/catch — a proteção deve viver só dentro de notificarParceiro`,
+      ).toBe(false);
+    }
+  });
+
+  it('🔴 o vínculo solicitação↔paciente existe, senão o aviso não tem destinatário', () => {
+    // Quando a receita fica pronta, o sistema tem o `pacienteId` — e sem esta coluna não
+    // teria como descobrir de qual parceiro aquela pessoa veio.
+    expect(fonte('db/schema/solicitacoes-cadastro.ts')).toMatch(
+      /pacienteId: text\('paciente_id'\)/,
+    );
+    expect(
+      codigo('app/_actions/cadastro-por-link.ts'),
+      'o cadastro parou de gravar o vínculo',
+    ).toMatch(/pacienteId,/);
+  });
+
+  it('aceita pacienteId OU solicitacaoId, e recusa nenhum dos dois', () => {
+    const t = codigo(NOTIFICAR);
+    expect(t).toMatch(/motivo: 'sem_identificador'/);
+    expect(t).toMatch(/eq\(solicitacoesCadastro\.pacienteId, params\.pacienteId!\)/);
+  });
+});

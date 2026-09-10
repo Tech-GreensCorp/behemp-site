@@ -311,3 +311,37 @@ path:db/migrations/meta/0029_snapshot.json
 #   → aplicada APENAS no Postgres local; Neon intocado.
 path:db/migrations/0030_lame_madripoor.sql
 path:db/migrations/meta/0030_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO DE ESCOPO — o gatilho do aviso ao parceiro (09/09/2026) ────
+# Palavras do dono: "pode colocar os 2, temos que fazer esse fluxo funcionar e conectar
+# eles... claro que vamos fazer QA pra testar e isso não está em produção ativa e teremos
+# que deixar isso pronto até segunda."
+#
+# O QUE ESTA AUTORIZAÇÃO LIBERA: duas chamadas a `notificarParceiro()` — uma quando a
+# receita é assinada, outra quando a autorização da ANVISA é concluída. Uma linha em cada
+# ponto, em área clínica.
+#
+# POR QUE É SEGURO AGORA — dois interruptores independentes, os dois desligados:
+#   · BeHemp: sem PARCEIRO_GREENS_API_URL preenchida, o enviador NEM REIVINDICA da fila
+#   · Greens: ANVISA_HELP_CARD_ENABLED = false — nenhum paciente alcança o caminho
+#   → o gatilho pode ser ligado sem que um único evento saia daqui.
+#
+# A PROTEÇÃO QUE O CÓDIGO CARREGA: `notificarParceiro` NUNCA lança (try/catch em volta de
+# tudo, provado por sabotagem no guarda `o-aviso-ao-parceiro-nao-se-perde`). Se a Greens
+# estiver fora, o médico assina a receita normalmente e o aviso espera na fila.
+#
+# ⚠️ NENHUM `path:` FOI LIBERADO, e isto é a correção de um erro meu.
+# Eu havia escrito `path:lib/receituario/` aqui por antecipação — e o guarda
+# `hooks-de-escopo` ficou VERMELHO acusando que a proteção daquela área tinha caído.
+# Ele estava certo: os dois pontos que a autorização precisava eram
+# `app/(medico)/_actions/prescricoes.ts` e `app/api/anvisa/atualizar-status/route.ts`,
+# **nenhum dos dois em `lib/receituario/`**.
+#
+# Autorização mais larga que a necessidade é buraco: eu teria deixado uma área clínica
+# destravada para sempre por causa de duas linhas que nem moram nela. O `CLAUDE.md` já
+# registra essa classe — "escape amplo virou buraco" — e desta vez quem pegou foi o guarda.
+# A migration que o vínculo exigiu:
+#   · 1x ADD COLUMN anulável (paciente_id) + 1 índice comum. Sem FK de propósito: o
+#     vínculo é rastro, não integridade — e uma FK faria a exclusão de paciente esbarrar.
+path:db/migrations/0031_tranquil_karma.sql
+path:db/migrations/meta/0031_snapshot.json

@@ -147,6 +147,18 @@ export const solicitacoesCadastro = pgTable(
      * domínio e aterrissa onde o atacante quiser.
      */
     urlDeRetorno: text('url_de_retorno'),
+    /**
+     * O paciente que esta solicitação virou. Preenchido ao concluir o cadastro.
+     *
+     * 🔴 É A PEÇA QUE FECHA O CICLO. Sem ela, quando a receita fica pronta o sistema sabe
+     * o `pacienteId` e não tem como descobrir de qual parceiro aquela pessoa veio — o
+     * aviso de volta não teria destinatário.
+     *
+     * ⚠️ Sem FK de propósito: a coluna existe em `solicitacoes_cadastro`, que é de
+     * cadastro e não clínica, e uma FK para `pacientes` faria a exclusão de um paciente
+     * (soft delete, mas ainda assim) esbarrar aqui. O vínculo é rastro, não integridade.
+     */
+    pacienteId: text('paciente_id'),
 
     /**
      * Como o link chegou ao paciente: `bot_reply` (a resposta virou mensagem),
@@ -168,6 +180,8 @@ export const solicitacoesCadastro = pgTable(
     index('solicitacoes_cadastro_lead_idx').on(t.chatproLeadId),
     index('solicitacoes_cadastro_telefone_idx').on(t.telefone),
     index('solicitacoes_cadastro_status_idx').on(t.status),
+    // A busca do caminho de volta: dado um paciente, de qual parceiro ele veio?
+    index('solicitacoes_cadastro_paciente_idx').on(t.pacienteId),
     /**
      * A chave de idempotência do handoff. Índice COMUM, não único — de propósito, e pelo
      * mesmo motivo que o `behempReferralId` da Greens não é `@unique`: reentrega de
