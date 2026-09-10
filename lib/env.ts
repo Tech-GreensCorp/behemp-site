@@ -14,6 +14,31 @@ const envSchema = z.object({
   // ── Banco de Dados (Neon PostgreSQL) ─────────────────────────
   DATABASE_URL: z.string().url('DATABASE_URL é obrigatória'),
 
+  // ── ChatPro — o paciente que chega pelo WhatsApp (09/09/2026) ────────────────
+  /**
+   * Segredo do cabeçalho `x-chatpro-intake-secret`, usado por `/bot-link` e `/intake`.
+   * Sem ele as duas rotas ficam FECHADAS: endpoint que cria cadastro de paciente nunca
+   * deve abrir por falta de configuração.
+   */
+  CHATPRO_INTAKE_SECRET: z.string().optional(),
+  /** Segredo que vai no caminho da URL do webhook. 32+ bytes aleatórios em hexadecimal. */
+  CHATPRO_WEBHOOK_PATH_TOKEN: z.string().optional(),
+  /** 🔴 Dá acesso a TODAS as conversas da instância. Só `lib/chatpro/cliente.ts` o lê. */
+  CHATPRO_INSTANCE_TOKEN: z.string().optional(),
+  CHATPRO_INSTANCE_ID: z.string().optional(),
+  CHATPRO_CHAT_API_URL: z.string().url().default('https://sparks.chatpro.com.br'),
+  /** Validade do link em horas. 168 = 7 dias. */
+  CHATPRO_LINK_TTL_HORAS: z.coerce.number().int().positive().default(168),
+  /** Caminho do formulário de cadastro. Fica em variável porque a rota ainda está sendo definida. */
+  CHATPRO_CADASTRO_PATH: z.string().default('/cadastro'),
+  /** Confirmar o contato na API do ChatPro também no `/intake` (no `/bot-link` é sempre). */
+  CHATPRO_CONFIRMAR_NO_INTAKE: z.string().optional(),
+  /**
+   * Permite que `/start` crie solicitação sem confirmar o contato — **só** quando a URL traz
+   * o identificador, que é um UUID e portanto não adivinhável. Telefone sozinho nunca basta.
+   */
+  CHATPRO_START_SEM_CONFIRMACAO: z.string().optional(),
+
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),
@@ -39,6 +64,13 @@ const envSchema = z.object({
   NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: z.string().optional(),
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email().optional(),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
+
+  // ── Retransmissão de mídia da teleconsulta (Cloudflare Realtime TURN) ──
+  // Escolhido pelo dono em 20/08/2026 (Item 8 do 04-LISTA-DE-AFAZERES). Opcionais de
+  // propósito: sem elas, a videochamada usa só STUN e o cliente avisa que não há
+  // retransmissão — em vez de cair no relay público de terceiro que havia antes.
+  CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
+  CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
 
   // ── Chat em Tempo Real (Pusher) ───────────────────────────────
   NEXT_PUBLIC_PUSHER_KEY: z.string().optional(),

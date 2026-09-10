@@ -1,4 +1,4 @@
-import { pgTable, text, date, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, date, index, boolean } from 'drizzle-orm/pg-core';
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { users } from './users';
 import { medicos } from './medicos';
@@ -36,6 +36,20 @@ export const pacientes = pgTable(
     peso: text('peso'),
     altura: text('altura'),
     historicoMedico: text('historico_medico'),
+    /**
+     * Declarado pelo próprio paciente no cadastro que vem do WhatsApp.
+     *
+     * ⚠️ TRÊS ESTADOS: `true`, `false` e **`null` (não informado)**. Quem se cadastrou
+     * por outro caminho não respondeu esta pergunta, e afirmar `false` sobre essas
+     * pessoas seria inventar uma resposta clínica que ninguém deu.
+     *
+     * ⚠️ É DECLARAÇÃO, NÃO DIAGNÓSTICO. A tela do médico rotula a origem — quem separa
+     * o que o paciente disse do que foi verificado é a mesma regra que governa a IA
+     * clínica aqui.
+     */
+    jaFazTratamentoCannabis: boolean('ja_faz_tratamento_cannabis'),
+    /** O que ele descreveu sobre o tratamento atual. Dado sensível: nunca vai a log. */
+    tratamentoAtualDescricao: text('tratamento_atual_descricao'),
     patologia: text('patologia'),
 
     // ── Dados da Associação ───────────────────────────

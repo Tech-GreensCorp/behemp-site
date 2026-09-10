@@ -27,11 +27,42 @@ const isPublicRoute = createRouteMatcher([
   '/politica-de-privacidade',
   '/termos-de-uso',
   '/redirect',
+  // Previsualização de layout — SÓ existe fora de produção.
+  // A própria rota faz `notFound()` quando NODE_ENV=production, então liberá-la aqui não abre
+  // nada em produção: lá ela não existe. Sem esta linha, o middleware manda para o Clerk antes
+  // de a rota poder responder — foi o que aconteceu em 20/08/2026.
+  ...(process.env.NODE_ENV === 'production' ? [] : ['/preview(.*)']),
   // Arquivos de SEO — NUNCA devem ser interceptados pelo auth
   '/robots.txt',
   '/sitemap.xml',
   '/sitemap(.*).xml',
   '/favicon.ico',
+  /**
+   * 🔴 O CADASTRO QUE VEM DO WHATSAPP.
+   *
+   * Quem abre este link AINDA NÃO TEM CONTA — criar a conta é justamente o que a tela
+   * faz. Sem esta linha o middleware manda o paciente para o login antes de a página
+   * existir, e ele fica preso num laço: para se cadastrar, precisaria já estar cadastrado.
+   *
+   * A rota não fica desprotegida por isso: o token de 64 hex no caminho é a credencial,
+   * é de uso único, expira, e é conferido no servidor antes de qualquer campo ser pintado.
+   */
+  '/cadastro(.*)',
+  /**
+   * 🔴 AS ROTAS DO CHATPRO NÃO USAM CLERK — E NÃO PODEM USAR.
+   *
+   * Quem as chama é o servidor do ChatPro e o cron, não um navegador com sessão. Elas
+   * têm autenticação própria: `x-chatpro-intake-secret` comparado em tempo constante no
+   * bot-link e no intake, token no caminho da URL no webhook, e `CRON_SECRET` no
+   * processador.
+   *
+   * ⚠️ ISTO NÃO APARECEU NOS TESTES LOCAIS porque o `.env` de desenvolvimento está sem
+   * as chaves do Clerk — sem elas o middleware não bloqueia nada, e tudo respondeu 200.
+   * Em produção, com o Clerk configurado, toda chamada do ChatPro receberia um redirect
+   * para a tela de login: o bot registraria falha, o paciente cairia na triagem humana, e
+   * o log da aplicação não mostraria nada — porque a requisição nunca chegaria à rota.
+   */
+  '/api/chatpro(.*)',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',

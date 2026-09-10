@@ -4,3 +4,15 @@ out
 build
 pnpm-lock.yaml
 *.d.ts
+
+# Documentos visuais de decisão (docs/decisoes-visuais/): são ENTREGÁVEIS publicados, não
+# código-fonte. Reformatá-los criaria divergência com o artifact que o dono já leu, e o
+# Prettier mexeria em espaço significativo dentro de <svg> e <pre>. Acrescentado em 20/08/2026.
+docs/decisoes-visuais/*.html
+
+# Snapshots e journal do drizzle-kit: são arquivos GERADOS, nunca editados à mão. Formatá-los
+# divergiria do que o gerador produz — e na próxima `pnpm db:generate` o Prettier e o drizzle
+# ficariam brigando pelo mesmo arquivo. Os 25 snapshots já estavam TODOS fora do Prettier antes
+# desta linha; ignorá-los não esconde dívida, tira do portão um arquivo que ninguém escreve.
+# Acrescentado em 25/08/2026, quando a migration 0024 empurrou o teto pela terceira vez.
+db/migrations/meta/*.json

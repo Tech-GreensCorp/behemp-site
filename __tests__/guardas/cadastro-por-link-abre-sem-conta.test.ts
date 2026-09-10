@@ -1,0 +1,297 @@
+/**
+ * Guarda: o cadastro que vem do WhatsApp abre para quem AINDA NÃO TEM CONTA — e não
+ * confia em nada que o navegador mande.
+ *
+ * POR QUE ESTE ARQUIVO EXISTE
+ * O defeito que o originou é o pior tipo: invisível no ambiente de desenvolvimento e fatal
+ * em produção.
+ *
+ * O middleware do Clerk protege TUDO por padrão, e seu matcher declara explicitamente
+ * *"sempre roda para API routes"*. Nem `/cadastro/{token}` nem `/api/chatpro/*` estavam na
+ * lista de rotas públicas. Em produção isso significaria:
+ *
+ *   · o paciente clica no link do WhatsApp → é mandado para a tela de LOGIN → e para se
+ *     cadastrar precisaria já estar cadastrado. Laço fechado.
+ *   · o servidor do ChatPro chama `/bot-link` → recebe um redirect → o bot registra falha
+ *     → e o log da aplicação não mostra NADA, porque a requisição nunca chega à rota.
+ *
+ * E os 31 testes locais passaram verdes: o `.env` de desenvolvimento está sem as chaves do
+ * Clerk, e sem elas o middleware não bloqueia coisa alguma. Foi preciso ler o middleware
+ * para achar — nenhuma execução acusaria.
+ *
+ * A lição que este guarda fixa: **teste que passa por ausência de configuração não testou
+ * nada.** É a mesma família do que o greens-corp viveu — lá, 72 horas de log vazio que
+ * pareciam "não configurado" e eram "o fluxo nunca chegou".
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import { cpfEhValido, formatarCpf, mascararCpf } from '../../lib/validacao/cpf';
+
+const RAIZ = join(import.meta.dirname, '..', '..');
+const fonte = (a: string) => readFileSync(join(RAIZ, a), 'utf8');
+
+/** Código sem comentários — proibir o código não pode significar proibir a explicação. */
+const codigo = (a: string) =>
+  fonte(a)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+const MIDDLEWARE = 'middleware.ts';
+const ACTION = 'app/_actions/cadastro-por-link.ts';
+const PAGINA = 'app/(auth)/cadastro/[token]/page.tsx';
+const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
+const SCHEMA_SOLICITACAO = 'db/schema/solicitacoes-cadastro.ts';
+const SCHEMA_PACIENTES = 'db/schema/pacientes.ts';
+
+/** Só o bloco `createRouteMatcher([...])`, para não confundir com menção no resto. */
+function listaDeRotasPublicas(): string {
+  const t = codigo(MIDDLEWARE);
+  const inicio = t.indexOf('createRouteMatcher([');
+  expect(inicio, 'o middleware não declara mais rotas públicas').toBeGreaterThan(-1);
+  const fim = t.indexOf(']);', inicio);
+  return t.slice(inicio, fim);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. AS DUAS ROTAS QUE NÃO PODEM EXIGIR SESSÃO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('o middleware deixa passar quem ainda não tem conta', () => {
+  it('🔴 /cadastro está entre as rotas públicas', () => {
+    // Sem isto o paciente precisa de conta para criar conta.
+    expect(listaDeRotasPublicas(), 'o link do WhatsApp voltou a exigir login').toMatch(
+      /'\/cadastro\(\.\*\)'/,
+    );
+  });
+
+  it('🔴 /api/chatpro está entre as rotas públicas', () => {
+    // Elas têm autenticação PRÓPRIA (segredo, token no caminho, CRON_SECRET). O Clerk
+    // aqui não protege: impede.
+    expect(listaDeRotasPublicas(), 'as chamadas do ChatPro voltariam a receber redirect').toMatch(
+      /'\/api\/chatpro\(\.\*\)'/,
+    );
+  });
+
+  it('o matcher continua cobrindo as API routes — a lista pública é o que decide', () => {
+    // Se alguém "resolvesse" o problema tirando /api do matcher, TODAS as rotas de API
+    // ficariam sem middleware, inclusive as que dependem dele.
+    expect(codigo(MIDDLEWARE)).toMatch(/'\/\(api\|trpc\)\(\.\*\)'/);
+  });
+
+  it('CONTROLE: as áreas logadas NÃO entraram na lista pública', () => {
+    // Sem este caso, o guarda acima seria satisfeito liberando o sistema inteiro.
+    const lista = listaDeRotasPublicas();
+    for (const area of ['/medico', '/admin', '/paciente']) {
+      expect(
+        new RegExp(`'${area}\\(`).test(lista),
+        `${area} virou público — isso abre a área logada`,
+      ).toBe(false);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. O SERVIDOR NÃO CONFIA NA TELA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('a action revalida tudo, mesmo o que a página já tinha validado', () => {
+  it('🔴 o token é revalidado dentro da action', () => {
+    // Entre abrir a tela e enviar existe uma janela: o link pode expirar, ser consumido
+    // em outra aba, ou ser cancelado pelo atendimento.
+    expect(codigo(ACTION), 'a action passou a confiar na validação da renderização').toMatch(
+      /validarTokenDeCadastro\(/,
+    );
+  });
+
+  it('🔴 o papel do usuário NUNCA vem do formulário', () => {
+    // Se viesse, quem abrisse o link escolheria ser admin. OWASP API3, forma mais direta.
+    const t = codigo(ACTION);
+    expect(t).toMatch(/role:\s*'paciente'/);
+    expect(
+      /role:\s*(dados|entrada|analise|body|input)\./.test(t),
+      'o papel passou a vir da entrada do usuário',
+    ).toBe(false);
+  });
+
+  it('🔴 a sessão é exigida antes de qualquer escrita', () => {
+    const t = codigo(ACTION).replace(/\s+/g, ' ');
+    expect(t, 'a action grava sem exigir sessão').toMatch(
+      /const \{ userId: clerkId \} = await auth\(\);[\s\S]{0,120}if \(!clerkId\) return falha/,
+    );
+  });
+
+  it('o CPF é validado no servidor, não só na tela', () => {
+    expect(codigo(ACTION)).toMatch(/cpfEhValido\(/);
+  });
+
+  it('o e-mail gravado é o CONFIRMADO no Clerk, não o digitado', () => {
+    // O digitado pode ter erro de digitação; o confirmado passou pelo código de 6 dígitos.
+    expect(codigo(ACTION)).toMatch(/emailAddresses\?\.\[0\]\?\.emailAddress/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. A ORDEM: CONTA PRIMEIRO, FICHA DEPOIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('a ficha clínica só nasce depois da sessão existir', () => {
+  it('🔴 a action de gravar é chamada DEPOIS do setActive', () => {
+    // Invertido, uma falha na verificação do e-mail deixaria no banco um paciente sem
+    // dono: invisível para ele e para o médico.
+    const t = codigo(FORM).replace(/\s+/g, ' ');
+    expect(t, 'a ficha passou a ser gravada antes da conta existir').toMatch(
+      /await setActive\([\s\S]*?concluirCadastroPorLink\(/,
+    );
+  });
+
+  it('🔴 o link só é consumido DEPOIS da ficha gravada', () => {
+    // Consumir antes deixaria o paciente sem link E sem cadastro se a gravação falhasse.
+    const t = codigo(ACTION).replace(/\s+/g, ' ');
+    expect(t).toMatch(/db\.transaction\([\s\S]*?marcarComoUtilizada\(/);
+  });
+
+  it('falha ao gravar NÃO manda o paciente recriar a conta', () => {
+    // A conta já existe: repetir o formulário falharia com "e-mail já cadastrado", e ele
+    // acharia que perdeu tudo.
+    expect(codigo(FORM)).toMatch(/Sua conta já foi criada/);
+  });
+});
+
+describe('o fluxo customizado reserva o lugar do CAPTCHA', () => {
+  it('🔴 o formulário tem o elemento `clerk-captcha`', () => {
+    // Sem ele o Clerk avisa no console e cai para o CAPTCHA invisível, que decide
+    // sozinho se o cadastro passa — sem dar ao paciente forma de provar que é humano.
+    // Em fluxo customizado quem reserva o lugar é o desenvolvedor.
+    expect(codigo(FORM), 'o elemento do CAPTCHA sumiu do formulário').toMatch(/id="clerk-captcha"/);
+  });
+
+  it('o elemento vem ANTES do botão de envio', () => {
+    // Abaixo da dobra, o desafio aparece onde o paciente não vê, e ele conclui que o
+    // botão parou de funcionar.
+    const t = codigo(FORM);
+    const captcha = t.indexOf('id="clerk-captcha"');
+    const botao = t.indexOf('Criar conta e agendar consulta');
+    expect(captcha).toBeGreaterThan(-1);
+    expect(botao).toBeGreaterThan(-1);
+    expect(captcha, 'o CAPTCHA foi parar depois do botão').toBeLessThan(botao);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. A PERGUNTA CLÍNICA TEM TRÊS ESTADOS, NÃO DOIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('"já faz tratamento" distingue NÃO de NÃO RESPONDEU', () => {
+  it.each([
+    ['solicitação', SCHEMA_SOLICITACAO, 'jaFazTratamento'],
+    ['paciente', SCHEMA_PACIENTES, 'jaFazTratamentoCannabis'],
+  ])('🔴 em %s o campo é boolean anulável, sem default', (_rotulo, arquivo, campo) => {
+    // `notNull().default(false)` afirmaria "não faz tratamento" sobre quem nunca respondeu
+    // — e é justamente essa resposta que muda a conduta do médico na primeira consulta.
+    const linha = codigo(arquivo)
+      .split('\n')
+      .find((l) => l.includes(campo));
+    expect(linha, `${campo} sumiu de ${arquivo}`).toBeTruthy();
+    expect(linha!).toMatch(/boolean\(/);
+    expect(/notNull\(\)/.test(linha!), `${campo} virou obrigatório e perde o "não informado"`).toBe(
+      false,
+    );
+    expect(/default\(/.test(linha!), `${campo} ganhou default e inventa a resposta`).toBe(false);
+  });
+
+  it('🔴 a tela exige resposta antes de deixar enviar', () => {
+    const t = codigo(FORM);
+    expect(t).toMatch(/jaFazTratamento\s*!==\s*null/);
+    expect(t).toMatch(/tratamentoRespondido/);
+  });
+
+  it('o estado inicial é null, não false', () => {
+    expect(codigo(FORM)).toMatch(/useState<boolean \| null>\(null\)/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. LGPD — O QUE NÃO PODE APARECER EM LOG NEM EM AUDITORIA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('CPF, telefone e texto clínico não vazam para log nem auditoria', () => {
+  it('🔴 nenhum console.* da action imprime dado pessoal', () => {
+    const t = codigo(ACTION);
+    const blocos: string[] = [];
+    const re = /console\.(log|warn|error|info)\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t))) {
+      let p = 1;
+      let i = re.lastIndex;
+      while (i < t.length && p > 0) {
+        if (t[i] === '(') p++;
+        else if (t[i] === ')') p--;
+        i++;
+      }
+      blocos.push(t.slice(m.index, i));
+    }
+    expect(blocos.length, 'a action ficou sem log nenhum').toBeGreaterThan(0);
+    for (const b of blocos) {
+      for (const proibido of ['cpf', 'telefone', 'tratamentoAtual', 'senha', 'email']) {
+        expect(
+          new RegExp(`\\b${proibido}\\b`, 'i').test(b),
+          `${proibido} aparece em log: ${b}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('🔴 a auditoria registra o ATO, não o conteúdo', () => {
+    // O conteúdo já está na ficha, com controle de acesso. Repeti-lo na auditoria cria
+    // uma segunda cópia sem esse controle.
+    const t = codigo(ACTION);
+    const inicio = t.indexOf('registrarAuditoria({');
+    expect(inicio).toBeGreaterThan(-1);
+    const bloco = t.slice(inicio, t.indexOf('});', inicio));
+    for (const proibido of ['cpf', 'tratamentoAtual', 'telefone', 'nomeCompleto']) {
+      expect(new RegExp(`\\b${proibido}\\b`).test(bloco), `${proibido} na auditoria`).toBe(false);
+    }
+    expect(bloco, 'a auditoria deixou de registrar o protocolo').toMatch(/protocolo/);
+  });
+
+  it('a página do link não é indexável', () => {
+    // O link é uma credencial: indexar exporia tokens em resultado de busca.
+    expect(codigo(PAGINA)).toMatch(/robots:\s*\{\s*index:\s*false/);
+  });
+
+  it('🔴 a mensagem de erro capturada não expõe valor de coluna', () => {
+    // `erro.message` do Postgres carrega o valor que violou a constraint — e as colunas
+    // aqui são CPF, telefone e texto clínico.
+    expect(codigo(ACTION)).toMatch(/erro instanceof Error \? erro\.name/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. O CPF É CONFERIDO DE VERDADE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('a validação de CPF recusa o que a aritmética recusa', () => {
+  it.each(['529.982.247-25', '111.444.777-35', '52998224725'])('aceita %s', (c) => {
+    expect(cpfEhValido(c)).toBe(true);
+  });
+
+  it.each(['123.456.789-00', '529.982.247-24', '5299822472', '', 'abc'])('recusa %s', (c) => {
+    expect(cpfEhValido(c)).toBe(false);
+  });
+
+  it.each(['111.111.111-11', '000.000.000-00', '999.999.999-99'])(
+    '🔴 recusa o repetido %s, que PASSA na aritmética',
+    (c) => {
+      // Os onze dígitos iguais fecham os dois verificadores. Sem a recusa explícita, o
+      // placeholder mais comum do Brasil entraria como CPF válido.
+      expect(cpfEhValido(c)).toBe(false);
+    },
+  );
+
+  it('mascara para log e formata para tela', () => {
+    expect(mascararCpf('52998224725')).toBe('529.***.***-25');
+    expect(formatarCpf('52998224725')).toBe('529.982.247-25');
+  });
+});
