@@ -406,6 +406,22 @@ medido em produção — e o evento fica `pendente` para sempre.
 Bloqueia o QA. Diagnóstico, as três opções e a recomendação: `docs/adr/ADR-0020-ajustes-pre-QA.md`
 §4.
 
+### 🔴 Achado de 10/09/2026 — NÃO LIGAR os 3 crons antigos sem medir antes
+
+Ao criar o workflow que esvazia as filas novas, a tentação óbvia era ligar junto os três crons
+que estavam no `vercel.json` e nunca rodaram: `verificar-validade-documentos`,
+`verificar-recompra-medicamentos` e `verificar-revisoes-dosagem`.
+
+⚠️ **Não foram ligados, de propósito.** O primeiro deles chama
+`enviarEmailRenovacaoDocumentoEquipe` via Brevo (`app/api/cron/verificar-validade-documentos/route.ts:308`).
+Ele nunca rodou **neste servidor** — então há meses de documentos vencidos acumulados, e a
+primeira execução dispararia a enxurrada toda de uma vez, para pessoas reais.
+
+**Antes de ligar, medir:** quantos registros a query devolveria hoje · quantos e-mails sairiam ·
+para quem. Se for volume grande, o primeiro disparo precisa de janela ou de corte por data.
+
+Ligar um cron parado não é retomar de onde parou: é executar meses de acúmulo em um minuto.
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
