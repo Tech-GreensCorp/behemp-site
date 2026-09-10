@@ -1498,3 +1498,50 @@ escopo se **cataloga e pede autorização**, não se faz de passagem.
 já roda. **O custo de deixar:** a fila existe e fica vazia — nenhum aviso é gerado.
 
 **Peço autorização para ligar os dois gatilhos como trabalho próprio, em commit próprio.**
+
+---
+
+## Item 26 — 🔴 CATALOGADO: `users.telefone` é texto livre, e isso impede casar paciente por telefone
+
+**Descoberto em 09/09/2026**, ao investigar se o bot da BeHemp poderia reconhecer sozinho um
+paciente que já existe.
+
+### O diagnóstico
+
+Quatro caminhos gravam `users.telefone`. **Nenhum normaliza:**
+
+| ponto                                           | `caminho:linha`                         | formato que grava                                                                            |
+| ----------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| webhook do Clerk — **todo cadastro passa aqui** | `app/api/webhooks/clerk/route.ts:147`   | `phone_numbers[0]` (E.164) **ou** `unsafe_metadata.phone` — **misto**                        |
+| médico cadastrando à mão                        | `app/(medico)/_actions/pacientes.ts:17` | `z.string().optional()` — **texto livre, zero validação**                                    |
+| admin editando                                  | `app/(admin)/_actions/usuarios.ts:145`  | regex `^[\d\s()\-+]{8,20}$` — aceita `(62) 99999-9999`, `62999999999` **e** `+5562999999999` |
+| cadastro por link (novo)                        | `app/_actions/cadastro-por-link.ts`     | ✅ E.164 — **o único que normaliza**                                                         |
+
+O campo é **texto livre na prática**. Comparar por igualdade de string falha na maioria dos
+casos — e falha **em silêncio**: quem procura conclui "não existe" em vez de "não sei dizer".
+
+### O perigo de mexer, medido
+
+|                                      |                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| pontos de escrita                    | **4**                                                                                |
+| está em produção?                    | **sim** — os quatro                                                                  |
+| existe teste que prove antes/depois? | **não**                                                                              |
+| o que quebra ao normalizar           | nada em leitura (é só exibição hoje); a migração de dados é o risco real             |
+| proporção de dados sujos             | 🔴 **NÃO MEDIDA** — o banco local tem 1 paciente e 0 telefones. Só produção responde |
+
+### O custo de deixar
+
+Enquanto isso vale, **nenhum lugar do sistema consegue reconhecer um paciente pelo telefone** —
+não é limitação do bot, é do campo. Vale para o ChatPro, para o atendimento e para qualquer
+integração futura que receba um número de fora.
+
+### Duas correções, e elas são independentes
+
+1. **Normalizar na comparação** (barato, sem migração): comparar só os dígitos. Resolve
+   formatação e DDI; **não resolve** o celular antigo sem o 9.
+2. **Normalizar o campo** (migração de dados): resolve de verdade. Exige backup, script
+   idempotente, e medir antes quantas linhas mudam.
+
+⚠️ **Nenhuma das duas foi feita.** A (1) entra na ADR-0017 como auxílio de busca — nunca como
+decisão. A (2) precisa de autorização e é trabalho próprio.

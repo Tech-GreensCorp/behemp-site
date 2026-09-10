@@ -122,6 +122,48 @@ que ajuda o paciente e que ele pode conferir sozinho na própria receita.
 receita de fora, e a conferência é humana (D-02). Isto entra como **requisito do campo** quando a
 conferência for automatizada — está registrado no §5.
 
+### D-06 — 🔴 O PACIENTE RESPONDE; A BUSCA POR TELEFONE APENAS AJUDA
+
+**Decisão do dono em 09/09/2026**, depois de uma investigação que mudou a pergunta.
+
+**A pergunta era:** o bot consegue reconhecer sozinho um paciente que já existe aqui?
+**A resposta medida é NÃO**, e o motivo não é do bot — é do campo.
+
+Quatro caminhos gravam `users.telefone` e **nenhum normaliza**: o webhook do Clerk grava
+E.164 **ou** o que veio de metadata; o cadastro pelo médico aceita `z.string().optional()`,
+texto livre; o admin edita com uma regex que aceita `(62) 99999-9999`, `62999999999` e
+`+5562999999999`. Diagnóstico completo no `04` Item 26.
+
+Comparar por igualdade de string falharia — e **falharia em silêncio**: o bot concluiria
+"não é paciente nosso" e ofereceria cadastro a quem já tem conta.
+
+**A decisão, então, é a mesma família da D-02:**
+
+```
+o paciente responde  →  ROTEIA   (por qual caminho ele segue)
+a busca por dígitos  →  AJUDA    (pré-preenche, e o atendimento confere)
+nenhum dos dois      →  DECIDE sozinho
+```
+
+O bot pergunta _"você já tem cadastro na BeHemp?"_. Ele sabe a resposta melhor que a nossa
+base — e a nossa base, neste campo, não tem autoridade para contradizê-lo.
+
+A busca por dígitos (ignorando formatação e DDI) roda **em paralelo**, para pré-preencher a
+tela e para o atendimento ver que existe um candidato. Ela **não** muda o caminho do fluxo.
+
+⚠️ **E ela não resolve tudo, o que é a razão de não decidir:** o celular antigo sem o nono
+dígito não casa. Um paciente de 2019 apareceria como novo — e o sistema afirmaria isso com
+confiança que não tem.
+
+**Rejeitado: decidir pelo telefone.** É o campo mais sujo do schema para essa finalidade, e o
+erro é invisível.
+**Rejeitado: normalizar `users.telefone` agora para viabilizar a decisão.** Quatro pontos de
+escrita, todos em produção, sem teste que prove antes e depois, e sem medição da proporção de
+dados sujos — o banco local tem 1 paciente e 0 telefones. É trabalho próprio, com autorização,
+não um passo desta ADR.
+**Rejeitado: não perguntar nada e sempre oferecer o link.** É o R-01: enche a fila de
+conferência de gente já cadastrada.
+
 ### D-04 — Paciente que já tem conta não recebe convite de cadastro
 
 O link cria conta. Quem já tem cai no reconhecimento da

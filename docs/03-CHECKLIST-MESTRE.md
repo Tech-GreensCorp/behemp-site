@@ -359,6 +359,13 @@ de passagem.**
 
 ---
 
+### ⚪ Achado de 09/09/2026 — sem data
+
+**`users.telefone` é texto livre** (`04` Item 26). Quatro caminhos gravam, nenhum normaliza — e
+isso impede reconhecer paciente por telefone em **qualquer** lugar do sistema, não só no bot.
+A proporção de dados sujos **não foi medida**: o banco local tem 1 paciente e 0 telefones.
+Normalizar o campo exige migração de dados e autorização.
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
