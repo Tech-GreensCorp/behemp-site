@@ -91,17 +91,53 @@ jobs:
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
 
-            # O `.env` do servidor é mantido MANUALMENTE lá — o rsync o exclui de
-            # propósito (ver EXCLUDE acima), para um deploy nunca sobrescrever segredo.
+            # ── As variáveis da integração, vindas dos GitHub Secrets ──────────────
             #
-            # ⚠️ A linha antiga copiava de `./.env`, um arquivo que o rsync GARANTE não
-            # existir — e falhava em todo deploy desde sempre, sem ninguém ver.
-            if [ -f .env ]; then
-              cp .env .next/standalone/.env
-            elif [ ! -f .next/standalone/.env ]; then
-              echo "::error::Sem .env na raiz nem no standalone — o app subiria sem configuração."
-              exit 1
-            fi
+            # 🔴 POR QUE ASSIM, E NÃO `cp .env`
+            #
+            # A versão anterior copiava de `./.env` — arquivo que o rsync GARANTE não
+            # existir (ele está no EXCLUDE, de propósito, para deploy nunca sobrescrever
+            # segredo). Falhava em todo deploy, em silêncio, desde sempre.
+            #
+            # E quando a checagem passou a existir, ela revelou o que ninguém sabia: **não
+            # há `.env` nem na raiz nem no standalone**. O app funciona porque o PM2 guarda
+            # o ambiente no `dump.pm2` desde o primeiro `pm2 start` — configuração viva só
+            # na memória de um processo, que ninguém consegue ler, versionar ou conferir.
+            #
+            # Aqui as variáveis passam a vir dos **GitHub Secrets**, como no repositório da
+            # Greens. O que se ganha: o valor entra por um caminho auditável, a rotação é um
+            # comando, e ninguém precisa de acesso SSH para trocar um segredo.
+            #
+            # ⚠️ ESCREVE SÓ AS DA INTEGRAÇÃO, e ACRESCENTA em vez de substituir. Gerar o
+            # `.env` inteiro exigiria que todos os ~40 secrets estivessem cadastrados, e um
+            # que faltasse derrubaria o app inteiro numa variável vazia.
+            ENVFILE=.next/standalone/.env
+            touch "$ENVFILE"
+
+            gravar() {
+              # $1 = nome, $2 = valor. Vazio não sobrescreve o que já existe.
+              [ -z "$2" ] && return 0
+              # Remove a linha antiga (se houver) e acrescenta a nova. `grep -v` com `||
+              # true` porque grep sai 1 quando não casa nada, e `set -e` mataria o deploy.
+              grep -v "^$1=" "$ENVFILE" > "$ENVFILE.tmp" 2>/dev/null || true
+              mv "$ENVFILE.tmp" "$ENVFILE"
+              echo "$1=$2" >> "$ENVFILE"
+            }
+
+            gravar PARCEIRO_GREENS_SEGREDO_ENTRADA "${{ secrets.PARCEIRO_GREENS_SEGREDO_ENTRADA }}"
+            gravar PARCEIRO_GREENS_SEGREDO_SAIDA   "${{ secrets.PARCEIRO_GREENS_SEGREDO_SAIDA }}"
+            gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
+            gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
+            gravar CHATPRO_INTAKE_SECRET           "${{ secrets.CHATPRO_INTAKE_SECRET }}"
+            gravar CHATPRO_INTAKE_SECRET_GREENS    "${{ secrets.CHATPRO_INTAKE_SECRET_GREENS }}"
+            gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"
+            gravar CHATPRO_INSTANCE_ID             "${{ secrets.CHATPRO_INSTANCE_ID }}"
+            gravar CHATPRO_INSTANCE_TOKEN          "${{ secrets.CHATPRO_INSTANCE_TOKEN }}"
+            gravar CHATPRO_GREENS_URL_DE_RETORNO   "${{ secrets.CHATPRO_GREENS_URL_DE_RETORNO }}"
+            gravar CRON_SECRET                     "${{ secrets.CRON_SECRET }}"
+            gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
+
+            chmod 600 "$ENVFILE"
 
             # Aplica as migrations pendentes.
             #
