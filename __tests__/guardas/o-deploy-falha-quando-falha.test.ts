@@ -163,6 +163,32 @@ describe('o script de deploy para no primeiro erro', () => {
     expect(carrega, 'o env é carregado DEPOIS do migrate — inútil').toBeLessThan(migra);
   });
 
+  it('🔴 os valores são gravados entre ASPAS', () => {
+    /**
+     * ⚠️ Este caso vem do deploy #39, que falhou com "DATABASE_URL ausente" mesmo com o
+     * `.env` escrito e o `source` no lugar.
+     *
+     * A URL do Neon é `postgresql://…/db?sslmode=require&channel_binding=require`. Escrita
+     * SEM aspas, o `source` INTERPRETA a linha: o `&` manda para background e corta o
+     * resto. Medido — a variável vira **vazia**. E o source não falha, então o `set -e`
+     * não pega: mais uma falha silenciosa neste mesmo arquivo.
+     */
+    const s = scriptRemoto();
+    expect(s, 'os valores voltaram a ser gravados sem aspas').toMatch(/printf "%s='/);
+    expect(
+      /echo "\$1=\$2" >>/.test(s),
+      'voltou o echo sem aspas — metacaractere de URL quebraria o source',
+    ).toBe(false);
+  });
+
+  it('🔴 a migration recebe DATABASE_URL direto, sem depender do source', () => {
+    // Defesa em profundidade: as aspas já resolvem, e esta linha continua funcionando
+    // mesmo que alguém quebre aquelas.
+    expect(scriptRemoto()).toMatch(
+      /DATABASE_URL="\$\{\{ secrets\.DATABASE_URL \}\}" pnpm db:migrate:prod/,
+    );
+  });
+
   it('🔴 o .env gerado tem permissão restrita', () => {
     // Ele passa a conter segredos de integração. 644 os deixaria legíveis por qualquer
     // usuário do servidor.
