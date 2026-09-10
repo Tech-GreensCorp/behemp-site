@@ -126,6 +126,43 @@ describe('o script de deploy para no primeiro erro', () => {
     expect(s, 'voltou o cp de um .env que não existe').not.toMatch(/^\s*cp \.env /m);
   });
 
+  it('🔴 o `.env` é CARREGADO no shell antes do migrate', () => {
+    /**
+     * ⚠️ Este caso existe porque o deploy do PR #38 falhou com "DATABASE_URL ausente".
+     *
+     * Escrever o `.env` não basta: o migrador lê `process.env`, e um arquivo não vira
+     * ambiente sozinho. O `drizzle-kit` antigo não tinha o problema porque o
+     * `drizzle.config.ts` usa dotenv — a diferença passou despercebida na troca.
+     *
+     * A ORDEM é o que este caso trava: carregar depois do migrate não serviria de nada.
+     */
+    const s = scriptRemoto();
+    // As três peças, conferidas separadamente — um regex de várias linhas com indentação
+    // quebra por espaço em branco, e o que importa é que as três existam e na ordem certa.
+    expect(s, 'perdeu o `set -a`').toMatch(/^\s*set -a\s*$/m);
+    expect(s, 'perdeu o source do .env').toMatch(/^\s*\. "\$ENVFILE"\s*$/m);
+    expect(s, 'perdeu o `set \+a`').toMatch(/^\s*set \+a\s*$/m);
+    /**
+     * ⚠️ A comparação de ordem roda sobre o script SEM COMENTÁRIOS.
+     *
+     * A primeira versão usava `indexOf('pnpm db:migrate:prod')` no texto cru — e casava
+     * com a MENÇÃO dentro do bloco que explica a decisão, que vem antes do comando. O
+     * teste acusava "carregado depois do migrate" sobre um script correto.
+     *
+     * É a oitava vez que uma checagem deste repositório confunde menção com uso, e a
+     * primeira em que isso aparece numa comparação de POSIÇÃO em vez de presença.
+     */
+    const semComentario = s
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    const carrega = semComentario.indexOf('. "$ENVFILE"');
+    const migra = semComentario.indexOf('pnpm db:migrate:prod');
+    expect(carrega, 'o carregamento do env sumiu').toBeGreaterThan(-1);
+    expect(migra, 'o migrate sumiu').toBeGreaterThan(-1);
+    expect(carrega, 'o env é carregado DEPOIS do migrate — inútil').toBeLessThan(migra);
+  });
+
   it('🔴 o .env gerado tem permissão restrita', () => {
     // Ele passa a conter segredos de integração. 644 os deixaria legíveis por qualquer
     // usuário do servidor.
