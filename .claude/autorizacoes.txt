@@ -345,3 +345,13 @@ path:db/migrations/meta/0030_snapshot.json
 #     vínculo é rastro, não integridade — e uma FK faria a exclusão de paciente esbarrar.
 path:db/migrations/0031_tranquil_karma.sql
 path:db/migrations/meta/0031_snapshot.json
+
+# ── Mesma autorização, ADR-0018 (10/09/2026) ─────────────────────────────────
+# COMPATIBILIDADE — a 0032 tem um DROP INDEX, e ele é SEGURO:
+#   · DROP + CREATE do MESMO índice no mesmo arquivo — nunca fica sem
+#   · o índice antigo era único em (tipo, chatpro_id); o novo em (conta, tipo, chatpro_id)
+#     com `conta` DEFAULT 'behemp' — acrescentar coluna a uma chave única só pode MANTER
+#     ou afrouxar a unicidade, nunca criar violação. Conferido: linhas == pares únicos.
+#   · 1x ADD COLUMN NOT NULL **com default** — não quebra linha existente
+path:db/migrations/0032_violet_purifiers.sql
+path:db/migrations/meta/0032_snapshot.json

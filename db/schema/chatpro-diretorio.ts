@@ -24,6 +24,19 @@ export const chatproDiretorio = pgTable(
   {
     ...baseColumns,
 
+    /**
+     * 🔴 DE QUAL CONTA É ESTE UUID (ADR-0018 D-02).
+     *
+     * Os departamentos e motivos são da CONTA, não do produto: `d3457174-…` é
+     * "Aguardando Autorização Anvisa" **na conta da Greens**, e na conta da BeHemp esse
+     * mesmo texto tem outro UUID.
+     *
+     * ⚠️ SEM A CONTA NA CHAVE, O ERRO É SILENCIOSO. Um evento da Greens procuraria no
+     * dicionário da BeHemp, não acharia, e gravaria o UUID cru no relatório — sem
+     * exceção, sem log, sem nada vermelho. Ninguém perceberia até tentar ler o funil
+     * meses depois.
+     */
+    conta: text('conta').notNull().default('behemp'),
     tipo: chatproDiretorioTipoEnum('tipo').notNull(),
     /** O UUID como o ChatPro o emite. É a chave que chega no webhook. */
     chatproId: text('chatpro_id').notNull(),
@@ -34,5 +47,5 @@ export const chatproDiretorio = pgTable(
      */
     sincronizadoEm: timestamp('sincronizado_em', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('chatpro_diretorio_tipo_id_idx').on(t.tipo, t.chatproId)],
+  (t) => [uniqueIndex('chatpro_diretorio_tipo_id_idx').on(t.conta, t.tipo, t.chatproId)],
 );

@@ -39,6 +39,11 @@ const envSchema = z.object({
    */
   CHATPRO_START_SEM_CONFIRMACAO: z.string().optional(),
 
+  /** ADR-0018: a conta de ChatPro da Greens. Segredo PRÓPRIO — um por conta. */
+  CHATPRO_INTAKE_SECRET_GREENS: z.string().optional(),
+  /** Destino do paciente que veio pelo bot da Greens. Validado contra as origens. */
+  CHATPRO_GREENS_URL_DE_RETORNO: z.string().optional(),
+
   // ── Parceiros (ADR-0016) ───────────────────────────────────────────────────
   /** Segredo do HMAC das chamadas que a Greens faz PARA CÁ (handoff de cadastro). */
   PARCEIRO_GREENS_SEGREDO_ENTRADA: z.string().optional(),

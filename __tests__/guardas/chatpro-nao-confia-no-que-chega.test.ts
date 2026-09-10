@@ -107,7 +107,21 @@ describe('o segredo nunca é comparado com ===', () => {
   it('toda rota autenticada usa o helper, nenhuma compara à mão', () => {
     for (const rota of [BOT_LINK, INTAKE, WEBHOOK]) {
       const t = codigo(rota);
-      expect(t, `${rota} não usa segredosConferem`).toMatch(/segredosConferem/);
+      /**
+       * ⚠️ DUAS FORMAS ACEITAS, e a segunda não afrouxa nada.
+       *
+       * O `bot-link` passou a atender DUAS contas (ADR-0018) e a comparação mudou de
+       * lugar: em vez de conferir um segredo, ele chama `identificarConta`, que descobre
+       * QUAL conta chamou — e usa `segredosConferem` por dentro.
+       *
+       * Aceitar só o nome seria buraco: bastaria escrever uma `identificarConta` que
+       * compara com `===`. Por isso o guarda `duas-contas-de-chatpro-nao-se-misturam`
+       * prova, por sabotagem, que ela usa o helper e que não tem `break` no laço. A
+       * garantia continua; ela passou a ser cobrada em dois arquivos.
+       */
+      expect(t, `${rota} não usa segredosConferem nem identificarConta`).toMatch(
+        /segredosConferem|identificarConta/,
+      );
       expect(
         /===\s*(esperado|process\.env\.CHATPRO)/.test(t),
         `${rota} compara segredo com === `,
@@ -129,8 +143,18 @@ describe('nenhuma rota abre por falta de configuração', () => {
     // Endpoint que cria cadastro de paciente nunca deve ficar aberto porque alguém
     // esqueceu de configurar o ambiente.
     const t = codigo(rota);
-    expect(t).toMatch(new RegExp(`if \\(!esperado\\)`));
-    expect(t).toMatch(new RegExp(variavel));
+    /**
+     * ⚠️ Duas formas de expressar a mesma recusa. O `bot-link` verifica
+     * `contasConfiguradas().length === 0` porque atende duas contas — a pergunta deixou
+     * de ser "o segredo existe?" e passou a ser "existe ALGUMA conta configurada?".
+     * O efeito é idêntico: sem configuração, 503.
+     */
+    expect(t, `${rota} pode abrir sem configuração`).toMatch(
+      /if \(!esperado\)|contasConfiguradas\(\)\.length === 0/,
+    );
+    // A variável ainda precisa ser NOMEADA em algum lugar do caminho — no `bot-link` ela
+    // vive em `lib/chatpro/contas.ts`, que o outro guarda cobre.
+    expect(t + codigo('lib/chatpro/contas.ts')).toMatch(new RegExp(variavel));
   });
 });
 

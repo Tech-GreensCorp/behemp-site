@@ -22,7 +22,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { lerSegredoDoCabecalho, segredosConferem } from '@/lib/chatpro/segredo';
+import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
+import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
 import { ErroDeContatoNaoConfirmado, ServicoDeSolicitacao } from '@/lib/chatpro/solicitacao';
 
 /** Nunca cacheia: cada chamada cria ou reemite um link. */
@@ -36,17 +37,23 @@ function textoPuro(corpo: string, status: number): NextResponse {
 }
 
 export async function GET(request: NextRequest) {
-  const esperado = process.env.CHATPRO_INTAKE_SECRET;
-
-  // Sem segredo configurado a rota fica FECHADA. Endpoint que cria cadastro de paciente
-  // nunca deve ficar aberto por falta de configuração.
-  if (!esperado) {
-    console.error('[chatpro] CHATPRO_INTAKE_SECRET ausente — bot-link indisponível');
+  /**
+   * 🔴 O SEGREDO IDENTIFICA A CONTA (ADR-0018 D-01).
+   *
+   * O mesmo endpoint atende a conta da BeHemp e a da Greens, e cada uma tem o seu segredo.
+   * Isso não é só separação de credencial: é o que diz DE ONDE veio a chamada, sem
+   * depender de um parâmetro na URL que o painel poderia preencher errado — ou que alguém
+   * poderia trocar.
+   *
+   * A conta decide o `parceiro` da solicitação e para onde o paciente volta no fim.
+   */
+  if (contasConfiguradas().length === 0) {
+    console.error('[chatpro] nenhuma conta configurada — bot-link indisponível');
     return textoPuro('Integração indisponível no momento.', 503);
   }
 
-  const recebido = lerSegredoDoCabecalho(request.headers);
-  if (!segredosConferem(recebido, esperado)) {
+  const conta = identificarConta(lerSegredoDoCabecalho(request.headers));
+  if (!conta) {
     // Nunca logar o segredo recebido nem o corpo da requisição.
     console.warn('[chatpro] bot-link com segredo inválido', {
       caminho: request.nextUrl.pathname,
@@ -58,6 +65,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const { mensagem } = await new ServicoDeSolicitacao().linkParaOBot({
+      // 🔴 Vem do SEGREDO, nunca da URL. Decide o `parceiro` da solicitação e para onde
+      // o paciente volta ao terminar (ADR-0018 D-01 e D-03).
+      conta,
       sessionId: q.get('sessionId'),
       leadId: q.get('leadId'),
       nome: q.get('name') ?? q.get('nome'),

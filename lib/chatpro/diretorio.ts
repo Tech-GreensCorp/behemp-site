@@ -22,7 +22,16 @@ type TipoDeDiretorio = 'departamento' | 'motivo_encerramento';
  * sincronização, o segundo não se conserta nunca.
  */
 export class ServicoDeDiretorio {
-  constructor(private cliente = new ClienteChatpro()) {}
+  /**
+   * ⚠️ A CONTA É PARÂMETRO, e o padrão é `behemp` só porque foi a primeira. Quem chamar
+   * sem dizer a conta está falando da nossa — e quem sincroniza a da Greens precisa
+   * dizê-lo explicitamente, o que é o ponto: esquecer produz erro visível na hora, em vez
+   * de tradução errada meses depois.
+   */
+  constructor(
+    private cliente = new ClienteChatpro(),
+    private conta: string = 'behemp',
+  ) {}
 
   /**
    * Puxa os dois catálogos da API e grava o que veio.
@@ -51,13 +60,14 @@ export class ServicoDeDiretorio {
       await db
         .insert(chatproDiretorio)
         .values({
+          conta: this.conta,
           tipo: linha.tipo,
           chatproId: linha.id,
           nome: linha.nome,
           sincronizadoEm: new Date(),
         })
         .onConflictDoUpdate({
-          target: [chatproDiretorio.tipo, chatproDiretorio.chatproId],
+          target: [chatproDiretorio.conta, chatproDiretorio.tipo, chatproDiretorio.chatproId],
           set: { nome: linha.nome, sincronizadoEm: new Date() },
         });
     }
@@ -82,7 +92,13 @@ export class ServicoDeDiretorio {
     const [linha] = await db
       .select({ nome: chatproDiretorio.nome })
       .from(chatproDiretorio)
-      .where(and(eq(chatproDiretorio.tipo, tipo), eq(chatproDiretorio.chatproId, id)))
+      .where(
+        and(
+          eq(chatproDiretorio.conta, this.conta),
+          eq(chatproDiretorio.tipo, tipo),
+          eq(chatproDiretorio.chatproId, id),
+        ),
+      )
       .limit(1);
 
     return linha?.nome ?? id;
