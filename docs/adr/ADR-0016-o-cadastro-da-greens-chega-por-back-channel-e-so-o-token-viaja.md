@@ -374,6 +374,58 @@ em silêncio, não virar erro.
 **Rejeitado: tratar o handoff como "só cadastro".** Era o que esta ADR fazia antes de ler o
 schema.
 
+## §8 — 🔴 RETIFICAÇÃO, 09/09/2026 — "fecha a pendência" estava errado, e era perigoso
+
+O contrato que mandei à Greens dizia que a rota de retorno _"acha a `medication_request` por
+`behempReferralId` e **FECHA** a pendência correspondente"_. O Claude de lá mediu antes de
+implementar e recusou — com razão.
+
+### O que ele mediu, e eu não
+
+| pendência lá      | gravidade    | o que trava                             |
+| ----------------- | ------------ | --------------------------------------- |
+| `RECEITA_AUSENTE` | **bloqueia** | a conferência de etapa → **o despacho** |
+| `ANVISA_AUSENTE`  | atenção      | nada                                    |
+
+E o pagamento **não** é barrado por pendência nenhuma. Ou seja: o paciente já compra; o que
+`RECEITA_AUSENTE` trava é a **caixa sair**.
+
+### Por que "fechar" seria perigoso
+
+🔴 **A volta não traz o arquivo** (D-09: fase 1 avisa que existe, fase 2 copia o blob).
+
+Fechar a pendência liberaria **despacho de medicamento controlado sem a receita em mãos** —
+alguém na logística veria via livre e a caixa sairia, com o documento existindo só do nosso lado
+do webhook.
+
+Eu escrevi o verbo "fecha" sem saber o que aquela pendência travava. **O erro de método é o
+mesmo do §6.1:** especifiquei o efeito no sistema do outro sem medir o sistema do outro.
+
+### A correção, que é dele
+
+A pendência **não some: troca de dono e de frase.**
+
+```
+antes:   RECEITA_AUSENTE     bloqueia · cobrada do PACIENTE
+depois:  RECEITA_NA_BEHEMP   bloqueia · tarefa da EQUIPE — "trazer o documento"
+```
+
+O paciente para de ser cobrado por algo que ele já resolveu — que é o ganho que o handoff
+prometia. E o bloqueio do despacho **continua exigido**, porque o documento continua não estando
+lá. Quando a fase 2 copiar o blob, a pendência cai sozinha.
+
+⚠️ **E ele deixou um teste que falha se alguém afrouxar isso** — transformar `RECEITA_NA_BEHEMP`
+em não-bloqueante fica vermelho do lado deles.
+
+### A regra que sai daí
+
+**Verbo de contrato é decisão sobre o sistema do outro.** "Fecha", "cancela", "aprova" e
+"libera" descrevem efeito, e quem conhece o efeito é quem tem o código. O certo é o contrato
+dizer **o fato** — _"a receita ficou pronta"_ — e deixar cada lado decidir o que fazer com ele.
+
+Nosso payload já fazia isso (`tipo: 'receita_emitida'` é fato, não ordem). O erro estava só na
+prosa que acompanhava — e prosa de contrato é lida como especificação.
+
 ## §5 — Fontes
 
 **Lidas.** OWASP, _Information exposure through query strings in URL_ — a URL é gravada em

@@ -42,6 +42,20 @@ export class EnviadorDeAvisos {
   constructor(
     private baseUrl = process.env.PARCEIRO_GREENS_API_URL,
     private segredo = process.env.PARCEIRO_GREENS_SEGREDO_SAIDA,
+    /**
+     * O caminho da rota do parceiro.
+     *
+     * ⚠️ CONFIGURÁVEL PORQUE EU JÁ ERREI ESTE VALOR UMA VEZ. Escrevi
+     * `/api/parceiros/behemp/atualizacao` no contrato; a Greens versiona a API e
+     * implementou em `/api/v1/...`. O default abaixo é o caminho real, acordado com eles
+     * em 09/09/2026 — e a variável existe para que a próxima divergência de rota seja um
+     * ajuste de ambiente, não um deploy.
+     *
+     * Um caminho errado se manifesta como 404, que **não** é retentável: o evento vira
+     * `falhou` na primeira tentativa e aparece no diagnóstico em vez de girar em silêncio.
+     */
+    private caminho = process.env.PARCEIRO_GREENS_CAMINHO_RETORNO?.trim() ||
+      '/api/v1/parceiros/behemp/atualizacao',
   ) {}
 
   estaConfigurado(): boolean {
@@ -130,20 +144,17 @@ export class EnviadorDeAvisos {
     const assinatura = assinar(evento.id, timestamp, corpo, this.segredo!);
 
     try {
-      const resposta = await fetch(
-        `${this.baseUrl!.replace(/\/+$/, '')}/api/parceiros/behemp/atualizacao`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-parceiro-evento-id': evento.id,
-            'x-parceiro-timestamp': timestamp,
-            'x-parceiro-assinatura': assinatura,
-          },
-          body: corpo,
-          signal: AbortSignal.timeout(TIMEOUT_MS),
+      const resposta = await fetch(`${this.baseUrl!.replace(/\/+$/, '')}${this.caminho}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-parceiro-evento-id': evento.id,
+          'x-parceiro-timestamp': timestamp,
+          'x-parceiro-assinatura': assinatura,
         },
-      );
+        body: corpo,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
 
       if (resposta.ok) {
         await db

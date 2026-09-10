@@ -59,6 +59,11 @@ const envSchema = z.object({
    * aberto é pior que um botão de volta ausente.
    */
   PARCEIRO_ORIGENS_DE_RETORNO: z.string().optional(),
+  /**
+   * Caminho da rota de retorno no parceiro. Só preencher se ele mudar de lugar — o
+   * default no código é o acordado: `/api/v1/parceiros/behemp/atualizacao`.
+   */
+  PARCEIRO_GREENS_CAMINHO_RETORNO: z.string().optional(),
 
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),

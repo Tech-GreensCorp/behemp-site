@@ -102,6 +102,20 @@ describe('a entrega é durável, não um fetch e reza', () => {
     expect(t).toMatch(/if \(!VALE_TENTAR_DE_NOVO\.has\(resposta\.status\)\)/);
   });
 
+  it('🔴 o caminho da rota é o ACORDADO, e é configurável', () => {
+    /**
+     * Eu escrevi `/api/parceiros/behemp/atualizacao` no contrato e a Greens implementou em
+     * `/api/v1/...` — eles versionam a API e eu não perguntei. Um caminho errado vira 404,
+     * que não é retentável: o evento falha na primeira tentativa. Melhor que girar em
+     * silêncio, e ainda assim é um aviso que não chega.
+     */
+    const t = codigo(ENVIADOR);
+    expect(t, 'o caminho acordado mudou sem aviso').toMatch(
+      /'\/api\/v1\/parceiros\/behemp\/atualizacao'/,
+    );
+    expect(t, 'o caminho deixou de ser configurável').toMatch(/PARCEIRO_GREENS_CAMINHO_RETORNO/);
+  });
+
   it('o backoff cresce, e tem teto', () => {
     // Insistir de minuto em minuto não traz a Greens de volta — só enche o log e gasta a
     // janela do cron com o mesmo evento.
