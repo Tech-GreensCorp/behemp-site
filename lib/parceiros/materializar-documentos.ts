@@ -16,7 +16,7 @@
 
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
-import { calcularValidade } from '@/app/_actions/documentos';
+import { calcularValidade } from '@/lib/documentos/validade';
 
 import { type DocumentoDoFluxo } from './documentos';
 
