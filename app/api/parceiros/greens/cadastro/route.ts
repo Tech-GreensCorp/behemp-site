@@ -37,7 +37,17 @@ const esquema = z.object({
   cpf: z.string().trim().max(20).optional().nullable(),
   pedidoDoParceiro: z.string().trim().max(64).optional().nullable(),
   /** Quais dos 5 documentos o parceiro JÁ tem. O que faltar vira pendência não bloqueante. */
-  documentos: z.array(z.string()).max(20).optional().nullable(),
+  /**
+   * Duas formas, desde 10/09/2026: a lista de NOMES (como sempre foi) ou objetos com a URL
+   * do arquivo. Com URL, baixamos e re-hospedamos — o paciente não reenvia na procuração.
+   * O `passthrough` deixa o objeto passar inteiro; quem valida o formato dele é
+   * `entradaDeDocumentoSchema`, que também confere a origem contra a allowlist (SSRF).
+   */
+  documentos: z
+    .array(z.union([z.string(), z.record(z.unknown())]))
+    .max(20)
+    .optional()
+    .nullable(),
   /** Para onde devolver o paciente. Conferida contra a lista de origens permitidas. */
   urlDeRetorno: z.string().trim().max(500).optional().nullable(),
 });

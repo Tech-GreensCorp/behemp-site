@@ -38,7 +38,7 @@ interface ActionResult<T = unknown> {
  * - Receita médica: 6 meses
  * - Outros: sem validade (usa data distante)
  */
-function calcularValidade(tipo: string, dataEmissao: string): string {
+export function calcularValidade(tipo: string, dataEmissao: string): string {
   const data = new Date(dataEmissao);
 
   switch (tipo) {
