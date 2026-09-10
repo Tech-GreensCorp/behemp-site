@@ -359,6 +359,13 @@ de passagem.**
 
 ---
 
+### ⚪ Achado de 09/09/2026 — sem data
+
+**`users.telefone` é texto livre** (`04` Item 26). Quatro caminhos gravam, nenhum normaliza — e
+isso impede reconhecer paciente por telefone em **qualquer** lugar do sistema, não só no bot.
+A proporção de dados sujos **não foi medida**: o banco local tem 1 paciente e 0 telefones.
+Normalizar o campo exige migração de dados e autorização.
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
@@ -521,6 +528,29 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | 3        | Ligar o cron de `/api/chatpro/processar`                                                                                                                                                         | dono/deploy       | o funil se mover (nada se perde até lá) |
 | 4        | Migration `0026` no Neon — só rodou no Postgres **local**                                                                                                                                        | deploy            | tudo, em produção                       |
 | 5        | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                                                                                        | chefia + jurídico | operação com paciente real              |
+
+### 📋 Handoff Greens → BeHemp (decidido em 09/09/2026)
+
+| item                                                    | estado                                             |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| **ADR-0016** — back-channel assinado, só o token na URL | ✅ escrita, com pesquisa fundamentada              |
+| **ADR-0027** no `greens-corp` — o lado de quem envia    | ✅ escrita (espelho; a fonte do contrato é a 0016) |
+| Implementação                                           | 📋 **bloqueada** — ver `04` Item 22                |
+
+🔴 **Não começar a implementar antes de:** a Dryelle subir a atualização do formulário da Greens
+(a lista de campos de 09/09 precisa ser reconferida), o aceite existir no fluxo do intake, e o
+segredo compartilhado estar nos dois `.env`.
+
+**As três ADRs estão escritas** (09/09/2026), e a ordem de EXECUÇÃO está no `04` Item 23:
+
+| #   | ADR      | o quê                                                                         | espelho no greens-corp |
+| --- | -------- | ----------------------------------------------------------------------------- | ---------------------- |
+| 1   | **0016** | cadastro da Greens chega por back-channel · **e o retorno automático** (D-09) | ADR-0027               |
+| 2   | **0017** | o bot da BeHemp oferece o link quando falta receita nossa ou ANVISA           | —                      |
+| 3   | **0018** | o bot da Greens usa o link da BeHemp e devolve o paciente                     | ADR-0028               |
+
+🔴 **O canal de VOLTA (0016 D-09) vem antes da 0018**, senão a 0018 cria um segundo caminho de
+retorno — que é o rejeitado R-05 dela.
 
 ### Trabalho próprio que precede itens da lista
 

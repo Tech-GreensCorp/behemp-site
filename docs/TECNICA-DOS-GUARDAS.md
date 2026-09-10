@@ -244,3 +244,64 @@ Sprint 0, preservando os casos — em especial os três de falsa acusação.
 testing para TS (ex.: Stryker) automatiza parte disto — **a sabotagem manual continua
 obrigatória** para os guardas, porque nenhuma ferramenta sabe qual mutação é a mais
 próxima do defeito real deste projeto.
+
+---
+
+## 🔴 Toda corrupção proposital precisa AFIRMAR que corrompeu
+
+**Acrescentado em 10/09/2026**, e a origem foi um flake do lado da Greens que vale contar
+inteiro porque a lição é de método, não de código.
+
+Um teste deles fabricava assinatura inválida assim:
+
+```js
+assinatura.replace(/.$/, '0'); // troca o último caractere por "0"
+```
+
+Quando o último caractere hex **já era `0`**, a "assinatura inválida" saía **idêntica à
+válida**. O serviço aceitava — corretamente — e o teste falhava esperando recusa. Uma vez
+a cada dezesseis, **≈6%**.
+
+O código estava certo o tempo todo. Errado era o teste, e do pior jeito possível:
+**intermitente**, que é o que ensina a rodar de novo e seguir.
+
+> A corrupção de um caractere só é corrupção **se o caractere for diferente do que estava
+> lá**.
+
+### O mesmo erro, na nossa forma de sabotar
+
+Nossas sabotagens são `sed -i` no shell. Se o padrão não casa — por uma quebra de linha,
+um espaço, uma reformatação do Prettier — **o arquivo fica intacto, o guarda passa verde,
+e quem lê conclui "guarda defeituoso"**.
+
+⚠️ **Isto aconteceu em 09/09/2026:** reportei uma sabotagem como _"VERDE — defeituoso"_ e o
+defeito era do meu `sed`.
+
+### A ferramenta
+
+`scripts/sabotar-e-conferir.sh <arquivo> <guarda> '<comando>'` — compara o SHA-256 antes e
+depois e **recusa rodar o teste** se o arquivo não mudou. Três desfechos, todos explícitos:
+
+| saída | significa                                                                          |
+| ----- | ---------------------------------------------------------------------------------- |
+| `3`   | **a sabotagem não aplicou** — o comando não casou. Não conclua nada sobre o guarda |
+| `0`   | o arquivo mudou **e** o guarda acusou                                              |
+| `1`   | o arquivo mudou e o guarda **passou** — defeituoso de verdade                      |
+| `4`   | o teste nem rodou (import, sintaxe, conexão)                                       |
+
+### E o instrumento também precisa ser medido
+
+A primeira versão desse script fazia `pnpm vitest … | grep -q`. Com `set -o pipefail`, o
+pipeline herda o código de saída do Vitest — que é **1 justamente quando o teste falha**.
+O `if` dava falso, e o script reportava _"GUARDA DEFEITUOSO"_ exatamente nos casos em que o
+guarda **tinha funcionado**.
+
+**O script que existe para impedir conclusão falsa produziu uma conclusão falsa.** Só
+apareceu porque uma sabotagem que eu sabia funcionar foi reportada como falha, e eu fui
+conferir em vez de aceitar.
+
+A regra final tem duas metades, e a segunda é a que se esquece:
+
+1. Toda corrupção proposital afirma que corrompeu.
+2. **A ferramenta que afirma isso é conferida contra um caso conhecido** — um que deve
+   acusar e um que não deve.

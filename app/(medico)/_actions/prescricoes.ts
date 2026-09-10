@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { notificarParceiro } from '@/lib/parceiros/notificar';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { prescricoes, logsAuditoria } from '@/db/schema';
@@ -73,6 +74,21 @@ export async function criarPrescricao(input: unknown) {
     orientacoes: parsed.data.orientacoes,
     validade,
   }).returning();
+
+  /**
+   * 🔴 AVISA O PARCEIRO QUE A RECEITA FICOU PRONTA (ADR-0016 D-09).
+   *
+   * Só tem efeito para paciente que veio de um parceiro — a maioria não veio, e para
+   * esses a função devolve `sem_parceiro` sem tocar em nada.
+   *
+   * ⚠️ NÃO ESTÁ DENTRO DE TRY POR DECISÃO: `notificarParceiro` **nunca lança** (o
+   * try/catch mora dentro dela, provado por sabotagem no guarda
+   * `o-aviso-ao-parceiro-nao-se-perde`). Envolvê-la aqui esconderia uma futura mudança que
+   * a fizesse lançar. A proteção vive num lugar só, e é onde ela é testada.
+   *
+   * E ela apenas ENFILEIRA. Quem entrega é o cron — nem a latência da Greens chega aqui.
+   */
+  await notificarParceiro({ pacienteId: prescricao.pacienteId, tipo: 'receita_emitida' });
 
   // Desbloqueio ANVISA após prescrição emitida
   try {

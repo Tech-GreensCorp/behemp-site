@@ -29,6 +29,7 @@ import { db } from '@/lib/db';
 import { ClienteChatpro, type ContatoChatpro } from './cliente';
 import { montarMensagemDoLink, primeiroNomeDe } from './mensagem-do-link';
 import { mascararEmail, mascararTelefone, normalizarTelefoneWhatsapp } from './telefone';
+import { urlDeRetornoPermitida } from '@/lib/parceiros/retorno';
 
 type Origem =
   | 'painel_admin'
@@ -55,7 +56,7 @@ export interface ResultadoDoLink {
 }
 
 /** Horas de validade do link. 168 = 7 dias. */
-function validadeEmHoras(): number {
+export function validadeEmHoras(): number {
   const bruto = Number(process.env.CHATPRO_LINK_TTL_HORAS);
   return Number.isFinite(bruto) && bruto > 0 ? bruto : 168;
 }
@@ -80,7 +81,7 @@ function urlBase(): string {
  * 32 bytes aleatórios em hexadecimal = 64 caracteres. O valor cru sai daqui uma única vez,
  * dentro da resposta que vai ao paciente; o banco guarda só o hash.
  */
-function gerarToken(): { token: string; hash: string } {
+export function gerarToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString('hex');
   return { token, hash: createHash('sha256').update(token).digest('hex') };
 }
@@ -97,7 +98,7 @@ export function hashDoToken(token: string): string {
  * simultâneas podem calcular o mesmo valor — o índice único da coluna recusa a segunda, e
  * quem chama tenta de novo.
  */
-async function proximoProtocolo(): Promise<string> {
+export async function proximoProtocolo(): Promise<string> {
   const [linha] = await db
     .select({ protocolo: solicitacoesCadastro.protocolo })
     .from(solicitacoesCadastro)
@@ -109,7 +110,7 @@ async function proximoProtocolo(): Promise<string> {
   return `SOL-${String(proximo).padStart(6, '0')}`;
 }
 
-function montarLink(token: string): string {
+export function montarLink(token: string): string {
   return `${urlBase()}${caminhoDoFormulario()}/${token}`;
 }
 
@@ -163,6 +164,16 @@ export class ServicoDeSolicitacao {
     origem: Origem;
     /** Ausente = o link foi criado mas ninguém o entregou (caso do webhook). */
     canalDeEntrega?: CanalDeEntrega | null;
+    /** A conta de ChatPro de origem, quando houver (ADR-0018). */
+    parceiro?: string | null;
+    /**
+     * Para onde devolver o paciente ao terminar.
+     *
+     * ⚠️ CONFERIDA CONTRA A LISTA DE ORIGENS antes de gravar — a mesma checagem do
+     * handoff. Um destino fora da lista é redirecionamento aberto, e não importa se ele
+     * veio de um handoff assinado ou da configuração de uma conta de bot.
+     */
+    urlDeRetorno?: string | null;
   }): Promise<ResultadoDoLink> {
     const existente = await this.buscarAtiva({
       leadId: params.leadId,
@@ -229,6 +240,11 @@ export class ServicoDeSolicitacao {
         origem: params.origem,
         chatproLeadId: params.leadId ?? null,
         chatproSessionId: params.sessionId ?? null,
+        parceiro: params.parceiro ?? null,
+        // 🔴 A MESMA validação do handoff: destino fora da lista de origens permitidas é
+        // redirecionamento aberto, e não importa se veio de chamada assinada ou da
+        // configuração de uma conta de bot.
+        urlDeRetorno: urlDeRetornoPermitida(params.urlDeRetorno),
         ...entrega,
       })
       .returning({ id: solicitacoesCadastro.id, protocolo: solicitacoesCadastro.protocolo });
@@ -275,6 +291,11 @@ export class ServicoDeSolicitacao {
     email?: string | null;
     telefone?: string | null;
     number?: string | null;
+    /**
+     * De qual conta de ChatPro veio (ADR-0018). Identificada pelo SEGREDO, não por
+     * parâmetro de URL. Ausente = a conta da BeHemp, que é o caso histórico.
+     */
+    conta?: { id: string; urlDeRetorno: string | null } | null;
   }): Promise<{ mensagem: string; resultado: ResultadoDoLink }> {
     let leadId = entrada.leadId?.trim() || null;
     let nome = entrada.nome?.trim() || null;
@@ -311,6 +332,8 @@ export class ServicoDeSolicitacao {
       sessionId: entrada.sessionId?.trim() ?? null,
       origem: 'chatpro_bot',
       canalDeEntrega: 'bot_reply',
+      parceiro: entrada.conta?.id ?? null,
+      urlDeRetorno: entrada.conta?.urlDeRetorno ?? null,
     });
 
     return { mensagem: this.textoDoLink(resultado), resultado };

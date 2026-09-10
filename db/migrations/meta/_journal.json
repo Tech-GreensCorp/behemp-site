@@ -197,6 +197,48 @@
       "when": 1788980210618,
       "tag": "0027_magenta_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788999954715,
+      "tag": "0028_plain_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789000920209,
+      "tag": "0029_colorful_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1789003264264,
+      "tag": "0030_lame_madripoor",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789006781583,
+      "tag": "0031_tranquil_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789008320860,
+      "tag": "0032_violet_purifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789009619720,
+      "tag": "0033_panoramic_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

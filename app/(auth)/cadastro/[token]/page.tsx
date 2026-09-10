@@ -8,6 +8,7 @@ import {
   type MotivoDeRecusa,
 } from '@/lib/chatpro/token-de-cadastro';
 import { Button } from '@/components/ui/button';
+import { pendenciasDe } from '@/lib/parceiros/documentos';
 
 import { FormularioDeCadastro } from './_components/formulario-de-cadastro';
 
@@ -132,6 +133,8 @@ export default async function CadastroPorLinkPage({
       <FormularioDeCadastro
         token={token}
         protocolo={resultado.protocolo}
+        pendencias={pendenciasDe(resultado.documentosDoParceiro)}
+        urlDeRetorno={resultado.urlDeRetorno}
         // ⚠️ Qualquer um destes pode ser null — existe contato de WhatsApp sem nome
         // nenhum. O formulário pede o que faltar em vez de assumir presença.
         nomeInicial={resultado.nomeCompleto}

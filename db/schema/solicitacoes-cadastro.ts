@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { solicitacaoCadastroOrigemEnum, solicitacaoCadastroStatusEnum } from './enums';
@@ -95,6 +95,71 @@ export const solicitacoesCadastro = pgTable(
     chatproLeadId: text('chatpro_lead_id'),
     /** UUID da conversa. Muda a cada atendimento; serve para reconstituir o caminho. */
     chatproSessionId: text('chatpro_session_id'),
+    // ── Contrato com o parceiro (ADR-0016 §7) ──────────────────────────────────
+    /**
+     * Qual parceiro encaminhou este paciente. `null` = veio direto pela BeHemp.
+     *
+     * Existe separado de `origem` porque as duas respondem perguntas diferentes: `origem`
+     * diz por qual MECANISMO a solicitação nasceu (bot, formulário, painel), e este diz
+     * de QUEM ela veio. Um parceiro novo amanhã não deve exigir um valor novo de enum.
+     */
+    parceiro: text('parceiro'),
+    /**
+     * O id do evento que trouxe este cadastro — a chave de idempotência do handoff.
+     *
+     * 🔴 É POR ELE QUE UM REENVIO NÃO VIRA SEGUNDA SOLICITAÇÃO. E aqui isso não é só
+     * higiene: do lado da Greens, `behempJourney != NONE` roteia o pagamento para o
+     * Mercado Pago **com desconto collab**. Um handoff duplicado erraria o gateway e o
+     * preço de uma compra, não só um cadastro.
+     */
+    eventoDoParceiro: text('evento_do_parceiro'),
+    /**
+     * O id do pedido no sistema do parceiro, quando ele manda um.
+     *
+     * ⚠️ NÃO é o nosso `id`. O caminho de volta usa o NOSSO id como `behempReferralId`
+     * lá (ADR-0016 D-12); este campo é a direção contrária — o que eles nos deram para
+     * localizar o pedido de lá. Confundir os dois faz a volta procurar no lugar errado.
+     */
+    pedidoDoParceiro: text('pedido_do_parceiro'),
+    /**
+     * O MANIFESTO dos documentos que o parceiro já tem — e, por ausência, dos que faltam
+     * (ADR-0016 D-06). São cinco: receita médica, laudo (opcional), comprovante de
+     * residência, autorização da ANVISA e documento de identidade.
+     *
+     * 🔴 GUARDA O QUE EXISTE LÁ, NÃO OS ARQUIVOS. A cópia dos blobs é fase 2: mover
+     * documento de saúde entre duas empresas exige URL assinada na origem, validação no
+     * destino, store privado e prazo de retenção — e o Item 6 registra que este
+     * repositório ainda tem 10+ uploads em store público.
+     *
+     * ⚠️ PENDÊNCIA NÃO BLOQUEIA. Quem chega sem receita é justamente quem mais precisa da
+     * teleconsulta; barrá-lo na porta é recusar quem o produto existe para atender.
+     */
+    documentosDoParceiro: jsonb('documentos_do_parceiro').$type<string[]>(),
+    /**
+     * Para onde devolver o paciente quando ele terminar aqui (ADR-0016 D-08).
+     *
+     * Ele veio da Greens porque quer comprar medicamento, e a compra acontece lá.
+     * Terminar sem caminho de volta é perder alguém no meio de um processo de duas
+     * empresas.
+     *
+     * ⚠️ VALIDADA CONTRA UMA LISTA DE ORIGENS PERMITIDAS antes de virar link. Aceitar
+     * URL arbitrária de um parceiro é redirecionamento aberto — a vítima confia no nosso
+     * domínio e aterrissa onde o atacante quiser.
+     */
+    urlDeRetorno: text('url_de_retorno'),
+    /**
+     * O paciente que esta solicitação virou. Preenchido ao concluir o cadastro.
+     *
+     * 🔴 É A PEÇA QUE FECHA O CICLO. Sem ela, quando a receita fica pronta o sistema sabe
+     * o `pacienteId` e não tem como descobrir de qual parceiro aquela pessoa veio — o
+     * aviso de volta não teria destinatário.
+     *
+     * ⚠️ Sem FK de propósito: a coluna existe em `solicitacoes_cadastro`, que é de
+     * cadastro e não clínica, e uma FK para `pacientes` faria a exclusão de um paciente
+     * (soft delete, mas ainda assim) esbarrar aqui. O vínculo é rastro, não integridade.
+     */
+    pacienteId: text('paciente_id'),
+
     /**
      * Como o link chegou ao paciente: `bot_reply` (a resposta virou mensagem),
      * `start_redirect` (ele clicou numa URL e caiu no formulário) ou `manual` (atendente
@@ -115,5 +180,15 @@ export const solicitacoesCadastro = pgTable(
     index('solicitacoes_cadastro_lead_idx').on(t.chatproLeadId),
     index('solicitacoes_cadastro_telefone_idx').on(t.telefone),
     index('solicitacoes_cadastro_status_idx').on(t.status),
+    // A busca do caminho de volta: dado um paciente, de qual parceiro ele veio?
+    index('solicitacoes_cadastro_paciente_idx').on(t.pacienteId),
+    /**
+     * A chave de idempotência do handoff. Índice COMUM, não único — de propósito, e pelo
+     * mesmo motivo que o `behempReferralId` da Greens não é `@unique`: reentrega de
+     * webhook precisa ser absorvida em silêncio, não virar erro 500. A unicidade é
+     * garantida pela consulta antes do insert, que sabe o que fazer com a colisão
+     * (devolver o mesmo token) — coisa que uma constraint não sabe.
+     */
+    index('solicitacoes_cadastro_evento_parceiro_idx').on(t.eventoDoParceiro),
   ],
 );

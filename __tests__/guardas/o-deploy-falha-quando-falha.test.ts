@@ -1,0 +1,143 @@
+/**
+ * Guarda: o deploy para quando algo falha, e a migration roda com o que existe no servidor.
+ *
+ * POR QUE ESTE ARQUIVO EXISTE — um deploy verde com banco desatualizado
+ *
+ * Em 10/09/2026 o deploy do PR #36 foi reportado como **sucesso**, com todos os 17 passos
+ * verdes. Dentro do passo do PM2, o log dizia:
+ *
+ *     err: cp: cannot stat '.env': No such file or directory
+ *     err: sh: 1: drizzle-kit: not found
+ *          ELIFECYCLE Command failed
+ *
+ * O script seguiu, reiniciou o PM2, e o GitHub marcou ✓. **O código novo subiu esperando
+ * tabelas que a migration não criou.**
+ *
+ * Duas causas, e as duas eram antigas:
+ *
+ * 1. **Sem `set -e`**, o script de deploy continua depois de qualquer erro. Falha vira
+ *    silêncio, e silêncio vira "deploy bem-sucedido".
+ * 2. **`drizzle-kit` é devDependency** e o servidor roda `pnpm install --prod`, que as
+ *    pula — o próprio log diz `devDependencies: skipped`. O CLI nunca esteve lá.
+ *
+ * A correção do (2) é a que a documentação do Drizzle recomenda: usar o **migrator do
+ * `drizzle-orm`**, que é dependência de produção e precisa apenas dos `.sql` gerados e de
+ * uma conexão.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const RAIZ = join(import.meta.dirname, '..', '..');
+const fonte = (a: string) => readFileSync(join(RAIZ, a), 'utf8');
+
+/**
+ * Código sem comentários.
+ *
+ * ⚠️ Este helper entrou porque o caso abaixo nasceu VERMELHO acusando um inocente: o
+ * migrador CITA `drizzle-kit` no bloco que explica por que NÃO o usa, e a primeira versão
+ * proibia a palavra no arquivo inteiro. Proibir o código não pode significar proibir a
+ * explicação — é a sétima vez que uma checagem deste repositório confunde menção com uso.
+ */
+const codigo = (a: string) =>
+  fonte(a)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+const DEPLOY = '.github/workflows/deploy.yml';
+const MIGRADOR = 'scripts/migrar.mjs';
+
+/** Só o script que roda NO SERVIDOR, dentro do passo do PM2. */
+function scriptRemoto(): string {
+  const t = fonte(DEPLOY);
+  const i = t.indexOf('script: |');
+  expect(i, 'o passo do PM2 sumiu do deploy').toBeGreaterThan(-1);
+  return t.slice(i);
+}
+
+describe('o script de deploy para no primeiro erro', () => {
+  it('🔴 tem `set -e`', () => {
+    /**
+     * Sem ele, `cp` que falha, migration que falha e qualquer outro erro viram silêncio —
+     * e o PM2 reinicia assim mesmo. Foi exatamente o que produziu um deploy verde com o
+     * banco sem as tabelas do código que subiu.
+     */
+    expect(scriptRemoto(), 'o deploy voltou a seguir depois de falhar').toMatch(/^\s*set -e\s*$/m);
+  });
+
+  it('🔴 a migration usa o migrator, NÃO o CLI drizzle-kit', () => {
+    /**
+     * O servidor roda `pnpm install --prod` e o log confirma `devDependencies: skipped`.
+     * `drizzle-kit` é devDependency: chamá-lo ali é chamar o que não existe.
+     */
+    const s = scriptRemoto();
+    expect(s, 'a migration de produção sumiu').toMatch(/pnpm db:migrate:prod/);
+    expect(
+      /pnpm db:migrate\s*$/m.test(s),
+      'voltou o `pnpm db:migrate`, que chama o CLI ausente em produção',
+    ).toBe(false);
+  });
+
+  it('🔴 o migrador NÃO importa drizzle-kit', () => {
+    // Se importasse, teria o mesmo problema com outro nome.
+    const t = codigo(MIGRADOR);
+    expect(/drizzle-kit/.test(t), 'o migrador passou a depender do CLI').toBe(false);
+    expect(t).toMatch(/from 'drizzle-orm\/node-postgres\/migrator'/);
+  });
+
+  it('🔴 o migrador é `.mjs` — não pode depender de transpilação', () => {
+    // `tsx` também é devDependency. Um migrador `.ts` teria o mesmo defeito que veio
+    // consertar, com outro nome.
+    expect(MIGRADOR.endsWith('.mjs')).toBe(true);
+    const scripts = JSON.parse(fonte('package.json')).scripts;
+    expect(scripts['db:migrate:prod']).toBe('node scripts/migrar.mjs');
+    expect(
+      /tsx|ts-node/.test(scripts['db:migrate:prod']),
+      'a migração de produção passou a exigir transpilação',
+    ).toBe(false);
+  });
+
+  it('CONTROLE: o migrador PODE citar drizzle-kit no comentário', () => {
+    // O bloco no topo dele explica por que não usa o CLI. Sem este caso, alguém
+    // "consertaria" o guarda apagando a explicação.
+    expect(fonte(MIGRADOR)).toMatch(/drizzle-kit/);
+  });
+
+  it('🔴 o migrador sai com erro quando falha', () => {
+    // Sair com 0 numa falha reintroduz o problema inteiro: o `set -e` não teria o que
+    // pegar, e o app reiniciaria contra um banco sem as tabelas.
+    const t = fonte(MIGRADOR);
+    expect(t).toMatch(/process\.exit\(1\)/);
+    // Duas saídas com erro: sem DATABASE_URL, e falha ao migrar.
+    expect([...t.matchAll(/process\.exit\(1\)/g)].length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('🔴 o `cp .env` não pode falhar em todo deploy', () => {
+    /**
+     * O rsync EXCLUI `/.env` de propósito — para um deploy nunca sobrescrever segredo. A
+     * linha antiga copiava de `./.env`, que o rsync garante não existir. Falhava sempre, e
+     * com `set -e` agora derrubaria o deploy inteiro.
+     */
+    const s = scriptRemoto();
+    expect(s, 'o cp do .env voltou a ser incondicional').toMatch(/if \[ -f \.env \]/);
+  });
+
+  it('🔴 o rsync continua EXCLUINDO o .env', () => {
+    // Se ele parasse de excluir, um deploy sobrescreveria os segredos do servidor com o
+    // que estivesse no repositório — que é justamente o que nunca deve acontecer.
+    expect(fonte(DEPLOY)).toMatch(/EXCLUDE:.*\/\.env/);
+  });
+
+  it('CONTROLE: o portão continua ANTES do rsync', () => {
+    /**
+     * Sem este caso, o guarda seria satisfeito por um deploy que roda migration cedo
+     * demais. A ordem importa: type-check, guardas e baseline precisam falhar **antes** de
+     * qualquer coisa chegar ao servidor.
+     */
+    const t = fonte(DEPLOY);
+    const portao = t.indexOf('Type-check (portão absoluto');
+    const rsync = t.indexOf('Sincronizar arquivos para AWS');
+    expect(portao).toBeGreaterThan(-1);
+    expect(portao, 'o portão foi parar depois do rsync').toBeLessThan(rsync);
+  });
+});

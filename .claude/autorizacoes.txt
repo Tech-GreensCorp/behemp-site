@@ -281,3 +281,119 @@ path:db/migrations/meta/0026_snapshot.json
 #   → aplicada APENAS no Postgres local; Neon intocado.
 path:db/migrations/0027_magenta_shockwave.sql
 path:db/migrations/meta/0027_snapshot.json
+
+# ── Autorizado pelo dono em 09/09/2026, handoff Greens → BeHemp (ADR-0016) ────
+# "nos fechamos tudo daqui da behemp em relação a primeira adr"
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN/SET NOT NULL = ZERO):
+#   · 1x ALTER TYPE ADD VALUE 'greens_handoff' — acréscimo a enum, não remove valor
+#   · 3x ADD COLUMN anuláveis: parceiro, evento_do_parceiro, pedido_do_parceiro
+#   · 1x índice COMUM (não único) sobre evento_do_parceiro — unique faria reentrega
+#        de webhook virar 500, mesmo motivo do behempReferralId da Greens
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0028_plain_pretty_boy.sql
+path:db/migrations/meta/0028_snapshot.json
+
+# ── Mesma autorização, D-06/D-07/D-08 da ADR-0016 (09/09/2026) ────────────────
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x ADD COLUMN anuláveis: documentos_do_parceiro (jsonb), url_de_retorno (text)
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0029_colorful_zarek.sql
+path:db/migrations/meta/0029_snapshot.json
+
+# ── Mesma autorização, caminho de volta / ADR-0016 D-09 (09/09/2026) ──────────
+# "pode seguir" — o dono, sobre o caminho de volta.
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x CREATE TYPE  — status e tipo do evento de saída
+#   · 1x CREATE TABLE — parceiro_eventos_saida, NOVA
+#   · 1x FK para solicitacoes_cadastro (ON DELETE CASCADE; tabela criada na 0025)
+#   · 2x índices sobre a tabela nova
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0030_lame_madripoor.sql
+path:db/migrations/meta/0030_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO DE ESCOPO — o gatilho do aviso ao parceiro (09/09/2026) ────
+# Palavras do dono: "pode colocar os 2, temos que fazer esse fluxo funcionar e conectar
+# eles... claro que vamos fazer QA pra testar e isso não está em produção ativa e teremos
+# que deixar isso pronto até segunda."
+#
+# O QUE ESTA AUTORIZAÇÃO LIBERA: duas chamadas a `notificarParceiro()` — uma quando a
+# receita é assinada, outra quando a autorização da ANVISA é concluída. Uma linha em cada
+# ponto, em área clínica.
+#
+# POR QUE É SEGURO AGORA — dois interruptores independentes, os dois desligados:
+#   · BeHemp: sem PARCEIRO_GREENS_API_URL preenchida, o enviador NEM REIVINDICA da fila
+#   · Greens: ANVISA_HELP_CARD_ENABLED = false — nenhum paciente alcança o caminho
+#   → o gatilho pode ser ligado sem que um único evento saia daqui.
+#
+# A PROTEÇÃO QUE O CÓDIGO CARREGA: `notificarParceiro` NUNCA lança (try/catch em volta de
+# tudo, provado por sabotagem no guarda `o-aviso-ao-parceiro-nao-se-perde`). Se a Greens
+# estiver fora, o médico assina a receita normalmente e o aviso espera na fila.
+#
+# ⚠️ NENHUM `path:` FOI LIBERADO, e isto é a correção de um erro meu.
+# Eu havia escrito `path:lib/receituario/` aqui por antecipação — e o guarda
+# `hooks-de-escopo` ficou VERMELHO acusando que a proteção daquela área tinha caído.
+# Ele estava certo: os dois pontos que a autorização precisava eram
+# `app/(medico)/_actions/prescricoes.ts` e `app/api/anvisa/atualizar-status/route.ts`,
+# **nenhum dos dois em `lib/receituario/`**.
+#
+# Autorização mais larga que a necessidade é buraco: eu teria deixado uma área clínica
+# destravada para sempre por causa de duas linhas que nem moram nela. O `CLAUDE.md` já
+# registra essa classe — "escape amplo virou buraco" — e desta vez quem pegou foi o guarda.
+# A migration que o vínculo exigiu:
+#   · 1x ADD COLUMN anulável (paciente_id) + 1 índice comum. Sem FK de propósito: o
+#     vínculo é rastro, não integridade — e uma FK faria a exclusão de paciente esbarrar.
+path:db/migrations/0031_tranquil_karma.sql
+path:db/migrations/meta/0031_snapshot.json
+
+# ── Mesma autorização, ADR-0018 (10/09/2026) ─────────────────────────────────
+# COMPATIBILIDADE — a 0032 tem um DROP INDEX, e ele é SEGURO:
+#   · DROP + CREATE do MESMO índice no mesmo arquivo — nunca fica sem
+#   · o índice antigo era único em (tipo, chatpro_id); o novo em (conta, tipo, chatpro_id)
+#     com `conta` DEFAULT 'behemp' — acrescentar coluna a uma chave única só pode MANTER
+#     ou afrouxar a unicidade, nunca criar violação. Conferido: linhas == pares únicos.
+#   · 1x ADD COLUMN NOT NULL **com default** — não quebra linha existente
+path:db/migrations/0032_violet_purifiers.sql
+path:db/migrations/meta/0032_snapshot.json
+
+# ── Migration 0033 ESCRITA À MÃO (10/09/2026) ────────────────────────────────
+# O `AGENTS.md` diz: "Não edite migration gerada manualmente sem explicar o motivo".
+# O motivo:
+#
+# O drizzle-kit gerou, para renomear um valor de enum:
+#     ALTER COLUMN tipo SET DATA TYPE text;
+#     DROP TYPE parceiro_evento_tipo;
+#     CREATE TYPE ... AS ENUM('receita_emitida','anvisa_aprovada');
+#     ALTER COLUMN tipo SET DATA TYPE parceiro_evento_tipo USING tipo::...;
+#
+# O último passo FALHA se existir linha com o valor antigo — e existia, aqui, no banco
+# local: uma linha 'anvisa_concluida'. A migration teria quebrado o deploy.
+#
+# Substituída por ALTER TYPE ... RENAME VALUE, que preserva os dados porque é o MESMO
+# valor mudando de rótulo. Envolvida em DO/IF EXISTS para ser idempotente — conferido
+# rodando duas vezes, zero erro.
+path:db/migrations/0033_panoramic_princess_powerful.sql
+path:db/migrations/meta/0033_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO — corrigir o deploy.yml (10/09/2026) ──────────────────────
+# Palavras do dono: "pode seguir para corrigir mas pesquise e correlacione para
+# conseguirmos fazer a correção correta".
+#
+# O DEFEITO, medido no log do deploy #34481253343:
+#   err: cp: cannot stat '.env': No such file or directory
+#   err: sh: 1: drizzle-kit: not found
+#        ELIFECYCLE Command failed
+#   → e o script SEGUIU, reiniciou o PM2, e o passo foi marcado ✓.
+#   Deploy verde, migrations não aplicadas.
+#
+# A causa da segunda: `pnpm install --prod` no servidor pula devDependencies (o próprio
+# log diz "devDependencies: skipped"), e `drizzle-kit` é devDependency.
+#
+# A CORREÇÃO, fundamentada na documentação do Drizzle: usar o **migrator do drizzle-orm**,
+# que é dependência de produção e precisa apenas dos .sql gerados e de uma conexão. O CLI
+# é ferramenta de desenvolvimento. Fonte: orm.drizzle.team/docs/migrations e a discussão
+# drizzle-team/drizzle-orm#5718 ("awkward inside a slim production container where
+# devDependencies have been pruned").
+#
+# E `set -e` no script remoto, que é a correção que impede a próxima falha de ser invisível.
+path:.github/workflows/deploy.yml

@@ -302,6 +302,11 @@ export const solicitacaoCadastroOrigemEnum = pgEnum('solicitacao_cadastro_origem
   'chatpro_start',
   'chatpro_start_nao_verificado',
   'chatpro_webhook',
+  /**
+   * O paciente preencheu o formulário de intake NA GREENS e escolheu continuar aqui.
+   * Os dados chegaram por back-channel assinado; com ele veio só o token (ADR-0016).
+   */
+  'greens_handoff',
 ]);
 
 /** Onde a solicitação está. `link_gerado` é o estado em que ela nasce. */
@@ -333,6 +338,36 @@ export const chatproEventoStatusEnum = pgEnum('chatpro_evento_status', [
   'processado',
   'descartado',
   'falhou',
+]);
+
+/** Estado de um aviso que precisa chegar ao parceiro (ADR-0016 D-09). */
+export const parceiroEventoSaidaStatusEnum = pgEnum('parceiro_evento_saida_status', [
+  'pendente',
+  /** Claim atômico, mesmo motivo de `chatpro_evento_status`: sem ele, dois processadores
+   *  concorrentes enviam o mesmo aviso duas vezes. */
+  'enviando',
+  'enviado',
+  /** Esgotou as tentativas. Fica no banco para alguém ver — não some. */
+  'falhou',
+]);
+
+/**
+ * O que aconteceu aqui que o parceiro precisa saber.
+ *
+ * 🔴 `anvisa_APROVADA`, e não "concluída" — a palavra foi trocada em 10/09/2026 depois de
+ * o lado da Greens apontar a ambiguidade.
+ *
+ * "Concluída" descreve o PROCESSO ter terminado, e uma ANVISA **negada** também está
+ * concluída. O gatilho sempre disparou só em `status = 'aprovado'`, então o comportamento
+ * nunca esteve errado — o **nome** é que não protegia. Quem lesse "concluída" amanhã
+ * poderia ligá-lo numa recusa, e a Greens fecharia a pendência do pedido: boa notícia
+ * sobre má notícia, em silêncio.
+ *
+ * Nome errado não quebra hoje. Ele espera alguém acreditar nele.
+ */
+export const parceiroEventoTipoEnum = pgEnum('parceiro_evento_tipo', [
+  'receita_emitida',
+  'anvisa_aprovada',
 ]);
 
 /** Os dois catálogos que o ChatPro expõe e que chegam como UUID nos webhooks. */

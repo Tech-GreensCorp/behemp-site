@@ -39,6 +39,37 @@ const envSchema = z.object({
    */
   CHATPRO_START_SEM_CONFIRMACAO: z.string().optional(),
 
+  /** ADR-0018: a conta de ChatPro da Greens. Segredo PRÓPRIO — um por conta. */
+  CHATPRO_INTAKE_SECRET_GREENS: z.string().optional(),
+  /** Destino do paciente que veio pelo bot da Greens. Validado contra as origens. */
+  CHATPRO_GREENS_URL_DE_RETORNO: z.string().optional(),
+
+  // ── Parceiros (ADR-0016) ───────────────────────────────────────────────────
+  /** Segredo do HMAC das chamadas que a Greens faz PARA CÁ (handoff de cadastro). */
+  PARCEIRO_GREENS_SEGREDO_ENTRADA: z.string().optional(),
+  /**
+   * Segredo do HMAC das chamadas que NÓS fazemos PARA A GREENS (retorno de receita/ANVISA).
+   *
+   * ⚠️ DIFERENTE do de entrada, de propósito: um por direção. Vazar um não compromete o
+   * outro, e rotacionar um não exige parar as duas pontas ao mesmo tempo.
+   */
+  PARCEIRO_GREENS_SEGREDO_SAIDA: z.string().optional(),
+  /** Base da API da Greens, para o retorno. */
+  PARCEIRO_GREENS_API_URL: z.string().url().optional(),
+  /**
+   * Origens para as quais podemos devolver o paciente, separadas por vírgula.
+   * Ex.: `https://greens-corp.com,https://app.greens-corp.com`
+   *
+   * ⚠️ Vazio = nenhum retorno é aceito. Falha fechada de propósito: um redirecionamento
+   * aberto é pior que um botão de volta ausente.
+   */
+  PARCEIRO_ORIGENS_DE_RETORNO: z.string().optional(),
+  /**
+   * Caminho da rota de retorno no parceiro. Só preencher se ele mudar de lugar — o
+   * default no código é o acordado: `/api/v1/parceiros/behemp/atualizacao`.
+   */
+  PARCEIRO_GREENS_CAMINHO_RETORNO: z.string().optional(),
+
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),

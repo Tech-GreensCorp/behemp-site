@@ -1256,3 +1256,361 @@ rotas do ChatPro têm autenticação própria (segredo em tempo constante, token
 ⚠️ **O que isto sugere e NÃO foi feito:** varrer as demais rotas de API do repositório
 procurando outras que dependam do middleware sem estar na lista — ou que estejam na lista sem
 precisar. É trabalho próprio, fora do escopo desta tarefa, e exige autorização.
+
+---
+
+## Item 22 — 📋 Handoff do cadastro da Greens → BeHemp (ADR-0016)
+
+**Decidido em 09/09/2026**, com rodadas de pesquisa antes: os dados vão por back-channel
+assinado e só o token viaja com o paciente. Decisões, rejeitados e fontes em
+[ADR-0016](adr/ADR-0016-o-cadastro-da-greens-chega-por-back-channel-e-so-o-token-viaja.md).
+Espelho do lado da Greens: `greens-corp-backend/docs/adr/ADR-0027`.
+
+### 🔴 Bloqueado por (não começar antes)
+
+| #   | o quê                                                                                                                                           | dono    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | **A atualização do formulário da Greens** — a Dryelle vai subir. A lista de campos de 09/09 precisa ser reconferida antes de congelar o payload | Dryelle |
+| 2   | O **aceite** do paciente no fluxo do intake (base legal da transferência) — já está sendo tratado lá                                            | Dryelle |
+| 3   | O segredo compartilhado `GREENS_HANDOFF_SECRET` nos dois `.env`                                                                                 | dono    |
+
+### Entregáveis — lado BeHemp (quem recebe)
+
+| #   | entregável                                                                                                                                  | aceite                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1   | `lib/parceiros/assinatura.ts` — HMAC-SHA256 sobre `id + timestamp + corpo`, comparação em tempo constante, janela de **300 s**              | recusa assinatura errada, corpo alterado e carimbo fora da janela   |
+| 2   | `POST /api/parceiros/greens/cadastro` — valida, cria `solicitacoes_cadastro` com `origem = 'greens_handoff'`, devolve `{ token, expiraEm }` | id repetido devolve o **mesmo** token, não cria segunda solicitação |
+| 3   | Enum `solicitacaoCadastroOrigemEnum` + `'greens_handoff'`, e as colunas do manifesto de documentos                                          | migration aditiva; nenhuma coluna obrigatória sem default           |
+| 4   | A rota do middleware liberada (`/api/parceiros(.*)`)                                                                                        | **não esquecer** — foi o `Item 21`, e o sintoma é log vazio         |
+| 5   | Tela `/continuar/{token}` — dados preenchidos e editáveis, senha, código de 6 dígitos, `clerk-captcha`                                      | e-mail que já tem conta vai para o login (D-07)                     |
+| 6   | Pendências dos 5 documentos visíveis e **não bloqueantes**                                                                                  | conclui o cadastro com zero documento                               |
+| 7   | Encaminhar para `/paciente/anvisa` (a procuração **já existe**, não se cria)                                                                | chega na procuração logado                                          |
+| 8   | Botão de volta ao **login da Greens** ao fim da procuração                                                                                  |                                                                     |
+| 9   | Os 4 guardas do §4 da ADR                                                                                                                   | nascem vermelhos, provados por sabotagem                            |
+
+### O que fica de fora, declarado
+
+**A cópia dos arquivos** (fase 2). Fase 1 move dados de texto e o manifesto. Copiar blob de
+saúde entre empresas exige URL assinada na origem, validação de MIME e tamanho no destino, store
+**privado** e prazo de retenção — e o `Item 6` registra que este repositório já tem 10+ uploads em
+store público, defeito conhecido e não corrigido. Código novo não repete isso.
+
+---
+
+## Item 23 — 📋 As três portas de entrada, e o caminho de volta (ADR-0016, 0017, 0018)
+
+**Decidido em 09/09/2026.** Três formas de o mesmo paciente chegar, um só corredor depois — e,
+para quem veio da Greens, um **retorno automático** com o que ficou pronto aqui.
+
+```
+              PACIENTE SEM RECEITA NOSSA / SEM ANVISA
+                              │
+     ┌────────────────────────┼────────────────────────┐
+  formulário               WhatsApp                 WhatsApp
+  da GREENS                da BEHEMP                da GREENS
+     │ ADR-0016               │ ADR-0017              │ ADR-0018
+     └────────────────────────┼────────────────────────┘
+                              ▼
+       solicitacoes_cadastro · mesma tela · mesma procuração
+                              ▼
+                  receita emitida / ANVISA concluída
+                              │
+                              ▼  (só para quem veio da Greens)
+              ADR-0016 D-09 · retorno automático ──► Greens
+```
+
+### Ordem de execução, e o porquê dela
+
+| #   | item                                               | por que nesta posição                                                     |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | **ADR-0016 ida** — recebe o cadastro da Greens     | é o único fluxo cujas duas pontas estão paradas hoje                      |
+| 2   | **ADR-0016 D-09 volta** — devolve receita e ANVISA | a ADR-0018 **depende** deste canal; construí-lo aqui evita construir dois |
+| 3   | **ADR-0017** — gatilho do bot da BeHemp            | a mecânica já está pronta (ADR-0015); falta só a regra de quando ofertar  |
+| 4   | **ADR-0018** — bot da Greens com link da BeHemp    | precisa do canal de volta (2) e da regra de gatilho (3)                   |
+
+🔴 **O item 2 antes do 4 é o que evita retrabalho.** Se a ADR-0018 fosse implementada primeiro,
+ela criaria seu próprio caminho de volta — e teríamos duas rotas fazendo a mesma coisa, que é o
+R-05 daquela ADR.
+
+### Bloqueios, por item
+
+| item          | bloqueado por                                                                    | dono           |
+| ------------- | -------------------------------------------------------------------------------- | -------------- |
+| ADR-0016      | atualização do formulário da Greens · aceite no intake · segredo nos dois `.env` | Dryelle / dono |
+| ADR-0016 D-09 | segredo **do sentido de volta** (diferente do de ida)                            | dono           |
+| ADR-0017      | nada técnico — a mecânica está no PR #36                                         | —              |
+| ADR-0018      | o canal de volta pronto · credenciais da conta de ChatPro **da Greens**          | nós / dono     |
+
+### 🔴 Duas regras que valem nas três, e não são técnicas
+
+**1. Quem confere a receita é gente.** Manual, no painel da BeHemp, depois do envio de tudo
+(ADR-0017 D-02). O dono declarou que virá IA ou orquestração — e quando vier, entra como decisão
+própria, não como descoberta.
+
+**2. A tela nunca diz que a receita é inválida.** A regra real é "só serve receita do nosso
+receituário", e ela é **interna**. Receita de outro médico é **legalmente válida**: uma tela que
+diga o contrário faz afirmação falsa sobre o ato de outro profissional. O que a tela diz — e é
+verdade — é _"em análise"_ e _"você precisa de uma avaliação com um médico parceiro"_. Vale **nos
+dois sistemas**, e pesa mais na Greens, que fala com o paciente primeiro.
+
+### O que fica de fora das três, declarado
+
+**Os arquivos** (fase 2, nas duas direções): manifesto agora, blob depois.
+**A automação da conferência** (ADR-0017 §5): declarada como futura, com dono e sem data.
+
+---
+
+## Item 24 — ✅ Lado BeHemp da ADR-0016 (ida), implementado em 09/09/2026
+
+**O que foi feito:** a ponta que **recebe** o cadastro que vem da Greens. A ponta que envia é
+trabalho de lá (ADR-0027), e o caminho de volta (D-09) é item próprio.
+
+### O contrato, que estava escondido no schema da Greens
+
+O `§6.1` bloqueou esta implementação até o `CONTRATO §4/§6` ser cruzado. Ele **não existe como
+documento** — é citado no schema e nunca foi escrito. O schema é a fonte, e especifica:
+
+| campo (lá)         | o que fixa                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `behempReferralId` | `VarChar(64)`, **nosso** id · _"é por ele que o webhook da Behemp localiza a solicitação"_ |
+| — não é `@unique`  | deliberado: unique faria reentrega de webhook virar erro 500                               |
+| `behempJourney`    | `!= NONE` → **Mercado Pago com desconto collab**; `NONE` → Cannect                         |
+
+🔴 **Isso muda o peso do handoff:** ele não decide só um cadastro — decide **o gateway e o preço
+de uma compra**. A idempotência deixou de ser higiene e virou requisito de dinheiro.
+
+### O que existe no disco
+
+| camada                         | arquivo                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| HMAC + janela de 300 s         | `lib/parceiros/assinatura.ts`                                                    |
+| recebe, idempotente por evento | `lib/parceiros/handoff.ts`                                                       |
+| rota                           | `app/api/parceiros/greens/cadastro/route.ts`                                     |
+| rota liberada do Clerk         | `middleware.ts` — `'/api/parceiros(.*)'`                                         |
+| campos                         | `parceiro`, `evento_do_parceiro`, `pedido_do_parceiro` + origem `greens_handoff` |
+| migration                      | `0028_plain_pretty_boy.sql` — **zero destrutivo**                                |
+| guarda                         | `handoff-do-parceiro-e-assinado-e-idempotente` — **29 casos**, 13 sabotagens     |
+
+### Como foi provado, ao vivo
+
+| #   | teste                                                        | resultado                                           |
+| --- | ------------------------------------------------------------ | --------------------------------------------------- |
+| 1–3 | sem assinatura · assinatura errada · fora da janela (10 min) | **401** nos três                                    |
+| 4   | assinatura correta                                           | **200** com `referralId` (cuid2, cabe nos 64)       |
+| 5   | 🔴 **reenvio do mesmo evento**                               | **mesmo** `referralId` e protocolo, `reenvio: true` |
+| 6   | corpo adulterado com assinatura do original                  | **401**                                             |
+| 7   | `eventoId` do corpo divergindo do cabeçalho                  | **422 EVENTO_DIVERGENTE**                           |
+| 8   | sem e-mail nem telefone                                      | **422 CONTATO_INSUFICIENTE**                        |
+| 9   | banco após o reenvio                                         | **1 linha**, não duas                               |
+| 10  | o paciente abre o link                                       | nome, e-mail e telefone da Greens pré-preenchidos   |
+
+### 🔴 Dois defeitos que o próprio processo pegou
+
+**1. O corpo sobrescrevia o `eventoId` do cabeçalho.** O `...analise.data` vinha **depois** do
+`eventoId` — o oposto do que o comentário ao lado afirmava. O `tsc` acusou (`TS2783`).
+**Corrigido eliminando a classe:** campo a campo, sem spread. Trocar a ordem resolveria o caso de
+hoje; proibir o spread impede que um campo novo no corpo, amanhã, alcance parâmetro que ninguém
+listou de propósito. O guarda cobra a ausência do spread, não a ordem.
+
+**2. O container do Postgres estava parado** e o `db:migrate` falhava com erro que não diz isso.
+Já catalogado antes; repetiu.
+
+### O que fica de fora, declarado
+
+| #   | o quê                                         | por quê                          |
+| --- | --------------------------------------------- | -------------------------------- |
+| 1   | O **caminho de volta** (ADR-0016 D-09)        | item próprio; precede a ADR-0018 |
+| 2   | A ponta que **envia**, na Greens              | ADR-0027, trabalho de lá         |
+| 3   | Cópia dos 5 arquivos                          | fase 2, nas duas direções        |
+| 4   | `PARCEIRO_GREENS_SEGREDO_ENTRADA` em produção | segue com o dono                 |
+
+---
+
+## Item 25 — ✅ O caminho de volta (ADR-0016 D-09), implementado em 09/09/2026
+
+A BeHemp avisa a Greens quando receita ou ANVISA ficam prontas, para o pedido do paciente
+destravar lá **sem ninguém digitar nada**. É a segunda direção do mesmo par.
+
+### A decisão de desenho que sustenta tudo: fila, não `fetch`
+
+O aviso nasce no instante em que o médico assina. Um `fetch` direto ali tem **dois** modos de
+falha, os dois silenciosos:
+
+| se…                                   | o que aconteceria                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| a Greens estiver fora naquele segundo | o aviso **se perde para sempre** — e ninguém descobre: o médico viu a receita ser assinada, o sistema não reclamou, e o pedido nunca destrava lá |
+| a Greens estiver **lenta**            | a tela do médico **trava** esperando um parceiro comercial responder                                                                             |
+
+Gravando primeiro, indisponibilidade vira **atraso**, não perda. E `notificarParceiro` **nunca
+lança**: quem a chama está no meio de um ato clínico, e falhar em avisar não pode impedir alguém
+de prescrever.
+
+### O que existe
+
+| camada                      | arquivo                                                          |
+| --------------------------- | ---------------------------------------------------------------- |
+| fila durável                | `db/schema/parceiro-eventos-saida.ts`                            |
+| enfileira (nunca lança)     | `lib/parceiros/notificar.ts`                                     |
+| entrega com retry e backoff | `lib/parceiros/enviador.ts`                                      |
+| cron                        | `app/api/parceiros/enviar/route.ts`                              |
+| migration                   | `0030_lame_madripoor.sql` — **zero destrutivo**                  |
+| guarda                      | `o-aviso-ao-parceiro-nao-se-perde` — **19 casos**, 13 sabotagens |
+
+### 🔴 Uma diferença de índice que parece inconsistência e não é
+
+| fila                                  | índice    | por quê                                                                                        |
+| ------------------------------------- | --------- | ---------------------------------------------------------------------------------------------- |
+| **entrada** (`solicitacoes_cadastro`) | **comum** | o remetente é o ChatPro/Greens; a reentrega deles é normal e precisa ser absorvida em silêncio |
+| **saída** (`parceiro_eventos_saida`)  | **único** | quem cria somos **nós**; criar duas vezes seria bug nosso — e bug nosso deve estourar          |
+
+### Provado ao vivo, contra um servidor que faz o papel da Greens
+
+| #   | cenário                 | resultado                                                     |
+| --- | ----------------------- | ------------------------------------------------------------- |
+| 1   | entrega normal          | **200**, e a assinatura **conferiu do outro lado**            |
+| 2   | Greens fora do ar (500) | reagendado, volta a `pendente`, **não se perde**              |
+| 3   | cron antes da hora      | **0 reivindicados** — respeitou o backoff                     |
+| 4   | Greens volta            | entregue com o **mesmo id do evento**                         |
+| 5   | resposta 400            | **`falhou` na 1ª tentativa** — 4xx não se conserta insistindo |
+| 6   | mesmo fato duas vezes   | `duplicate key`, **1 aviso** no banco                         |
+
+⚠️ **O que NÃO foi testado:** a rota real da Greens — ela ainda não existe. O teste foi contra
+servidor falso, que prova assinatura, retry, backoff e idempotência, **não** a integração real.
+Isso só é possível depois que o lado deles subir.
+
+### O que falta para funcionar de verdade
+
+| #   | pendência                                                                                             | dono             |
+| --- | ----------------------------------------------------------------------------------------------------- | ---------------- |
+| 1   | A rota `POST /api/parceiros/behemp/atualizacao` na Greens                                             | Claude da Greens |
+| 2   | `PARCEIRO_GREENS_SEGREDO_SAIDA` e `PARCEIRO_GREENS_API_URL` no `.env`                                 | dono             |
+| 3   | Cron de `/api/parceiros/enviar`                                                                       | dono/deploy      |
+| 4   | 🔴 **O GATILHO** — chamar `notificarParceiro()` quando a receita é assinada e quando a ANVISA conclui | ver abaixo       |
+
+### 🔴 O gatilho NÃO foi ligado, e isso é deliberado
+
+`notificarParceiro()` existe e funciona, mas **nada a chama ainda**. Ligá-la exige tocar o fluxo
+de receituário (`lib/receituario/`) e o de ANVISA — as duas **áreas protegidas pelo hook
+`escopo-autorizado`**, as duas em produção, e o `CLAUDE.md` é explícito: achado ou mudança fora do
+escopo se **cataloga e pede autorização**, não se faz de passagem.
+
+**O custo de mexer, medido:** dois pontos de chamada, uma linha cada, ambos em código clínico que
+já roda. **O custo de deixar:** a fila existe e fica vazia — nenhum aviso é gerado.
+
+**Peço autorização para ligar os dois gatilhos como trabalho próprio, em commit próprio.**
+
+---
+
+## Item 26 — 🔴 CATALOGADO: `users.telefone` é texto livre, e isso impede casar paciente por telefone
+
+**Descoberto em 09/09/2026**, ao investigar se o bot da BeHemp poderia reconhecer sozinho um
+paciente que já existe.
+
+### O diagnóstico
+
+Quatro caminhos gravam `users.telefone`. **Nenhum normaliza:**
+
+| ponto                                           | `caminho:linha`                         | formato que grava                                                                            |
+| ----------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| webhook do Clerk — **todo cadastro passa aqui** | `app/api/webhooks/clerk/route.ts:147`   | `phone_numbers[0]` (E.164) **ou** `unsafe_metadata.phone` — **misto**                        |
+| médico cadastrando à mão                        | `app/(medico)/_actions/pacientes.ts:17` | `z.string().optional()` — **texto livre, zero validação**                                    |
+| admin editando                                  | `app/(admin)/_actions/usuarios.ts:145`  | regex `^[\d\s()\-+]{8,20}$` — aceita `(62) 99999-9999`, `62999999999` **e** `+5562999999999` |
+| cadastro por link (novo)                        | `app/_actions/cadastro-por-link.ts`     | ✅ E.164 — **o único que normaliza**                                                         |
+
+O campo é **texto livre na prática**. Comparar por igualdade de string falha na maioria dos
+casos — e falha **em silêncio**: quem procura conclui "não existe" em vez de "não sei dizer".
+
+### O perigo de mexer, medido
+
+|                                      |                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| pontos de escrita                    | **4**                                                                                |
+| está em produção?                    | **sim** — os quatro                                                                  |
+| existe teste que prove antes/depois? | **não**                                                                              |
+| o que quebra ao normalizar           | nada em leitura (é só exibição hoje); a migração de dados é o risco real             |
+| proporção de dados sujos             | 🔴 **NÃO MEDIDA** — o banco local tem 1 paciente e 0 telefones. Só produção responde |
+
+### O custo de deixar
+
+Enquanto isso vale, **nenhum lugar do sistema consegue reconhecer um paciente pelo telefone** —
+não é limitação do bot, é do campo. Vale para o ChatPro, para o atendimento e para qualquer
+integração futura que receba um número de fora.
+
+### Duas correções, e elas são independentes
+
+1. **Normalizar na comparação** (barato, sem migração): comparar só os dígitos. Resolve
+   formatação e DDI; **não resolve** o celular antigo sem o 9.
+2. **Normalizar o campo** (migração de dados): resolve de verdade. Exige backup, script
+   idempotente, e medir antes quantas linhas mudam.
+
+⚠️ **Nenhuma das duas foi feita.** A (1) entra na ADR-0017 como auxílio de busca — nunca como
+decisão. A (2) precisa de autorização e é trabalho próprio.
+
+---
+
+## Item 27 — ✅ ADR-0017 implementada: a triagem do bot da BeHemp
+
+**O que faltava:** a ADR-0015 resolveu **como** o link nasce; faltava **quando** oferecê-lo.
+
+### O que existe
+
+| camada                                   | arquivo                                                      |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| o gatilho (consulta receita e ANVISA)    | `lib/chatpro/triagem.ts`                                     |
+| interpreta o que o paciente escreveu     | `lib/chatpro/resposta-do-paciente.ts`                        |
+| os textos, e o que eles nunca dizem      | `lib/chatpro/texto-da-triagem.ts`                            |
+| a rota (`text/plain`, como o `bot-link`) | `app/api/chatpro/triagem/route.ts`                           |
+| guarda                                   | `a-triagem-roteia-e-nao-julga` — **44 casos**, 14 sabotagens |
+
+### 🔴 O defeito que só apareceu no teste ao vivo
+
+A primeira versão interpretava a resposta com `/^(sim|nao|não|n|s)$/` — âncora total,
+palavra exata. Testei com as respostas que uma pessoa dá de verdade:
+
+| o paciente escreve     | a 1ª versão entendia | consequência                                     |
+| ---------------------- | -------------------- | ------------------------------------------------ |
+| `"não"`                | ✅ não tem           | ok                                               |
+| **`"Não, ainda não"`** | ❌ **"não sei"**     | 🔴 **o link NÃO era oferecido a quem precisava** |
+| `"Ainda não tenho"`    | ❌ "não sei"         | idem                                             |
+| `"tenho mas venceu"`   | ❌ "tem"             | 🔴 mandado para o caminho errado                 |
+
+**O paciente não escolhe entre opções — ele conversa.** A correção lê negação e afirmação
+**no texto**, e trata menção a vencimento como não-ter: _"tenho, mas venceu"_ é afirmação
+seguida de uma informação que a anula.
+
+⚠️ **A negação é procurada ANTES da afirmação**, e a ordem não é detalhe: **"não tenho"
+contém "tenho"**. Na ordem inversa, toda negação viraria afirmação.
+
+### O que a tela nunca diz, e a única exceção
+
+| ❌ nunca                        | ✅ e é verdade                                         |
+| ------------------------------- | ------------------------------------------------------ |
+| "sua receita é inválida"        | "você precisa de uma avaliação com um médico parceiro" |
+| "não aceitamos receita de fora" | "seu documento está em análise"                        |
+
+🔴 **A exceção é o vencimento**, e ela é nomeada: _"sua receita está vencida — receitas de
+canabidiol valem 30 dias"_. É fato objetivo, regra pública (RDC 1.015/2026), e **não julga
+quem a emitiu**. Esconder tiraria do paciente algo que ele confere sozinho no documento.
+
+O guarda varre o **arquivo de textos**, não só o resultado das funções — um texto novo,
+amanhã, também é alcançado.
+
+### Provado ao vivo
+
+| cenário                                   | resultado                                |
+| ----------------------------------------- | ---------------------------------------- |
+| receita vigente + ANVISA                  | não oferece · `tem_tudo`                 |
+| receita **vencida**                       | oferece · **e diz que venceu**           |
+| receita ok, sem ANVISA                    | oferece · _"nós cuidamos dela com você"_ |
+| só **rascunho** de receita                | oferece — rascunho não é documento       |
+| paciente diz "não tenho" contra a base    | **oferece** — a resposta dele vence      |
+| a palavra "inválida" em qualquer resposta | **0 ocorrências**                        |
+
+E a busca por dígitos casou os **quatro** formatos gravados: `(62) 98111-1111`,
+`+5562982222222`, `62983333333` e `(62) 9 8444-4444`.
+
+### O que fica de fora
+
+**A configuração do fluxo no painel** — quem chama esta rota e o que faz com o cabeçalho
+`x-triagem-motivo` é decisão do painel, não do código. Guia para o dono no
+`docs/chatpro/COMO-CONECTAR-NO-PAINEL.md`.
