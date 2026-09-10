@@ -172,9 +172,30 @@ describe('o fluxo customizado reserva o lugar do CAPTCHA', () => {
     // botão parou de funcionar.
     const t = codigo(FORM);
     const captcha = t.indexOf('id="clerk-captcha"');
-    const botao = t.indexOf('Criar conta e agendar consulta');
+    /**
+     * ⚠️ O botão é localizado pelo TIPO, não pelo texto.
+     *
+     * Até 10/09/2026 este caso procurava a string "Criar conta e agendar consulta". O texto
+     * passou a depender do destino (`textosDoDestino`) — quem vai para a procuração da ANVISA
+     * lê outra coisa —, e o guarda quebrou sem que nada de errado tivesse acontecido.
+     *
+     * Guarda que se apoia em texto de tela quebra na primeira mudança de copy. O que importa
+     * aqui é a POSIÇÃO do CAPTCHA em relação ao botão de envio, e `type="submit"` identifica
+     * o botão sem depender do que ele diz.
+     */
     expect(captcha).toBeGreaterThan(-1);
-    expect(botao).toBeGreaterThan(-1);
+    /**
+     * ⚠️ E o botão procurado é o PRIMEIRO DEPOIS do CAPTCHA.
+     *
+     * O arquivo tem dois `type="submit"`: o da etapa do código e o do cadastro, com o CAPTCHA
+     * entre eles. Pegar o primeiro do arquivo compararia com o botão errado e ficaria vermelho
+     * sem defeito nenhum.
+     *
+     * O que este caso garante é que existe um botão de envio DEPOIS do CAPTCHA — ou seja, que
+     * o desafio aparece antes de o paciente tentar enviar, e não abaixo da dobra.
+     */
+    const botao = t.indexOf('type="submit"', captcha);
+    expect(botao, 'não há botão de envio depois do CAPTCHA').toBeGreaterThan(-1);
     expect(captcha, 'o CAPTCHA foi parar depois do botão').toBeLessThan(botao);
   });
 });
