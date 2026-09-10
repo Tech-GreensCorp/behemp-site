@@ -393,6 +393,19 @@ desorganização: é decisão perdida.
 
 Correção: uma linha por ADR, e o status conferido contra o arquivo. Trabalho próprio.
 
+### 🔴 Achado de 10/09/2026 — os crons NUNCA rodaram neste servidor
+
+`vercel.json` declara três crons — validade de documento, recompra e revisão de dosagem. **O
+projeto não roda na Vercel** (EC2 + PM2, DT-006/DT-008), e não existe nenhum workflow com
+`schedule:`. Logo: os três nunca foram executados.
+
+E as duas filas novas herdam o mesmo buraco: `/api/chatpro/processar` e `/api/parceiros/enviar`
+existem, funcionam quando chamados, e **ninguém os chama**. O webhook do ChatPro aceita com 202 —
+medido em produção — e o evento fica `pendente` para sempre.
+
+Bloqueia o QA. Diagnóstico, as três opções e a recomendação: `docs/adr/ADR-0020-ajustes-pre-QA.md`
+§4.
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
