@@ -24,7 +24,14 @@ export interface SolicitacaoValidada {
   telefone: string | null;
   expiraEm: Date;
   /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
-  documentosDoParceiro: string[] | null;
+  /**
+   * Lista mista: nome puro, ou objeto com o arquivo já re-hospedado aqui. Quem só precisa
+   * saber o que falta usa `normalizarManifesto`, que lê as duas formas.
+   */
+  documentosDoParceiro: Array<
+    | string
+    | { tipo: string; urlBlob: string; nomeArquivo: string | null; dataEmissao: string | null }
+  > | null;
   /** Destino de volta, JÁ conferido contra a lista de origens quando foi gravado. */
   urlDeRetorno: string | null;
 }

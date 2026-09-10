@@ -21,6 +21,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+import { destinoDepoisDoCadastro } from '@/lib/parceiros/destino-do-paciente';
 import { useSignUp } from '@clerk/nextjs/legacy';
 import {
   ArrowLeft,
@@ -248,8 +250,17 @@ export function FormularioDeCadastro({
       }
 
       setEtapa('pronto');
-      // O destino é agendar a teleconsulta: é para isso que ele veio.
-      setTimeout(() => router.push('/paciente/teleconsulta'), 1400);
+      /**
+       * 🔴 O DESTINO DEPENDE DO QUE FALTA, e é o que separa os dois fluxos da Greens.
+       *
+       * Sem receita → agendamento: a receita só existe depois de um médico avaliar.
+       * Com receita e sem ANVISA → procuração: mandá-lo agendar seria pedir que repetisse um
+       * ato médico que já aconteceu.
+       *
+       * A regra e o porquê da ordem moram em `lib/parceiros/destino-do-paciente.ts`.
+       */
+      const destino = destinoDepoisDoCadastro(pendencias.map((p) => p.chave));
+      setTimeout(() => router.push(destino), 1400);
     } catch (err) {
       setErro(traduzirErro(err));
     } finally {

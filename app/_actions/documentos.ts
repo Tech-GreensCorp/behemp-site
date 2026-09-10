@@ -1,5 +1,6 @@
 'use server';
 
+import { calcularValidade } from '@/lib/documentos/validade';
 import { db } from '@/lib/db';
 import { documentos, pacientes, users } from '@/db/schema';
 import { eq, desc, and, isNull } from 'drizzle-orm';
@@ -17,7 +18,13 @@ import { registrarAuditoria } from '@/lib/utils/audit';
 
 const uploadDocumentoSchema = z.object({
   pacienteId: z.string().min(1),
-  tipo: z.enum(['rg', 'rg_responsavel', 'receita_medica', 'comprovante_residencia', 'autorizacao_anvisa']),
+  tipo: z.enum([
+    'rg',
+    'rg_responsavel',
+    'receita_medica',
+    'comprovante_residencia',
+    'autorizacao_anvisa',
+  ]),
   dataEmissao: z.string().min(1, 'Data de emissão é obrigatória'),
   observacoes: z.string().optional(),
 });
@@ -38,24 +45,6 @@ interface ActionResult<T = unknown> {
  * - Receita médica: 6 meses
  * - Outros: sem validade (usa data distante)
  */
-function calcularValidade(tipo: string, dataEmissao: string): string {
-  const data = new Date(dataEmissao);
-
-  switch (tipo) {
-    case 'autorizacao_anvisa':
-      data.setMonth(data.getMonth() + 24);
-      break;
-    case 'receita_medica':
-      data.setMonth(data.getMonth() + 6);
-      break;
-    default:
-      // Documentos sem validade: 100 anos
-      data.setFullYear(data.getFullYear() + 100);
-      break;
-  }
-
-  return data.toISOString().split('T')[0];
-}
 
 // ── Actions ───────────────────────────────────────────────────
 
@@ -124,7 +113,11 @@ export async function uploadDocumento(
         acao: 'criar',
         entidade: 'documentos',
         entidadeId: doc.id,
-        dadosDepois: { tipo: parsed.data.tipo, pacienteId: parsed.data.pacienteId, nomeArquivo: arquivo.name },
+        dadosDepois: {
+          tipo: parsed.data.tipo,
+          pacienteId: parsed.data.pacienteId,
+          nomeArquivo: arquivo.name,
+        },
       });
     }
 
@@ -138,9 +131,7 @@ export async function uploadDocumento(
 /**
  * Remove um documento (soft delete + remove do Blob).
  */
-export async function removerDocumento(
-  documentoId: string,
-): Promise<ActionResult> {
+export async function removerDocumento(documentoId: string): Promise<ActionResult> {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) {
@@ -192,7 +183,7 @@ export async function removerDocumento(
  */
 export async function listarDocumentos(
   pacienteId: string,
-): Promise<ActionResult<typeof documentos.$inferSelect[]>> {
+): Promise<ActionResult<(typeof documentos.$inferSelect)[]>> {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) {
@@ -202,12 +193,7 @@ export async function listarDocumentos(
     const resultado = await db
       .select()
       .from(documentos)
-      .where(
-        and(
-          eq(documentos.pacienteId, pacienteId),
-          isNull(documentos.deletedAt),
-        ),
-      )
+      .where(and(eq(documentos.pacienteId, pacienteId), isNull(documentos.deletedAt)))
       .orderBy(desc(documentos.createdAt));
 
     return { sucesso: true, dados: resultado };

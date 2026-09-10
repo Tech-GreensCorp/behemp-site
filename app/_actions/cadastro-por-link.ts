@@ -28,6 +28,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { pacientes, solicitacoesCadastro, users } from '@/db/schema';
 import { db } from '@/lib/db';
 import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
+import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
@@ -201,6 +202,23 @@ export async function concluirCadastroPorLink(
       })
       .where(eq(solicitacoesCadastro.id, solicitacao.id));
 
+    /**
+     * 8 ── Os arquivos que o parceiro mandou junto viram documentos DESTE paciente.
+     *
+     * Só agora existe `pacienteId`, e `documentos.paciente_id` é `notNull`. O arquivo já está
+     * re-hospedado aqui desde o handoff — a URL do parceiro é de vida curta e teria expirado
+     * nos 7 dias que o paciente tem para abrir o link.
+     *
+     * ⚠️ Fora da transação de propósito, e depois de `marcarComoUtilizada`: um erro ao copiar
+     * documento não pode desfazer um cadastro que já deu certo. A função nunca lança; no pior
+     * caso o paciente envia o documento manualmente, como sempre pôde.
+     */
+    const copiados = await materializarDocumentosDoParceiro({
+      pacienteId,
+      documentosDoParceiro: solicitacao.documentosDoParceiro,
+      protocolo: solicitacao.protocolo,
+    });
+
     await registrarAuditoria({
       userId: clerkId,
       acao: 'criar',
@@ -212,6 +230,7 @@ export async function concluirCadastroPorLink(
       dadosDepois: {
         protocolo: solicitacao.protocolo,
         origem: 'link_whatsapp',
+        documentosRecebidosDoParceiro: copiados.inseridos,
         declarouTratamentoEmCurso: dados.jaFazTratamento,
         linkConsumidoAgora: consumiu,
       },
