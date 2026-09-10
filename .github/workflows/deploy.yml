@@ -139,6 +139,22 @@ jobs:
 
             chmod 600 "$ENVFILE"
 
+            # 🔴 CARREGA O `.env` NO AMBIENTE DESTE SHELL.
+            #
+            # Sem isto, `pnpm db:migrate:prod` falha com "DATABASE_URL ausente" — e falhou,
+            # no deploy do PR #38. O migrador lê `process.env`, e o `.env` que acabamos de
+            # escrever é um ARQUIVO: ninguém o carrega sozinho.
+            #
+            # O `drizzle-kit` antigo não tinha esse problema porque o `drizzle.config.ts`
+            # usa dotenv — a diferença passou despercebida ao trocar o CLI pelo migrador.
+            #
+            # `set -a` exporta tudo que for definido até o `set +a`. É o jeito canônico de
+            # transformar um arquivo de env em ambiente de shell, e é preciso porque o
+            # `pnpm` roda o script num processo filho, que herda o ambiente — não o arquivo.
+            set -a
+            . "$ENVFILE"
+            set +a
+
             # Aplica as migrations pendentes.
             #
             # 🔴 `db:migrate:prod`, e NÃO `db:migrate`. O segundo chama o CLI `drizzle-kit`,

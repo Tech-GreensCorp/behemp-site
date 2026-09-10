@@ -41,7 +41,11 @@ const url = process.env.DATABASE_URL;
 if (!url) {
   // Falha FECHADA: sem URL, sair com erro para o deploy parar. O contrário — seguir e
   // reiniciar o app — é o que produziu banco desatualizado com deploy verde.
-  console.error('[migrar] DATABASE_URL ausente — nada foi aplicado');
+  console.error(
+    '[migrar] DATABASE_URL ausente — nada foi aplicado.\n' +
+      '         Este script lê process.env, e um arquivo .env NÃO é carregado sozinho.\n' +
+      '         No deploy, o shell precisa fazer: set -a; . .next/standalone/.env; set +a',
+  );
   process.exit(1);
 }
 
