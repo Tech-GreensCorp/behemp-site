@@ -1423,3 +1423,78 @@ Já catalogado antes; repetiu.
 | 2   | A ponta que **envia**, na Greens              | ADR-0027, trabalho de lá         |
 | 3   | Cópia dos 5 arquivos                          | fase 2, nas duas direções        |
 | 4   | `PARCEIRO_GREENS_SEGREDO_ENTRADA` em produção | segue com o dono                 |
+
+---
+
+## Item 25 — ✅ O caminho de volta (ADR-0016 D-09), implementado em 09/09/2026
+
+A BeHemp avisa a Greens quando receita ou ANVISA ficam prontas, para o pedido do paciente
+destravar lá **sem ninguém digitar nada**. É a segunda direção do mesmo par.
+
+### A decisão de desenho que sustenta tudo: fila, não `fetch`
+
+O aviso nasce no instante em que o médico assina. Um `fetch` direto ali tem **dois** modos de
+falha, os dois silenciosos:
+
+| se…                                   | o que aconteceria                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| a Greens estiver fora naquele segundo | o aviso **se perde para sempre** — e ninguém descobre: o médico viu a receita ser assinada, o sistema não reclamou, e o pedido nunca destrava lá |
+| a Greens estiver **lenta**            | a tela do médico **trava** esperando um parceiro comercial responder                                                                             |
+
+Gravando primeiro, indisponibilidade vira **atraso**, não perda. E `notificarParceiro` **nunca
+lança**: quem a chama está no meio de um ato clínico, e falhar em avisar não pode impedir alguém
+de prescrever.
+
+### O que existe
+
+| camada                      | arquivo                                                          |
+| --------------------------- | ---------------------------------------------------------------- |
+| fila durável                | `db/schema/parceiro-eventos-saida.ts`                            |
+| enfileira (nunca lança)     | `lib/parceiros/notificar.ts`                                     |
+| entrega com retry e backoff | `lib/parceiros/enviador.ts`                                      |
+| cron                        | `app/api/parceiros/enviar/route.ts`                              |
+| migration                   | `0030_lame_madripoor.sql` — **zero destrutivo**                  |
+| guarda                      | `o-aviso-ao-parceiro-nao-se-perde` — **19 casos**, 13 sabotagens |
+
+### 🔴 Uma diferença de índice que parece inconsistência e não é
+
+| fila                                  | índice    | por quê                                                                                        |
+| ------------------------------------- | --------- | ---------------------------------------------------------------------------------------------- |
+| **entrada** (`solicitacoes_cadastro`) | **comum** | o remetente é o ChatPro/Greens; a reentrega deles é normal e precisa ser absorvida em silêncio |
+| **saída** (`parceiro_eventos_saida`)  | **único** | quem cria somos **nós**; criar duas vezes seria bug nosso — e bug nosso deve estourar          |
+
+### Provado ao vivo, contra um servidor que faz o papel da Greens
+
+| #   | cenário                 | resultado                                                     |
+| --- | ----------------------- | ------------------------------------------------------------- |
+| 1   | entrega normal          | **200**, e a assinatura **conferiu do outro lado**            |
+| 2   | Greens fora do ar (500) | reagendado, volta a `pendente`, **não se perde**              |
+| 3   | cron antes da hora      | **0 reivindicados** — respeitou o backoff                     |
+| 4   | Greens volta            | entregue com o **mesmo id do evento**                         |
+| 5   | resposta 400            | **`falhou` na 1ª tentativa** — 4xx não se conserta insistindo |
+| 6   | mesmo fato duas vezes   | `duplicate key`, **1 aviso** no banco                         |
+
+⚠️ **O que NÃO foi testado:** a rota real da Greens — ela ainda não existe. O teste foi contra
+servidor falso, que prova assinatura, retry, backoff e idempotência, **não** a integração real.
+Isso só é possível depois que o lado deles subir.
+
+### O que falta para funcionar de verdade
+
+| #   | pendência                                                                                             | dono             |
+| --- | ----------------------------------------------------------------------------------------------------- | ---------------- |
+| 1   | A rota `POST /api/parceiros/behemp/atualizacao` na Greens                                             | Claude da Greens |
+| 2   | `PARCEIRO_GREENS_SEGREDO_SAIDA` e `PARCEIRO_GREENS_API_URL` no `.env`                                 | dono             |
+| 3   | Cron de `/api/parceiros/enviar`                                                                       | dono/deploy      |
+| 4   | 🔴 **O GATILHO** — chamar `notificarParceiro()` quando a receita é assinada e quando a ANVISA conclui | ver abaixo       |
+
+### 🔴 O gatilho NÃO foi ligado, e isso é deliberado
+
+`notificarParceiro()` existe e funciona, mas **nada a chama ainda**. Ligá-la exige tocar o fluxo
+de receituário (`lib/receituario/`) e o de ANVISA — as duas **áreas protegidas pelo hook
+`escopo-autorizado`**, as duas em produção, e o `CLAUDE.md` é explícito: achado ou mudança fora do
+escopo se **cataloga e pede autorização**, não se faz de passagem.
+
+**O custo de mexer, medido:** dois pontos de chamada, uma linha cada, ambos em código clínico que
+já roda. **O custo de deixar:** a fila existe e fica vazia — nenhum aviso é gerado.
+
+**Peço autorização para ligar os dois gatilhos como trabalho próprio, em commit próprio.**

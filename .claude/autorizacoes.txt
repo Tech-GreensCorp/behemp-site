@@ -300,3 +300,14 @@ path:db/migrations/meta/0028_snapshot.json
 #   → aplicada APENAS no Postgres local; Neon intocado.
 path:db/migrations/0029_colorful_zarek.sql
 path:db/migrations/meta/0029_snapshot.json
+
+# ── Mesma autorização, caminho de volta / ADR-0016 D-09 (09/09/2026) ──────────
+# "pode seguir" — o dono, sobre o caminho de volta.
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x CREATE TYPE  — status e tipo do evento de saída
+#   · 1x CREATE TABLE — parceiro_eventos_saida, NOVA
+#   · 1x FK para solicitacoes_cadastro (ON DELETE CASCADE; tabela criada na 0025)
+#   · 2x índices sobre a tabela nova
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0030_lame_madripoor.sql
+path:db/migrations/meta/0030_snapshot.json

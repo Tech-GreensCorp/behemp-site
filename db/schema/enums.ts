@@ -340,6 +340,23 @@ export const chatproEventoStatusEnum = pgEnum('chatpro_evento_status', [
   'falhou',
 ]);
 
+/** Estado de um aviso que precisa chegar ao parceiro (ADR-0016 D-09). */
+export const parceiroEventoSaidaStatusEnum = pgEnum('parceiro_evento_saida_status', [
+  'pendente',
+  /** Claim atômico, mesmo motivo de `chatpro_evento_status`: sem ele, dois processadores
+   *  concorrentes enviam o mesmo aviso duas vezes. */
+  'enviando',
+  'enviado',
+  /** Esgotou as tentativas. Fica no banco para alguém ver — não some. */
+  'falhou',
+]);
+
+/** O que aconteceu aqui que o parceiro precisa saber. */
+export const parceiroEventoTipoEnum = pgEnum('parceiro_evento_tipo', [
+  'receita_emitida',
+  'anvisa_concluida',
+]);
+
 /** Os dois catálogos que o ChatPro expõe e que chegam como UUID nos webhooks. */
 export const chatproDiretorioTipoEnum = pgEnum('chatpro_diretorio_tipo', [
   'departamento',
