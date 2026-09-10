@@ -201,3 +201,31 @@ describe('retrocompatibilidade — o formato antigo continua valendo', () => {
     expect(r.comArquivo).toHaveLength(0);
   });
 });
+
+/**
+ * A allowlist só existe se o valor chegar ao servidor.
+ *
+ * 🔴 CADASTRAR O SECRET NO GITHUB NÃO BASTA. O `deploy.yml` escreve uma lista FIXA de chaves
+ * no `.env` do servidor — um secret que não está nessa lista fica no GitHub e nunca chega ao
+ * processo. Aconteceu em 10/09/2026: o secret foi cadastrado e o deploy não o escrevia.
+ *
+ * Sem ele, `origensPermitidas()` cai no `PARCEIRO_ORIGENS_DE_RETORNO` — que tem o domínio do
+ * site da Greens, não o bucket de onde os documentos saem. Todo arquivo seria recusado, e em
+ * silêncio: recusa vira pendência, não erro.
+ */
+describe('a variável da allowlist chega ao servidor', () => {
+  it('o deploy escreve PARCEIRO_ORIGENS_DE_DOCUMENTO no .env', () => {
+    const yaml = readFileSync(path.join(raiz, '.github/workflows/deploy.yml'), 'utf8');
+    expect(yaml).toMatch(/gravar PARCEIRO_ORIGENS_DE_DOCUMENTO\s+"\$\{\{ secrets\./);
+  });
+
+  it('e o código lê essa variável antes do fallback', () => {
+    const codigo = ler(BUSCADOR);
+    const i = codigo.indexOf('PARCEIRO_ORIGENS_DE_DOCUMENTO');
+    const j = codigo.indexOf('PARCEIRO_ORIGENS_DE_RETORNO');
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(-1);
+    // a específica vem primeiro; a de retorno é só o fallback
+    expect(i).toBeLessThan(j);
+  });
+});

@@ -167,6 +167,7 @@ jobs:
             gravar PARCEIRO_GREENS_SEGREDO_SAIDA   "${{ secrets.PARCEIRO_GREENS_SEGREDO_SAIDA }}"
             gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
             gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
+            gravar PARCEIRO_ORIGENS_DE_DOCUMENTO  "${{ secrets.PARCEIRO_ORIGENS_DE_DOCUMENTO }}"
             gravar CHATPRO_INTAKE_SECRET           "${{ secrets.CHATPRO_INTAKE_SECRET }}"
             gravar CHATPRO_INTAKE_SECRET_GREENS    "${{ secrets.CHATPRO_INTAKE_SECRET_GREENS }}"
             gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"

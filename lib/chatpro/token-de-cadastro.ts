@@ -22,6 +22,15 @@ export interface SolicitacaoValidada {
   nomeCompleto: string | null;
   email: string | null;
   telefone: string | null;
+  /** Só existe quando veio do parceiro — o bot do WhatsApp não pede CPF. */
+  cpf: string | null;
+  /**
+   * Qual parceiro encaminhou, ou `null` quando o paciente veio direto pelo nosso WhatsApp.
+   *
+   * 🔴 É o que decide se a tela PEDE os dados ou apenas os CONFIRMA: quem preencheu o
+   * formulário da Greens já digitou nome, CPF, telefone e e-mail lá.
+   */
+  parceiro: string | null;
   expiraEm: Date;
   /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
   /**
@@ -87,6 +96,8 @@ export async function validarTokenDeCadastro(
     nomeCompleto: linha.nomeCompleto,
     email: linha.email,
     telefone: linha.telefone,
+    cpf: linha.cpf,
+    parceiro: linha.parceiro,
     expiraEm: linha.expiraEm,
     documentosDoParceiro: linha.documentosDoParceiro ?? null,
     urlDeRetorno: linha.urlDeRetorno ?? null,

@@ -140,6 +140,15 @@ export default async function CadastroPorLinkPage({
         nomeInicial={resultado.nomeCompleto}
         emailInicial={resultado.email}
         telefoneInicial={resultado.telefone}
+        cpfInicial={resultado.cpf}
+        /**
+         * 🔴 QUEM VEIO DO FORMULÁRIO DO PARCEIRO NÃO DIGITA NADA DE NOVO.
+         *
+         * Ele já preencheu nome, CPF, telefone e e-mail lá. A tela CONFIRMA o que chegou e
+         * pede só o que ainda não existe: a senha e o código do e-mail. Pedir tudo de novo é
+         * fazer o trabalho duas vezes, e é onde se perde gente no meio do cadastro.
+         */
+        veioDeParceiro={!!resultado.parceiro}
       />
     </div>
   );
