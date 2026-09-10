@@ -1,7 +1,8 @@
 import { inngest } from './client';
 import { db } from '@/lib/db';
-import { documentos, dosagens, medicamentos, pacientes, users, notificacoes, emailsNotificacao, alertasEnviados, alertasConfig } from '@/db/schema';
+import { documentos, dosagens, medicamentos, pacientes, users, notificacoes, emailsNotificacao, alertasEnviados, alertasConfig, consultas, pagamentos, medicos } from '@/db/schema';
 import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { coletarAlertasMedicacao, coletarAlertasLicencas, coletarAlertasMensalidades } from '@/lib/alertas/coletor';
 import { gerarHtmlDigestAdmin, gerarHtmlAlertaPaciente } from '@/lib/email/alertas';
 import { enviarEmailGenerico } from '@/lib/email/brevo';
@@ -365,6 +366,86 @@ export const enviarEmailRecompraAgendado = inngest.createFunction(
     return {
       enviado: true,
       marcos: marcos.map((m) => m.diasAntes),
+      timestamp: new Date().toISOString(),
+    };
+  },
+);
+
+/**
+ * Job: Liberar reservas de agendamento expiradas.
+ *
+ * Roda a cada 5 minutos. Reservas nascem com `consultas.status = 'reservada'` e um
+ * prazo em `expiraEm` (ver `reservarConsulta` em app/(public)/_actions/agendamento.ts).
+ * Quem não confirma dentro do prazo perde o horário: este job cancela a consulta
+ * (liberando o horário para outro paciente, via o índice único que já trata
+ * 'reservada' como ativa) e avisa o paciente por e-mail. O médico nunca chegou a ser
+ * notificado da reserva (só é avisado na confirmação), então não recebe e-mail aqui.
+ */
+export const liberarReservasExpiradas = inngest.createFunction(
+  {
+    id: 'liberar-reservas-expiradas',
+    name: 'Liberar Reservas de Agendamento Expiradas',
+    triggers: [{ cron: '*/5 * * * *' }],
+  },
+  async ({ step }) => {
+    const reservasExpiradas = await step.run('buscar-reservas-expiradas', async () => {
+      const agora = new Date();
+      // users é referenciado duas vezes (paciente e médico) — alias evita ambiguidade.
+      const medicoUsers = alias(users, 'medico_users');
+
+      const resultado = await db
+        .select({
+          consultaId: consultas.id,
+          dataHora: consultas.dataHora,
+          pacienteNome: users.nome,
+          pacienteEmail: users.email,
+          medicoNome: medicoUsers.nome,
+        })
+        .from(consultas)
+        .innerJoin(pacientes, eq(consultas.pacienteId, pacientes.id))
+        .innerJoin(users, eq(pacientes.userId, users.id))
+        .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
+        .innerJoin(medicoUsers, eq(medicoUsers.id, medicos.userId))
+        .where(and(
+          eq(consultas.status, 'reservada'),
+          lte(consultas.expiraEm, agora),
+          isNull(consultas.deletedAt),
+        ));
+
+      console.log(`[Job] Encontradas ${resultado.length} reservas expiradas`);
+      return resultado;
+    });
+
+    for (const reserva of reservasExpiradas) {
+      await step.run(`liberar-reserva-${reserva.consultaId}`, async () => {
+        await db
+          .update(consultas)
+          .set({ status: 'cancelada', expiraEm: null })
+          .where(eq(consultas.id, reserva.consultaId));
+
+        await db
+          .update(pagamentos)
+          .set({ erroConfirmacao: 'Reserva expirada antes da confirmação.' })
+          .where(eq(pagamentos.consultaId, reserva.consultaId));
+
+        try {
+          const { enviarEmailConsultaCancelada } = await import('@/lib/email/consultas');
+          await enviarEmailConsultaCancelada({
+            pacienteNome: reserva.pacienteNome,
+            pacienteEmail: reserva.pacienteEmail,
+            medicoNome: reserva.medicoNome,
+            dataHora: new Date(reserva.dataHora),
+            motivo: 'O horário reservado expirou antes da confirmação.',
+          });
+          console.log(`[Job] Reserva ${reserva.consultaId} liberada e paciente avisado`);
+        } catch (error) {
+          console.error(`[Job] Reserva ${reserva.consultaId} liberada, mas falhou o e-mail:`, error);
+        }
+      });
+    }
+
+    return {
+      reservasLiberadas: reservasExpiradas.length,
       timestamp: new Date().toISOString(),
     };
   },

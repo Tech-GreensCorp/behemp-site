@@ -148,7 +148,7 @@ export default function PacienteDashboardPage() {
           id: 1,
           titulo: 'Agendar primeira consulta',
           descricao: 'Você ainda não tem consulta marcada',
-          href: '/agendamento',
+          href: '/paciente/agendamento',
           urgente: true,
         }
       : null,
@@ -388,7 +388,7 @@ export default function PacienteDashboardPage() {
                     </div>
                     <p className="text-sm font-bold text-foreground">Nenhuma consulta agendada</p>
                     <Link
-                      href="/agendamento"
+                      href="/paciente/agendamento"
                       className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
                     >
                       Agendar agora

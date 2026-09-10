@@ -397,3 +397,36 @@ path:db/migrations/meta/0033_snapshot.json
 #
 # E `set -e` no script remoto, que é a correção que impede a próxima falha de ser invisível.
 path:.github/workflows/deploy.yml
+
+# ── Autorizada pela Dryelle Ebelin em 10/09/2026, feature de pagamento ────────
+# Pedido literal no chat: adicionar etapa de pagamento (sem integração real com o futuro
+# gateway "Gather") ao fluxo de /agendamento, revisar e corrigir bugs desse fluxo, e criar
+# área admin para gerenciar pagamentos de teleconsulta (valor, split médico/plataforma).
+#
+# POR QUE cada caminho:
+#   · `app/(public)/_actions/agendamento.ts` — arquivo EXISTENTE, único caller é o wizard
+#     do site público. Corrige bug de autorização (auth() só rodava num branch condicional
+#     — payload podia trazer pacienteId de qualquer paciente sem checar dono da sessão),
+#     fecha condição de corrida de double-booking, evita evento órfão no Google Calendar,
+#     acrescenta auditoria e remove 2 exports mortos e sem checagem de auth
+#     (`cancelarConsulta`, `listarConsultasMedico` — confirmado zero callers no repo).
+#   · `app/(public)/_actions/pagamentos.ts`, `app/(admin)/_actions/pagamentos.ts`,
+#     `app/(admin)/admin/pagamentos/**` — ARQUIVOS NOVOS, não há comportamento em produção
+#     a quebrar.
+#   · `db/schema/consultas.ts` — aditivo: 2 colunas nullable (timestamp de e-mail enviado)
+#     + 1 índice único PARCIAL em (medico_id, data_hora), só para consulta ativa
+#     (`status <> 'cancelada' and deleted_at is null`) — não rejeita linha existente, só
+#     impede nova colisão.
+#
+# PERIGO MEDIDO:
+#   · nenhuma tabela clínica (pacientes/medicos/prescricoes) é tocada
+#   · pagamento é local/preparatório: sem chamada a gateway externo, sem cobrança real
+#   · migration é 100% aditiva — gerar e revisar o SQL antes de db:migrate; db:migrate
+#     contra o Neon de produção continua exigindo ordem expressa, não coberto aqui
+# CUSTO DE DEIXAR: a feature pedida não sai do papel, e os bugs de autorização/corrida no
+# agendamento público continuam ativos em produção.
+path:app/(public)/_actions/agendamento.ts
+path:app/(public)/_actions/pagamentos.ts
+path:app/(admin)/_actions/pagamentos.ts
+path:app/(admin)/admin/pagamentos
+path:db/schema/consultas.ts

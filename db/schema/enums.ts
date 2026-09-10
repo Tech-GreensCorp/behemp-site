@@ -31,8 +31,14 @@ export const documentoTipoEnum = pgEnum('documento_tipo', [
   'procuracao_especifica',
 ]);
 
-/** Status da consulta */
+/**
+ * Status da consulta.
+ * 'reservada': horário travado com prazo (`consultas.expiraEm`) enquanto o paciente
+ * está na etapa de confirmação — vira 'agendada'/'confirmada' ao confirmar, ou
+ * 'cancelada' se o prazo expirar sem confirmação (liberado pelo job de limpeza).
+ */
 export const consultaStatusEnum = pgEnum('consulta_status', [
+  'reservada',
   'agendada',
   'confirmada',
   'realizada',
@@ -186,6 +192,19 @@ export const alertaTipoEnum = pgEnum('alerta_tipo', ['medicacao', 'licenca_anvis
 
 /** Destinatário do alerta enviado */
 export const alertaDestinatarioEnum = pgEnum('alerta_destinatario', ['admin', 'paciente']);
+
+/**
+ * Status do pagamento de teleconsulta.
+ * Preparatório: pagamento não bloqueia o agendamento (nasce 'pendente' e assim fica
+ * até a integração real com o gateway existir).
+ */
+export const pagamentoStatusEnum = pgEnum('pagamento_status', [
+  'pendente',
+  'pago',
+  'isento',
+  'cancelado',
+  'estornado',
+]);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // IA CLÍNICA — acrescentados na Sprint 2 (20/08/2026)

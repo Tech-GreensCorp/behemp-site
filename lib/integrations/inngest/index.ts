@@ -5,4 +5,5 @@ export {
   verificarRecompraMedicamentos,
   enviarEmailRecompraAgendado,
   digestDiarioAdmin,
+  liberarReservasExpiradas,
 } from './functions';

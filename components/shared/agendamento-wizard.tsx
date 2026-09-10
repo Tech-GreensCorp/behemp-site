@@ -3,17 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import {
   listarMedicosDisponiveis,
   listarHorariosLivres,
-  agendarConsulta,
+  reservarConsulta,
+  confirmarAgendamento,
 } from '@/app/(public)/_actions/agendamento';
-import { useAuth } from '@clerk/nextjs';
-import Link from 'next/link';
+import { AgendamentoPagamentoStep } from '@/components/shared/agendamento-pagamento-step';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,18 +23,20 @@ import {
   Clock,
   Loader2,
   Stethoscope,
-  UserCheck,
-  Video,
 } from 'lucide-react';
 
 /**
- * Wizard multi-step para agendamento de consultas.
+ * Wizard multi-step para agendamento de consultas — vive dentro da área logada
+ * (`/paciente/agendamento`), já protegida pelo layout de `(paciente)`.
  *
  * Steps:
- * 1. Seleção de médico
- * 2. Seleção de data e horário
- * 3. Confirmação (login required)
- * 4. Sucesso
+ * 0. Seleção de médico
+ * 1. Seleção de data e horário — ao continuar, reserva o horário por um prazo curto
+ *    (`reservarConsulta`); ninguém mais consegue reservar o mesmo horário enquanto
+ *    a reserva estiver ativa
+ * 2. Confirmação — dentro do prazo, confirma de fato (`confirmarAgendamento`)
+ * 3. Pagamento — última tela. Só layout, sem requisição própria: mostra o valor e o
+ *    status já registrado até aqui. Fica pronta para quando o Gather existir.
  */
 
 interface Medico {
@@ -53,32 +53,22 @@ function formatarValor(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function iniciaisDoNome(nome: string): string {
+  return nome
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .slice(0, 2)
+    .join('');
+}
+
 const STEPS = [
   { label: 'Médico', icon: Stethoscope },
   { label: 'Data/Hora', icon: CalendarDays },
   { label: 'Confirmação', icon: CheckCircle2 },
 ];
 
-const INFO_CARDS = [
-  {
-    icon: Video,
-    titulo: '100% Online',
-    descricao: 'Consulta por videoconferência via Google Meet',
-  },
-  {
-    icon: Clock,
-    titulo: 'Duração: ~60 min',
-    descricao: 'Avaliação completa e orientação personalizada',
-  },
-  {
-    icon: UserCheck,
-    titulo: 'Confirmação Imediata',
-    descricao: 'Receba o link do Meet por e-mail na hora',
-  },
-];
-
 export function AgendamentoWizard() {
-  const { isSignedIn } = useAuth();
   const [step, setStep] = useState(0);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(null);
@@ -88,13 +78,18 @@ export function AgendamentoWizard() {
   const [observacoes, setObservacoes] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
-  const [agendando, setAgendando] = useState(false);
+  const [reservando, setReservando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<{ meetLink: string; consultaId: string } | null>(null);
+  const [reserva, setReserva] = useState<{
+    consultaId: string;
+    expiraEm: string;
+    valor: number | null;
+    moeda: string;
+  } | null>(null);
 
-  // Carregar médicos
   useEffect(() => {
-    if (!isSignedIn) return; // Não carrega se não logado
-    async function load() {
+    async function carregarMedicos() {
       setCarregando(true);
       const res = await listarMedicosDisponiveis();
       if (res.sucesso && res.dados) {
@@ -102,10 +97,9 @@ export function AgendamentoWizard() {
       }
       setCarregando(false);
     }
-    load();
-  }, [isSignedIn]);
+    carregarMedicos();
+  }, []);
 
-  // Carregar horários ao selecionar data
   const carregarHorarios = useCallback(async (data: Date) => {
     if (!medicoSelecionado) return;
     setCarregandoHorarios(true);
@@ -136,97 +130,54 @@ export function AgendamentoWizard() {
     setHorarioSelecionado(null);
   }
 
-  async function handleConfirmar() {
-    if (!medicoSelecionado || !dataSelecionada || !horarioSelecionado) return;
-
-    setAgendando(true);
-
+  function horarioSelecionadoParaData(): Date | null {
+    if (!dataSelecionada || !horarioSelecionado) return null;
     const [hora, minuto] = horarioSelecionado.split(':');
     const dataHora = new Date(dataSelecionada);
     dataHora.setHours(parseInt(hora), parseInt(minuto), 0, 0);
+    return dataHora;
+  }
 
-    // Para agendamento público, usamos um pacienteId placeholder
-    // Em produção, será o pacienteId do usuário autenticado
-    const res = await agendarConsulta({
+  // Data/Hora → Confirmação: reserva o horário (trava com prazo). Se falhar, não
+  // avança — outra pessoa pode ter acabado de reservar o mesmo horário, ou algo
+  // real está quebrado (auth, banco).
+  async function handleReservar() {
+    if (!medicoSelecionado) return;
+    const dataHora = horarioSelecionadoParaData();
+    if (!dataHora) return;
+
+    setReservando(true);
+    const res = await reservarConsulta({
       medicoId: medicoSelecionado.id,
-      pacienteId: 'auto', // A action deveria resolver pelo user autenticado
       dataHora: dataHora.toISOString(),
       observacoes: observacoes || undefined,
     });
+    setReservando(false);
+
+    if (res.sucesso && res.dados) {
+      setReserva(res.dados);
+      setStep(2); // Confirmação
+    } else {
+      toast.error(res.erro ?? 'Não foi possível reservar este horário. Tente novamente.');
+    }
+  }
+
+  // Confirmação final: dentro do prazo da reserva, confirma de fato.
+  async function handleConfirmar() {
+    if (!reserva) return;
+
+    setConfirmando(true);
+    const res = await confirmarAgendamento({ consultaId: reserva.consultaId });
 
     if (res.sucesso && res.dados) {
       setResultado(res.dados);
-      setStep(3); // Sucesso
-      toast.success('Consulta agendada com sucesso!');
+      toast.success('Consulta confirmada com sucesso!');
+      setStep(3); // Pagamento (tela final)
     } else {
-      toast.error(res.erro ?? 'Erro ao agendar consulta');
+      toast.error(res.erro ?? 'Erro ao confirmar agendamento');
     }
 
-    setAgendando(false);
-  }
-
-  // ── Gate: exigir login ──────────────────────────────────────
-  if (!isSignedIn) {
-    return (
-      <Card className="border-0 shadow-xl">
-        <CardContent className="flex flex-col items-center py-16 text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
-            <CalendarDays size={40} className="text-[#C08E3A]" />
-          </div>
-          <h2 className="text-2xl font-bold">Pronto para agendar?</h2>
-          <p className="mt-3 max-w-md text-muted-foreground">
-            Crie sua conta ou faça login para confirmar o agendamento e garantir seu horário com um dos nossos especialistas.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/entrar?redirect_url=/agendamento">
-              <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
-                Entrar para agendar
-              </Button>
-            </Link>
-            <Link href="/registrar-se?redirect_url=/agendamento">
-              <Button variant="outline" className="gap-2 px-8">
-                Criar conta grátis
-              </Button>
-            </Link>
-          </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Cadastro rápido · Atendimento humanizado
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // ── Info Cards ──────────────────────────────────────────────
-  if (step === 0 && medicos.length === 0 && !carregando) {
-    return (
-      <div className="space-y-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => {
-            const CardIcon = card.icon;
-            return (
-            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
-              <CardContent className="p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <CardIcon size={24} className="text-foreground" />
-                </div>
-                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
-              </CardContent>
-            </Card>
-          ); })}
-        </div>
-
-        <Card className="border-0 shadow-xl">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <p className="text-lg font-medium">Nenhum médico disponível no momento</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Entre em contato conosco para mais informações
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    setConfirmando(false);
   }
 
   return (
@@ -238,9 +189,9 @@ export function AgendamentoWizard() {
           {STEPS.map((s, i) => (
             <div key={s.label} className="flex items-center gap-2">
               <div
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                   i <= step
-                    ? 'bg-[#C08E3A] text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -254,7 +205,7 @@ export function AgendamentoWizard() {
                 {s.label}
               </span>
               {i < STEPS.length - 1 && (
-                <div className={`mx-2 h-px w-8 ${i < step ? 'bg-[#C08E3A]' : 'bg-border'}`} />
+                <div className={`mx-2 h-px w-8 ${i < step ? 'bg-primary' : 'bg-border'}`} />
               )}
             </div>
           ))}
@@ -263,72 +214,56 @@ export function AgendamentoWizard() {
 
       {/* Step 0 — Seleção de Médico */}
       {step === 0 && (
-        <Card className="border-0 shadow-xl">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Stethoscope size={20} className="text-[#C08E3A]" />
-              Escolha seu médico
-            </CardTitle>
+            <CardTitle>Escolha seu médico</CardTitle>
           </CardHeader>
           <CardContent>
             {carregando ? (
               <div className="flex justify-center py-12">
-                <Loader2 size={32} className="animate-spin text-primary" />
+                <Loader2 size={28} className="animate-spin text-primary" />
+              </div>
+            ) : medicos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-sm font-medium">Nenhum médico disponível no momento</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Entre em contato conosco para mais informações
+                </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {medicos.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="group flex w-full items-stretch gap-6 rounded-2xl border border-border/50 p-6 text-left transition-all duration-300 hover:border-[#C08E3A]/60 hover:shadow-xl hover:scale-[1.01]"
-                    style={{ transformOrigin: 'top center' }}
+                    className="group flex items-center gap-4 rounded-xl border border-border/60 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
                   >
-                    {/* Foto */}
-                    <div className="shrink-0">
-                      {m.avatarUrl ? (
-                        <img
-                          src={m.avatarUrl}
-                          alt={m.nome}
-                          className="h-28 w-28 rounded-xl object-cover transition-all duration-300 group-hover:h-32 group-hover:w-32"
-                        />
-                      ) : (
-                        <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:h-32 group-hover:w-32">
-                          <Stethoscope size={40} className="text-primary/60" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Informações */}
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <h3 className="text-xl font-bold leading-tight">{m.nome}</h3>
-                      <p className="mt-1 text-sm font-semibold text-[#C08E3A]">{m.especialidade}</p>
-
-                      {m.bio && (
-                        <p className="mt-3 text-sm leading-relaxed text-justify text-muted-foreground transition-all duration-300 line-clamp-3 group-hover:line-clamp-none">
-                          {m.bio}
-                        </p>
-                      )}
-
-                      <div className="mt-auto pt-3 space-y-1">
-                        {m.valorConsulta !== null && (
-                          <p className="text-sm">
-                            <strong>Valor:</strong> {formatarValor(m.valorConsulta)}
-                          </p>
-                        )}
-                        <p className="text-sm font-semibold text-emerald-600">
-                          Médico parceiro da associação
-                        </p>
-                        {m.googleConectado && (
-                          <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
-                            <Video size={10} />
-                            Google Meet
-                          </Badge>
-                        )}
+                    {m.avatarUrl ? (
+                      <img
+                        src={m.avatarUrl}
+                        alt={m.nome}
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {iniciaisDoNome(m.nome)}
                       </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold leading-tight">{m.nome}</p>
+                      <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
+                      {m.valorConsulta !== null && (
+                        <p className="mt-0.5 text-xs font-medium text-primary">
+                          R$ {formatarValor(m.valorConsulta)}
+                        </p>
+                      )}
                     </div>
 
-                    <ChevronRight size={18} className="shrink-0 self-center text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-[#C08E3A]" />
+                    <ChevronRight
+                      size={16}
+                      className="shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+                    />
                   </button>
                 ))}
               </div>
@@ -339,20 +274,17 @@ export function AgendamentoWizard() {
 
       {/* Step 1 — Data e Horário */}
       {step === 1 && medicoSelecionado && (
-        <Card className="border-0 shadow-xl">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays size={20} className="text-[#C08E3A]" />
-                Escolha data e horário
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1">
+              <CardTitle>Escolha data e horário</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1 text-xs">
                 <ChevronLeft size={14} />
                 Trocar médico
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Consulta com <strong>{medicoSelecionado.nome}</strong>, {medicoSelecionado.especialidade}
+              Consulta com <strong className="text-foreground">{medicoSelecionado.nome}</strong>
             </p>
           </CardHeader>
           <CardContent>
@@ -377,14 +309,14 @@ export function AgendamentoWizard() {
               <div>
                 {!dataSelecionada ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Clock size={32} className="mb-2 text-muted-foreground" />
+                    <Clock size={28} className="mb-2 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground">
                       Selecione uma data para ver os horários disponíveis
                     </p>
                   </div>
                 ) : carregandoHorarios ? (
                   <div className="flex justify-center py-12">
-                    <Loader2 size={24} className="animate-spin text-primary" />
+                    <Loader2 size={22} className="animate-spin text-primary" />
                   </div>
                 ) : horariosLivres.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -402,10 +334,10 @@ export function AgendamentoWizard() {
                         <button
                           key={h}
                           onClick={() => setHorarioSelecionado(h)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                             horarioSelecionado === h
-                              ? 'border-[#C08E3A] bg-[#C08E3A] text-white'
-                              : 'border-border hover:border-[#C08E3A]/50'
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border hover:border-primary/40'
                           }`}
                         >
                           {h}
@@ -419,14 +351,19 @@ export function AgendamentoWizard() {
                           value={observacoes}
                           onChange={(e) => setObservacoes(e.target.value)}
                           placeholder="Observações para o médico (opcional)"
-                          className="min-h-[80px]"
+                          className="min-h-[72px]"
                         />
                         <Button
-                          onClick={() => setStep(2)}
-                          className="mt-4 w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+                          onClick={handleReservar}
+                          disabled={reservando}
+                          className="mt-4 w-full gap-2"
                         >
+                          {reservando ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
                           Continuar
-                          <ChevronRight size={14} />
                         </Button>
                       </div>
                     )}
@@ -438,25 +375,17 @@ export function AgendamentoWizard() {
         </Card>
       )}
 
-      {/* Step 2 — Confirmação */}
-      {step === 2 && medicoSelecionado && dataSelecionada && horarioSelecionado && (
-        <Card className="border-0 shadow-xl">
+      {/* Step 2 — Confirmação (dentro do prazo da reserva) */}
+      {step === 2 && medicoSelecionado && dataSelecionada && horarioSelecionado && reserva && (
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle2 size={20} className="text-[#C08E3A]" />
-              Confirme sua consulta
-            </CardTitle>
+            <CardTitle>Confirme sua consulta</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Resumo */}
-            <div className="rounded-xl border border-border/50 p-6 space-y-3">
+          <CardContent className="space-y-5">
+            <div className="rounded-xl border border-border/60 p-5 space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Médico</span>
                 <span className="font-medium">{medicoSelecionado.nome}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Especialidade</span>
-                <span className="font-medium">{medicoSelecionado.especialidade}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Data</span>
@@ -469,14 +398,19 @@ export function AgendamentoWizard() {
                 <span className="font-medium">{horarioSelecionado}</span>
               </div>
               {observacoes && (
-                <div className="border-t pt-3">
+                <div className="border-t pt-2.5">
                   <span className="text-sm text-muted-foreground">Observações</span>
                   <p className="mt-1 text-sm">{observacoes}</p>
                 </div>
               )}
             </div>
 
-            {/* Ação */}
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock size={12} />
+              Horário reservado até{' '}
+              {new Date(reserva.expiraEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep(1)} className="gap-1">
                 <ChevronLeft size={14} />
@@ -484,48 +418,24 @@ export function AgendamentoWizard() {
               </Button>
               <Button
                 onClick={handleConfirmar}
-                disabled={agendando}
-                className="flex-1 gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+                disabled={confirmando}
+                className="flex-1 gap-2"
               >
-                {agendando ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={16} />
-                )}
-                {agendando ? 'Agendando...' : 'Confirmar Agendamento'}
+                {confirmando && <Loader2 size={16} className="animate-spin" />}
+                {confirmando ? 'Confirmando...' : 'Confirmar Agendamento'}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 3 — Sucesso */}
+      {/* Step 3 — Pagamento (tela final: confirmação + valor, sem requisição) */}
       {step === 3 && resultado && (
-        <Card className="border-0 shadow-xl">
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
-              <CheckCircle2 size={40} className="text-emerald-600" />
-            </div>
-            <h2 className="text-2xl font-bold">Consulta agendada!</h2>
-            <p className="mt-3 max-w-md text-muted-foreground">
-              Sua consulta foi agendada com sucesso. Você receberá um e-mail de confirmação
-              com os detalhes e o link do Google Meet.
-            </p>
-            {resultado.meetLink && (
-              <a
-                href={resultado.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6"
-              >
-                <Button className="gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
-                  <Video size={16} />
-                  Acessar Google Meet
-                </Button>
-              </a>
-            )}
-          </CardContent>
-        </Card>
+        <AgendamentoPagamentoStep
+          meetLink={resultado.meetLink}
+          valor={reserva?.valor ?? null}
+          moeda={reserva?.moeda ?? 'BRL'}
+        />
       )}
     </div>
   );

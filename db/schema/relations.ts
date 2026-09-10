@@ -18,6 +18,7 @@ import { receituarioTemplates } from './receituario-templates';
 import { teleconsultas, transcricoes } from './teleconsultas';
 import { autorizacoesAnvisa } from './autorizacoes-anvisa';
 import { procuracoesEspecificas } from './procuracoes-especificas';
+import { pagamentos } from './pagamentos';
 
 /**
  * Declaração centralizada de todas as relations do Drizzle ORM.
@@ -93,6 +94,26 @@ export const consultasRelations = relations(consultas, ({ one, many }) => ({
     references: [medicos.id],
   }),
   prescricoes: many(prescricoes),
+  pagamento: one(pagamentos, {
+    fields: [consultas.id],
+    references: [pagamentos.consultaId],
+  }),
+}));
+
+// ── Pagamentos ────────────────────────────────────────────────
+export const pagamentosRelations = relations(pagamentos, ({ one }) => ({
+  consulta: one(consultas, {
+    fields: [pagamentos.consultaId],
+    references: [consultas.id],
+  }),
+  paciente: one(pacientes, {
+    fields: [pagamentos.pacienteId],
+    references: [pacientes.id],
+  }),
+  medico: one(medicos, {
+    fields: [pagamentos.medicoId],
+    references: [medicos.id],
+  }),
 }));
 
 // ── Anamneses ─────────────────────────────────────────────────
