@@ -18,10 +18,22 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { DESTINOS, destinoDepoisDoCadastro } from '@/lib/parceiros/destino-do-paciente';
+import {
+  DESTINOS,
+  destinoDepoisDoCadastro,
+  textosDoDestino,
+} from '@/lib/parceiros/destino-do-paciente';
 
 const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
 const codigo = readFileSync(path.join(process.cwd(), FORM), 'utf8');
+
+/** Tira comentários de linha e de bloco — o que interessa é o que a tela RENDERIZA. */
+function semComentarios(fonte: string): string {
+  return fonte
+    .split('\n')
+    .filter((linha) => !/^\s*(\/\/|\/\*|\*)/.test(linha))
+    .join('\n');
+}
 
 describe('o destino segue o que falta', () => {
   it('sem receita → agendamento (fluxo 2 da Greens)', () => {
@@ -133,5 +145,69 @@ describe('quem veio do parceiro confirma os dados, não os digita', () => {
     );
     expect(pagina).toContain('cpfInicial={resultado.cpf}');
     expect(pagina).toContain('veioDeParceiro={!!resultado.parceiro}');
+  });
+});
+
+/**
+ * O que a tela PROMETE, e o que ela CONFIRMA ter recebido.
+ *
+ * Dois apontamentos do dono em 10/09/2026, ao ver a tela em produção:
+ *
+ *   "os 2 tão com nome de criar conta e agendar consulta" — inclusive o do paciente que já
+ *   tem receita e vai para a procuração da ANVISA. Prometer consulta a quem não vai ter
+ *   consulta confunde no clique e desmente a tela seguinte.
+ *
+ *   "deveria aparecer também as documentações enviadas não?" — a tela dizia só o que FALTA.
+ *   Quem subiu RG e comprovante no formulário da Greens não via confirmação de que chegou.
+ */
+describe('a tela promete o que vai entregar', () => {
+  it('quem vai para a ANVISA não lê "agendar consulta"', () => {
+    const t = textosDoDestino(DESTINOS.anvisa);
+    expect(t.botao).not.toMatch(/consulta/i);
+    expect(t.destaque).toBe('autorização');
+  });
+
+  it('quem vai agendar continua lendo consulta', () => {
+    const t = textosDoDestino(DESTINOS.agendamento);
+    expect(t.botao).toMatch(/consulta/i);
+    expect(t.destaque).toBe('consulta');
+  });
+
+  it('e a tela usa a função — não texto fixo', () => {
+    expect(codigo).toContain('textosDoDestino(');
+    expect(codigo).toContain('{textos.botao}');
+    expect(codigo).toContain('{textos.destaque}');
+    /**
+     * ⚠️ E o texto antigo não pode ter sobrado NO JSX.
+     *
+     * Ele continua no comentário que explica a mudança — e deve continuar, é o registro do
+     * porquê. Procurar a string crua acusaria a própria documentação da correção: menção vs
+     * uso, a décima vez desta classe no repositório.
+     */
+    expect(semComentarios(codigo)).not.toContain('Criar conta e agendar consulta');
+  });
+});
+
+describe('a tela confirma o que já recebeu', () => {
+  it('mostra os documentos que o parceiro mandou', () => {
+    expect(codigo).toContain('O que já recebemos');
+    expect(codigo).toContain('recebidos.map');
+  });
+
+  it('e diz que não precisa reenviar — é o que tira a dúvida do paciente', () => {
+    expect(codigo).toMatch(/não precisa enviar de novo/i);
+  });
+
+  it('o bloco só aparece quando há algo recebido', () => {
+    // Um "O que já recebemos" vazio afirmaria que nada chegou, o que é pior que não mostrar.
+    expect(codigo).toContain('recebidos.length > 0');
+  });
+
+  it('a página calcula os recebidos a partir do manifesto', () => {
+    const pagina = readFileSync(
+      path.join(process.cwd(), 'app/(auth)/cadastro/[token]/page.tsx'),
+      'utf8',
+    );
+    expect(pagina).toContain('recebidosDe(resultado.documentosDoParceiro)');
   });
 });

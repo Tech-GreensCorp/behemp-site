@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { destinoDepoisDoCadastro } from '@/lib/parceiros/destino-do-paciente';
+import { destinoDepoisDoCadastro, textosDoDestino } from '@/lib/parceiros/destino-do-paciente';
 import { useSignUp } from '@clerk/nextjs/legacy';
 import {
   ArrowLeft,
@@ -34,6 +34,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  Check,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -53,6 +54,16 @@ interface Props {
   protocolo: string;
   /** O que o parceiro ainda não tem. Aparece como aviso — nunca bloqueia (ADR-0016 D-06). */
   pendencias?: {
+    chave: string;
+    rotulo: string;
+    opcional: boolean;
+    resolvemosAqui: boolean;
+  }[];
+  /**
+   * O que o parceiro JÁ mandou. Aparece confirmado — quem subiu RG e comprovante no
+   * formulário da Greens precisa ver que chegou, senão para no meio e liga para perguntar.
+   */
+  recebidos?: {
     chave: string;
     rotulo: string;
     opcional: boolean;
@@ -132,6 +143,7 @@ export function FormularioDeCadastro({
   token,
   protocolo,
   pendencias = [],
+  recebidos = [],
   urlDeRetorno = null,
   nomeInicial,
   emailInicial,
@@ -151,6 +163,15 @@ export function FormularioDeCadastro({
     veioDeParceiro && nomeInicial && emailInicial && telefoneInicial && cpfInicial,
   );
   const [corrigindo, setCorrigindo] = useState(false);
+
+  /**
+   * 🔴 O QUE A TELA PROMETE VEM DO DESTINO, não de um texto fixo.
+   *
+   * Os dois fluxos terminavam com "Criar conta e agendar consulta" — inclusive o do paciente
+   * que já tem receita e vai para a procuração da ANVISA. Prometer consulta a quem não vai
+   * ter consulta confunde no clique e desmente a tela seguinte.
+   */
+  const textos = textosDoDestino(destinoDepoisDoCadastro(pendencias.map((p) => p.chave)));
   const confirmandoDados = dadosVieramDoParceiro && !corrigindo;
 
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
@@ -317,7 +338,7 @@ export function FormularioDeCadastro({
 
   return (
     <div className="relative mx-auto w-full max-w-xl">
-      <Cabecalho protocolo={protocolo} etapa={etapa} />
+      <Cabecalho protocolo={protocolo} etapa={etapa} textos={textos} />
 
       <div
         className={cn(
@@ -543,6 +564,24 @@ export function FormularioDeCadastro({
             {pendencias.length > 0 && (
               <>
                 <Separador />
+                {recebidos.length > 0 && (
+                  <Secao titulo="O que já recebemos" icone={FileText}>
+                    <div className="border-secondary/30 bg-secondary/5 rounded-xl border px-4 py-3.5">
+                      <ul className="space-y-2">
+                        {recebidos.map((r) => (
+                          <li key={r.chave} className="flex items-start gap-2.5 text-sm">
+                            <Check size={15} className="text-secondary mt-0.5 shrink-0" />
+                            <span className="text-foreground">{r.rotulo}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-muted-foreground mt-3 text-xs">
+                        Chegaram junto com o seu cadastro. Você não precisa enviar de novo.
+                      </p>
+                    </div>
+                  </Secao>
+                )}
+
                 <Secao titulo="O que ainda vamos precisar" icone={FileText}>
                   {/*
                     🔴 AVISO, NUNCA BLOQUEIO (ADR-0016 D-06). Quem chega sem receita é
@@ -708,7 +747,7 @@ export function FormularioDeCadastro({
                   </>
                 ) : (
                   <>
-                    Criar conta e agendar consulta
+                    {textos.botao}
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -731,7 +770,16 @@ export function FormularioDeCadastro({
 
 /* ── Peças ─────────────────────────────────────────────────────────────────────── */
 
-function Cabecalho({ protocolo, etapa }: { protocolo: string; etapa: string }) {
+function Cabecalho({
+  protocolo,
+  etapa,
+  textos,
+}: {
+  protocolo: string;
+  etapa: string;
+  /** O que a tela promete — vem do destino, não de texto fixo. Ver `textosDoDestino`. */
+  textos: ReturnType<typeof textosDoDestino>;
+}) {
   const passo = etapa === 'dados' ? 1 : etapa === 'codigo' ? 2 : 3;
   return (
     <div className="animate-fade-up mb-7 text-center">
@@ -741,13 +789,13 @@ function Cabecalho({ protocolo, etapa }: { protocolo: string; etapa: string }) {
           'Tudo certo!'
         ) : (
           <>
-            Falta pouco para sua <span className="text-accent-italic">consulta</span>
+            {textos.titulo} <span className="text-accent-italic">{textos.destaque}</span>
           </>
         )}
       </h1>
       <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
         {etapa === 'dados'
-          ? 'Preencha seus dados para criar sua conta e agendar a teleconsulta com um médico prescritor.'
+          ? textos.subtitulo
           : etapa === 'codigo'
             ? 'Só falta confirmar seu e-mail.'
             : 'Estamos abrindo sua agenda de consultas.'}

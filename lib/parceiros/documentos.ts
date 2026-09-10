@@ -99,3 +99,21 @@ export function pendenciasDe(manifesto: unknown): Pendencia[] {
     resolvemosAqui: DOCUMENTOS_QUE_RESOLVEMOS.includes(chave),
   }));
 }
+
+/**
+ * O QUE O PARCEIRO JÁ MANDOU — o espelho de `pendenciasDe`.
+ *
+ * Levantado pelo dono em 10/09/2026: _"deveria aparecer também as documentações enviadas
+ * não?"_. A tela dizia só o que FALTA. Quem preencheu o formulário da Greens e subiu RG e
+ * comprovante não via nenhuma confirmação de que aquilo chegou — e a dúvida "será que
+ * perderam meus documentos?" é o tipo de coisa que faz o paciente parar e ligar.
+ */
+export function recebidosDe(manifesto: unknown): Pendencia[] {
+  const tem = new Set<string>(normalizarManifesto(manifesto));
+  return DOCUMENTOS_DO_FLUXO.filter((d) => tem.has(d)).map((chave) => ({
+    chave,
+    rotulo: rotuloDoDocumento(chave),
+    opcional: DOCUMENTOS_OPCIONAIS.includes(chave),
+    resolvemosAqui: DOCUMENTOS_QUE_RESOLVEMOS.includes(chave),
+  }));
+}

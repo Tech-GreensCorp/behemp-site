@@ -45,3 +45,35 @@ export function destinoDepoisDoCadastro(pendentes: readonly string[]): Destino {
   // Sem nenhuma das duas pendências, o caminho de sempre.
   return DESTINOS.teleconsulta;
 }
+
+/**
+ * O QUE A TELA PROMETE, conforme para onde ela vai levar.
+ *
+ * Levantado pelo dono em 10/09/2026: os dois fluxos terminavam com o mesmo botão, _"Criar
+ * conta e agendar consulta"_ — inclusive o do paciente que **já tem receita** e vai para a
+ * procuração da ANVISA. Prometer consulta a quem não vai ter consulta é errado duas vezes:
+ * confunde no momento do clique, e desmente a tela seguinte.
+ */
+export function textosDoDestino(destino: Destino): {
+  titulo: string;
+  destaque: string;
+  subtitulo: string;
+  botao: string;
+} {
+  if (destino === DESTINOS.anvisa) {
+    return {
+      titulo: 'Falta pouco para sua',
+      destaque: 'autorização',
+      subtitulo:
+        'Crie sua conta para preencher a procuração da ANVISA. Os documentos que você já enviou vêm junto.',
+      botao: 'Criar conta e continuar',
+    };
+  }
+  return {
+    titulo: 'Falta pouco para sua',
+    destaque: 'consulta',
+    subtitulo:
+      'Preencha seus dados para criar sua conta e agendar a teleconsulta com um médico prescritor.',
+    botao: 'Criar conta e agendar consulta',
+  };
+}
