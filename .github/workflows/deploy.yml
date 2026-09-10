@@ -41,10 +41,39 @@ jobs:
         run: node scripts/conferir-baseline.mjs
 
       - name: Build do projeto (Next.js)
-        # Passar variáveis públicas necessárias para o build
+        # 🔴 TODA `NEXT_PUBLIC_*` PRECISA EXISTIR AQUI, E NÃO NO SERVIDOR.
+        #
+        # Elas são substituídas pelo VALOR durante o `next build` e viajam dentro do
+        # JavaScript que o navegador baixa. Quem não existe no build não vira valor: vira
+        # acesso a uma propriedade que, no navegador, é `undefined`.
+        #
+        # O que isso custou, em 10/09/2026: o build que rodava em produção tinha sido feito
+        # À MÃO NO SERVIDOR, onde o `.env` completo existia — então as chaves do Pusher
+        # estavam congeladas dentro dele e a teleconsulta funcionava. Quando o deploy passou
+        # a entregar o build do CI, que não recebia essas variáveis, o bundle saiu com
+        #
+        #     let t = env.NEXT_PUBLIC_PUSHER_KEY, s = env.NEXT_PUBLIC_PUSHER_CLUSTER;
+        #     if (!t || !s) throw Error("[Pusher Client] … devem estar …")
+        #
+        # e a teleconsulta passou a morrer em "Erro ao iniciar a sala" — sem erro no
+        # servidor, porque a falha acontece no navegador.
+        #
+        # ⚠️ Isto NÃO se resolve escrevendo a variável no `.env` do servidor. O `.env` do
+        # servidor alimenta o código que roda no servidor; o navegador só recebe o que foi
+        # embutido no build. É a diferença que o nome `NEXT_PUBLIC_` anuncia e que é fácil
+        # ler como "pública, então qualquer lugar serve".
+        #
+        # Valor de `NEXT_PUBLIC_*` NÃO é segredo — ele é servido a qualquer visitante dentro
+        # do bundle. Está em `secrets` por conveniência de gestão, não por sigilo.
         env:
           NEXT_PUBLIC_APP_URL: 'https://be4hope.org'
           DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
+          NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_WHATSAPP_BEHEMP: ${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}
+          NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: ${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}
+          NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED: ${{ secrets.NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED }}
         run: pnpm build
 
       - name: Limpar .next antigo no servidor antes do deploy
