@@ -1692,3 +1692,46 @@ decorativo e o teste verde. Corrigido para medir o caminho de falha, não a pres
   Limpeza é trabalho próprio, com acesso ao servidor.
 - **IP Elástico na EC2** (recomendação da Dryelle). Não é causa deste incidente; evita que o
   `SERVER_IP` fique obsoleto num reboot.
+
+## Item 29 — 🟠 PENDENTE: a aprovação da ANVISA não avisa o paciente por e-mail nem WhatsApp
+
+**Adiado pelo dono em 10/09/2026**, ao descrever o fluxo 1 da Greens: _"isso nós fazemos depois,
+deixe anotado como pendência"_. O passo 7 do fluxo dele pede _"recebe notificação email, celular
+e no sistema"_.
+
+### O diagnóstico
+
+`app/api/anvisa/atualizar-status/route.ts:63-72` notifica **só pelo Pusher**:
+
+```ts
+await pusher.trigger(`private-user-${atualizado.pacienteId}`, 'anvisa:status-atualizado', {…});
+```
+
+Dentro do sistema funciona. Fora dele, o paciente não fica sabendo — e o paciente que veio da
+Greens **não tem motivo para abrir a nossa plataforma de novo**: ele entrou para resolver a
+autorização e saiu.
+
+### O que existe e não está ligado neste ponto
+
+| canal    | peça no projeto                     | ligada aqui? |
+| -------- | ----------------------------------- | ------------ |
+| e-mail   | Brevo — `lib/email/notificacoes.ts` | ❌           |
+| WhatsApp | ChatPro — `lib/chatpro/cliente.ts`  | ❌           |
+| sistema  | Pusher — `private-user-<id>`        | ✅           |
+
+### A decisão de conteúdo já está tomada, e é o que destrava
+
+A ADR-0017 fixou a regra: **fato que o paciente sente sai automático; texto que alguém compõe
+passa por aprovação.** _"Sua autorização da ANVISA foi aprovada"_ é fato — sai automático, sem
+fila de aprovação.
+
+⚠️ E o que **não** pode ir junto: número do processo, nome do medicamento, ou qualquer coisa que
+transforme a notificação num documento clínico trafegando por WhatsApp. O aviso diz que ficou
+pronto e onde ver — o conteúdo fica na plataforma, com controle de acesso. É a mesma regra que
+o guarda `o-aviso-ao-parceiro-nao-se-perde` já aplica ao aviso que vai para a Greens.
+
+### O guarda que vai junto
+
+Quando for implementado: o aviso ao paciente não pode carregar dado clínico, e a falha de um
+canal não pode impedir os outros — nem derrubar a atualização de status, que é o fato que
+importa.
