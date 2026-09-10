@@ -463,9 +463,37 @@ describe('o manifesto vira aviso, nunca trava', () => {
     ]);
   });
 
-  it('o laudo é o único marcado como opcional', () => {
+  it('🔴 o laudo é o ÚNICO opcional — ANVISA e receita não são', () => {
+    /**
+     * O formulário da Greens chama `autorizacao_anvisa` de opcional, e a palavra engana:
+     * lá ela é dispensável para ENVIAR o formulário; aqui ela é **necessária** para o
+     * paciente importar, e falta justamente porque ele ainda não a tem — é um dos dois
+     * motivos de ele estar vindo.
+     *
+     * Marcá-la "(opcional)" na tela diria que é dispensável. Não é: nós é que vamos
+     * tirá-la com ele.
+     */
     const p = pendenciasDe([]);
     expect(p.filter((x) => x.opcional).map((x) => x.chave)).toEqual(['laudo_medico']);
+    expect(
+      p
+        .filter((x) => x.resolvemosAqui)
+        .map((x) => x.chave)
+        .sort(),
+    ).toEqual(['autorizacao_anvisa', 'receita_medica']);
+  });
+
+  it('🔴 nenhum documento é opcional E resolvido aqui ao mesmo tempo', () => {
+    // As duas marcas dizem coisas contraditórias ao paciente: uma que ele pode ignorar,
+    // outra que nós vamos cuidar. Um documento com as duas confundiria.
+    for (const p of pendenciasDe([])) {
+      expect(p.opcional && p.resolvemosAqui, `${p.chave} tem as duas marcas`).toBe(false);
+    }
+  });
+
+  it('a tela NÃO chama a ANVISA de opcional', () => {
+    const FORM = 'app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx';
+    expect(fonte(FORM)).toMatch(/nós resolvemos com você/);
   });
 
   it('documento desconhecido é descartado, não derruba a chamada', () => {

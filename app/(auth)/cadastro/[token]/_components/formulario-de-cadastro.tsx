@@ -50,7 +50,12 @@ interface Props {
   token: string;
   protocolo: string;
   /** O que o parceiro ainda não tem. Aparece como aviso — nunca bloqueia (ADR-0016 D-06). */
-  pendencias?: { chave: string; rotulo: string; opcional: boolean }[];
+  pendencias?: {
+    chave: string;
+    rotulo: string;
+    opcional: boolean;
+    resolvemosAqui: boolean;
+  }[];
   /** Destino de volta, já conferido contra a lista de origens permitidas. */
   urlDeRetorno?: string | null;
   nomeInicial: string | null;
@@ -474,6 +479,17 @@ export function FormularioDeCadastro({
                             {p.opcional && (
                               <span className="text-muted-foreground/70 ml-1.5 text-xs">
                                 (opcional)
+                              </span>
+                            )}
+                            {/*
+                              🔴 NÃO diz "opcional" aqui. A ANVISA e a receita faltam
+                              porque são o que ele veio buscar — chamá-las de opcionais
+                              diria que são dispensáveis, e não são: nós é que vamos
+                              tirá-las com ele.
+                            */}
+                            {p.resolvemosAqui && (
+                              <span className="text-secondary/80 ml-1.5 text-xs">
+                                — nós resolvemos com você
                               </span>
                             )}
                           </span>

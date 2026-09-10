@@ -18,10 +18,26 @@ export const DOCUMENTOS_DO_FLUXO = [
 export type DocumentoDoFluxo = (typeof DOCUMENTOS_DO_FLUXO)[number];
 
 /**
- * O laudo é o único opcional — declarado pelo dono em 09/09/2026. Ele entra na lista de
- * pendências como "opcional", e não como falta.
+ * 🔴 DUAS COISAS DIFERENTES QUE O FORMULÁRIO DA GREENS CHAMA DE "OPCIONAL".
+ *
+ * Corrigido em 09/09/2026, quando o lado da Greens informou que `autorizacao_anvisa`
+ * passou a ser opcional lá. A palavra é a mesma; o significado, não:
+ *
+ * - **laudo_medico** — opcional de verdade: pode nunca existir, e ninguém vai cobrar.
+ * - **autorizacao_anvisa** — opcional *no formulário deles*, e **necessária** para o
+ *   paciente importar. Ela falta justamente porque ele ainda não tem — e é um dos dois
+ *   motivos de ele estar vindo para cá. A procuração daqui existe para resolvê-la.
+ *
+ * Marcar as duas como "(opcional)" na tela diria ao paciente que a ANVISA é dispensável.
+ * Não é: nós é que vamos tirá-la com ele.
  */
 export const DOCUMENTOS_OPCIONAIS: readonly DocumentoDoFluxo[] = ['laudo_medico'];
+
+/** O que não falta por descuido: falta porque é o que o paciente vem buscar aqui. */
+export const DOCUMENTOS_QUE_RESOLVEMOS: readonly DocumentoDoFluxo[] = [
+  'autorizacao_anvisa',
+  'receita_medica',
+];
 
 const ROTULOS: Record<DocumentoDoFluxo, string> = {
   receita_medica: 'Receita médica',
@@ -49,7 +65,10 @@ export function normalizarManifesto(cru: unknown): DocumentoDoFluxo[] {
 export interface Pendencia {
   chave: DocumentoDoFluxo;
   rotulo: string;
+  /** Pode nunca existir, e ninguém vai cobrar. */
   opcional: boolean;
+  /** Falta porque é o que ele veio buscar — a consulta e a procuração resolvem. */
+  resolvemosAqui: boolean;
 }
 
 /** O que ainda falta, dado o que o parceiro declarou ter. */
@@ -59,5 +78,6 @@ export function pendenciasDe(manifesto: string[] | null | undefined): Pendencia[
     chave,
     rotulo: rotuloDoDocumento(chave),
     opcional: DOCUMENTOS_OPCIONAIS.includes(chave),
+    resolvemosAqui: DOCUMENTOS_QUE_RESOLVEMOS.includes(chave),
   }));
 }
