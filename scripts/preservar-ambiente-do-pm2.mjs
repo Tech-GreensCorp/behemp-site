@@ -56,43 +56,166 @@ function chavesJaNoArquivo() {
   return new Set(linhas.map((l) => l.match(/^([A-Za-z_][A-Za-z0-9_]*)=/)?.[1]).filter(Boolean));
 }
 
+/** Lê um arquivo no formato `.env` e devolve um Map de chave -> valor. */
+function lerEnv(caminho) {
+  const mapa = new Map();
+  if (!caminho || !fs.existsSync(caminho)) return mapa;
+  for (const linha of fs.readFileSync(caminho, 'utf8').split('\n')) {
+    const m = linha.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!m) continue;
+    let valor = m[2].trim();
+    if (
+      (valor.startsWith("'") && valor.endsWith("'")) ||
+      (valor.startsWith('"') && valor.endsWith('"'))
+    ) {
+      valor = valor.slice(1, -1);
+    }
+    mapa.set(m[1], valor);
+  }
+  return mapa;
+}
+
+/**
+ * TODOS os retratos que este script já salvou, do mais recente para o mais antigo.
+ *
+ * ⚠️ Não serve pegar só o mais recente: o deploy salva um retrato NOVO a cada execução,
+ * e depois da primeira recriação esse retrato já aponta para o diretório de destino.
+ * O que interessa é justamente o retrato ANTERIOR, que ainda guarda o diretório antigo.
+ */
+function retratosAnteriores() {
+  const casa = process.env.HOME ?? '.';
+  let arquivos;
+  try {
+    arquivos = fs
+      .readdirSync(casa)
+      .filter((n) => n.startsWith('.pm2-backup-') && n.endsWith('.json'))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
+  const retratos = [];
+  for (const nome of arquivos.slice(0, 10)) {
+    try {
+      retratos.push(JSON.parse(fs.readFileSync(path.join(casa, nome), 'utf8')));
+    } catch {
+      // retrato ilegível não impede os outros
+    }
+  }
+  return retratos;
+}
+
+/**
+ * 🔴 DE ONDE AS VARIÁVEIS PODEM VIR — E POR QUE SÃO QUATRO FONTES, NÃO UMA.
+ *
+ * A primeira versão deste script olhava só o `pm2_env` do processo, porque o deploy #37
+ * tinha concluído que "o app vive do dump.pm2". Estava errado, e o erro derrubou a
+ * produção em 10/09/2026 às 15h37: o processo lia as variáveis de um ARQUIVO `.env`
+ * dentro do diretório de onde ele rodava — copiado à mão no dia anterior. O `pm2_env`
+ * estava vazio, o script reportou "nada a copiar", e o processo novo nasceu sem
+ * CLERK_SECRET_KEY. Toda rota respondeu 500.
+ *
+ * A lição: a fonte do ambiente não se presume, se procura em todas as que existem.
+ */
+function fontesDeAmbiente(destinoDir) {
+  const fontes = [];
+  const vistos = new Set([path.resolve(destinoDir)]);
+
+  /**
+   * Arquivo `.env` e ambiente de processo NÃO se tratam igual.
+   *
+   * Um `.env` é um arquivo de configuração da aplicação: tudo nele é do app, e copiar
+   * uma chave que o schema ainda não declara é melhor que perdê-la. Já o ambiente de um
+   * processo carrega PATH, HOME, PWD e as variáveis do próprio PM2 — ali o filtro pelo
+   * schema é obrigatório.
+   */
+  const deArquivo = (cwd, rotulo) => {
+    if (!cwd) return;
+    const dir = path.resolve(cwd);
+    if (vistos.has(dir)) return;
+    vistos.add(dir);
+    const valores = lerEnv(path.join(dir, '.env'));
+    if (valores.size > 0) {
+      fontes.push({ nome: `${rotulo} ${dir}/.env`, valores, filtrarPeloSchema: false });
+    }
+  };
+
+  const proc = processoDoPm2(APP);
+  if (proc) {
+    deArquivo(proc.pm2_env?.pm_cwd, 'arquivo em');
+    fontes.push({
+      nome: 'ambiente do processo',
+      valores: new Map(Object.entries(proc.pm2_env ?? {})),
+      filtrarPeloSchema: true,
+    });
+  }
+
+  for (const retrato of retratosAnteriores()) {
+    deArquivo(retrato.pm2_env?.pm_cwd, 'arquivo (retrato) em');
+    fontes.push({
+      nome: 'ambiente do retrato',
+      valores: new Map(Object.entries(retrato.pm2_env ?? {})),
+      filtrarPeloSchema: true,
+    });
+  }
+
+  return fontes;
+}
+
+const destinoDir = path.dirname(ENVFILE);
 const proc = processoDoPm2(APP);
-if (!proc) {
-  console.log(`[ambiente] nenhum processo "${APP}" no PM2 — nada a preservar.`);
-  process.exit(0);
-}
 
-// Retrato do estado atual, antes de qualquer mudança. Fica fora do repositório.
-const backup = path.join(
-  process.env.HOME ?? '.',
-  `.pm2-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-);
-try {
-  fs.writeFileSync(backup, JSON.stringify(proc, null, 2), { mode: 0o600 });
-  console.log(`[ambiente] retrato do processo salvo em ${backup}`);
-} catch (erro) {
-  console.log(`[ambiente] aviso: não deu para salvar o retrato (${erro.code ?? 'erro'})`);
+if (proc) {
+  // Retrato do estado atual, antes de qualquer mudança. Fica fora do repositório.
+  const backup = path.join(
+    process.env.HOME ?? '.',
+    `.pm2-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+  );
+  try {
+    fs.writeFileSync(backup, JSON.stringify(proc, null, 2), { mode: 0o600 });
+    console.log(`[ambiente] retrato do processo salvo em ${backup}`);
+  } catch (erro) {
+    console.log(`[ambiente] aviso: não deu para salvar o retrato (${erro.code ?? 'erro'})`);
+  }
+  console.log(`[ambiente] caminho do script no PM2: ${proc.pm2_env?.pm_exec_path ?? '(?)'}`);
+  console.log(`[ambiente] cwd do processo:          ${proc.pm2_env?.pm_cwd ?? '(?)'}`);
+} else {
+  console.log(`[ambiente] nenhum processo "${APP}" no PM2 — procurando o ambiente anterior.`);
 }
-
-console.log(`[ambiente] caminho do script no PM2: ${proc.pm2_env?.pm_exec_path ?? '(?)'}`);
-console.log(`[ambiente] cwd do processo:          ${proc.pm2_env?.pm_cwd ?? '(?)'}`);
 
 const conhecidas = chavesDoSchema();
 const jaTem = chavesJaNoArquivo();
-const doProcesso = proc.pm2_env ?? {};
+const fontes = fontesDeAmbiente(destinoDir);
 
-const aCopiar = [...conhecidas].filter(
-  (k) => !jaTem.has(k) && typeof doProcesso[k] === 'string' && doProcesso[k] !== '',
-);
-
-if (aCopiar.length === 0) {
-  console.log('[ambiente] ✓ o .env já cobre tudo que o processo tem. Nada a copiar.');
+if (fontes.length === 0) {
+  console.log('[ambiente] nenhuma fonte de ambiente anterior encontrada. Nada a copiar.');
   process.exit(0);
 }
 
-const linhas = aCopiar
+/** chave -> valor, respeitando a ordem das fontes (a primeira que tiver a chave vence). */
+const aCopiar = new Map();
+const origemDe = new Map();
+for (const fonte of fontes) {
+  let quantas = 0;
+  for (const [chave, valor] of fonte.valores) {
+    if (fonte.filtrarPeloSchema && !conhecidas.has(chave)) continue; // nunca PATH, HOME, PWD…
+    if (jaTem.has(chave) || aCopiar.has(chave)) continue;
+    if (typeof valor !== 'string' || valor === '') continue;
+    aCopiar.set(chave, valor);
+    origemDe.set(chave, fonte.nome);
+    quantas += 1;
+  }
+  console.log(`[ambiente] fonte "${fonte.nome}": ${quantas} chave(s) aproveitada(s)`);
+}
+
+if (aCopiar.size === 0) {
+  console.log('[ambiente] ✓ o .env já cobre tudo que as fontes têm. Nada a copiar.');
+  process.exit(0);
+}
+
+const linhas = [...aCopiar.keys()]
   .sort()
-  .map((k) => `${k}='${String(doProcesso[k]).replace(/'/g, "'\\''")}'`)
+  .map((k) => `${k}='${String(aCopiar.get(k)).replace(/'/g, "'\\''")}'`)
   .join('\n');
 
 fs.appendFileSync(
@@ -101,6 +224,6 @@ fs.appendFileSync(
 );
 fs.chmodSync(ENVFILE, 0o600);
 
-console.log(`[ambiente] ✓ ${aCopiar.length} variáveis copiadas do processo para o .env:`);
-for (const k of aCopiar.sort()) console.log(`             ${k}`);
+console.log(`[ambiente] ✓ ${aCopiar.size} variáveis recuperadas para o .env:`);
+for (const k of [...aCopiar.keys()].sort()) console.log(`             ${k}  ← ${origemDe.get(k)}`);
 console.log('[ambiente]   (nomes apenas — nenhum valor é impresso)');

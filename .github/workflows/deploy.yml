@@ -283,8 +283,25 @@ jobs:
           for i in $(seq 1 20); do
             CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo 000)
             if [ "$CODIGO" = "200" ]; then
-              echo "✓ produção está servindo o build deste deploy."
-              exit 0
+              echo "  o build deste deploy está sendo servido."
+
+              # 🔴 E O SITE PRECISA RESPONDER, NÃO SÓ EXISTIR.
+              #
+              # Em 10/09/2026 este portão passou VERDE com a produção inteira em HTTP 500:
+              # o chunk estático é servido mesmo quando o app falha em toda rota, porque o
+              # erro estava na autenticação, não no empacotamento.
+              #
+              # Servir arquivo não é estar de pé. A home tem que responder.
+              HOME_CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://be4hope.org/" || echo 000)
+              if [ "$HOME_CODIGO" = "200" ]; then
+                echo "✓ produção está servindo ESTE build, e a home responde 200."
+                exit 0
+              fi
+              echo "  ✗ o build é este, mas a home responde HTTP $HOME_CODIGO."
+              echo "    O processo subiu com o build certo e está falhando em runtime —"
+              echo "    tipicamente variável de ambiente ausente. Ver o passo do PM2 acima:"
+              echo "    a linha [ambiente] diz quantas chaves foram recuperadas e de onde."
+              exit 1
             fi
             echo "  tentativa $i/20: HTTP $CODIGO (o processo pode estar subindo)"
             sleep 5

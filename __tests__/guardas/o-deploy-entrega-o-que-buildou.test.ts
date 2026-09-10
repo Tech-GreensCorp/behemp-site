@@ -163,7 +163,21 @@ describe('o workflow morre se produção não passar a servir este build', () =>
 
   it('e o caminho de sucesso sai com 0, senão o portão nunca deixaria passar', () => {
     const passo = yaml.slice(yaml.indexOf('Produção está servindo ESTE build?'));
-    expect(passo).toMatch(/produção está servindo o build deste deploy[\s\S]{0,80}exit 0/i);
+    expect(passo).toMatch(/e a home responde 200[\s\S]{0,60}exit 0/i);
+  });
+
+  /**
+   * 🔴 SERVIR ARQUIVO NÃO É ESTAR DE PÉ.
+   *
+   * Em 10/09/2026 este portão passou VERDE com a produção inteira em HTTP 500: o chunk
+   * estático é servido mesmo quando o app falha em toda rota, porque a falha estava na
+   * autenticação e não no empacotamento. O deploy afirmou sucesso sobre um site caído.
+   */
+  it('confere também que uma ROTA responde, não só que o arquivo existe', () => {
+    const passo = yaml.slice(yaml.indexOf('Produção está servindo ESTE build?'));
+    expect(passo).toContain('HOME_CODIGO');
+    expect(passo).toMatch(/curl[^\n]*https:\/\/be4hope\.org\/"/);
+    expect(passo).toMatch(/if \[ "\$HOME_CODIGO" = "200" \]/);
   });
 });
 
