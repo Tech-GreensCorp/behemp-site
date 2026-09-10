@@ -17,8 +17,27 @@ const MAXIMO_DE_TENTATIVAS = 6;
 const TAMANHO_DO_LOTE = 20;
 const TIMEOUT_MS = 10_000;
 
-/** Status HTTP que vale tentar de novo. 4xx (menos 429) é erro nosso: insistir não conserta. */
-const VALE_TENTAR_DE_NOVO = new Set([408, 429, 500, 502, 503, 504]);
+/**
+ * Status HTTP que vale tentar de novo. 4xx costuma ser erro nosso — corpo ou assinatura
+ * errados não se consertam insistindo.
+ *
+ * 🔴 O 404 É A EXCEÇÃO, E ENTROU DEPOIS DE UMA MEDIÇÃO.
+ *
+ * A regra "4xx não se retenta" está certa em geral e erra justamente aqui, porque 404 tem
+ * duas causas que a resposta não distingue:
+ *
+ *   · caminho errado no nosso lado    → permanente; insistir não resolve
+ *   · a rota ainda não foi publicada  → TEMPORÁRIO, e é o estado real da Greens hoje:
+ *     `api.greens-corp.com/health` responde 200 e a rota de retorno responde 404, porque
+ *     ela existe na branch e não em produção
+ *
+ * E há um terceiro caso, que acontece toda semana: **um deploy em andamento devolve 404
+ * por alguns segundos**. Sem retry, um aviso que caísse nessa janela morreria.
+ *
+ * Retentar custa pouco — seis tentativas com backoff até 60 min dão ~2 h — e no fim vira
+ * `falhou` visível do mesmo jeito. Não retentar custa o aviso.
+ */
+const VALE_TENTAR_DE_NOVO = new Set([404, 408, 429, 500, 502, 503, 504]);
 
 export interface ResultadoDoEnvio {
   reivindicados: number;

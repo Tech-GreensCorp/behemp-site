@@ -98,7 +98,7 @@ describe('a entrega é durável, não um fetch e reza', () => {
 
   it('4xx não é retentado — insistir não conserta corpo ou assinatura errados', () => {
     const t = codigo(ENVIADOR);
-    expect(t).toMatch(/VALE_TENTAR_DE_NOVO = new Set\(\[408, 429, 500, 502, 503, 504\]\)/);
+    expect(t).toMatch(/VALE_TENTAR_DE_NOVO = new Set\(\[404, 408, 429, 500, 502, 503, 504\]\)/);
     expect(t).toMatch(/if \(!VALE_TENTAR_DE_NOVO\.has\(resposta\.status\)\)/);
   });
 
@@ -114,6 +114,18 @@ describe('a entrega é durável, não um fetch e reza', () => {
       /'\/api\/v1\/parceiros\/behemp\/atualizacao'/,
     );
     expect(t, 'o caminho deixou de ser configurável').toMatch(/PARCEIRO_GREENS_CAMINHO_RETORNO/);
+  });
+
+  it('🔴 404 É retentável — deploy em andamento devolve 404 por segundos', () => {
+    /**
+     * A regra "4xx não se retenta" erra aqui. 404 tem três causas que a resposta não
+     * distingue: caminho errado (permanente), rota ainda não publicada (temporário — o
+     * estado real da Greens hoje) e deploy em andamento (segundos).
+     *
+     * Sem retry, um aviso que caísse na janela de um deploy morreria. Com retry, o
+     * caminho permanentemente errado ainda vira `falhou` visível depois de ~2 h.
+     */
+    expect(codigo(ENVIADOR)).toMatch(/new Set\(\[404,/);
   });
 
   it('o backoff cresce, e tem teto', () => {
