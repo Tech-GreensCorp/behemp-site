@@ -121,7 +121,17 @@ jobs:
               # true` porque grep sai 1 quando não casa nada, e `set -e` mataria o deploy.
               grep -v "^$1=" "$ENVFILE" > "$ENVFILE.tmp" 2>/dev/null || true
               mv "$ENVFILE.tmp" "$ENVFILE"
-              echo "$1=$2" >> "$ENVFILE"
+              # 🔴 ASPAS SIMPLES, e isto não é estilo — é o bug do deploy #39.
+              #
+              # A URL do Neon é `postgresql://…/db?sslmode=require&channel_binding=require`.
+              # Escrita SEM aspas, o `.` (source) INTERPRETA a linha: o `&` manda para
+              # background e corta o resto. Medido: a variável vira VAZIA — e o source não
+              # falha, então o `set -e` não pega. Falha silenciosa, da mesma família das
+              # outras três deste arquivo.
+              #
+              # O `'\''` fecha a aspa, escapa uma literal e reabre — cobre valor que
+              # contenha aspa simples.
+              printf "%s='\''%s'\''\n" "$1" "$(printf '%s' "$2" | sed "s/'/'\\\\''/g")" >> "$ENVFILE"
             }
 
             gravar PARCEIRO_GREENS_SEGREDO_ENTRADA "${{ secrets.PARCEIRO_GREENS_SEGREDO_ENTRADA }}"
@@ -164,7 +174,16 @@ jobs:
             # `db:migrate:prod` usa o migrator do próprio `drizzle-orm`, que é dependência
             # de produção e precisa só dos .sql e da conexão — o caminho que a documentação
             # do Drizzle recomenda quando devDependencies são podadas.
-            pnpm db:migrate:prod
+            # 🔴 A VARIÁVEL VAI DIRETO NO COMANDO, sem depender do `source`.
+            #
+            # O `set -a; . $ENVFILE` acima serve ao APP; para a migration, passar o valor
+            # aqui elimina a classe inteira de problema: nenhum metacaractere de shell tem
+            # chance de interferir, porque o valor nunca é interpretado — vai do GitHub
+            # para o ambiente deste comando e pronto.
+            #
+            # É defesa em profundidade: as aspas no `.env` já resolvem, e esta linha
+            # continua funcionando mesmo que alguém quebre aquelas.
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" pnpm db:migrate:prod
 
             # Copia arquivos estáticos vitais para o standalone (CSS/Imagens)
             cp -r public .next/standalone/
