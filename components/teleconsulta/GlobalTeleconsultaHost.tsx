@@ -533,7 +533,25 @@ export function GlobalTeleconsultaHost() {
 
                     {/* Estado de aguardando / Lobby — sobrepõe quando paciente não conectado */}
                     {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-30">
+                        /* 🔴 O z-index É CONDICIONAL, E ISSO NÃO É DETALHE DE ESTILO.
+                         *
+                         * Em `lobby` este overlay É a tela: traz o card "Pronto para iniciar?",
+                         * o consentimento da ADR-0007 e o botão de iniciar. Ele precisa cobrir.
+                         *
+                         * Depois de iniciar, com o paciente ainda fora, ele vira FUNDO — e um
+                         * fundo não pode cobrir o que está na frente. Com `z-30` fixo ele
+                         * escondia o PiP da própria câmera do médico (`z-10`) e os botões de
+                         * Paciente / Prontuário / Prescrição / Copilot (`z-20`), que ficavam
+                         * renderizados e invisíveis atrás de um `bg-slate-900` opaco.
+                         *
+                         * Relatado pelo dono em 10/09/2026 como "a câmera não aparece, o sidebar
+                         * da esquerda também não" — os dois somem juntos porque a causa é uma só.
+                         */
+                        <div
+                            className={`absolute inset-0 flex items-center justify-center bg-slate-900 ${
+                                phase === 'lobby' ? 'z-30' : 'z-0'
+                            }`}
+                        >
                             {phase === "lobby" ? (
                                 <div className="flex flex-col items-center gap-6 text-center max-w-md max-h-[90vh] overflow-y-auto p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
                                     <VideoIcon className="h-16 w-16 text-primary animate-pulse" />
