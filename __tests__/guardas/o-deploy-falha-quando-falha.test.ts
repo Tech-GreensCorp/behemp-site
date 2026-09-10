@@ -112,14 +112,33 @@ describe('o script de deploy para no primeiro erro', () => {
     expect([...t.matchAll(/process\.exit\(1\)/g)].length).toBeGreaterThanOrEqual(2);
   });
 
-  it('🔴 o `cp .env` não pode falhar em todo deploy', () => {
+  it('🔴 as variáveis vêm dos GitHub Secrets, não de um `.env` que não existe', () => {
     /**
-     * O rsync EXCLUI `/.env` de propósito — para um deploy nunca sobrescrever segredo. A
-     * linha antiga copiava de `./.env`, que o rsync garante não existir. Falhava sempre, e
-     * com `set -e` agora derrubaria o deploy inteiro.
+     * A versão anterior copiava de `./.env` — arquivo que o rsync GARANTE não existir. E
+     * quando a checagem passou a existir, ela revelou o que ninguém sabia: **não há `.env`
+     * nem na raiz nem no standalone**. O app funcionava porque o PM2 guarda o ambiente no
+     * `dump.pm2` desde o primeiro `pm2 start` — configuração viva só na memória de um
+     * processo, que ninguém lê, versiona ou confere.
      */
     const s = scriptRemoto();
-    expect(s, 'o cp do .env voltou a ser incondicional').toMatch(/if \[ -f \.env \]/);
+    expect(s, 'a geração do .env a partir dos secrets sumiu').toMatch(/gravar\(\) \{/);
+    expect(s).toMatch(/secrets\.PARCEIRO_GREENS_SEGREDO_ENTRADA/);
+    expect(s, 'voltou o cp de um .env que não existe').not.toMatch(/^\s*cp \.env /m);
+  });
+
+  it('🔴 o .env gerado tem permissão restrita', () => {
+    // Ele passa a conter segredos de integração. 644 os deixaria legíveis por qualquer
+    // usuário do servidor.
+    expect(scriptRemoto()).toMatch(/chmod 600 "\$ENVFILE"/);
+  });
+
+  it('🔴 secret vazio NÃO apaga o valor que já está lá', () => {
+    /**
+     * Um secret ainda não cadastrado chega como string vazia. Sem esta guarda, o primeiro
+     * deploy depois de acrescentar uma variável ao workflow apagaria as demais — e o app
+     * subiria com configuração pela metade.
+     */
+    expect(scriptRemoto()).toMatch(/\[ -z "\$2" \] && return 0/);
   });
 
   it('🔴 o rsync continua EXCLUINDO o .env', () => {
