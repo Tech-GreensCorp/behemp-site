@@ -374,3 +374,26 @@ path:db/migrations/meta/0032_snapshot.json
 # rodando duas vezes, zero erro.
 path:db/migrations/0033_panoramic_princess_powerful.sql
 path:db/migrations/meta/0033_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO — corrigir o deploy.yml (10/09/2026) ──────────────────────
+# Palavras do dono: "pode seguir para corrigir mas pesquise e correlacione para
+# conseguirmos fazer a correção correta".
+#
+# O DEFEITO, medido no log do deploy #34481253343:
+#   err: cp: cannot stat '.env': No such file or directory
+#   err: sh: 1: drizzle-kit: not found
+#        ELIFECYCLE Command failed
+#   → e o script SEGUIU, reiniciou o PM2, e o passo foi marcado ✓.
+#   Deploy verde, migrations não aplicadas.
+#
+# A causa da segunda: `pnpm install --prod` no servidor pula devDependencies (o próprio
+# log diz "devDependencies: skipped"), e `drizzle-kit` é devDependency.
+#
+# A CORREÇÃO, fundamentada na documentação do Drizzle: usar o **migrator do drizzle-orm**,
+# que é dependência de produção e precisa apenas dos .sql gerados e de uma conexão. O CLI
+# é ferramenta de desenvolvimento. Fonte: orm.drizzle.team/docs/migrations e a discussão
+# drizzle-team/drizzle-orm#5718 ("awkward inside a slim production container where
+# devDependencies have been pruned").
+#
+# E `set -e` no script remoto, que é a correção que impede a próxima falha de ser invisível.
+path:.github/workflows/deploy.yml

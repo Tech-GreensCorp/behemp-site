@@ -18,7 +18,8 @@
     "db:seed": "npx tsx db/seed.ts",
     "db:seed-perfis": "npx tsx db/seed-perfis-teste.ts",
     "db:sync-clerk": "npx tsx --env-file=.env db/sync-clerk.ts",
-    "db:import-triagens": "npx tsx --env-file=.env scripts/importar-triagens-elementor.ts"
+    "db:import-triagens": "npx tsx --env-file=.env scripts/importar-triagens-elementor.ts",
+    "db:migrate:prod": "node scripts/migrar.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.4.1",

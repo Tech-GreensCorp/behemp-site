@@ -76,16 +76,43 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # 🔴 `set -e` — A CORREÇÃO MAIS IMPORTANTE DESTE ARQUIVO (10/09/2026).
+            #
+            # Sem ele, o script seguia depois de qualquer falha. No deploy do PR #36 duas
+            # coisas falharam — `cp: cannot stat '.env'` e `drizzle-kit: not found` — o PM2
+            # reiniciou assim mesmo, e o passo foi marcado ✓.
+            #
+            # O resultado foi o pior possível: DEPLOY VERDE COM BANCO DESATUALIZADO. O
+            # código novo subiu esperando tabelas que a migration não criou.
+            set -e
+
             cd ${{ secrets.TARGET_DIR }}
 
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
 
-            # Copia o .env para dentro do standalone (Opção A)
-            cp .env .next/standalone/.env
+            # O `.env` do servidor é mantido MANUALMENTE lá — o rsync o exclui de
+            # propósito (ver EXCLUDE acima), para um deploy nunca sobrescrever segredo.
+            #
+            # ⚠️ A linha antiga copiava de `./.env`, um arquivo que o rsync GARANTE não
+            # existir — e falhava em todo deploy desde sempre, sem ninguém ver.
+            if [ -f .env ]; then
+              cp .env .next/standalone/.env
+            elif [ ! -f .next/standalone/.env ]; then
+              echo "::error::Sem .env na raiz nem no standalone — o app subiria sem configuração."
+              exit 1
+            fi
 
-            # Aplica eventuais migrações do banco
-            pnpm db:migrate
+            # Aplica as migrations pendentes.
+            #
+            # 🔴 `db:migrate:prod`, e NÃO `db:migrate`. O segundo chama o CLI `drizzle-kit`,
+            # que é devDependency — e o passo acima roda `--prod`, que pula devDependencies
+            # (o log dizia "devDependencies: skipped"). O CLI nunca esteve aqui.
+            #
+            # `db:migrate:prod` usa o migrator do próprio `drizzle-orm`, que é dependência
+            # de produção e precisa só dos .sql e da conexão — o caminho que a documentação
+            # do Drizzle recomenda quando devDependencies são podadas.
+            pnpm db:migrate:prod
 
             # Copia arquivos estáticos vitais para o standalone (CSS/Imagens)
             cp -r public .next/standalone/
