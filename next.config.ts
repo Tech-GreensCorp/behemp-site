@@ -1,8 +1,34 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+
+  /**
+   * A RAIZ DO EMPACOTAMENTO E ESTE DIRETORIO, E NAO A QUE O NEXT ADIVINHA.
+   *
+   * O Next infere a raiz do workspace procurando lockfile PARA CIMA. Em maquina de
+   * desenvolvimento com outros projetos ao lado (~/Developer/Projects/*), ele encontra o
+   * "package-lock.json" de um VIZINHO e conclui que a raiz e o diretorio de cima. O
+   * standalone entao reproduz o caminho relativo a essa raiz:
+   *
+   *     .next/standalone/Developer/Projects/behemp-site/server.js   <- o real
+   *     .next/standalone/server.js                                   <- o que o deploy espera
+   *
+   * Medido aqui em 10/09/2026: o build local caia no primeiro caminho.
+   *
+   * NAO ERA A CAUSA DA FALHA DE PRODUCAO. O runner do GitHub clona so este repositorio,
+   * nao ha lockfile vizinho, e o log do deploy #40 mostra o rsync enviando
+   * ".next/standalone/server.js" - no lugar certo. Aquilo era outro problema (o caminho
+   * gravado no PM2). Esta linha resolve uma coisa so, e vale por ela: que o build da
+   * maquina de quem desenvolve seja IGUAL ao do CI. Build que difere por causa do que
+   * existe na pasta ao lado e um diagnostico que nao se pode confiar - foi exatamente o
+   * que me fez apontar a causa errada.
+   *
+   * Doc: nextjs.org/docs/app/api-reference/config/next-config-js/output
+   */
+  outputFileTracingRoot: path.join(__dirname),
 
   serverExternalPackages: ['docusign-esign'],
 

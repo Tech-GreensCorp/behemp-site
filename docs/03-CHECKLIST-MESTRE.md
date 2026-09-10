@@ -366,6 +366,21 @@ isso impede reconhecer paciente por telefone em **qualquer** lugar do sistema, n
 A proporção de dados sujos **não foi medida**: o banco local tem 1 paciente e 0 telefones.
 Normalizar o campo exige migração de dados e autorização.
 
+### 🔴 Achado de 10/09/2026 — CORRIGIDO no mesmo dia
+
+**Nenhum deploy chegou a produção entre 14/08 e 10/09.** O Actions reportava sucesso e o site
+servia um build antigo: `pm2 restart` reusa o caminho gravado e não relê o script
+(Unitech/pm2#3054), o `pnpm build` perdoava a própria falha com `|| true`, e nada conferia se
+produção passou a servir o build novo.
+
+⚠️ **Consequência para o planejamento:** os 19 commits do PR #36 — IA clínica com revisão
+humana, cadeia conduta-prescrição-titulação, `tab-prescricoes`, `tab-dosagem`, ChatPro,
+cadastro por link e handoff de parceiros — **nunca estiveram em produção**. Não se perdeu
+nada: está tudo na `main`. O que faltava era o processo executar o que já lhe entregavam.
+
+Diagnóstico completo, risco medido e o que ficou de fora: `docs/04-LISTA-DE-AFAZERES.md`
+Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
+
 ## Concluído
 
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:

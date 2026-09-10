@@ -1614,3 +1614,81 @@ E a busca por dígitos casou os **quatro** formatos gravados: `(62) 98111-1111`,
 **A configuração do fluxo no painel** — quem chama esta rota e o que faz com o cabeçalho
 `x-triagem-motivo` é decisão do painel, não do código. Guia para o dono no
 `docs/chatpro/COMO-CONECTAR-NO-PAINEL.md`.
+
+## Item 28 — ✅ CORRIGIDO: o deploy passava verde e produção servia um build antigo
+
+**Descoberto em 10/09/2026.** Entre 14/08 e 10/09 **nenhum deploy chegou ao processo em
+produção**. O Actions reportava sucesso, o rsync entregava os arquivos, o PM2 reiniciava — e
+o site continuava servindo um build anterior. Não havia erro em log nenhum.
+
+### O diagnóstico
+
+Três defeitos independentes cooperavam. **Cada um sozinho já bastava para esconder o problema.**
+
+| #   | defeito                                                        | efeito                                                    |
+| --- | -------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | `package.json:7` — o script `build` terminava em `\|\| true`   | build quebrado devolvia **exit 0**                        |
+| 2   | `deploy.yml` — `pm2 restart … \|\| pm2 start …`                | `restart` **reusa o caminho gravado** e não relê o script |
+| 3   | nenhum passo conferia se produção passou a servir o build novo | "verde" não significava nada                              |
+
+O (2) é a causa direta, e é comportamento documentado do PM2 ([Unitech/pm2#3054](https://github.com/Unitech/pm2/issues/3054)):
+trocar o `script` e reiniciar mantém o arquivo antigo em execução. `--update-env`, `reload` e
+`startOrReload` **não** corrigem — só `delete` + `start`.
+
+**Medições que fecharam o caso:**
+
+- produção redirecionava para `/entrar` até uma rota **inexistente** → o middleware em
+  execução não era o do build entregue
+- um chunk do build da vez respondia **404** em produção → quem serve os estáticos é o
+  processo, e o processo era outro
+- a Dryelle mediu no servidor, em 09/09: `.next/standalone/server.js` com **mtime de 14/08**
+- o `git pull` + `pnpm build` manual dela **funcionou** justamente por rodar no diretório de
+  onde o PM2 executa — o que confirma que rsync e PM2 estavam em diretórios diferentes
+
+### 🔴 O risco que a correção precisou desarmar antes
+
+`pm2 delete` não apaga arquivo, log nem código — mas **descarta o ambiente vivo do processo**.
+E medimos: o deploy escrevia **12** variáveis no `.env`, enquanto `lib/env.ts` declara **61**.
+As outras 49 — `CLERK_SECRET_KEY`, `BREVO_API_KEY`, `PUSHER_SECRET`, `DOCUSIGN_*` — nunca
+foram escritas em arquivo nenhum: viviam só na memória do processo, herdadas do primeiro
+`pm2 start` manual (o deploy #37 já tinha revelado que **não existe `.env` no servidor**).
+
+Reproduzido localmente: **sem `CLERK_SECRET_KEY`, toda rota responde 500, inclusive as
+públicas.** Um `pm2 delete` sem preservar teria derrubado o site inteiro.
+
+### Como foi corrigido
+
+1. `package.json` — o `build` volta a propagar falha. Provado: com o `next.config.ts`
+   quebrado, antes `exit 0`, agora `exit 1`.
+2. `scripts/preservar-ambiente-do-pm2.mjs` — copia para o `.env` as variáveis que só existem
+   no processo, **restrito às chaves que `lib/env.ts` declara** (nunca `PATH`/`HOME`), com
+   retrato do PM2 salvo antes e **nenhum valor impresso** — a saída vai para log público.
+3. `scripts/pm2-do-app.mjs` — lê o caminho que o processo usa, para o deploy **comparar em vez
+   de supor**.
+4. `deploy.yml` — imprime o diagnóstico, preserva o ambiente, recusa mexer no processo se o
+   `server.js` novo não chegou, e recria (`delete` + `start`) **apenas quando o caminho
+   diverge**; caminho igual continua sendo `restart`, sem indisponibilidade.
+5. `deploy.yml` — **portão pós-deploy**: baixa da URL pública um chunk com hash deste build e
+   falha o job se não vier 200 em 100 s. É a única afirmação do workflow que não depende de
+   nenhum passo ter "dado certo".
+6. `next.config.ts` — `outputFileTracingRoot: path.join(__dirname)`, para o build local não
+   divergir do build do CI. **Não era a causa** (o log do deploy #40 mostra o `server.js` no
+   lugar certo), mas foi a divergência que me fez apontar a causa errada.
+
+### O guarda
+
+`__tests__/guardas/o-deploy-entrega-o-que-buildou.test.ts` — **21 casos**, provados por
+**9 sabotagens**. Uma delas achou um defeito no próprio guarda: ele checava a _presença_ de
+`exit 1` no portão, e o passo tem dois — trocar só o final por um `echo` deixava o portão
+decorativo e o teste verde. Corrigido para medir o caminho de falha, não a presença.
+
+### O que ficou de fora
+
+- **`/api/versao` com o SHA do commit**, conferido pelo portão em vez do hash do chunk. É mais
+  direto e não depende de heurística. Fora do escopo desta correção — o chunk já prova o que
+  precisa hoje, e a rota nova exigiria mexer no middleware.
+- **Unificar os diretórios do rsync e do PM2 no servidor.** A correção faz o deploy convergir
+  sozinho para o diretório do rsync, mas o diretório antigo continua existindo na máquina.
+  Limpeza é trabalho próprio, com acesso ao servidor.
+- **IP Elástico na EC2** (recomendação da Dryelle). Não é causa deste incidente; evita que o
+  `SERVER_IP` fique obsoleto num reboot.
