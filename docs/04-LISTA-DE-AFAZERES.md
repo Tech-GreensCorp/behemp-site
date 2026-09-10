@@ -1545,3 +1545,72 @@ integração futura que receba um número de fora.
 
 ⚠️ **Nenhuma das duas foi feita.** A (1) entra na ADR-0017 como auxílio de busca — nunca como
 decisão. A (2) precisa de autorização e é trabalho próprio.
+
+---
+
+## Item 27 — ✅ ADR-0017 implementada: a triagem do bot da BeHemp
+
+**O que faltava:** a ADR-0015 resolveu **como** o link nasce; faltava **quando** oferecê-lo.
+
+### O que existe
+
+| camada                                   | arquivo                                                      |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| o gatilho (consulta receita e ANVISA)    | `lib/chatpro/triagem.ts`                                     |
+| interpreta o que o paciente escreveu     | `lib/chatpro/resposta-do-paciente.ts`                        |
+| os textos, e o que eles nunca dizem      | `lib/chatpro/texto-da-triagem.ts`                            |
+| a rota (`text/plain`, como o `bot-link`) | `app/api/chatpro/triagem/route.ts`                           |
+| guarda                                   | `a-triagem-roteia-e-nao-julga` — **44 casos**, 14 sabotagens |
+
+### 🔴 O defeito que só apareceu no teste ao vivo
+
+A primeira versão interpretava a resposta com `/^(sim|nao|não|n|s)$/` — âncora total,
+palavra exata. Testei com as respostas que uma pessoa dá de verdade:
+
+| o paciente escreve     | a 1ª versão entendia | consequência                                     |
+| ---------------------- | -------------------- | ------------------------------------------------ |
+| `"não"`                | ✅ não tem           | ok                                               |
+| **`"Não, ainda não"`** | ❌ **"não sei"**     | 🔴 **o link NÃO era oferecido a quem precisava** |
+| `"Ainda não tenho"`    | ❌ "não sei"         | idem                                             |
+| `"tenho mas venceu"`   | ❌ "tem"             | 🔴 mandado para o caminho errado                 |
+
+**O paciente não escolhe entre opções — ele conversa.** A correção lê negação e afirmação
+**no texto**, e trata menção a vencimento como não-ter: _"tenho, mas venceu"_ é afirmação
+seguida de uma informação que a anula.
+
+⚠️ **A negação é procurada ANTES da afirmação**, e a ordem não é detalhe: **"não tenho"
+contém "tenho"**. Na ordem inversa, toda negação viraria afirmação.
+
+### O que a tela nunca diz, e a única exceção
+
+| ❌ nunca                        | ✅ e é verdade                                         |
+| ------------------------------- | ------------------------------------------------------ |
+| "sua receita é inválida"        | "você precisa de uma avaliação com um médico parceiro" |
+| "não aceitamos receita de fora" | "seu documento está em análise"                        |
+
+🔴 **A exceção é o vencimento**, e ela é nomeada: _"sua receita está vencida — receitas de
+canabidiol valem 30 dias"_. É fato objetivo, regra pública (RDC 1.015/2026), e **não julga
+quem a emitiu**. Esconder tiraria do paciente algo que ele confere sozinho no documento.
+
+O guarda varre o **arquivo de textos**, não só o resultado das funções — um texto novo,
+amanhã, também é alcançado.
+
+### Provado ao vivo
+
+| cenário                                   | resultado                                |
+| ----------------------------------------- | ---------------------------------------- |
+| receita vigente + ANVISA                  | não oferece · `tem_tudo`                 |
+| receita **vencida**                       | oferece · **e diz que venceu**           |
+| receita ok, sem ANVISA                    | oferece · _"nós cuidamos dela com você"_ |
+| só **rascunho** de receita                | oferece — rascunho não é documento       |
+| paciente diz "não tenho" contra a base    | **oferece** — a resposta dele vence      |
+| a palavra "inválida" em qualquer resposta | **0 ocorrências**                        |
+
+E a busca por dígitos casou os **quatro** formatos gravados: `(62) 98111-1111`,
+`+5562982222222`, `62983333333` e `(62) 9 8444-4444`.
+
+### O que fica de fora
+
+**A configuração do fluxo no painel** — quem chama esta rota e o que faz com o cabeçalho
+`x-triagem-motivo` é decisão do painel, não do código. Guia para o dono no
+`docs/chatpro/COMO-CONECTAR-NO-PAINEL.md`.

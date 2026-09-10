@@ -91,3 +91,23 @@ export function mascararEmail(valor?: string | null): string {
   const visivel = usuario.slice(0, 2);
   return `${visivel}***@${dominio}`;
 }
+
+/**
+ * A CHAVE DE BUSCA DE UM TELEFONE — só os dígitos, e só os últimos 8.
+ *
+ * ⚠️ MORA AQUI, e não junto da consulta que a usa, por uma regra do projeto: helper de
+ * domínio é puro — sem `db`, sem `auth`, sem `next/*`. Quando ela estava no módulo que
+ * consulta o banco, o guarda que a testa arrastava a conexão do Neon no import e não
+ * rodava.
+ *
+ * ⚠️ OITO E NÃO ONZE, de propósito: é o que sobra depois de DDI, DDD e o nono dígito —
+ * as três partes que variam entre os formatos que temos gravados. Comparar os últimos 8
+ * casa `+5562999997197`, `62999997197` e até `6299997197` (o antigo, sem o 9).
+ *
+ * O preço é o falso positivo: dois números de estados diferentes podem terminar iguais.
+ * Aceitável **porque isto não decide** — apenas apresenta um candidato para conferência.
+ */
+export function chaveDeBusca(telefone: string | null | undefined): string | null {
+  const digitos = (telefone ?? '').replace(/\D/g, '');
+  return digitos.length >= 8 ? digitos.slice(-8) : null;
+}
