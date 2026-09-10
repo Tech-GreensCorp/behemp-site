@@ -87,6 +87,41 @@ destino — que é o que o negócio quer.
 **Rejeitado: explicar a regra ao paciente.** É o que o dono pediu para não dizer, e a coluna da
 direita entrega o mesmo resultado sem a declaração.
 
+### D-03b — 🔴 ACRESCENTADO EM 09/09: existe uma SEGUNDA régua, e ela é dizível
+
+A auditoria do `greens-corp` registrou o que faltava aqui: **a receita vence em 30 dias** —
+RDC 1.015/2026, em vigor desde 04/05/2026, para produto com até 0,2 % de THC, verificado em fonte
+do Conselho Federal de Farmácia. E, palavras da auditoria, _"nada no sistema sabe que uma receita
+expira"_.
+
+São **dois** motivos independentes para faltar receita válida, e eles têm naturezas diferentes:
+
+| #   | motivo                        | natureza                         | a tela pode dizer? |
+| --- | ----------------------------- | -------------------------------- | ------------------ |
+| 1   | não veio do nosso receituário | **comercial**                    | **não** — ver D-03 |
+| 2   | **passou de 30 dias**         | **regulatória** (RDC 1.015/2026) | **sim**            |
+
+🔴 **O motivo 2 pode e deve ser dito**, e isso não contradiz a D-03. _"Sua receita está vencida"_
+é fato objetivo, é regra pública, e **não julga o médico que a emitiu**. O que a D-03 proíbe é
+afirmar falsidade sobre documento legalmente válido — e uma receita vencida não é válida para
+dispensação, por norma, não por escolha nossa.
+
+⚠️ **Consequência prática:** o gatilho deixa de ter dois estados e passa a ter três.
+
+```
+tem receita?
+  ├─ não tem                        → link (silencioso quanto ao motivo)
+  ├─ tem, mas venceu (>30 dias)     → link + "sua receita está vencida"  ← DIZÍVEL
+  └─ tem, vigente, de fora          → link (silencioso quanto ao motivo)
+```
+
+**Rejeitado: tratar os dois motivos igual.** Esconder o vencimento seria esconder uma informação
+que ajuda o paciente e que ele pode conferir sozinho na própria receita.
+
+**Rejeitado: implementar a checagem de 30 dias agora.** O sistema não guarda a data de emissão da
+receita de fora, e a conferência é humana (D-02). Isto entra como **requisito do campo** quando a
+conferência for automatizada — está registrado no §5.
+
 ### D-04 — Paciente que já tem conta não recebe convite de cadastro
 
 O link cria conta. Quem já tem cai no reconhecimento da
@@ -105,15 +140,17 @@ que transfere o atendimento para uma pessoa. **O paciente nunca vê erro.**
 
 ## §3 — O que fica rejeitado
 
-| #    | rejeitado                                           | motivo                                                       |
-| ---- | --------------------------------------------------- | ------------------------------------------------------------ |
-| R-01 | oferecer o link a todo contato                      | enche a fila de conferência de gente já cadastrada           |
-| R-02 | só oferecer quando o paciente pedir                 | quem não sabe que precisa, não pede                          |
-| R-03 | o bot decidir a validade pela resposta do paciente  | resposta sincera não é conferência                           |
-| R-04 | regra automática de validade agora                  | é conferência humana até existir a IA/orquestração           |
-| R-05 | a tela dizer "receita inválida"                     | afirmação falsa sobre documento legalmente válido            |
-| R-06 | explicar ao paciente que só aceitamos receita nossa | o dono pediu para não dizer; há frase verdadeira equivalente |
-| R-07 | bloquear o link para quem já tem conta              | a tela resolve melhor que o painel                           |
+| #    | rejeitado                                           | motivo                                                                |
+| ---- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| R-01 | oferecer o link a todo contato                      | enche a fila de conferência de gente já cadastrada                    |
+| R-02 | só oferecer quando o paciente pedir                 | quem não sabe que precisa, não pede                                   |
+| R-03 | o bot decidir a validade pela resposta do paciente  | resposta sincera não é conferência                                    |
+| R-04 | regra automática de validade agora                  | é conferência humana até existir a IA/orquestração                    |
+| R-05 | a tela dizer "receita inválida"                     | afirmação falsa sobre documento legalmente válido                     |
+| R-06 | explicar ao paciente que só aceitamos receita nossa | o dono pediu para não dizer; há frase verdadeira equivalente          |
+| R-08 | esconder também o **vencimento** da receita         | é fato objetivo e público; esconder tira do paciente algo que o ajuda |
+| R-09 | implementar a régua de 30 dias agora                | não há data de emissão guardada, e a conferência é humana             |
+| R-07 | bloquear o link para quem já tem conta              | a tela resolve melhor que o painel                                    |
 
 ## §4 — Como se prova
 

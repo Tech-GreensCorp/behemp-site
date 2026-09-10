@@ -242,6 +242,88 @@ Todos nascem vermelhos e se provam por sabotagem (`docs/TECNICA-DOS-GUARDAS.md`)
 
 ---
 
+## §6 — 🔴 RETIFICAÇÃO, 09/09/2026 — a Greens já tinha metade disto, e eu não olhei
+
+A ADR foi escrita e **só depois** o Claude do `greens-corp` apontou divergências. Quatro
+procediam. Ficam registradas porque o erro de método importa mais que o de conteúdo.
+
+### 6.1 — 🔴 JÁ EXISTE contrato Greens↔BeHemp, e esta ADR o ignorava
+
+O commit `0fd763c` — _"Sprint G1: camada de gateway, roteamento por jornada Behemp"_, do **mesmo
+dia** — plantou no schema da Greens:
+
+```prisma
+enum BehempJourney {
+  NONE              // nunca passou pela Behemp
+  SENT_TO_BEHEMP    // Canal A: a Greens encaminhou     ← é a IDA desta ADR
+  CAME_FROM_BEHEMP  // Canal B: a Behemp encaminhou     ← é a VOLTA (D-09)
+  ADMIN_MARKED      // marcado à mão, sem webhook
+}
+behempReferralId String? @db.VarChar(64)  // "id do encaminhamento do outro lado
+                                          //  (CONTRATO §4 e §6)"
+```
+
+O comentário do schema diz o que este documento deveria ter dito primeiro: _"é por ele que **o
+webhook da Behemp localiza a solicitação**"_.
+
+**Os dois canais já têm nome, já têm coluna, e já apontam para um CONTRATO com seções
+numeradas.** Esta ADR inventou `origem = 'greens_handoff'` para a mesma coisa.
+
+⚠️ **E há consequência de negócio que eu não sabia existir:** a jornada decide **gateway de
+pagamento e desconto** — _"o desconto collab combinado entre as duas; quem chegou com tudo pronto
+e nunca passou por lá paga na Cannect"_. O handoff não é só cadastro: muda **quanto o paciente
+paga e onde**.
+
+**Correção:** `behempReferralId` é a chave de correlação, e a resposta do nosso endpoint precisa
+devolvê-lo — não só o token de tela.
+
+🔴 **Isto BLOQUEIA a implementação da ida** até o `CONTRATO §4/§6` ser lido e cruzado.
+
+**O erro de método, nomeado:** pesquisei fundamento na web e li o **frontend** da Greens, e não
+procurei o que o **backend** dela já tinha. A regra do `CLAUDE.md` — _"replicar solução que já
+existe no próprio código exige pesquisa antes"_ — incluía o outro repositório, que esta ADR trata
+como parceiro desde a primeira linha.
+
+### 6.2 — ❌ `city` não existe; o payload muda
+
+O formulário atualizado (`a644f83` back / `21cd52f` front) **não coleta cidade**. Enviar campo que
+a origem não tem é contrato que falha no primeiro teste.
+
+**Campos reconferidos:** nome, e-mail, telefone, **RG (agora obrigatório)** — e **não** cidade.
+
+### 6.3 — ✅ O aceite já existe, e é mais preciso do que supus
+
+Campo de consentimento gravado em `medication_requests`, exigido **exatamente quando falta a
+ANVISA** — o recorte certo, porque é o caso em que o paciente precisa vir para cá.
+
+**O bloqueio nº 2 do `04` Item 22 caiu.** Sobra o segredo compartilhado.
+
+### 6.4 — ⚠️ A validade da receita tem uma SEGUNDA régua, e ela é dizível
+
+A auditoria da Greens registrou: **a receita vence em 30 dias** (RDC 1.015/2026, em vigor desde
+04/05/2026, produto até 0,2 % de THC), e _"nada no sistema sabe que uma receita expira"_.
+
+São **dois** motivos independentes para faltar receita válida:
+
+| #   | motivo                     | natureza                         | pode ser dito? |
+| --- | -------------------------- | -------------------------------- | -------------- |
+| 1   | não é do nosso receituário | comercial                        | **não** (D-11) |
+| 2   | **passou de 30 dias**      | **regulatória** (RDC 1.015/2026) | **sim**        |
+
+🔴 **O segundo pode e deve ser dito.** _"Sua receita está vencida"_ é verdade, é regra pública, e
+não julga o médico que a emitiu. A regra de linguagem da D-11 vale para o motivo 1 — não para
+este.
+
+### 6.5 — ⚠️ E uma afirmação minha que era falsa
+
+Escrevi que a worktree da Greens tinha _"24 arquivos modificados por outra pessoa"_ e instruí
+_"não commite arquivo que você não escreveu"_. **Eram 37, e a maioria era trabalho da própria
+sessão de lá** — ADR-0025, ADR-0026, texto do WhatsApp, duas migrations. Seguida ao pé da letra, a
+instrução mandaria abandonar o trabalho de uma tarde.
+
+Li `git status`, vi arquivos que não eram meus, e **concluí autoria** — que o `git status` não
+informa. Autoria se lê no histórico ou se pergunta; não se deduz de um arquivo estar modificado.
+
 ## §5 — Fontes
 
 **Lidas.** OWASP, _Information exposure through query strings in URL_ — a URL é gravada em
