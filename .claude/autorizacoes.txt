@@ -355,3 +355,22 @@ path:db/migrations/meta/0031_snapshot.json
 #   · 1x ADD COLUMN NOT NULL **com default** — não quebra linha existente
 path:db/migrations/0032_violet_purifiers.sql
 path:db/migrations/meta/0032_snapshot.json
+
+# ── Migration 0033 ESCRITA À MÃO (10/09/2026) ────────────────────────────────
+# O `AGENTS.md` diz: "Não edite migration gerada manualmente sem explicar o motivo".
+# O motivo:
+#
+# O drizzle-kit gerou, para renomear um valor de enum:
+#     ALTER COLUMN tipo SET DATA TYPE text;
+#     DROP TYPE parceiro_evento_tipo;
+#     CREATE TYPE ... AS ENUM('receita_emitida','anvisa_aprovada');
+#     ALTER COLUMN tipo SET DATA TYPE parceiro_evento_tipo USING tipo::...;
+#
+# O último passo FALHA se existir linha com o valor antigo — e existia, aqui, no banco
+# local: uma linha 'anvisa_concluida'. A migration teria quebrado o deploy.
+#
+# Substituída por ALTER TYPE ... RENAME VALUE, que preserva os dados porque é o MESMO
+# valor mudando de rótulo. Envolvida em DO/IF EXISTS para ser idempotente — conferido
+# rodando duas vezes, zero erro.
+path:db/migrations/0033_panoramic_princess_powerful.sql
+path:db/migrations/meta/0033_snapshot.json

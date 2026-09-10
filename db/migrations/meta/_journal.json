@@ -232,6 +232,13 @@
       "when": 1789008320860,
       "tag": "0032_violet_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789009619720,
+      "tag": "0033_panoramic_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

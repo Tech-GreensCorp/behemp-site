@@ -263,7 +263,7 @@ describe('o aviso é disparado onde deve, e não atrapalha quem o dispara', () =
 
   it('🔴 a ANVISA aprovada dispara o aviso', () => {
     expect(codigo(ANVISA), 'o gatilho da ANVISA sumiu').toMatch(
-      /notificarParceiro\(\{[^}]*tipo: 'anvisa_concluida'/,
+      /notificarParceiro\(\{[^}]*tipo: 'anvisa_aprovada'/,
     );
   });
 

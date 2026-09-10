@@ -18,7 +18,7 @@ import { parceiroEventosSaida, solicitacoesCadastro } from '@/db/schema';
  * A ordem certa é: o ato clínico acontece e é gravado; o aviso é consequência. Falhar em
  * avisar é um problema para o cron resolver, não para o médico.
  */
-export type TipoDeAviso = 'receita_emitida' | 'anvisa_concluida';
+export type TipoDeAviso = 'receita_emitida' | 'anvisa_aprovada';
 
 export async function notificarParceiro(params: {
   /** Um dos dois. `pacienteId` é o que os pontos clínicos têm em mãos. */

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
    * falhar porque um parceiro está fora do ar.
    */
   if (status === 'aprovado' && atualizado?.pacienteId) {
-    await notificarParceiro({ pacienteId: atualizado.pacienteId, tipo: 'anvisa_concluida' });
+    await notificarParceiro({ pacienteId: atualizado.pacienteId, tipo: 'anvisa_aprovada' });
   }
 
   // Notificar paciente via Pusher

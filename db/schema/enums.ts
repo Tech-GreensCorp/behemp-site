@@ -351,10 +351,23 @@ export const parceiroEventoSaidaStatusEnum = pgEnum('parceiro_evento_saida_statu
   'falhou',
 ]);
 
-/** O que aconteceu aqui que o parceiro precisa saber. */
+/**
+ * O que aconteceu aqui que o parceiro precisa saber.
+ *
+ * 🔴 `anvisa_APROVADA`, e não "concluída" — a palavra foi trocada em 10/09/2026 depois de
+ * o lado da Greens apontar a ambiguidade.
+ *
+ * "Concluída" descreve o PROCESSO ter terminado, e uma ANVISA **negada** também está
+ * concluída. O gatilho sempre disparou só em `status = 'aprovado'`, então o comportamento
+ * nunca esteve errado — o **nome** é que não protegia. Quem lesse "concluída" amanhã
+ * poderia ligá-lo numa recusa, e a Greens fecharia a pendência do pedido: boa notícia
+ * sobre má notícia, em silêncio.
+ *
+ * Nome errado não quebra hoje. Ele espera alguém acreditar nele.
+ */
 export const parceiroEventoTipoEnum = pgEnum('parceiro_evento_tipo', [
   'receita_emitida',
-  'anvisa_concluida',
+  'anvisa_aprovada',
 ]);
 
 /** Os dois catálogos que o ChatPro expõe e que chegam como UUID nos webhooks. */
