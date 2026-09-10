@@ -362,6 +362,86 @@ continuar.
 defeito · um cenário composto · **um CONTROLE limpo**. Sem o controle, verde não
 significa nada. Se o cenário que isola X não acusa X, a regra não existe.
 
+## Deploy: como se sobe, se observa e se diagnostica
+
+🔴 **Método fixado em 10/09/2026**, depois de **quatro** deploys seguidos que falharam por
+motivos diferentes — e o primeiro deles passou **verde** com o banco desatualizado.
+
+### 1. Segredo vai do arquivo direto para o GitHub, nunca pelo chat
+
+```bash
+openssl rand -hex 32 > ~/.nome-do-segredo && chmod 600 ~/.nome-do-segredo
+tr -d '\n' < ~/.nome-do-segredo | gh secret set NOME_DA_VARIAVEL --repo Org/repo
+```
+
+**Por que assim:** o valor não passa por clipboard, navegador nem conversa. E `tr -d '\n'`
+não é detalhe — sem ele, o segredo cadastrado tem uma quebra de linha a mais que o do outro
+lado, e o HMAC não bate.
+
+**Conferência entre dois sistemas, sem revelar nada:**
+
+```bash
+tr -d '\n' < ~/.arquivo | sha256sum | cut -c1-12
+```
+
+⚠️ **A fórmula precisa ser a MESMA nos dois lados.** Em 10/09 comparamos duas impressões
+que pareciam divergir e eram do mesmo valor: uma calculada sobre os 64 hex, outra sobre os
+65 bytes do arquivo com `\n`. Impressão calculada de jeito diferente não prova nada.
+
+### 2. Monitorar o deploy — e o site junto
+
+```bash
+gh run list --limit 3 --json databaseId,status,conclusion,workflowName,displayTitle
+gh run view <id> --json jobs        # passo a passo
+gh run view <id> --log | grep -iE "err:|error|ELIFECYCLE"
+```
+
+🔴 **Verde não é prova.** Um passo pode rodar, falhar por dentro e ser marcado ✓ — foi o
+que aconteceu no deploy do PR #36: `drizzle-kit: not found` e o script seguiu. **Ler o log
+do passo, não só o ícone.**
+
+E acompanhar o **site** durante o deploy, não só o workflow: `curl -o /dev/null -w "%{http_code}"`
+a cada rodada diz se o restart derrubou algo.
+
+### 3. Diagnosticar: correlacionar, não adivinhar
+
+**A ordem que funcionou**, nesta sequência:
+
+| #   | passo                                   | o que evita                  |
+| --- | --------------------------------------- | ---------------------------- |
+| 1   | ler o **log do passo**, não a conclusão | o ✓ que esconde erro         |
+| 2   | **reproduzir** num shell isolado        | corrigir o que não é a causa |
+| 3   | **pesquisar** o erro com o nome dele    | resolver por tentativa       |
+| 4   | corrigir **e** escrever o guarda        | a volta silenciosa           |
+
+⚠️ **Reproduzir antes de corrigir.** O `DATABASE_URL ausente` do deploy #39 tinha o secret
+cadastrado e o `source` no lugar. Só reproduzindo num `bash -c` isolado ficou claro que a
+URL do Neon (`?sslmode=require&channel_binding=require`) **vira string vazia** ao ser
+carregada sem aspas — o `&` manda para background e corta o resto.
+
+### 4. As quatro falhas, e o que cada uma ensinou
+
+| deploy | falhou com                                   | a lição                                                               |
+| ------ | -------------------------------------------- | --------------------------------------------------------------------- |
+| #36    | `drizzle-kit: not found`, e passou **verde** | script remoto sem `set -e` transforma falha em silêncio               |
+| #37    | `Sem .env na raiz nem no standalone`         | a guarda revelou que **não havia** `.env` — o app vivia do `dump.pm2` |
+| #38    | `DATABASE_URL ausente`                       | escrever o `.env` não basta: arquivo **não vira ambiente** sozinho    |
+| #39    | `DATABASE_URL ausente` de novo               | `source` **interpreta**; um `.env` é dado, não código                 |
+
+🔴 **As quatro eram silenciosas.** Nenhuma quebrou o site — o que as tornou difíceis é
+exatamente isso: o sistema continuava de pé afirmando que estava atualizado.
+
+### 5. O que todo script de deploy precisa ter
+
+- **`set -e`** no script remoto — sem ele, falha vira silêncio
+- **variável no comando** quando o valor é crítico: `VAR="…" comando`, em vez de depender
+  de arquivo carregado
+- **aspas** ao gravar valor em `.env` — URL de banco tem `?` e `&`
+- **valor vazio não sobrescreve** o que já existe, senão o primeiro deploy depois de
+  acrescentar uma variável apaga as outras
+- **migration com a ferramenta de runtime**, nunca com CLI de desenvolvimento: `pnpm
+install --prod` poda `devDependencies`, e o log diz `devDependencies: skipped`
+
 ## Onde script, teste e seed moram
 
 | o quê                   | onde                                     | convenção                                                                               |
