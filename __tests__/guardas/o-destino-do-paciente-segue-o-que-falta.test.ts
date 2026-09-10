@@ -70,3 +70,68 @@ describe('a tela usa a regra, em vez de decidir por conta própria', () => {
     ]);
   });
 });
+
+/**
+ * A segunda metade do fluxo Greens 1: o paciente que veio do formulário do parceiro **não
+ * digita de novo** o que já preencheu lá.
+ *
+ * O dono apontou isso em 10/09/2026, ao ver a tela de demonstração: _"ele só precisa inserir o
+ * código do email e a senha nova já que os dados nós vamos puxar do formulário da greens"_.
+ * A tela pedia nome, CPF, telefone e e-mail outra vez — o mesmo trabalho duas vezes, no ponto
+ * do funil onde se perde gente.
+ */
+describe('quem veio do parceiro confirma os dados, não os digita', () => {
+  it('a tela distingue a origem — sem isso ela não tem como decidir', () => {
+    expect(codigo).toContain('veioDeParceiro');
+    expect(codigo).toContain('dadosVieramDoParceiro');
+    expect(codigo).toContain('confirmandoDados');
+  });
+
+  /**
+   * 🔴 A DECISÃO PRECISA DERIVAR DOS DADOS, não ser uma constante.
+   *
+   * Checar que a palavra `confirmandoDados` existe não prova nada: trocá-la por `false`
+   * deixa a tela pedindo tudo de novo e o guarda verde. Foi o que a sabotagem mostrou, em
+   * 10/09/2026, antes deste caso existir.
+   */
+  it('e a decisão DERIVA da origem — não é constante', () => {
+    expect(codigo).toMatch(/const confirmandoDados = dadosVieramDoParceiro && !corrigindo;/);
+  });
+
+  it('só confirma quando os QUATRO campos vieram — um faltando e ela pede', () => {
+    // Confirmar um CPF que não chegou mostraria um campo vazio como se fosse dado do paciente.
+    expect(codigo).toMatch(
+      /veioDeParceiro &&\s*nomeInicial &&\s*emailInicial &&\s*telefoneInicial &&\s*cpfInicial/,
+    );
+  });
+
+  /**
+   * 🔴 CONFIRMAR NÃO É ESCONDER.
+   *
+   * Se a Greens mandar um telefone errado, o paciente precisa poder consertar — senão o erro
+   * vira definitivo justamente no cadastro que deveria facilitar a vida dele. Um "conserto"
+   * que removesse o caminho de correção passaria neste arquivo sem este caso.
+   */
+  it('e há caminho de correção — o dado errado do parceiro não vira definitivo', () => {
+    expect(codigo).toContain('setCorrigindo(true)');
+    expect(codigo).toMatch(/Corrigir/);
+  });
+
+  it('os quatro dados aparecem na tela de confirmação, não ficam invisíveis', () => {
+    const i = codigo.indexOf('Confirme seus dados');
+    expect(i).toBeGreaterThan(-1);
+    const bloco = codigo.slice(i, i + 900);
+    for (const rotulo of ['Nome', 'CPF', 'Telefone', 'E-mail']) {
+      expect(bloco).toContain(`rotulo="${rotulo}"`);
+    }
+  });
+
+  it('o CPF chega até a tela — sem ele o fluxo 1 nunca confirma', () => {
+    const pagina = readFileSync(
+      path.join(process.cwd(), 'app/(auth)/cadastro/[token]/page.tsx'),
+      'utf8',
+    );
+    expect(pagina).toContain('cpfInicial={resultado.cpf}');
+    expect(pagina).toContain('veioDeParceiro={!!resultado.parceiro}');
+  });
+});

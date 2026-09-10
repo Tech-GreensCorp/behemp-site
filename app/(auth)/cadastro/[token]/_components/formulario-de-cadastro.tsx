@@ -63,6 +63,30 @@ interface Props {
   nomeInicial: string | null;
   emailInicial: string | null;
   telefoneInicial: string | null;
+  /** Só chega preenchido quando veio do parceiro — o bot do WhatsApp não pede CPF. */
+  cpfInicial?: string | null;
+  /**
+   * 🔴 QUEM VEIO DO FORMULÁRIO DO PARCEIRO NÃO DIGITA NADA DE NOVO.
+   *
+   * Ele já preencheu nome, CPF, telefone e e-mail lá. A tela CONFIRMA o que chegou e pede só o
+   * que ainda não existe: a senha, e depois o código do e-mail. Pedir tudo outra vez é fazer o
+   * trabalho duas vezes, e é onde se perde gente no meio do cadastro.
+   *
+   * ⚠️ Confirmar não é esconder: os dados aparecem, e há um "corrigir" ao lado. Se a Greens
+   * mandou um telefone errado, o paciente precisa poder consertar — senão o erro vira
+   * definitivo justamente no cadastro que deveria simplificar a vida dele.
+   */
+  veioDeParceiro?: boolean;
+}
+
+/** Uma linha de dado já confirmado: rótulo à esquerda, valor à direita. */
+function LinhaConfirmada({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className="text-muted-foreground text-xs">{rotulo}</span>
+      <span className="text-foreground text-sm font-medium">{valor}</span>
+    </div>
+  );
 }
 
 /** `+5562988771234` → `(62) 98877-1234`. O paciente não reconhece o formato E.164. */
@@ -112,16 +136,29 @@ export function FormularioDeCadastro({
   nomeInicial,
   emailInicial,
   telefoneInicial,
+  cpfInicial = null,
+  veioDeParceiro = false,
 }: Props) {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
+
+  /**
+   * Os quatro campos que o formulário do parceiro já coletou. Se os quatro vieram, a tela
+   * confirma em vez de pedir — e `corrigindo` devolve os campos editáveis quando o paciente
+   * clica em "corrigir".
+   */
+  const dadosVieramDoParceiro = Boolean(
+    veioDeParceiro && nomeInicial && emailInicial && telefoneInicial && cpfInicial,
+  );
+  const [corrigindo, setCorrigindo] = useState(false);
+  const confirmandoDados = dadosVieramDoParceiro && !corrigindo;
 
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
   const [nome, setNome] = useState(nomeInicial ?? '');
-  const [cpf, setCpf] = useState('');
+  const [cpf, setCpf] = useState(cpfInicial ? formatarCpf(cpfInicial) : '');
   const [telefone, setTelefone] = useState(formatarTelefoneParaTela(telefoneInicial));
   const [email, setEmail] = useState(emailInicial ?? '');
   const [senha, setSenha] = useState('');
@@ -366,58 +403,91 @@ export function FormularioDeCadastro({
           </form>
         ) : (
           <form onSubmit={criarConta} className="space-y-7">
-            <Secao titulo="Seus dados" icone={User}>
-              <Campo
-                id="nome"
-                rotulo="Nome completo"
-                valor={nome}
-                aoMudar={setNome}
-                placeholder="Como está no seu documento"
-                autoComplete="name"
-                valido={nomeValido}
-                dica={nome.length > 0 && !nomeValido ? 'Informe nome e sobrenome' : undefined}
-              />
-              <Campo
-                id="cpf"
-                rotulo="CPF"
-                valor={formatarCpf(cpf) === cpf ? cpf : cpf}
-                aoMudar={(v) => setCpf(somenteDigitosDoCpf(v).slice(0, 11))}
-                exibir={cpf.length === 11 ? formatarCpf(cpf) : cpf}
-                placeholder="000.000.000-00"
-                inputMode="numeric"
-                valido={cpfValido}
-                dica={
-                  cpf.length === 11 && !cpfValido
-                    ? 'Confira os números — este CPF não é válido'
-                    : undefined
-                }
-              />
-              <div className="grid gap-5 sm:grid-cols-2">
+            {confirmandoDados ? (
+              /**
+               * 🔴 O PACIENTE QUE VEIO DO PARCEIRO CONFIRMA — NÃO DIGITA.
+               *
+               * Ele acabou de preencher nome, CPF, telefone e e-mail no formulário da Greens.
+               * Repetir os quatro campos aqui é pedir o mesmo trabalho duas vezes, e é o ponto
+               * do funil onde se perde gente.
+               *
+               * ⚠️ Confirmar não é esconder: os dados aparecem, e há "corrigir" ao lado. Se a
+               * Greens mandou um telefone errado, ele precisa poder consertar — senão o erro
+               * vira definitivo justamente no cadastro que deveria facilitar a vida dele.
+               */
+              <Secao titulo="Confirme seus dados" icone={User}>
+                <div className="border-border/60 bg-muted/30 space-y-3 rounded-2xl border p-5">
+                  <LinhaConfirmada rotulo="Nome" valor={nome} />
+                  <LinhaConfirmada rotulo="CPF" valor={formatarCpf(cpf)} />
+                  <LinhaConfirmada rotulo="Telefone" valor={telefone} />
+                  <LinhaConfirmada rotulo="E-mail" valor={email} />
+                  <p className="text-muted-foreground pt-1 text-xs">
+                    Estes dados vieram do formulário que você preencheu. O e-mail acima será o seu
+                    login.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCorrigindo(true)}
+                  className="text-primary text-sm font-medium transition-opacity hover:opacity-70"
+                >
+                  Algo está errado? Corrigir
+                </button>
+              </Secao>
+            ) : (
+              <Secao titulo="Seus dados" icone={User}>
                 <Campo
-                  id="telefone"
-                  rotulo="Telefone (WhatsApp)"
-                  valor={telefone}
-                  aoMudar={(v) => setTelefone(mascararTelefoneDigitado(v))}
-                  placeholder="(00) 00000-0000"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  icone={Phone}
-                  valido={telefoneValido}
+                  id="nome"
+                  rotulo="Nome completo"
+                  valor={nome}
+                  aoMudar={setNome}
+                  placeholder="Como está no seu documento"
+                  autoComplete="name"
+                  valido={nomeValido}
+                  dica={nome.length > 0 && !nomeValido ? 'Informe nome e sobrenome' : undefined}
                 />
                 <Campo
-                  id="email"
-                  rotulo="E-mail"
-                  valor={email}
-                  aoMudar={setEmail}
-                  placeholder="voce@email.com"
-                  type="email"
-                  autoComplete="email"
-                  icone={Mail}
-                  valido={emailValido}
-                  dica="Será o seu login"
+                  id="cpf"
+                  rotulo="CPF"
+                  valor={formatarCpf(cpf) === cpf ? cpf : cpf}
+                  aoMudar={(v) => setCpf(somenteDigitosDoCpf(v).slice(0, 11))}
+                  exibir={cpf.length === 11 ? formatarCpf(cpf) : cpf}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  valido={cpfValido}
+                  dica={
+                    cpf.length === 11 && !cpfValido
+                      ? 'Confira os números — este CPF não é válido'
+                      : undefined
+                  }
                 />
-              </div>
-            </Secao>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Campo
+                    id="telefone"
+                    rotulo="Telefone (WhatsApp)"
+                    valor={telefone}
+                    aoMudar={(v) => setTelefone(mascararTelefoneDigitado(v))}
+                    placeholder="(00) 00000-0000"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    icone={Phone}
+                    valido={telefoneValido}
+                  />
+                  <Campo
+                    id="email"
+                    rotulo="E-mail"
+                    valor={email}
+                    aoMudar={setEmail}
+                    placeholder="voce@email.com"
+                    type="email"
+                    autoComplete="email"
+                    icone={Mail}
+                    valido={emailValido}
+                    dica="Será o seu login"
+                  />
+                </div>
+              </Secao>
+            )}
 
             <Separador />
 
