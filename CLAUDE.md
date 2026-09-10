@@ -57,6 +57,7 @@ Siga primeiro `AGENTS.md`. Este arquivo define apenas o modo operacional do Clau
 | precisa da teoria de um tópico — **abra só o ramo**, nunca a árvore toda                                           | `docs/arvore-do-conhecimento/00-RAIZ.md`                                                    |
 | vai escrever um teste que impeça uma classe de erro de voltar                                                      | `docs/TECNICA-DOS-GUARDAS.md`                                                               |
 | 🔴 **duas instruções divergem**, ou não sabe por que uma skill não apareceu                                        | `.claude/rules/precedencia-das-instrucoes.md`                                               |
+| 🔴 **o deploy não chegou a produção** — o plano curto/definitivo e o que está implementado                         | `docs/PLANO-DE-CORRECAO-DO-DEPLOY.md`                                                       |
 | decisão de infraestrutura e deploy (DT-001 a DT-010)                                                               | `docs/DECISOES_TECNICAS.md` — **não migrar, não apagar**                                    |
 | 🔴 **vai escrever ou revisar cartão do Trello** — anatomia obrigatória e o formato que o Trello aceita             | `docs/10-PADRAO-DO-KANBAN.md`                                                               |
 | o mapa completo das docs                                                                                           | `docs/00-LEIA-PRIMEIRO.md`                                                                  |
@@ -88,11 +89,11 @@ Siga primeiro `AGENTS.md`. Este arquivo define apenas o modo operacional do Clau
 Runner: **Vitest 4** desde a Sprint 0 (20/08/2026). `pnpm test` roda todos.
 
 🔴 **Os números abaixo foram MEDIDOS com `pnpm test`, não estimados.** Última medição:
-**10/09/2026 — 590 casos em 17 guardas.** (Eram 199 em 8 na medição de 24/08, quando três
+**10/09/2026 — 625 casos em 19 guardas.** (Eram 199 em 8 na medição de 24/08, quando três
 estavam errados — ver a retratação ao pé da tabela.)
 
 | guarda                                         | quebra o build se…                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | como rodar                           |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `hooks-de-escopo`                              | um hook de bloqueio parar de bloquear o que deve, **ou voltar a acusar inocente** — **37 casos**, incluindo **4** regressões de falsa acusação, 2 provas do mecanismo de autorização e a **paridade** com o guarda em bash                                                                                                                                                                                                                                                                         | `pnpm test`                          |
 | `autorizacao-tem-escopo-de-objeto`             | uma action ou handler de teleconsulta usar `salaId`/`roomId`/`pacienteId` **do cliente** sem provar escopo de objeto (OWASP API1/BOLA) — **16 casos**, fatiados por função                                                                                                                                                                                                                                                                                                                         | `pnpm test`                          |
 | `sem-relay-de-terceiro-na-teleconsulta`        | a mídia da consulta voltar a atravessar relay gratuito de terceiro, ou credencial de ICE voltar ao código — **17 casos**, com 4 de controle contra falsa acusação                                                                                                                                                                                                                                                                                                                                  | `pnpm test`                          |
@@ -110,6 +111,7 @@ estavam errados — ver a retratação ao pé da tabela.)
 | `o-aviso-ao-parceiro-nao-se-perde`             | enfileirar um aviso voltar a **lançar** (derrubaria a assinatura da receita), o envio virar `fetch` direto (perderia o aviso com a Greens fora do ar), o id do evento passar a ser gerado a cada retry (cada reenvio viraria fato novo lá), o índice do fato virar comum, ou dado clínico entrar no payload — **19 casos**                                                                                                                                                                         | `pnpm test`                          |
 | `a-triagem-roteia-e-nao-julga`                 | a resposta do paciente deixar de vencer a base, a interpretação voltar a exigir palavra exata (**"Não, ainda não" deixaria de ser reconhecido**), rascunho passar a contar como receita, ou a tela dizer que a receita de alguém é "inválida" — **44 casos**                                                                                                                                                                                                                                       | `pnpm test`                          |
 | `duas-contas-de-chatpro-nao-se-misturam`       | as duas contas passarem a usar o mesmo segredo, a comparação ganhar `break` (o tempo diria **qual** conta casou), a conta sair da chave do dicionário de UUIDs (a tradução erraria **em silêncio**), a conta passar a vir da URL em vez do segredo, ou ser identificada e **não repassada** — **20 casos**                                                                                                                                                                                         | `pnpm test`                          |
+| `o-deploy-entrega-o-que-buildou`               | o `build` voltar a perdoar a própria falha com `                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                      | true`, o deploy voltar a `pm2 restart … |     | pm2 start …`(que **reusa o caminho antigo** e faz produção servir build velho em silêncio), o ambiente ser preservado DEPOIS do`pm2 delete` (o site cairia inteiro em 500), ou o portão que confere produção virar aviso — **21 casos**, provados por **9 sabotagens**, uma das quais achou um defeito no próprio guarda | `pnpm test` |
 | portão de baseline                             | lint, Prettier ou type-check **piorarem** em relação a `baseline.json`. Não exige zero — exige não piorar                                                                                                                                                                                                                                                                                                                                                                                          | `node scripts/conferir-baseline.mjs` |
 
 Os **dois** guardas dos hooks ficam (`DO-19`): o `.sh` roda **sem `node_modules`**, o `.ts` roda
@@ -441,6 +443,48 @@ exatamente isso: o sistema continuava de pé afirmando que estava atualizado.
   acrescentar uma variável apaga as outras
 - **migration com a ferramenta de runtime**, nunca com CLI de desenvolvimento: `pnpm
 install --prod` poda `devDependencies`, e o log diz `devDependencies: skipped`
+
+### 6. 🔴 O log do deploy no GitHub é FONTE — e vem ANTES da hipótese
+
+**Decisão do dono em 10/09/2026:** _"já coloque no claude.md essa regra para sempre verificar
+os logs do deploy pelo github"_.
+
+O log não serve para confirmar o que já se decidiu. Ele é a **primeira** medição, e
+frequentemente **desmente** a hipótese formada no repositório local.
+
+```bash
+RUN=$(gh run list --workflow=deploy.yml --limit 1 --json databaseId -q '.[0].databaseId')
+gh run view "$RUN" --log | grep -iE "err:|error|ELIFECYCLE"   # o que quebrou
+gh run view "$RUN" --log | grep -F  "standalone/server.js"    # o que foi de fato ENVIADO
+gh run view "$RUN" --log | grep -iE "pm2|restart|rsync"       # o que o servidor fez
+```
+
+**O incidente que originou a regra.** Diagnostiquei o 307 das rotas novas como
+`outputFileTracingRoot` ausente: o build **da minha máquina** punha o `server.js` em
+`.next/standalone/Developer/Projects/behemp-site/`, e não na raiz — porque o Next procura
+lockfile para cima e encontra o de um projeto **vizinho**. Estava certo, e era verificável.
+Levei ao dono como causa raiz de produção.
+
+O log do deploy #40 mostrava, na listagem do rsync, `.next/standalone/server.js`. O runner
+do GitHub clona **só este repositório**: não existe lockfile vizinho lá, o gatilho nunca
+ocorreu, e o arquivo sempre chegou no lugar certo. **A causa era outra.**
+
+🔴 **A regra:** máquina de desenvolvimento e runner de CI são ambientes diferentes, e o que
+se mede num não vale no outro. Antes de chamar algo de causa **de produção**, achar no log
+do deploy a linha que confirma. Sem linha, não é causa — é hipótese, e se apresenta como tal.
+
+⚠️ **Segundo achado do mesmo dia: `pnpm build` mascarava a própria falha.** O script era
+`next build && cp A 2>/dev/null || true && cp B 2>/dev/null || true`. Em shell, `&&` e `||`
+têm a **mesma precedência** e associam à esquerda:
+
+```
+(((next build && cpA) || true) && cpB) || true
+                 ↑ falhou    ↑ vira true aqui, e de novo no fim  →  exit 0
+```
+
+Medido: com o `next.config.ts` sintaticamente quebrado, `pnpm build` devolveu **exit 0**. O
+`set -e` do deploy não salva disto — o comando _teve_ sucesso. **`|| true` no fim de uma
+cadeia perdoa tudo que veio antes, não só o último comando.**
 
 ## Onde script, teste e seed moram
 

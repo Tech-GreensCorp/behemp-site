@@ -149,6 +149,30 @@ jobs:
 
             chmod 600 "$ENVFILE"
 
+            # ── O QUE O PM2 ESTÁ RODANDO HOJE, ANTES DE MUDAR QUALQUER COISA ────────
+            #
+            # Não muda nada: só imprime. Existe porque em 10/09/2026 descobrimos que o
+            # processo em produção não servia o build entregue — e ninguém tinha como
+            # saber, porque o caminho que o PM2 usa nunca aparecia em lugar nenhum.
+            echo "[diag] diretório do deploy:  $(pwd)"
+            echo "[diag] server.js entregue:   $(ls -l --time-style=+%F_%T .next/standalone/server.js 2>/dev/null || echo AUSENTE)"
+            pm2 describe behemp-site 2>/dev/null | grep -E "script path|exec cwd|status|uptime" \
+              || echo "[diag] nenhum processo behemp-site no PM2"
+
+            # ── PRESERVA O AMBIENTE QUE SÓ EXISTE DENTRO DO PROCESSO ───────────────
+            #
+            # 🔴 SEM ISTO, RECRIAR O PROCESSO DERRUBA O SITE INTEIRO.
+            #
+            # O deploy escreve 12 variáveis no `.env`; o `lib/env.ts` declara 61. As
+            # outras — CLERK_SECRET_KEY, BREVO_API_KEY, PUSHER_SECRET, DOCUSIGN_* —
+            # nunca foram escritas em arquivo nenhum: vivem só na memória do processo,
+            # herdadas do primeiro `pm2 start` manual. Foi o que o deploy #37 revelou.
+            #
+            # Reproduzido em 10/09/2026: sem CLERK_SECRET_KEY, TODA rota responde 500,
+            # inclusive as públicas. O script copia para o `.env` apenas as chaves que o
+            # app declara em `lib/env.ts`, e imprime somente NOMES.
+            node scripts/preservar-ambiente-do-pm2.mjs
+
             # 🔴 CARREGA O `.env` NO AMBIENTE DESTE SHELL.
             #
             # Sem isto, `pnpm db:migrate:prod` falha com "DATABASE_URL ausente" — e falhou,
@@ -189,8 +213,88 @@ jobs:
             cp -r public .next/standalone/
             cp -r .next/static .next/standalone/.next/
 
-            # Reinicia o processo com cwd no standalone
+            # ── O PROCESSO PRECISA APONTAR PARA O server.js DESTE DEPLOY ───────────
+            #
+            # 🔴 `pm2 restart` NÃO RELÊ O CAMINHO DO SCRIPT. Ele reusa o que foi gravado
+            # no `pm2 start` original — comportamento conhecido (Unitech/pm2#3054, onde
+            # o usuário trocou `index.js` por `dist/app.js` e o PM2 seguiu executando o
+            # antigo). Nem `--update-env`, nem `reload`, nem `startOrReload` corrigem.
+            #
+            # Era a causa da falha de 10/09/2026: o rsync entregava o build novo, o
+            # `pm2 restart` reiniciava OUTRO server.js, e o site servia um build de dias
+            # antes. Todo deploy passava verde. Nenhuma rota nova aparecia.
+            CAMINHO_ATUAL="$(node scripts/pm2-do-app.mjs --caminho || true)"
+
             cd .next/standalone
-            pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
+
+            # 1) Nada destrutivo antes de o arquivo novo existir de fato.
+            if [ ! -f server.js ]; then
+              echo "[pm2] ✗ server.js não está aqui — o build não chegou."
+              echo "[pm2]   Abortando SEM tocar no processo: o site continua no ar como está."
+              exit 1
+            fi
+
+            CAMINHO_ESPERADO="$(pwd)/server.js"
+            echo "[pm2] o processo roda:  ${CAMINHO_ATUAL:-<nenhum processo>}"
+            echo "[pm2] o deploy entrega: $CAMINHO_ESPERADO"
+
+            if [ "$CAMINHO_ATUAL" = "$CAMINHO_ESPERADO" ]; then
+              # Caminho certo: restart preserva o processo e não tem janela de queda.
+              echo "[pm2] mesmo caminho — restart basta."
+              pm2 restart behemp-site --update-env
+            else
+              # Caminho diferente (ou processo inexistente): só recriar resolve.
+              #
+              # `pm2 delete` NÃO apaga arquivo, log nem código — remove o registro do
+              # processo e o mata. O que ele descarta é o ambiente vivo, e é por isso
+              # que o passo de preservação acima roda ANTES, nunca depois.
+              echo "[pm2] caminho diferente — restart reusaria o antigo. Recriando."
+              pm2 delete behemp-site 2>/dev/null || true
+              pm2 start server.js --name "behemp-site" --update-env
+            fi
+
             pm2 save
-            pm2 save
+
+      # ── ⛔ O PORTÃO QUE IMPEDE "DEPLOY VERDE COM PRODUÇÃO PARADA" ──────────────
+      #
+      # Todo passo acima pode ter sucesso e ainda assim o site continuar servindo um
+      # build antigo — foi exatamente o que aconteceu entre 14/08 e 10/09/2026, e o
+      # que o diagnóstico da Dryelle mediu no servidor (`server.js` com mtime de
+      # 14 de agosto enquanto o Actions reportava sucesso em ~15s).
+      #
+      # COMO ELE PROVA: cada build gera chunks com hash NOVO em `.next/static/chunks`.
+      # Quem serve esses arquivos é o próprio processo Node, a partir do build que ele
+      # carregou. Se o processo for outro, o arquivo não existe lá e a resposta é 404 —
+      # medido em produção em 10/09/2026, com um chunk do build da vez.
+      #
+      # Portanto: 200 aqui significa que o processo em produção É este build. É a única
+      # afirmação deste workflow que não depende de nenhum passo ter "dado certo".
+      - name: Produção está servindo ESTE build?
+        run: |
+          set -e
+          ALVO=$(ls -S .next/static/chunks/*.js 2>/dev/null | head -1 || true)
+          if [ -z "$ALVO" ]; then
+            echo "✗ nenhum chunk em .next/static/chunks — o build não produziu o que deveria."
+            exit 1
+          fi
+          URL="https://be4hope.org/_next/static/chunks/$(basename "$ALVO")"
+          echo "conferindo: $URL"
+
+          for i in $(seq 1 20); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo 000)
+            if [ "$CODIGO" = "200" ]; then
+              echo "✓ produção está servindo o build deste deploy."
+              exit 0
+            fi
+            echo "  tentativa $i/20: HTTP $CODIGO (o processo pode estar subindo)"
+            sleep 5
+          done
+
+          echo ""
+          echo "✗ DEPOIS DE 100s, PRODUÇÃO NÃO SERVE UM ARQUIVO DESTE BUILD."
+          echo ""
+          echo "  Os arquivos foram entregues e o PM2 reiniciou — e mesmo assim o site"
+          echo "  responde a partir de outro build. O passo 'Reiniciar Servidor (PM2)'"
+          echo "  acima imprime o caminho que o processo usa e o que o deploy entrega:"
+          echo "  comparar os dois diz se o rsync e o PM2 estão em diretórios diferentes."
+          exit 1
