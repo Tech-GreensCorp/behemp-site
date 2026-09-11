@@ -35,6 +35,16 @@ import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { marcarComoUtilizada, validarTokenDeCadastro } from '@/lib/chatpro/token-de-cadastro';
 
+/** O formato de um anexo enviado pelo próprio paciente no cadastro. */
+const anexoSchema = z
+  .object({
+    nomeArquivo: z.string().trim().min(1).max(200),
+    tipoMime: z.string().trim().max(100),
+    conteudoBase64: z.string().min(1),
+  })
+  .optional()
+  .nullable();
+
 const esquema = z.object({
   token: z.string().regex(/^[a-f0-9]{64}$/i, 'Link inválido'),
   nomeCompleto: z
@@ -57,14 +67,15 @@ const esquema = z.object({
    */
   temAutorizacaoAnvisa: z.boolean().optional().nullable(),
   /** O arquivo, quando ele respondeu que tem e anexou ali mesmo. */
-  anexoAnvisa: z
-    .object({
-      nomeArquivo: z.string().trim().min(1).max(200),
-      tipoMime: z.string().trim().max(100),
-      conteudoBase64: z.string().min(1),
-    })
-    .optional()
-    .nullable(),
+  anexoAnvisa: anexoSchema,
+  /**
+   * 🔴 A MESMA DECLARAÇÃO, PARA A RECEITA — e é ela que decide o destino.
+   *
+   * Sem saber se ele tem receita, o sistema considera que falta tudo e manda todo mundo para
+   * o agendamento — inclusive quem só precisa da procuração. Era o buraco do fluxo BeHemp 1.
+   */
+  temReceitaMedica: z.boolean().optional().nullable(),
+  anexoReceita: anexoSchema,
   tratamentoAtual: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -248,6 +259,16 @@ export async function concluirCadastroPorLink(
       });
     }
 
+    let anexouReceita = false;
+    if (dados.anexoReceita) {
+      anexouReceita = await anexarDocumentoDoCadastro({
+        pacienteId,
+        tipo: 'receita_medica',
+        anexo: dados.anexoReceita,
+        protocolo: solicitacao.protocolo,
+      });
+    }
+
     const copiados = await materializarDocumentosDoParceiro({
       pacienteId,
       documentosDoParceiro: solicitacao.documentosDoParceiro,
@@ -270,6 +291,8 @@ export async function concluirCadastroPorLink(
         // procuração depois sem perguntar de novo.
         declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
         anexouAutorizacaoAnvisa: anexouAnvisa,
+        declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
+        anexouReceitaMedica: anexouReceita,
         declarouTratamentoEmCurso: dados.jaFazTratamento,
         linkConsumidoAgora: consumiu,
       },
