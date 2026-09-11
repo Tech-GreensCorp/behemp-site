@@ -25,6 +25,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
 import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
 import { ErroDeContatoNaoConfirmado, ServicoDeSolicitacao } from '@/lib/chatpro/solicitacao';
+import {
+  cabecalhosDoLimite,
+  consumir,
+  identificarChamador,
+} from '@/lib/seguranca/limite-de-requisicao';
+
+/** Folgado para bot real, estreito para força bruta. */
+const LIMITE_DO_BOT = 60;
 
 /** Nunca cacheia: cada chamada cria ou reemite um link. */
 export const dynamic = 'force-dynamic';
@@ -37,6 +45,23 @@ function textoPuro(corpo: string, status: number): NextResponse {
 }
 
 export async function GET(request: NextRequest) {
+  /**
+   * 🔴 LIMITE ANTES DE TUDO — OWASP API4:2023.
+   *
+   * Aqui o segredo no cabeçalho é o único portão: quem o tiver, gera link de cadastro. A
+   * comparação é em tempo constante, mas isso não impede tentar. E o custo de cada tentativa
+   * é nosso, não de quem tenta.
+   *
+   * 60/min é folgado para um bot atendendo pacientes de verdade, e estreito para força bruta.
+   */
+  const limite = consumir(identificarChamador(request.headers, 'botlink'), LIMITE_DO_BOT, 60);
+  if (!limite.permitido) {
+    return new NextResponse('Muitas requisições. Tente novamente em instantes.', {
+      status: 429,
+      headers: cabecalhosDoLimite(limite, LIMITE_DO_BOT),
+    });
+  }
+
   /**
    * 🔴 O SEGREDO IDENTIFICA A CONTA (ADR-0018 D-01).
    *
