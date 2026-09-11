@@ -35,16 +35,6 @@ import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { marcarComoUtilizada, validarTokenDeCadastro } from '@/lib/chatpro/token-de-cadastro';
 
-/** O formato de um anexo enviado pelo próprio paciente no cadastro. */
-const anexoSchema = z
-  .object({
-    nomeArquivo: z.string().trim().min(1).max(200),
-    tipoMime: z.string().trim().max(100),
-    conteudoBase64: z.string().min(1),
-  })
-  .optional()
-  .nullable();
-
 const esquema = z.object({
   token: z.string().regex(/^[a-f0-9]{64}$/i, 'Link inválido'),
   nomeCompleto: z
@@ -66,8 +56,34 @@ const esquema = z.object({
    * procuração depois da consulta, sem perguntar de novo.
    */
   temAutorizacaoAnvisa: z.boolean().optional().nullable(),
-  /** O arquivo, quando ele respondeu que tem e anexou ali mesmo. */
-  anexoAnvisa: anexoSchema,
+  /**
+   * 🔴 OS ANEXOS VÊM COMO LISTA, UM POR TIPO.
+   *
+   * A primeira versão tinha um campo por documento (`anexoAnvisa`, `anexoReceita`). Cinco dos
+   * oito fluxos pedem o "formulário completo", com os cinco documentos — e cinco campos
+   * nomeados viram cinco lugares para esquecer um.
+   *
+   * A lista também deixa o contrato estável: documento novo no fluxo não muda a assinatura da
+   * action, só a lista de tipos aceitos.
+   */
+  anexos: z
+    .array(
+      z.object({
+        tipo: z.enum([
+          'receita_medica',
+          'laudo_medico',
+          'comprovante_residencia',
+          'autorizacao_anvisa',
+          'documento_identidade',
+        ]),
+        nomeArquivo: z.string().trim().min(1).max(200),
+        tipoMime: z.string().trim().max(100),
+        conteudoBase64: z.string().min(1),
+      }),
+    )
+    .max(5)
+    .optional()
+    .nullable(),
   /**
    * 🔴 A MESMA DECLARAÇÃO, PARA A RECEITA — e é ela que decide o destino.
    *
@@ -75,7 +91,6 @@ const esquema = z.object({
    * o agendamento — inclusive quem só precisa da procuração. Era o buraco do fluxo BeHemp 1.
    */
   temReceitaMedica: z.boolean().optional().nullable(),
-  anexoReceita: anexoSchema,
   tratamentoAtual: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -249,24 +264,15 @@ export async function concluirCadastroPorLink(
      * ficha só existe agora. Fora da transação — anexo que falha não desfaz cadastro que deu
      * certo.
      */
-    let anexouAnvisa = false;
-    if (dados.anexoAnvisa) {
-      anexouAnvisa = await anexarDocumentoDoCadastro({
+    const tiposAnexados: string[] = [];
+    for (const anexo of dados.anexos ?? []) {
+      const gravou = await anexarDocumentoDoCadastro({
         pacienteId,
-        tipo: 'autorizacao_anvisa',
-        anexo: dados.anexoAnvisa,
+        tipo: anexo.tipo,
+        anexo,
         protocolo: solicitacao.protocolo,
       });
-    }
-
-    let anexouReceita = false;
-    if (dados.anexoReceita) {
-      anexouReceita = await anexarDocumentoDoCadastro({
-        pacienteId,
-        tipo: 'receita_medica',
-        anexo: dados.anexoReceita,
-        protocolo: solicitacao.protocolo,
-      });
+      if (gravou) tiposAnexados.push(anexo.tipo);
     }
 
     const copiados = await materializarDocumentosDoParceiro({
@@ -290,9 +296,9 @@ export async function concluirCadastroPorLink(
         // Registra a DECLARAÇÃO, não só o arquivo: "não tenho" é o que permite oferecer a
         // procuração depois sem perguntar de novo.
         declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
-        anexouAutorizacaoAnvisa: anexouAnvisa,
         declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
-        anexouReceitaMedica: anexouReceita,
+        // Só os TIPOS — nunca o nome do arquivo, que costuma trazer o nome da pessoa.
+        documentosAnexadosNoCadastro: tiposAnexados,
         declarouTratamentoEmCurso: dados.jaFazTratamento,
         linkConsumidoAgora: consumiu,
       },

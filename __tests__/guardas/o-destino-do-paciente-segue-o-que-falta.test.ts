@@ -264,7 +264,8 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   it('e trocar para "ainda não" descarta o arquivo — não se grava contradição', () => {
     const i = codigo.indexOf('setTemAnvisa(opcao.valor)');
     const bloco = codigo.slice(i, i + 400);
-    expect(bloco).toContain('setArquivoAnvisa(null)');
+    // Desde a P3 os anexos vivem num mapa: descartar é remover a chave.
+    expect(bloco).toContain("escolherAnexo('autorizacao_anvisa', null)");
   });
 
   it('a declaração é enviada mesmo sem anexo — "não tenho" é informação', () => {
@@ -382,6 +383,166 @@ describe('a pergunta da receita, e o destino que a considera', () => {
       'utf8',
     );
     expect(action).toContain('temReceitaMedica');
-    expect(action).toContain("tipo: 'receita_medica',");
+    /**
+     * Desde a P3 os anexos chegam como LISTA, com o tipo em cada item — cinco campos
+     * nomeados viravam cinco lugares para esquecer um. O que o guarda exige é que
+     * `receita_medica` continue sendo um tipo aceito.
+     */
+    expect(action).toMatch(/anexos: z\s*\n?\s*\.array\(/);
+    expect(action).toContain("'receita_medica',");
+  });
+});
+
+/**
+ * P3 — O FORMULÁRIO É UM SÓ, e mostra o que falta.
+ *
+ * Cinco dos oito fluxos pedem o "formulário completo". A decisão D-05 da ADR-0021 rejeitou um
+ * formulário por fluxo: cinco telas divergem na primeira mudança. O que existe é uma tela que
+ * oferece anexo para cada documento PENDENTE — quem veio do parceiro com tudo não vê campo
+ * nenhum; quem veio do bot vê todos.
+ */
+describe('o formulário oferece anexo para o que falta', () => {
+  it('a lista de anexos sai das pendências, não de uma lista fixa', () => {
+    expect(codigo).toContain('const documentosParaAnexar = pendencias.filter(');
+    expect(codigo).toContain('documentosParaAnexar.map(');
+  });
+
+  it('receita e ANVISA ficam fora dessa lista — têm bloco próprio, com pergunta', () => {
+    // Repeti-las pediria o mesmo arquivo duas vezes na mesma tela.
+    expect(codigo).toMatch(/p\.chave !== 'receita_medica' && p\.chave !== 'autorizacao_anvisa'/);
+  });
+
+  it('o bloco some quando não falta documento nenhum', () => {
+    // Um "Seus documentos" vazio afirmaria que algo falta quando nada falta.
+    expect(codigo).toContain('documentosParaAnexar.length > 0');
+  });
+
+  /**
+   * 🔴 UM MAPA, NÃO UM ESTADO POR DOCUMENTO.
+   *
+   * Cinco estados nomeados são cinco lugares para esquecer um — e o esquecido some em
+   * silêncio, porque anexo que não sobe não dá erro: vira pendência.
+   */
+  it('os anexos vivem num mapa por tipo', () => {
+    expect(codigo).toMatch(/useState<Record<string, File>>\(\{\}\)/);
+    expect(codigo).toContain('const escolherAnexo = (tipo: string, arquivo: File | null)');
+  });
+
+  it('o limite de tamanho está no ponto único que recebe todos os anexos', () => {
+    const i = codigo.indexOf('const escolherAnexo =');
+    expect(codigo.slice(i, i + 500)).toMatch(/8 \* 1024 \* 1024/);
+  });
+});
+
+/**
+ * P5 (parte) — O CONSENTIMENTO É OBJETO VERSIONADO, e o texto é o da Greens.
+ *
+ * O dono mandou reusar o consentimento do formulário completo deles, e ele é bom por um
+ * motivo verificável: cada escolha de redação responde a um artigo da LGPD. O módulo registra
+ * quais, para que ninguém "simplifique" o texto sem saber o que está removendo.
+ */
+describe('o consentimento tem versão, texto e finalidades separadas', () => {
+  const consentimento = readFileSync(
+    path.join(process.cwd(), 'lib/parceiros/consentimento.ts'),
+    'utf8',
+  );
+
+  it('o texto apresentado vive no código, não só na tela', () => {
+    // O que vale é o que a pessoa LEU. Guardar só uma referência não prova a que ela disse sim.
+    expect(consentimento).toContain('TEXTO_DO_CONSENTIMENTO');
+    expect(consentimento).toMatch(/duas finalidades/);
+  });
+
+  it('tem versão — art. 8º §6º só funciona se soubermos a QUE texto ele disse sim', () => {
+    expect(consentimento).toContain('VERSAO_DO_CONSENTIMENTO');
+  });
+
+  it('as finalidades são separadas — consentimento é específico (art. 11, I)', () => {
+    // Um booleano impediria aceitar a avaliação médica e recusar o retorno à Greens.
+    expect(consentimento).toContain('avaliacaoMedica');
+    expect(consentimento).toContain('retornoAoParceiro');
+  });
+
+  it('🔴 o registro prevê revogação — sem ela é autorização perpétua', () => {
+    expect(consentimento).toMatch(/revogadoEm: Date \| null/);
+  });
+
+  it('e a fundamentação de cada escolha de redação está escrita', () => {
+    for (const artigo of ['art. 11, I', 'art. 8º, §4º', 'art. 9º, V', 'art. 8º, §6º']) {
+      expect(consentimento).toContain(artigo);
+    }
+  });
+});
+
+/**
+ * P4 — a tela de escolha, e P2 — o aviso da procuração.
+ *
+ * As duas peças menores da ADR-0021, e as duas têm a mesma armadilha: são telas que parecem
+ * decorativas e não são. A P4 evita que o paciente de recompra tente criar conta que já existe;
+ * a P2 é o único lugar onde a declaração "não tenho ANVISA" vira ação.
+ */
+describe('P4 — a tela de escolha não obriga a acertar de primeira', () => {
+  const tela = readFileSync(path.join(process.cwd(), 'app/(auth)/acesso/page.tsx'), 'utf8');
+
+  it('oferece os dois caminhos', () => {
+    expect(tela).toContain('href="/entrar"');
+    expect(tela).toContain('href="/registrar-se"');
+  });
+
+  /**
+   * 🔴 O PACIENTE DE RECOMPRA NÃO LEMBRA SE TEM CONTA AQUI.
+   *
+   * Ele lembra de ter comprado na Greens. Sem uma saída para a dúvida, escolhe no chute — e
+   * metade dos chutes termina em "e-mail já cadastrado", que é um erro que ele não resolve
+   * sozinho.
+   */
+  it('e dá uma saída para quem não sabe responder', () => {
+    expect(tela).toMatch(/Não lembra se já tem conta/i);
+  });
+
+  it('a rota é pública — quem chega ainda não provou quem é', () => {
+    const middleware = readFileSync(path.join(process.cwd(), 'middleware.ts'), 'utf8');
+    expect(middleware).toContain("'/acesso',");
+  });
+});
+
+describe('P2 — o aviso da procuração avisa, não bloqueia', () => {
+  const aviso = readFileSync(
+    path.join(process.cwd(), 'components/paciente/AvisoDaProcuracao.tsx'),
+    'utf8',
+  );
+
+  it('só aparece quando a procuração é mesmo necessária', () => {
+    expect(aviso).toContain('if (!precisaDaProcuracao || fechado) return null;');
+  });
+
+  it('leva à procuração em um clique', () => {
+    expect(aviso).toContain('/paciente/anvisa');
+    expect(aviso).toMatch(/Fazer a procuração agora/);
+  });
+
+  /**
+   * 🔴 PODE SER FECHADO — é aviso, não pedágio (ADR-0016 D-06).
+   *
+   * Barrar quem não tem autorização seria barrar justamente quem veio resolver isso.
+   */
+  it('pode ser fechado', () => {
+    expect(aviso).toContain('setFechado(true)');
+  });
+
+  /**
+   * ⚠️ E o fechar vale para a SESSÃO, não para sempre.
+   *
+   * Persistir "ele fechou" esconderia o aviso de quem fechou sem ler, com a autorização ainda
+   * faltando — o sistema teria decidido por ele que o assunto acabou.
+   */
+  it('e fechar não é decisão definitiva — o estado é local', () => {
+    expect(aviso).toContain('const [fechado, setFechado] = useState(false)');
+    expect(aviso).not.toMatch(/localStorage|fetch\(|action/i);
+  });
+
+  it('não pergunta de novo o que o paciente já respondeu no cadastro', () => {
+    // A declaração é gravada desde a P1/ANVISA. Perguntar aqui seria repetir.
+    expect(aviso).not.toMatch(/Você já tem|Sim, já tenho/);
   });
 });
