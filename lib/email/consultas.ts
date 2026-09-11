@@ -952,6 +952,68 @@ export async function enviarEmailCancelamentoMedico(params: {
   });
 }
 
+// ── E-mail: Notificação ao Médico — Paciente Remarcou ─────────
+// Só é chamada quando o PACIENTE remarca uma consulta que o médico já sabia que
+// existia (status 'agendada'/'confirmada') — nunca para uma reserva 'reservada' ainda
+// não paga, da qual o médico nunca chegou a ser avisado (ver `enviarEmailConsultaMedico`
+// e o comentário de `liberarReservasExpiradas`).
+
+export async function enviarEmailConsultaRemarcadaPeloPacienteMedico(params: {
+  medicoNome: string;
+  medicoEmail: string;
+  pacienteNome: string;
+  dataHoraAntiga: Date;
+  dataHoraNova: Date;
+}): Promise<void> {
+  const primeiroNomeMedico = escapeHtml(params.medicoNome.split(' ')[0]);
+  const pacienteNomeEscapado = escapeHtml(params.pacienteNome);
+  const dataAntigaFormatada = formatarData(params.dataHoraAntiga);
+  const dataNovaFormatada = formatarData(params.dataHoraNova);
+
+  const corpo = `
+    <p style="margin:0 0 20px;font-size:14px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Olá, <strong>${primeiroNomeMedico}</strong>. O paciente <strong>${pacienteNomeEscapado}</strong>
+      remarcou uma consulta na sua agenda.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      <tr><td style="background:${CORES.bg};border-radius:12px;padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:8px 0;border-bottom:1px solid ${CORES.divider};">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Paciente</p>
+            <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:${CORES.textPrimary};">${pacienteNomeEscapado}</p>
+          </td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid ${CORES.divider};">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Data anterior</p>
+            <p style="margin:4px 0 0;font-size:14px;color:${CORES.textSecondary};text-decoration:line-through;">${dataAntigaFormatada}</p>
+          </td></tr>
+          <tr><td style="padding:8px 0 0;">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Nova data</p>
+            <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:${CORES.green};">${dataNovaFormatada}</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+      <a href="${APP_URL()}/medico/agenda" style="display:inline-block;background:${CORES.gold};color:#fff;font-size:13px;font-weight:600;padding:12px 28px;border-radius:50px;text-decoration:none;">📅 Ver Agenda</a>
+    </td></tr></table>`;
+
+  const html = templateBase({
+    emoji: '🔄',
+    badge: 'Consulta remarcada',
+    badgeCor: CORES.goldBg,
+    titulo: 'Paciente remarcou a consulta',
+    corpo,
+  });
+
+  const client = criarClienteBrevo();
+  await client.transactionalEmails.sendTransacEmail({
+    subject: `🔄 ${pacienteNomeEscapado} remarcou a consulta para ${dataNovaFormatada}`,
+    htmlContent: html,
+    sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+    to: [{ email: params.medicoEmail, name: params.medicoNome }],
+  });
+}
+
 export async function enviarEmailTeleconsultaIniciada(params: {
   pacienteNome: string;
   pacienteEmail: string;
@@ -1153,6 +1215,65 @@ export async function enviarEmailReservaAguardandoPagamento(params: {
   const client = criarClienteBrevo();
   await client.transactionalEmails.sendTransacEmail({
     subject: `⏳ Horário reservado — finalize o pagamento até ${prazoFormatado}`,
+    htmlContent: html,
+    sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+    to: [{ email: params.pacienteEmail, name: params.pacienteNome }],
+  });
+}
+
+// ── E-mail: Reserva expirada por falta de pagamento ───────────
+// Disparado por `liberarReservasExpiradas` (lib/integrations/inngest/functions.ts) quando
+// o prazo de `enviarEmailReservaAguardandoPagamento` passa sem pagamento. Não usar
+// `enviarEmailConsultaCancelada` aqui: aquele template fala "sua consulta foi cancelada",
+// como se algo confirmado tivesse sido desfeito — mas uma reserva nunca chegou a ser
+// confirmada, e o médico nem chegou a ser avisado dela. O tom certo é "o horário que
+// você tinha reservado venceu", não "cancelamos sua consulta".
+
+export async function enviarEmailReservaExpirada(params: {
+  pacienteNome: string;
+  pacienteEmail: string;
+  medicoNome: string;
+  dataHora: Date;
+}): Promise<void> {
+  const primeiroNome = escapeHtml(params.pacienteNome.split(' ')[0]);
+  const medicoNomeEscapado = escapeHtml(params.medicoNome);
+  const dataHoraFormatada = formatarData(params.dataHora);
+
+  const corpo = `
+    <p style="margin:0 0 20px;font-size:14px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Olá, <strong>${primeiroNome}</strong>. O prazo para pagar o horário que você reservou com
+      <strong>Dr(a). ${medicoNomeEscapado}</strong> venceu, e a reserva foi liberada
+      automaticamente.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      <tr><td style="background:${CORES.bg};border-radius:12px;padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:8px 0;">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Horário que expirou</p>
+            <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:${CORES.textPrimary};text-decoration:line-through;">${dataHoraFormatada}</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 20px;font-size:13px;color:${CORES.textMuted};text-align:center;line-height:1.6;">
+      Sem problema — o horário agora está disponível para outros pacientes, mas você pode
+      reservar um novo horário a qualquer momento.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+      <a href="${APP_URL()}/paciente/agendamento" style="display:inline-block;background:${CORES.primary};color:#fff;font-size:13px;font-weight:600;padding:12px 28px;border-radius:50px;text-decoration:none;">📅 Agendar novo horário</a>
+    </td></tr></table>`;
+
+  const html = templateBase({
+    emoji: '⌛',
+    badge: 'Reserva expirada',
+    badgeCor: CORES.redBg,
+    titulo: 'Sua reserva expirou',
+    corpo,
+  });
+
+  const client = criarClienteBrevo();
+  await client.transactionalEmails.sendTransacEmail({
+    subject: `⌛ Reserva expirada — o horário com Dr(a). ${params.medicoNome} foi liberado`,
     htmlContent: html,
     sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
     to: [{ email: params.pacienteEmail, name: params.pacienteNome }],

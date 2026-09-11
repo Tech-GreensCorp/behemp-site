@@ -7,11 +7,18 @@ import { z } from 'zod';
 import { verificarPaciente } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { revalidatePath } from 'next/cache';
-import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
+import {
+  criarConsultaGoogleCalendar,
+  cancelarEventoGoogleCalendar,
+  atualizarEventoGoogleCalendar,
+} from '@/lib/integrations/google-calendar';
 import {
   enviarEmailConsultaAgendada,
   enviarEmailConsultaMedico,
   enviarEmailReservaAguardandoPagamento,
+  enviarEmailConsultaCancelada,
+  enviarEmailConsultaRemarcada,
+  enviarEmailConsultaRemarcadaPeloPacienteMedico,
 } from '@/lib/email/consultas';
 import { format } from 'date-fns';
 
@@ -659,13 +666,18 @@ export interface ReservaAtivaAgendamento {
 
 export interface HistoricoAgendamentoItem {
   id: string;
+  medicoId: string;
   medicoNome: string;
+  medicoEspecialidade: string;
   medicoAvatarUrl: string | null;
   dataHora: string;
   status: 'reservada' | 'agendada' | 'confirmada' | 'realizada' | 'cancelada';
   valor: number | null;
   moeda: string;
   expiraEm: string | null;
+  observacoes: string | null;
+  /** null = ainda pode remarcar de graça uma vez; preenchido = já usou a remarcação gratuita. */
+  remarcadaPeloPacienteEm: string | null;
 }
 
 /**
@@ -737,11 +749,15 @@ export async function obterEstadoAgendamentoPaciente(): Promise<
     const historicoRows = await db
       .select({
         id: consultas.id,
+        medicoId: consultas.medicoId,
         medicoNome: users.nome,
+        medicoEspecialidade: medicos.especialidade,
         medicoAvatarUrl: users.avatarUrl,
         dataHora: consultas.dataHora,
         status: consultas.status,
         expiraEm: consultas.expiraEm,
+        observacoes: consultas.observacoes,
+        remarcadaPeloPacienteEm: consultas.remarcadaPeloPacienteEm,
         valor: pagamentos.valor,
         moeda: pagamentos.moeda,
       })
@@ -755,19 +771,305 @@ export async function obterEstadoAgendamentoPaciente(): Promise<
 
     const historico: HistoricoAgendamentoItem[] = historicoRows.map((r) => ({
       id: r.id,
+      medicoId: r.medicoId,
       medicoNome: r.medicoNome,
+      medicoEspecialidade: r.medicoEspecialidade,
       medicoAvatarUrl: r.medicoAvatarUrl,
       dataHora: r.dataHora.toISOString(),
       status: r.status,
       valor: r.valor !== null ? Number(r.valor) : null,
       moeda: r.moeda ?? 'BRL',
       expiraEm: r.expiraEm ? r.expiraEm.toISOString() : null,
+      observacoes: r.observacoes,
+      remarcadaPeloPacienteEm: r.remarcadaPeloPacienteEm ? r.remarcadaPeloPacienteEm.toISOString() : null,
     }));
 
     return { sucesso: true, dados: { reservaAtiva, historico } };
   } catch (error) {
     console.error('[Action] Erro ao obter estado do agendamento:', error);
     return { sucesso: false, erro: 'Erro ao carregar estado do agendamento' };
+  }
+}
+
+const cancelarReservaPendenteSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+});
+
+/**
+ * Cancela uma reserva PENDENTE (status 'reservada', ainda sem pagamento) a pedido do
+ * próprio paciente. Só existe para esse status: uma consulta 'agendada'/'confirmada' já
+ * tem pagamento associado, e cancelar isso passa por suporte, não por autoatendimento
+ * (ver `remarcarConsultaPaciente` abaixo para a alternativa de trocar a data).
+ */
+export async function cancelarReservaPendente(
+  dados: z.infer<typeof cancelarReservaPendenteSchema>,
+): Promise<ActionResult> {
+  try {
+    const parsed = cancelarReservaPendenteSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    const { consultaId } = parsed.data;
+
+    const [reserva] = await db
+      .select()
+      .from(consultas)
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
+
+    if (!reserva) {
+      return { sucesso: false, erro: 'Reserva não encontrada.' };
+    }
+
+    if (reserva.status !== 'reservada') {
+      return {
+        sucesso: false,
+        erro:
+          'Só é possível cancelar por aqui uma reserva ainda não paga. Para consultas já ' +
+          'confirmadas, entre em contato com o suporte.',
+      };
+    }
+
+    await db
+      .update(consultas)
+      .set({ status: 'cancelada', expiraEm: null })
+      .where(eq(consultas.id, consultaId));
+
+    // Sincroniza o pagamento vinculado — nasceu 'pendente' e nunca foi pago de verdade,
+    // então "cancelado" é o estado correto agora (recomendação: status do pagamento não
+    // pode ficar dessincronizado do status da consulta).
+    await db
+      .update(pagamentos)
+      .set({ status: 'cancelado' })
+      .where(eq(pagamentos.consultaId, consultaId));
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, reserva.medicoId))
+      .limit(1);
+
+    const [paciente] = await db
+      .select()
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    await registrarAuditoria({
+      userId: paciente?.users.id ?? pacienteId,
+      acao: 'atualizar',
+      entidade: 'consultas',
+      entidadeId: consultaId,
+      dadosAntes: { status: 'reservada' },
+      dadosDepois: { status: 'cancelada', por: 'paciente' },
+    });
+
+    // O médico nunca foi avisado desta reserva (só é avisado quando o pagamento é
+    // confirmado de verdade) — não faz sentido notificá-lo de um cancelamento de algo
+    // que ele não sabia que existia.
+    if (paciente && medico) {
+      try {
+        await enviarEmailConsultaCancelada({
+          pacienteNome: paciente.users.nome,
+          pacienteEmail: paciente.users.email,
+          medicoNome: medico.users.nome,
+          dataHora: reserva.dataHora,
+          motivo: 'Você cancelou esta reserva.',
+        });
+      } catch (emailError) {
+        console.error('[Action] Erro ao enviar e-mail de cancelamento pelo paciente:', emailError);
+      }
+    }
+
+    revalidatePath('/paciente/agendamento');
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao cancelar reserva:', error);
+    return { sucesso: false, erro: 'Erro interno ao cancelar a reserva' };
+  }
+}
+
+const remarcarConsultaPacienteSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+  novaDataHora: z.string().datetime('Data/hora inválida'),
+});
+
+/**
+ * Remarca (troca a data/hora de) uma consulta a pedido do próprio paciente — permitido
+ * para qualquer status ainda ativo ('reservada', 'agendada', 'confirmada'). Limitado a
+ * UMA vez sem custo por consulta: `consultas.remarcadaPeloPacienteEm` é o próprio limite
+ * — se já estiver preenchido, uma nova remarcação exige contato com o suporte.
+ */
+export async function remarcarConsultaPaciente(
+  dados: z.infer<typeof remarcarConsultaPacienteSchema>,
+): Promise<ActionResult> {
+  try {
+    const parsed = remarcarConsultaPacienteSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    const { consultaId, novaDataHora } = parsed.data;
+
+    const [consulta] = await db
+      .select()
+      .from(consultas)
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
+
+    if (!consulta) {
+      return { sucesso: false, erro: 'Consulta não encontrada.' };
+    }
+
+    if (!['reservada', 'agendada', 'confirmada'].includes(consulta.status)) {
+      return {
+        sucesso: false,
+        erro: 'Esta consulta não pode mais ser remarcada.',
+      };
+    }
+
+    if (consulta.remarcadaPeloPacienteEm !== null) {
+      return {
+        sucesso: false,
+        erro:
+          'Você já remarcou esta consulta uma vez. Para remarcar de novo, entre em ' +
+          'contato com o suporte.',
+      };
+    }
+
+    const dataAnterior = consulta.dataHora;
+    const novaData = new Date(novaDataHora);
+
+    if (novaData.getTime() <= Date.now()) {
+      return { sucesso: false, erro: 'Escolha uma data no futuro.' };
+    }
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, consulta.medicoId))
+      .limit(1);
+
+    const [paciente] = await db
+      .select()
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    if (!medico || !paciente) {
+      return { sucesso: false, erro: 'Erro ao carregar dados da consulta' };
+    }
+
+    // Se havia evento no Calendar (consulta já confirmada de verdade), atualiza a data
+    // nele também — best-effort, igual ao padrão do resto do arquivo: falha aqui não
+    // pode travar a remarcação.
+    let novoMeetLink: string | null = consulta.googleMeetLink;
+    if (consulta.googleEventId && medico.medicos.googleRefreshToken) {
+      const novaDataFim = new Date(novaData.getTime() + 60 * 60 * 1000);
+      const resultadoGoogle = await atualizarEventoGoogleCalendar({
+        eventId: consulta.googleEventId,
+        refreshToken: medico.medicos.googleRefreshToken,
+        novaDataInicio: novaData,
+        novaDataFim,
+      });
+      if (resultadoGoogle.sucesso && resultadoGoogle.dados) {
+        novoMeetLink = resultadoGoogle.dados.meetLink;
+      } else {
+        console.error(
+          '[Action] Falha ao atualizar evento no Calendar ao remarcar (paciente):',
+          resultadoGoogle.erro,
+        );
+      }
+    }
+
+    // Mesmo índice único que protege `reservarConsulta` — outro médico/horário pode ter
+    // sido ocupado nesse meio tempo.
+    try {
+      await db
+        .update(consultas)
+        .set({
+          dataHora: novaData,
+          googleMeetLink: novoMeetLink,
+          remarcadaPeloPacienteEm: new Date(),
+          // Uma reserva pendente continua pendente, só com prazo renovado — ela não virou
+          // paga só porque a data mudou.
+          expiraEm: consulta.status === 'reservada' ? new Date(Date.now() + RESERVA_TTL_MINUTOS * 60 * 1000) : null,
+        })
+        .where(eq(consultas.id, consultaId));
+    } catch (dbError) {
+      const codigo = (dbError as { code?: string }).code;
+      if (codigo === '23505') {
+        return {
+          sucesso: false,
+          erro: 'Este médico já tem outra consulta nesse horário. Escolha outro horário.',
+        };
+      }
+      throw dbError;
+    }
+
+    await db
+      .update(pagamentos)
+      .set({ dataHora: novaData })
+      .where(eq(pagamentos.consultaId, consultaId));
+
+    await registrarAuditoria({
+      userId: paciente.users.id,
+      acao: 'atualizar',
+      entidade: 'consultas',
+      entidadeId: consultaId,
+      dadosAntes: { dataHora: dataAnterior.toISOString() },
+      dadosDepois: { dataHora: novaData.toISOString(), remarcadaPor: 'paciente' },
+    });
+
+    try {
+      await enviarEmailConsultaRemarcada({
+        pacienteNome: paciente.users.nome,
+        pacienteEmail: paciente.users.email,
+        medicoNome: medico.users.nome,
+        dataHoraAnterior: dataAnterior,
+        dataHoraNova: novaData,
+      });
+    } catch (emailError) {
+      console.error('[Action] Erro ao enviar e-mail de remarcação ao paciente:', emailError);
+    }
+
+    // O médico só é avisado se já sabia da consulta (status já era 'agendada'/'confirmada'
+    // antes desta remarcação) — uma 'reservada' nunca chegou a ser comunicada a ele.
+    if (consulta.status !== 'reservada') {
+      try {
+        await enviarEmailConsultaRemarcadaPeloPacienteMedico({
+          medicoNome: medico.users.nome,
+          medicoEmail: medico.users.email,
+          pacienteNome: paciente.users.nome,
+          dataHoraAntiga: dataAnterior,
+          dataHoraNova: novaData,
+        });
+      } catch (emailError) {
+        console.error('[Action] Erro ao enviar e-mail de remarcação ao médico:', emailError);
+      }
+    }
+
+    revalidatePath('/paciente/agendamento');
+    revalidatePath('/medico/agenda');
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao remarcar consulta (paciente):', error);
+    return { sucesso: false, erro: 'Erro interno ao remarcar a consulta' };
   }
 }
 

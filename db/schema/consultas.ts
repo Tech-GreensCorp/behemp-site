@@ -43,6 +43,10 @@ export const consultas = pgTable(
      *  "invalid_grant") não bloqueia mais o agendamento — a consulta nasce sem Meet
      *  e o motivo fica aqui, visível para o médico/admin reconectarem o Google. */
     googleCalendarErro: text('google_calendar_erro'),
+    /** O PACIENTE (não o médico, que remarca livremente) só pode remarcar uma vez sem
+     *  custo — presença desta data é o próprio limite: outra remarcação pelo paciente
+     *  passa a exigir contato com o suporte. */
+    remarcadaPeloPacienteEm: timestamp('remarcada_pelo_paciente_em', { withTimezone: true }),
     ...softDeleteColumn,
   },
   (table) => [
