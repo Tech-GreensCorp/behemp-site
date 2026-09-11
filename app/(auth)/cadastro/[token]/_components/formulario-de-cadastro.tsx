@@ -107,6 +107,15 @@ interface Props {
  * seria um lugar para qualquer um despejar arquivo; aqui o token de uso único do link é a
  * credencial, e ela já é conferida.
  */
+async function lerAnexos(mapa: Record<string, File>) {
+  const lidos = [];
+  for (const [tipo, arquivo] of Object.entries(mapa)) {
+    const um = await lerAnexo(arquivo);
+    if (um) lidos.push({ tipo: tipo as never, ...um });
+  }
+  return lidos;
+}
+
 async function lerAnexo(arquivo: File | null) {
   if (!arquivo) return null;
   const buffer = await arquivo.arrayBuffer();
@@ -228,8 +237,28 @@ export function FormularioDeCadastro({
    * receita válida. Era o buraco do fluxo BeHemp 1.
    */
   const [temReceita, setTemReceita] = useState<boolean | null>(null);
-  const [arquivoReceita, setArquivoReceita] = useState<File | null>(null);
-  const [arquivoAnvisa, setArquivoAnvisa] = useState<File | null>(null);
+
+  /**
+   * 🔴 UM MAPA, NÃO UM ESTADO POR DOCUMENTO.
+   *
+   * Cinco dos oito fluxos pedem o "formulário completo", com os cinco documentos. Cinco
+   * estados nomeados viram cinco lugares para esquecer um — e o esquecido some em silêncio,
+   * porque anexo que não sobe não dá erro: vira pendência.
+   */
+  const [anexos, setAnexos] = useState<Record<string, File>>({});
+  const escolherAnexo = (tipo: string, arquivo: File | null) => {
+    setErroDoAnexo('');
+    if (arquivo && arquivo.size > 8 * 1024 * 1024) {
+      setErroDoAnexo('O arquivo passa de 8 MB. Tente uma foto menor ou um PDF.');
+      return;
+    }
+    setAnexos((atual) => {
+      const proximo = { ...atual };
+      if (arquivo) proximo[tipo] = arquivo;
+      else delete proximo[tipo];
+      return proximo;
+    });
+  };
   const [erroDoAnexo, setErroDoAnexo] = useState('');
   /**
    * A pergunta só faz sentido quando a autorização falta **e** ninguém já perguntou.
@@ -239,6 +268,16 @@ export function FormularioDeCadastro({
    */
   const perguntarSobreAnvisa =
     !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'autorizacao_anvisa');
+  /**
+   * Os documentos que ainda cabem anexar aqui.
+   *
+   * Receita e ANVISA saem da lista: elas têm bloco próprio, com a pergunta antes do anexo,
+   * porque a resposta delas decide o destino. Repeti-las aqui pediria o mesmo arquivo duas
+   * vezes na mesma tela.
+   */
+  const documentosParaAnexar = pendencias.filter(
+    (p) => p.chave !== 'receita_medica' && p.chave !== 'autorizacao_anvisa',
+  );
   const perguntarSobreReceita =
     !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'receita_medica');
 
@@ -380,9 +419,8 @@ export function FormularioDeCadastro({
          * `null` quando a pergunta nem apareceu — o parceiro já tinha mandado a autorização.
          */
         temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null,
-        anexoAnvisa: await lerAnexo(arquivoAnvisa),
         temReceitaMedica: perguntarSobreReceita ? temReceita : null,
-        anexoReceita: await lerAnexo(arquivoReceita),
+        anexos: await lerAnexos(anexos),
         tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       });
 
@@ -715,6 +753,55 @@ export function FormularioDeCadastro({
 
             <Separador />
 
+            {/*
+              🔴 UM ANEXO PARA CADA DOCUMENTO QUE FALTA — a peça P3 da ADR-0021.
+            
+              Não existem "dois formulários". Existe UM que mostra o que falta: quem veio do
+              parceiro com tudo não vê nenhum campo; quem veio do bot vê os cinco. Cinco telas
+              divergiriam na primeira mudança (D-05).
+            
+              Receita e ANVISA têm bloco próprio, com pergunta antes do anexo, porque a resposta
+              delas decide para onde o paciente vai. Os outros três são só envio.
+            */}
+            {documentosParaAnexar.length > 0 && (
+              <>
+                <Secao titulo="Seus documentos" icone={FileText}>
+                  <p className="text-muted-foreground -mt-1 mb-4 text-xs">
+                    Envie agora ou depois, pela sua área. Nada disso impede você de continuar.
+                  </p>
+                  <div className="space-y-4">
+                    {documentosParaAnexar.map((doc) => (
+                      <div key={doc.chave} className="space-y-1.5">
+                        <Label htmlFor={`anexo-${doc.chave}`}>
+                          {doc.rotulo}
+                          {doc.opcional && (
+                            <span className="text-muted-foreground/70 ml-1.5 text-xs">
+                              (opcional)
+                            </span>
+                          )}
+                        </Label>
+                        <Input
+                          id={`anexo-${doc.chave}`}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={(e) => escolherAnexo(doc.chave, e.target.files?.[0] ?? null)}
+                          className="h-12 rounded-xl"
+                        />
+                        {anexos[doc.chave] && (
+                          <p className="text-secondary flex items-center gap-1.5 text-xs">
+                            <Check size={13} /> {anexos[doc.chave].name}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {erroDoAnexo && <p className="text-destructive mt-2 text-xs">{erroDoAnexo}</p>}
+                </Secao>
+
+                <Separador />
+              </>
+            )}
+
             {perguntarSobreReceita && (
               <>
                 {/*
@@ -739,7 +826,7 @@ export function FormularioDeCadastro({
                             type="button"
                             onClick={() => {
                               setTemReceita(opcao.valor);
-                              if (!opcao.valor) setArquivoReceita(null);
+                              if (!opcao.valor) escolherAnexo('receita_medica', null);
                             }}
                             aria-pressed={escolhido}
                             className={cn(
@@ -764,18 +851,9 @@ export function FormularioDeCadastro({
                           id="anexo-receita"
                           type="file"
                           accept=".pdf,.jpg,.jpeg,.png,.webp"
-                          onChange={(e) => {
-                            const arquivo = e.target.files?.[0] ?? null;
-                            setErroDoAnexo('');
-                            if (arquivo && arquivo.size > 8 * 1024 * 1024) {
-                              setErroDoAnexo(
-                                'O arquivo passa de 8 MB. Tente uma foto menor ou um PDF.',
-                              );
-                              setArquivoReceita(null);
-                              return;
-                            }
-                            setArquivoReceita(arquivo);
-                          }}
+                          onChange={(e) =>
+                            escolherAnexo('receita_medica', e.target.files?.[0] ?? null)
+                          }
                           className="h-12 rounded-xl"
                         />
                         <p className="text-muted-foreground text-xs">
@@ -820,8 +898,7 @@ export function FormularioDeCadastro({
                               // enviar documento que ele acabou de dizer que não tem seria
                               // gravar uma contradição.
                               if (!opcao.valor) {
-                                setArquivoAnvisa(null);
-                                setErroDoAnexo('');
+                                escolherAnexo('autorizacao_anvisa', null);
                               }
                             }}
                             aria-pressed={escolhido}
@@ -852,18 +929,9 @@ export function FormularioDeCadastro({
                           id="anexo-anvisa"
                           type="file"
                           accept=".pdf,.jpg,.jpeg,.png,.webp"
-                          onChange={(e) => {
-                            const arquivo = e.target.files?.[0] ?? null;
-                            setErroDoAnexo('');
-                            if (arquivo && arquivo.size > 8 * 1024 * 1024) {
-                              setErroDoAnexo(
-                                'O arquivo passa de 8 MB. Tente uma foto menor ou um PDF.',
-                              );
-                              setArquivoAnvisa(null);
-                              return;
-                            }
-                            setArquivoAnvisa(arquivo);
-                          }}
+                          onChange={(e) =>
+                            escolherAnexo('autorizacao_anvisa', e.target.files?.[0] ?? null)
+                          }
                           className="h-12 rounded-xl"
                         />
                         {erroDoAnexo ? (

@@ -264,7 +264,8 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   it('e trocar para "ainda não" descarta o arquivo — não se grava contradição', () => {
     const i = codigo.indexOf('setTemAnvisa(opcao.valor)');
     const bloco = codigo.slice(i, i + 400);
-    expect(bloco).toContain('setArquivoAnvisa(null)');
+    // Desde a P3 os anexos vivem num mapa: descartar é remover a chave.
+    expect(bloco).toContain("escolherAnexo('autorizacao_anvisa', null)");
   });
 
   it('a declaração é enviada mesmo sem anexo — "não tenho" é informação', () => {
@@ -382,6 +383,93 @@ describe('a pergunta da receita, e o destino que a considera', () => {
       'utf8',
     );
     expect(action).toContain('temReceitaMedica');
-    expect(action).toContain("tipo: 'receita_medica',");
+    /**
+     * Desde a P3 os anexos chegam como LISTA, com o tipo em cada item — cinco campos
+     * nomeados viravam cinco lugares para esquecer um. O que o guarda exige é que
+     * `receita_medica` continue sendo um tipo aceito.
+     */
+    expect(action).toMatch(/anexos: z\s*\n?\s*\.array\(/);
+    expect(action).toContain("'receita_medica',");
+  });
+});
+
+/**
+ * P3 — O FORMULÁRIO É UM SÓ, e mostra o que falta.
+ *
+ * Cinco dos oito fluxos pedem o "formulário completo". A decisão D-05 da ADR-0021 rejeitou um
+ * formulário por fluxo: cinco telas divergem na primeira mudança. O que existe é uma tela que
+ * oferece anexo para cada documento PENDENTE — quem veio do parceiro com tudo não vê campo
+ * nenhum; quem veio do bot vê todos.
+ */
+describe('o formulário oferece anexo para o que falta', () => {
+  it('a lista de anexos sai das pendências, não de uma lista fixa', () => {
+    expect(codigo).toContain('const documentosParaAnexar = pendencias.filter(');
+    expect(codigo).toContain('documentosParaAnexar.map(');
+  });
+
+  it('receita e ANVISA ficam fora dessa lista — têm bloco próprio, com pergunta', () => {
+    // Repeti-las pediria o mesmo arquivo duas vezes na mesma tela.
+    expect(codigo).toMatch(/p\.chave !== 'receita_medica' && p\.chave !== 'autorizacao_anvisa'/);
+  });
+
+  it('o bloco some quando não falta documento nenhum', () => {
+    // Um "Seus documentos" vazio afirmaria que algo falta quando nada falta.
+    expect(codigo).toContain('documentosParaAnexar.length > 0');
+  });
+
+  /**
+   * 🔴 UM MAPA, NÃO UM ESTADO POR DOCUMENTO.
+   *
+   * Cinco estados nomeados são cinco lugares para esquecer um — e o esquecido some em
+   * silêncio, porque anexo que não sobe não dá erro: vira pendência.
+   */
+  it('os anexos vivem num mapa por tipo', () => {
+    expect(codigo).toMatch(/useState<Record<string, File>>\(\{\}\)/);
+    expect(codigo).toContain('const escolherAnexo = (tipo: string, arquivo: File | null)');
+  });
+
+  it('o limite de tamanho está no ponto único que recebe todos os anexos', () => {
+    const i = codigo.indexOf('const escolherAnexo =');
+    expect(codigo.slice(i, i + 500)).toMatch(/8 \* 1024 \* 1024/);
+  });
+});
+
+/**
+ * P5 (parte) — O CONSENTIMENTO É OBJETO VERSIONADO, e o texto é o da Greens.
+ *
+ * O dono mandou reusar o consentimento do formulário completo deles, e ele é bom por um
+ * motivo verificável: cada escolha de redação responde a um artigo da LGPD. O módulo registra
+ * quais, para que ninguém "simplifique" o texto sem saber o que está removendo.
+ */
+describe('o consentimento tem versão, texto e finalidades separadas', () => {
+  const consentimento = readFileSync(
+    path.join(process.cwd(), 'lib/parceiros/consentimento.ts'),
+    'utf8',
+  );
+
+  it('o texto apresentado vive no código, não só na tela', () => {
+    // O que vale é o que a pessoa LEU. Guardar só uma referência não prova a que ela disse sim.
+    expect(consentimento).toContain('TEXTO_DO_CONSENTIMENTO');
+    expect(consentimento).toMatch(/duas finalidades/);
+  });
+
+  it('tem versão — art. 8º §6º só funciona se soubermos a QUE texto ele disse sim', () => {
+    expect(consentimento).toContain('VERSAO_DO_CONSENTIMENTO');
+  });
+
+  it('as finalidades são separadas — consentimento é específico (art. 11, I)', () => {
+    // Um booleano impediria aceitar a avaliação médica e recusar o retorno à Greens.
+    expect(consentimento).toContain('avaliacaoMedica');
+    expect(consentimento).toContain('retornoAoParceiro');
+  });
+
+  it('🔴 o registro prevê revogação — sem ela é autorização perpétua', () => {
+    expect(consentimento).toMatch(/revogadoEm: Date \| null/);
+  });
+
+  it('e a fundamentação de cada escolha de redação está escrita', () => {
+    for (const artigo of ['art. 11, I', 'art. 8º, §4º', 'art. 9º, V', 'art. 8º, §6º']) {
+      expect(consentimento).toContain(artigo);
+    }
   });
 });

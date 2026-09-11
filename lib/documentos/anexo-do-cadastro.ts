@@ -21,7 +21,27 @@ import { put } from '@vercel/blob';
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
 
+import { type DocumentoDoFluxo } from '@/lib/parceiros/documentos';
+
 import { calcularValidade } from './validade';
+
+/**
+ * 🔴 O VOCABULÁRIO DO FLUXO NÃO É O DA TABELA — a mesma tradução de
+ * `lib/parceiros/materializar-documentos.ts`, e pelo mesmo motivo.
+ *
+ * `laudo_medico` não tem equivalente em `documentos` e fica de fora: forçá-lo em
+ * `documento_pessoal` classificaria um documento CLÍNICO como pessoal, e quem lesse a ficha
+ * depois acreditaria na classificação errada.
+ *
+ * ⚠️ Duas cópias da mesma tradução é exatamente o tipo de coisa que diverge. Está catalogado:
+ * quando o enum ganhar `laudo_medico`, as duas somem juntas.
+ */
+const TRADUCAO: Partial<Record<DocumentoDoFluxo, string>> = {
+  receita_medica: 'receita_medica',
+  comprovante_residencia: 'comprovante_residencia',
+  autorizacao_anvisa: 'autorizacao_anvisa',
+  documento_identidade: 'rg',
+};
 
 /** 8 MB. Foto de documento ou PDF de uma página não passa disso. */
 export const TAMANHO_MAXIMO_DO_ANEXO = 8 * 1024 * 1024;
@@ -50,11 +70,13 @@ export interface AnexoDoCadastro {
  */
 export async function anexarDocumentoDoCadastro(params: {
   pacienteId: string;
-  tipo: 'autorizacao_anvisa' | 'receita_medica';
+  tipo: DocumentoDoFluxo;
   anexo: AnexoDoCadastro;
   protocolo: string;
 }): Promise<boolean> {
   try {
+    const tipoNaTabela = TRADUCAO[params.tipo];
+    if (!tipoNaTabela) return false; // laudo_medico — sem destino, ver o bloco acima
     if (!TIPOS_ACEITOS_NO_ANEXO.includes(params.anexo.tipoMime as never)) return false;
 
     const bytes = Buffer.from(params.anexo.conteudoBase64, 'base64');
@@ -88,11 +110,11 @@ export async function anexarDocumentoDoCadastro(params: {
 
     await db.insert(documentos).values({
       pacienteId: params.pacienteId,
-      tipo: params.tipo,
+      tipo: tipoNaTabela as 'receita_medica',
       urlBlob: blob.url,
       nomeArquivo: params.anexo.nomeArquivo,
       dataEmissao: hoje,
-      dataValidade: calcularValidade(params.tipo, hoje),
+      dataValidade: calcularValidade(tipoNaTabela, hoje),
       observacoes: `Enviado pelo paciente no cadastro · protocolo ${params.protocolo} · data de emissão não informada; a data acima é a do envio`,
     });
 
