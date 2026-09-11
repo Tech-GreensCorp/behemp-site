@@ -13,10 +13,10 @@ export default function PacienteAgendamentoPage() {
         <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase">
           Agendamento
         </p>
-        <h1 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
+        <h1 className="font-display text-foreground text-2xl font-bold sm:text-3xl">
           Agende sua consulta
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Escolha o médico, a data e o horário para a sua teleconsulta.
         </p>
       </div>

@@ -36,8 +36,9 @@ export default async function PagamentoDetalhePage({
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pagamento</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {p.pacienteNome} · {new Date(p.dataHora).toLocaleString('pt-BR', {
+          <p className="text-muted-foreground mt-1 text-sm">
+            {p.pacienteNome} ·{' '}
+            {new Date(p.dataHora).toLocaleString('pt-BR', {
               dateStyle: 'short',
               timeStyle: 'short',
             })}
@@ -71,11 +72,13 @@ export default async function PagamentoDetalhePage({
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-xs text-muted-foreground">Status do pagamento</p>
-              <div className="mt-1"><PagamentoStatusBadge status={p.status} /></div>
+              <p className="text-muted-foreground text-xs">Status do pagamento</p>
+              <div className="mt-1">
+                <PagamentoStatusBadge status={p.status} />
+              </div>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Estágio do agendamento</p>
+              <p className="text-muted-foreground text-xs">Estágio do agendamento</p>
               <div className="mt-1">
                 <PagamentoFunilBadge
                   pagamentoConcluidoEm={p.pagamentoConcluidoEm}
@@ -85,66 +88,76 @@ export default async function PagamentoDetalhePage({
               </div>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Valor (recebido integralmente pelo médico)</p>
-              <p className="mt-1 text-lg font-bold">{p.moeda} {formatarValor(p.valor)}</p>
+              <p className="text-muted-foreground text-xs">
+                Valor (recebido integralmente pelo médico)
+              </p>
+              <p className="mt-1 text-lg font-bold">
+                {p.moeda} {formatarValor(p.valor)}
+              </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Paciente</p>
+              <p className="text-muted-foreground text-xs">Paciente</p>
               <p className="mt-1 font-medium">{p.pacienteNome}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Recebido por</p>
+              <p className="text-muted-foreground text-xs">Recebido por</p>
               <p className="mt-1 font-medium">{p.medicoNome}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Criado em</p>
+              <p className="text-muted-foreground text-xs">Criado em</p>
               <p className="mt-1">{new Date(p.createdAt).toLocaleString('pt-BR')}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Pago em</p>
+              <p className="text-muted-foreground text-xs">Pago em</p>
               <p className="mt-1">{p.pagoEm ? new Date(p.pagoEm).toLocaleString('pt-BR') : '—'}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Gateway</p>
+              <p className="text-muted-foreground text-xs">Gateway</p>
               <p className="mt-1">{p.gatewayProvider ?? 'Aguardando integração'}</p>
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <p className="mb-3 text-xs font-medium text-muted-foreground">Rastreamento do funil</p>
+            <p className="text-muted-foreground mb-3 text-xs font-medium">Rastreamento do funil</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-muted-foreground">Iniciou o agendamento</p>
+                <p className="text-muted-foreground text-xs">Iniciou o agendamento</p>
                 <p className="mt-0.5 text-sm">{new Date(p.iniciadoEm).toLocaleString('pt-BR')}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Iniciou o pagamento</p>
+                <p className="text-muted-foreground text-xs">Iniciou o pagamento</p>
                 <p className="mt-0.5 text-sm">
-                  {p.pagamentoIniciadoEm ? new Date(p.pagamentoIniciadoEm).toLocaleString('pt-BR') : '—'}
+                  {p.pagamentoIniciadoEm
+                    ? new Date(p.pagamentoIniciadoEm).toLocaleString('pt-BR')
+                    : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Concluiu a etapa de pagamento</p>
+                <p className="text-muted-foreground text-xs">Concluiu a etapa de pagamento</p>
                 <p className="mt-0.5 text-sm">
-                  {p.pagamentoConcluidoEm ? new Date(p.pagamentoConcluidoEm).toLocaleString('pt-BR') : '—'}
+                  {p.pagamentoConcluidoEm
+                    ? new Date(p.pagamentoConcluidoEm).toLocaleString('pt-BR')
+                    : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Agendamento confirmado</p>
+                <p className="text-muted-foreground text-xs">Agendamento confirmado</p>
                 <p className="mt-0.5 text-sm">
                   {p.confirmadoEm ? new Date(p.confirmadoEm).toLocaleString('pt-BR') : '—'}
                 </p>
               </div>
             </div>
             {p.consultaId && (
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="text-muted-foreground mt-3 text-xs">
                 Consulta vinculada: <span className="font-mono">{p.consultaId}</span>
               </p>
             )}
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Alterar status do pagamento</p>
+            <p className="text-muted-foreground mb-2 text-xs font-medium">
+              Alterar status do pagamento
+            </p>
             <PagamentoStatusForm pagamentoId={p.id} statusAtual={p.status} />
           </div>
         </CardContent>

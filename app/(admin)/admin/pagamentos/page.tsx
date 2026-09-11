@@ -46,12 +46,12 @@ export default async function PagamentosPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Pagamentos</h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             {total} pagamento{total !== 1 ? 's' : ''} de teleconsulta
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            O valor vai direto para a conta do médico — este painel é um registro de
-            acompanhamento, a Be4Hope não retém nem intermedeia o valor.
+          <p className="text-muted-foreground mt-1 text-xs">
+            O valor vai direto para a conta do médico — este painel é um registro de acompanhamento,
+            a Be4Hope não retém nem intermedeia o valor.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -75,9 +75,9 @@ export default async function PagamentosPage({
       {itens.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Wallet size={48} className="mb-4 text-muted-foreground/40" />
+            <Wallet size={48} className="text-muted-foreground/40 mb-4" />
             <p className="text-lg font-medium">Nenhum pagamento encontrado</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               {status || busca || atencao
                 ? 'Tente ajustar os filtros de busca.'
                 : 'Pagamentos aparecem aqui assim que um paciente inicia um agendamento.'}
@@ -90,7 +90,7 @@ export default async function PagamentosPage({
             <div className="overflow-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <tr className="text-muted-foreground border-b text-left text-xs font-semibold tracking-wider uppercase">
                     <th className="px-6 py-3">Paciente</th>
                     <th className="px-6 py-3">Médico</th>
                     <th className="px-6 py-3">Horário solicitado</th>
@@ -102,10 +102,12 @@ export default async function PagamentosPage({
                 </thead>
                 <tbody className="divide-y">
                   {itens.map((p) => (
-                    <tr key={p.id} className="transition-colors hover:bg-muted/30">
+                    <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium">{p.pacienteNome ?? '—'}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{p.medicoNome ?? '—'}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
+                      <td className="text-muted-foreground px-6 py-4 text-sm">
+                        {p.medicoNome ?? '—'}
+                      </td>
+                      <td className="text-muted-foreground px-6 py-4 text-sm">
                         {new Date(p.dataHora).toLocaleString('pt-BR', {
                           dateStyle: 'short',
                           timeStyle: 'short',
@@ -141,7 +143,7 @@ export default async function PagamentosPage({
       )}
 
       {totalPaginas > 1 && (
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
           {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((p) => (
             <Link
               key={p}

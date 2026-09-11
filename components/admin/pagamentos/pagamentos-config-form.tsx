@@ -41,17 +41,18 @@ export function PagamentosConfigForm({ configInicial }: PagamentosConfigFormProp
           <Settings size={16} />
           Configuração de pagamento
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Valor padrão usado quando o médico não tem valor próprio de consulta definido. O
-          pagamento vai direto para a conta do médico — a Be4Hope não retém comissão, então não
-          há divisão a configurar aqui. Consultas já criadas mantêm o valor calculado na hora do
-          agendamento.
+        <p className="text-muted-foreground text-sm">
+          Valor padrão usado quando o médico não tem valor próprio de consulta definido. O pagamento
+          vai direto para a conta do médico — a Be4Hope não retém comissão, então não há divisão a
+          configurar aqui. Consultas já criadas mantêm o valor calculado na hora do agendamento.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="valor-consulta-padrao">Valor padrão da consulta ({configInicial.moedaPadrao})</Label>
+            <Label htmlFor="valor-consulta-padrao">
+              Valor padrão da consulta ({configInicial.moedaPadrao})
+            </Label>
             <Input
               id="valor-consulta-padrao"
               type="number"
