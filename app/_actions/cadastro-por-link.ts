@@ -28,6 +28,10 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { pacientes, solicitacoesCadastro, users } from '@/db/schema';
 import { db } from '@/lib/db';
 import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
+import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
+import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
+import { FINALIDADES } from '@/lib/parceiros/consentimento';
+import { conceder } from '@/lib/parceiros/consentimento-registrado';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
@@ -46,7 +50,62 @@ const esquema = z.object({
   telefone: z.string().trim().min(8, 'Informe seu telefone'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
   jaFazTratamento: z.boolean(),
+  /**
+   * 🔴 O PACIENTE DECLARA SE JÁ TEM A AUTORIZAÇÃO DA ANVISA.
+   *
+   * `null` = não respondeu (o fluxo do parceiro que já mandou a autorização nem pergunta).
+   * `false` = declarou que NÃO tem — e é justamente essa informação que permite oferecer a
+   * procuração depois da consulta, sem perguntar de novo.
+   */
+  temAutorizacaoAnvisa: z.boolean().optional().nullable(),
+  /**
+   * 🔴 OS ANEXOS VÊM COMO LISTA, UM POR TIPO.
+   *
+   * A primeira versão tinha um campo por documento (`anexoAnvisa`, `anexoReceita`). Cinco dos
+   * oito fluxos pedem o "formulário completo", com os cinco documentos — e cinco campos
+   * nomeados viram cinco lugares para esquecer um.
+   *
+   * A lista também deixa o contrato estável: documento novo no fluxo não muda a assinatura da
+   * action, só a lista de tipos aceitos.
+   */
+  anexos: z
+    .array(
+      z.object({
+        tipo: z.enum([
+          'receita_medica',
+          'laudo_medico',
+          'comprovante_residencia',
+          'autorizacao_anvisa',
+          'documento_identidade',
+        ]),
+        nomeArquivo: z.string().trim().min(1).max(200),
+        tipoMime: z.string().trim().max(100),
+        conteudoBase64: z.string().min(1),
+      }),
+    )
+    .max(5)
+    .optional()
+    .nullable(),
+  /**
+   * 🔴 A MESMA DECLARAÇÃO, PARA A RECEITA — e é ela que decide o destino.
+   *
+   * Sem saber se ele tem receita, o sistema considera que falta tudo e manda todo mundo para
+   * o agendamento — inclusive quem só precisa da procuração. Era o buraco do fluxo BeHemp 1.
+   */
+  temReceitaMedica: z.boolean().optional().nullable(),
   tratamentoAtual: z.string().trim().max(2000).optional().nullable(),
+  /**
+   * 🔴 O QUE ELE AUTORIZOU, uma finalidade por vez (LGPD art. 11, I).
+   *
+   * `z.enum` fecha a lista de propósito: `z.string()` aceitaria uma finalidade que nenhum
+   * consumidor lê, e gravaria um consentimento inerte — que parece registro e não autoriza
+   * nada. Lista vazia é resposta válida: ele leu e não autorizou.
+   */
+  finalidadesConsentidas: z
+    .array(
+      z.enum([FINALIDADES.avaliacaoMedica, FINALIDADES.apoioAnvisa, FINALIDADES.retornoAoParceiro]),
+    )
+    .optional(),
 });
 
 export type EntradaDoCadastro = z.input<typeof esquema>;
@@ -201,6 +260,65 @@ export async function concluirCadastroPorLink(
       })
       .where(eq(solicitacoesCadastro.id, solicitacao.id));
 
+    /**
+     * 8 ── Os arquivos que o parceiro mandou junto viram documentos DESTE paciente.
+     *
+     * Só agora existe `pacienteId`, e `documentos.paciente_id` é `notNull`. O arquivo já está
+     * re-hospedado aqui desde o handoff — a URL do parceiro é de vida curta e teria expirado
+     * nos 7 dias que o paciente tem para abrir o link.
+     *
+     * ⚠️ Fora da transação de propósito, e depois de `marcarComoUtilizada`: um erro ao copiar
+     * documento não pode desfazer um cadastro que já deu certo. A função nunca lança; no pior
+     * caso o paciente envia o documento manualmente, como sempre pôde.
+     */
+    /**
+     * 8b ── O documento que ELE anexou no formulário, quando anexou.
+     *
+     * Mesma posição e mesmo motivo do bloco acima: `documentos.paciente_id` é `notNull`, e a
+     * ficha só existe agora. Fora da transação — anexo que falha não desfaz cadastro que deu
+     * certo.
+     */
+    const tiposAnexados: string[] = [];
+    for (const anexo of dados.anexos ?? []) {
+      const gravou = await anexarDocumentoDoCadastro({
+        pacienteId,
+        tipo: anexo.tipo,
+        anexo,
+        protocolo: solicitacao.protocolo,
+      });
+      if (gravou) tiposAnexados.push(anexo.tipo);
+    }
+
+    /**
+     * 8c ── O CONSENTIMENTO, gravado como ato.
+     *
+     * ⚠️ Fora da transação, pelo mesmo motivo dos blocos acima — e com o erro caindo para o
+     * lado seguro: se esta gravação falhar, o que acontece é que **nada é enviado à Greens**
+     * (a P5 lê daqui antes de montar qualquer envio). Um cadastro sem consentimento gravado
+     * custa ao paciente marcar de novo no painel; o inverso custaria dado de saúde saindo da
+     * empresa sem registro que o autorize.
+     */
+    if (dados.finalidadesConsentidas?.length) {
+      try {
+        await conceder({
+          pacienteId,
+          finalidades: dados.finalidadesConsentidas,
+          origem: 'cadastro_por_link',
+        });
+      } catch (erroDoConsentimento) {
+        console.error('[cadastro] consentimento não gravado', {
+          protocolo: solicitacao.protocolo,
+          erro: erroDoConsentimento instanceof Error ? erroDoConsentimento.name : 'desconhecida',
+        });
+      }
+    }
+
+    const copiados = await materializarDocumentosDoParceiro({
+      pacienteId,
+      documentosDoParceiro: solicitacao.documentosDoParceiro,
+      protocolo: solicitacao.protocolo,
+    });
+
     await registrarAuditoria({
       userId: clerkId,
       acao: 'criar',
@@ -212,6 +330,15 @@ export async function concluirCadastroPorLink(
       dadosDepois: {
         protocolo: solicitacao.protocolo,
         origem: 'link_whatsapp',
+        documentosRecebidosDoParceiro: copiados.inseridos,
+        // Registra a DECLARAÇÃO, não só o arquivo: "não tenho" é o que permite oferecer a
+        // procuração depois sem perguntar de novo.
+        declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
+        declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
+        // As finalidades autorizadas. Sem o texto — ele está na tabela `consentimentos`.
+        finalidadesConsentidas: dados.finalidadesConsentidas ?? [],
+        // Só os TIPOS — nunca o nome do arquivo, que costuma trazer o nome da pessoa.
+        documentosAnexadosNoCadastro: tiposAnexados,
         declarouTratamentoEmCurso: dados.jaFazTratamento,
         linkConsumidoAgora: consumiu,
       },

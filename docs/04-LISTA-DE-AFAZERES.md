@@ -19,6 +19,95 @@
 
 ---
 
+## 🔴 Item 34 — o aviso `consentimento_revogado` NÃO cabe no S1 como ele é hoje
+
+**Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado em
+11/09**, por um motivo que só apareceu ao tentar: o S1 não consegue avisar a mesma coisa duas
+vezes.
+
+**A medição.** `db/schema/parceiro-eventos-saida.ts:70`:
+
+```
+uniqueIndex('parceiro_eventos_saida_fato_idx').on(t.parceiro, t.tipo, t.solicitacaoId)
+```
+
+E `lib/parceiros/notificar.ts` usa `onConflictDoNothing` nesse alvo — de propósito, para que o
+mesmo fato chamado duas vezes não vire dois avisos. O guarda `o-aviso-ao-parceiro-nao-se-perde`
+**quebra o build** se esse índice virar comum (caso _"🔴 o índice do fato é ÚNICO"_).
+
+**A consequência, se eu simplesmente acrescentasse o tipo:** o paciente que **revoga,
+reconsente e revoga de novo** geraria UM aviso. O segundo seria engolido em silêncio, e a
+Greens seguiria usando dado de saúde de alguém que retirou o consentimento. Um aviso que às
+vezes não sai é pior que aviso nenhum: cria a crença de que o outro lado foi avisado.
+
+**As opções, com o custo de cada uma** — a escolha é do dono:
+
+| #   | opção                                                               | custo                                                               | risco                                                              |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| a   | acrescentar `ocorrenciaId` (cuid2) ao índice único                  | migration + ajustar o guarda do S1 + rever os dois tipos existentes | mexe no índice que protege a idempotência de `receita_emitida`     |
+| b   | tabela própria de avisos de consentimento, com o seu próprio índice | migration aditiva; não toca no S1 nem no guarda dele                | dois caminhos de saída para o parceiro, que podem divergir         |
+| c   | um aviso por revogação, aceitando um por solicitação                | trivial                                                             | 🔴 **o caso "revoga de novo" fica silencioso** — recusado por isso |
+
+**Recomendação: (b).** Ela não toca na idempotência de `receita_emitida`, que decide **gateway
+e desconto** do lado da Greens — e essa é exatamente a peça que não se mexe por causa de outra.
+
+⚠️ **O que vale ENQUANTO isso não existe, e precisa ser dito ao paciente:** revogar impede
+envios **futuros** (a P5 lê o consentimento vigente a cada envio), e o que já foi enviado
+continua com quem recebeu. A tela `/paciente/privacidade` diz isso, em vez de prometer o que o
+sistema não cumpre.
+
+## 🟠 Item 33 — a declaração "não tenho ANVISA" NÃO é persistida
+
+**Achado em 11/09/2026, ao plugar a P2.** `app/_actions/cadastro-por-link.ts:298-299` grava
+`declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` **apenas dentro de
+`registrarAuditoria`**. Não existe coluna para nenhuma das duas — nem em
+`solicitacoes_cadastro`, nem em `pacientes`. Log de auditoria não é fonte de leitura de
+produto.
+
+**O que isso custou:** o comentário de `components/paciente/AvisoDaProcuracao.tsx` afirmava que
+o cadastro gravava a declaração. Afirmação falsa, que sobreviveu porque **o componente não era
+renderizado por tela nenhuma** — ninguém a exercitou. Retratado no próprio arquivo em 11/09.
+
+**Como ficou funcionando sem isso:** o aviso passou a sair do **estado real** —
+`autorizacoes_anvisa` sem linha `aprovado` dentro da validade. É informação melhor: descreve o
+que existe, em vez do que o paciente lembrou de responder.
+
+**O que ainda se perde sem a coluna:** não conseguimos deixar de repetir a pergunta em outras
+telas, que era o propósito original da declaração. E o fluxo BeHemp 1 continua sem saber
+distinguir _"declarou que não tem"_ de _"nunca respondeu"_.
+
+**Perigo de corrigir (medido):** migration **aditiva**, duas colunas `boolean` nullable em
+`solicitacoes_cadastro`. Nenhum ponto de chamada quebra — nada lê hoje. O risco real é o de
+sempre: `main` é produção e push aplica migration sem rollback. **Não corrigir de passagem:**
+é trabalho próprio, em commit próprio, com autorização.
+
+## 🔴 Item 32 — CONCLUÍDO em 11/09/2026: a tela do consentimento
+
+**O diagnóstico, que só apareceu ao ligar a P5:** `lib/parceiros/transferencia-de-cadastro.ts`
+recebia `finalidadesConsentidas: Finalidade[]` por parâmetro. A regra estava certa e o dado
+que ela julgava vinha de quem chama — um consentimento **alegado**, não lido.
+
+**Onde ficou:**
+
+| peça                                                           | o quê                                              |
+| -------------------------------------------------------------- | -------------------------------------------------- |
+| `db/schema/consentimentos.ts` + `db/migrations/0034_*.sql`     | uma linha por finalidade; aditiva, sem `DROP`      |
+| `lib/parceiros/consentimento-registrado.ts`                    | ler / conceder / revogar — sem auth, sem `next/*`  |
+| `app/(paciente)/_actions/consentimento.ts`                     | paciente vem da **sessão**, nunca do formulário    |
+| `components/paciente/ConsentimentoDoCompartilhamento.tsx`      | o texto integral, as 3 caixas, o efeito de recusar |
+| `app/(paciente)/paciente/privacidade/`                         | ver e **revogar** (art. 8º §5º)                    |
+| `app/(auth)/cadastro/[token]/…/formulario-de-cadastro.tsx:+18` | o bloco no cadastro por link                       |
+| `app/_actions/cadastro-por-link.ts:+40`                        | grava pelo mesmo caminho, sem `insert` próprio     |
+
+**O que ficou de fora, e por quê:**
+
+- 🟠 **O consentimento não aparece no formulário completo (P3)** — só no cadastro por link e no
+  painel. Quem chega pela P3 ainda não tem onde consentir na própria tela; ele consegue pelo
+  `/paciente/privacidade` depois. **Fica como pendência.**
+- 🟠 **Revogar não avisa a Greens.** O S1 `consentimento_revogado` foi aceito em conversa com o
+  lado deles e **ainda não foi implementado** — hoje a revogação impede envios **futuros**, e
+  o que já foi continua lá. A tela diz isso ao paciente, em vez de prometer o que não cumpre.
+
 ## Item 1 — 🔴 A migration estreia contra a produção, sem ensaio
 
 Achado ao ler o pipeline para dimensionar o custo de ~10 tabelas novas. Não veio de
@@ -1614,3 +1703,235 @@ E a busca por dígitos casou os **quatro** formatos gravados: `(62) 98111-1111`,
 **A configuração do fluxo no painel** — quem chama esta rota e o que faz com o cabeçalho
 `x-triagem-motivo` é decisão do painel, não do código. Guia para o dono no
 `docs/chatpro/COMO-CONECTAR-NO-PAINEL.md`.
+
+## Item 28 — ✅ CORRIGIDO: o deploy passava verde e produção servia um build antigo
+
+**Descoberto em 10/09/2026.** Entre 14/08 e 10/09 **nenhum deploy chegou ao processo em
+produção**. O Actions reportava sucesso, o rsync entregava os arquivos, o PM2 reiniciava — e
+o site continuava servindo um build anterior. Não havia erro em log nenhum.
+
+### O diagnóstico
+
+Três defeitos independentes cooperavam. **Cada um sozinho já bastava para esconder o problema.**
+
+| #   | defeito                                                        | efeito                                                    |
+| --- | -------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | `package.json:7` — o script `build` terminava em `\|\| true`   | build quebrado devolvia **exit 0**                        |
+| 2   | `deploy.yml` — `pm2 restart … \|\| pm2 start …`                | `restart` **reusa o caminho gravado** e não relê o script |
+| 3   | nenhum passo conferia se produção passou a servir o build novo | "verde" não significava nada                              |
+
+O (2) é a causa direta, e é comportamento documentado do PM2 ([Unitech/pm2#3054](https://github.com/Unitech/pm2/issues/3054)):
+trocar o `script` e reiniciar mantém o arquivo antigo em execução. `--update-env`, `reload` e
+`startOrReload` **não** corrigem — só `delete` + `start`.
+
+**Medições que fecharam o caso:**
+
+- produção redirecionava para `/entrar` até uma rota **inexistente** → o middleware em
+  execução não era o do build entregue
+- um chunk do build da vez respondia **404** em produção → quem serve os estáticos é o
+  processo, e o processo era outro
+- a Dryelle mediu no servidor, em 09/09: `.next/standalone/server.js` com **mtime de 14/08**
+- o `git pull` + `pnpm build` manual dela **funcionou** justamente por rodar no diretório de
+  onde o PM2 executa — o que confirma que rsync e PM2 estavam em diretórios diferentes
+
+### 🔴 O risco que a correção precisou desarmar antes
+
+`pm2 delete` não apaga arquivo, log nem código — mas **descarta o ambiente vivo do processo**.
+E medimos: o deploy escrevia **12** variáveis no `.env`, enquanto `lib/env.ts` declara **61**.
+As outras 49 — `CLERK_SECRET_KEY`, `BREVO_API_KEY`, `PUSHER_SECRET`, `DOCUSIGN_*` — nunca
+foram escritas em arquivo nenhum: viviam só na memória do processo, herdadas do primeiro
+`pm2 start` manual (o deploy #37 já tinha revelado que **não existe `.env` no servidor**).
+
+Reproduzido localmente: **sem `CLERK_SECRET_KEY`, toda rota responde 500, inclusive as
+públicas.** Um `pm2 delete` sem preservar teria derrubado o site inteiro.
+
+### Como foi corrigido
+
+1. `package.json` — o `build` volta a propagar falha. Provado: com o `next.config.ts`
+   quebrado, antes `exit 0`, agora `exit 1`.
+2. `scripts/preservar-ambiente-do-pm2.mjs` — copia para o `.env` as variáveis que só existem
+   no processo, **restrito às chaves que `lib/env.ts` declara** (nunca `PATH`/`HOME`), com
+   retrato do PM2 salvo antes e **nenhum valor impresso** — a saída vai para log público.
+3. `scripts/pm2-do-app.mjs` — lê o caminho que o processo usa, para o deploy **comparar em vez
+   de supor**.
+4. `deploy.yml` — imprime o diagnóstico, preserva o ambiente, recusa mexer no processo se o
+   `server.js` novo não chegou, e recria (`delete` + `start`) **apenas quando o caminho
+   diverge**; caminho igual continua sendo `restart`, sem indisponibilidade.
+5. `deploy.yml` — **portão pós-deploy**: baixa da URL pública um chunk com hash deste build e
+   falha o job se não vier 200 em 100 s. É a única afirmação do workflow que não depende de
+   nenhum passo ter "dado certo".
+6. `next.config.ts` — `outputFileTracingRoot: path.join(__dirname)`, para o build local não
+   divergir do build do CI. **Não era a causa** (o log do deploy #40 mostra o `server.js` no
+   lugar certo), mas foi a divergência que me fez apontar a causa errada.
+
+### O guarda
+
+`__tests__/guardas/o-deploy-entrega-o-que-buildou.test.ts` — **21 casos**, provados por
+**9 sabotagens**. Uma delas achou um defeito no próprio guarda: ele checava a _presença_ de
+`exit 1` no portão, e o passo tem dois — trocar só o final por um `echo` deixava o portão
+decorativo e o teste verde. Corrigido para medir o caminho de falha, não a presença.
+
+### O que ficou de fora
+
+- **`/api/versao` com o SHA do commit**, conferido pelo portão em vez do hash do chunk. É mais
+  direto e não depende de heurística. Fora do escopo desta correção — o chunk já prova o que
+  precisa hoje, e a rota nova exigiria mexer no middleware.
+- **Unificar os diretórios do rsync e do PM2 no servidor.** A correção faz o deploy convergir
+  sozinho para o diretório do rsync, mas o diretório antigo continua existindo na máquina.
+  Limpeza é trabalho próprio, com acesso ao servidor.
+- **IP Elástico na EC2** (recomendação da Dryelle). Não é causa deste incidente; evita que o
+  `SERVER_IP` fique obsoleto num reboot.
+
+## Item 29 — 🟠 PENDENTE: a aprovação da ANVISA não avisa o paciente por e-mail nem WhatsApp
+
+**Adiado pelo dono em 10/09/2026**, ao descrever o fluxo 1 da Greens: _"isso nós fazemos depois,
+deixe anotado como pendência"_. O passo 7 do fluxo dele pede _"recebe notificação email, celular
+e no sistema"_.
+
+### O diagnóstico
+
+`app/api/anvisa/atualizar-status/route.ts:63-72` notifica **só pelo Pusher**:
+
+```ts
+await pusher.trigger(`private-user-${atualizado.pacienteId}`, 'anvisa:status-atualizado', {…});
+```
+
+Dentro do sistema funciona. Fora dele, o paciente não fica sabendo — e o paciente que veio da
+Greens **não tem motivo para abrir a nossa plataforma de novo**: ele entrou para resolver a
+autorização e saiu.
+
+### O que existe e não está ligado neste ponto
+
+| canal    | peça no projeto                     | ligada aqui? |
+| -------- | ----------------------------------- | ------------ |
+| e-mail   | Brevo — `lib/email/notificacoes.ts` | ❌           |
+| WhatsApp | ChatPro — `lib/chatpro/cliente.ts`  | ❌           |
+| sistema  | Pusher — `private-user-<id>`        | ✅           |
+
+### A decisão de conteúdo já está tomada, e é o que destrava
+
+A ADR-0017 fixou a regra: **fato que o paciente sente sai automático; texto que alguém compõe
+passa por aprovação.** _"Sua autorização da ANVISA foi aprovada"_ é fato — sai automático, sem
+fila de aprovação.
+
+⚠️ E o que **não** pode ir junto: número do processo, nome do medicamento, ou qualquer coisa que
+transforme a notificação num documento clínico trafegando por WhatsApp. O aviso diz que ficou
+pronto e onde ver — o conteúdo fica na plataforma, com controle de acesso. É a mesma regra que
+o guarda `o-aviso-ao-parceiro-nao-se-perde` já aplica ao aviso que vai para a Greens.
+
+### O guarda que vai junto
+
+Quando for implementado: o aviso ao paciente não pode carregar dado clínico, e a falha de um
+canal não pode impedir os outros — nem derrubar a atualização de status, que é o fato que
+importa.
+
+## Item 30 — 🟡 O store privado começou pelos caminhos novos (Item 6 segue aberto)
+
+**Decisão do dono em 10/09/2026:** _"então vamos colocar no nosso store privado"_.
+
+### O que mudou
+
+Os **dois caminhos criados nesta sessão** passaram a gravar `access: 'private'`:
+
+| caminho                                  | arquivo                                   |
+| ---------------------------------------- | ----------------------------------------- |
+| anexo enviado pelo paciente no cadastro  | `lib/documentos/anexo-do-cadastro.ts`     |
+| documento que vem do parceiro no handoff | `lib/parceiros/documentos-do-parceiro.ts` |
+
+E nasceu a porta de entrega: **`/api/documentos/<id>/arquivo`** — autentica, confere **escopo
+de objeto** (o paciente, o médico DELE, ou admin), audita a leitura, e nunca entra em cache
+compartilhado.
+
+⚠️ **Ela serve os dois mundos de propósito:** blob antigo (público) é redirecionado; blob novo
+é entregue por streaming autenticado. Assim a tela usa **um endereço** para qualquer documento,
+e terminar o Item 6 não vai exigir tocar em tela nenhuma.
+
+### ✅ 11/09/2026 — o grupo da tabela `documentos` foi fechado
+
+Decisão do dono: _"AGORA É O MOMENTO de ajustarmos isso"_.
+
+**Quatro pontos** passaram a gravar privado, e as **três telas** que os abriam passaram a
+apontar para a rota autenticada — a tela ANTES do upload, que é a ordem que impede o documento
+de sumir:
+
+| ponto                                      | tela que o abre                |
+| ------------------------------------------ | ------------------------------ |
+| `app/_actions/documentos.ts`               | `tab-documentos.tsx` (médico)  |
+| `app/_actions/documentos-paciente.ts`      | `paciente/perfil/page.tsx`     |
+| `app/_actions/documentos-paciente-self.ts` | `paciente/documentos/page.tsx` |
+| `app/api/upload-documento/route.ts`        | as três acima                  |
+
+### 🔴 O que ainda falta, e por que cada um é um caso diferente
+
+**Sete pontos continuam gravando público, e eles NÃO são iguais entre si:**
+
+| grupo                      | pontos                                                              | por que ainda não                                                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **ANVISA** (jsonb, sem id) | `anvisa/upload-documento`, `anvisa/procuracao`, `webhooks/docusign` | 🔴 os documentos vivem num **jsonb dentro de `autorizacoes_anvisa`**, não na tabela `documentos` — **não têm id**, e a rota atual endereça por id. Precisa de rota própria, ou de migrar para a tabela |
+| **exames**                 | `_actions/exames.ts`, `api/upload-exame`                            | tabela própria (`exames`) — mesma solução, rota própria                                                                                                                                                |
+| **chat**                   | `_actions/chat.ts`                                                  | anexo de conversa; escopo é o grupo, não o paciente                                                                                                                                                    |
+| **avatar**                 | `api/upload-avatar`                                                 | ⚠️ **decisão: fica público.** Foto de perfil não é dado de saúde, e privá-la só acrescentaria uma rota autenticada em todo carregamento de tela                                                        |
+| **relatório**              | `api/upload-relatorio`                                              | verificar o que contém antes de decidir                                                                                                                                                                |
+
+⚠️ **O caso da ANVISA é o mais importante e o mais caro** — é onde está a procuração assinada.
+Ele exige decidir se aqueles documentos migram para a tabela `documentos` (o que resolveria de
+uma vez, e daria id a eles) ou se ganham rota própria endereçada por autorização + tipo.
+
+**Antes eram 12; são 7.** Eles não foram tocados: mexer em 14 lugares
+no meio de outra tarefa é exatamente o que o `CLAUDE.md` proíbe, e cada um tem uma tela que lê
+`urlBlob` direto.
+
+```
+app/_actions/documentos.ts · documentos-paciente.ts · documentos-paciente-self.ts
+app/_actions/exames.ts · chat.ts
+app/api/upload-documento · upload-exame · upload-avatar · upload-relatorio
+app/api/anvisa/upload-documento · anvisa/procuracao
+lib/integrations/blob/index.ts
+```
+
+**O perigo de mexer, medido:** cada ponto tem uma tela que usa `urlBlob` como `href`. Trocar o
+upload sem trocar a tela deixa o documento invisível — e invisível é pior que público, porque
+some sem avisar.
+
+**A ordem que funciona**, e é a mesma que esta sessão usou: a rota de entrega primeiro (feita),
+depois cada tela passando a apontar para ela, e **só então** o upload virando privado. Um ponto
+por vez, com a tela junto.
+
+⚠️ E os arquivos **já gravados** continuam públicos. Torná-los privados exige copiá-los, o que
+é migração de dado — trabalho próprio, com o histórico preservado (proibição 4).
+
+## Item 31 — 🟡 O limite de requisição é por PROCESSO, não compartilhado
+
+**Criado junto com a defesa**, em 10/09/2026, e registrado no mesmo movimento porque é o tipo
+de limitação que some da memória de quem não a escreveu.
+
+`lib/seguranca/limite-de-requisicao.ts` guarda o contador **na memória do processo**. Isso
+funciona hoje porque há **uma instância** (EC2 + PM2 — DT-006/DT-008).
+
+| cenário              | efeito                                             |
+| -------------------- | -------------------------------------------------- |
+| uma instância (hoje) | o limite vale o que diz                            |
+| duas instâncias      | cada uma conta metade — o limite efetivo **dobra** |
+| reinício do processo | o contador **zera**                                |
+
+**Quando trocar:** no dia em que houver mais de uma instância, ou um balanceador. A troca é
+substituir a função `consumir` por uma sobre store compartilhado (Redis, ou a própria tabela
+com `FOR UPDATE SKIP LOCKED`, que o projeto já usa nas filas). **Quem chama não muda** — foi
+desenhado assim de propósito.
+
+⚠️ **Não é motivo para adiar nada.** Sem limite nenhum, o custo de cada tentativa de força
+bruta era do servidor. Com este, o atacante precisa de muitas origens para o mesmo efeito.
+Melhor que nada por uma margem enorme, pior que compartilhado por uma margem conhecida.
+
+### Como a auditoria chegou aqui
+
+Contra o **OWASP API Security Top 10 (2023)**, medido em 10/09/2026:
+
+| risco                           | estado                                                 |
+| ------------------------------- | ------------------------------------------------------ |
+| API1 — BOLA                     | ✅ escopo de objeto em 9 pontos                        |
+| API2 — autenticação quebrada    | ✅ `timingSafeEqual` nos dois segredos                 |
+| API3 — exposição de propriedade | ✅ guardas contra PII em log e dado clínico no payload |
+| **API4 — consumo irrestrito**   | 🔴 **era o único sem defesa nenhuma** → corrigido aqui |
+| replay                          | ✅ janela de 300 s com `Math.abs`                      |
+| enumeração de identificador     | ✅ `cuid2`, não sequencial                             |

@@ -289,6 +289,51 @@ for m/m com densidade ~0,9. **Nas duas leituras plausíveis o produto passa de 0
 é conclusão regulatória** — `CAN-03` diz que a concentração válida é a da **Autorização Sanitária**
 — mas é o motivo pelo qual o campo de teor **existe na tela** e não sai de um cálculo nosso.
 
+### 🔴 Validade da receita — as duas normas respondem coisas diferentes (10/09/2026)
+
+**Levantado pelo lado da Greens durante a integração**, e confirmado por pesquisa aqui. Não é
+divergência de opinião: são **dois caminhos regulatórios distintos**, e o mesmo papel tem
+resposta diferente em cada um.
+
+| ID       | o que a norma diz                                                                                                                                                                                           | fonte                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `VAL-01` | Para **dispensação em farmácia**, a receita de produto de Cannabis tem **validade de 30 dias** — Receita de Controle Especial, produtos até 0,2 % de THC                                                    | **RDC 1.015/2026**              |
+| `VAL-02` | Para **importação por pessoa física**, o que vale 2 anos é o **cadastro/autorização**, não a receita. A norma lista o conteúdo obrigatório da prescrição (Art. 7º) e **não declara prazo de validade dela** | **RDC 660/2022**, Arts. 7º e 8º |
+
+⚠️ **O nosso código diz 6 meses, e esse número não tem fonte.**
+`lib/documentos/validade.ts` usa `receita_medica: +6 meses`. A pesquisa de 10/09/2026 **não
+encontrou norma que sustente 6 meses para produto de Cannabis** — é o prazo de praxe para
+receita **simples**, e produto de Cannabis não é receita simples: exige Receita de Controle
+Especial ou Notificação A, conforme o teor.
+
+### A consequência, concreta
+
+O médico da Be4Hope emite a receita hoje. No **dia 45**, o paciente tenta comprar:
+
+| sistema | resposta    | efeito                       |
+| ------- | ----------- | ---------------------------- |
+| Be4Hope | **válida**  | o paciente acredita que pode |
+| Greens  | **vencida** | o despacho é **bloqueado**   |
+
+**O mesmo documento, duas respostas opostas** — e quem descobre é o paciente, na hora da
+compra. É exatamente o que a ADR-0016 D-10 previu: _"duas regras de validade em dois sistemas
+divergem no primeiro ajuste, e o paciente vê respostas diferentes em cada um"_.
+
+### 🔴 Decisão pendente do dono
+
+Isto é **regra de negócio em matéria regulada** — não se presume (`DO-17`). As opções, com o
+custo de cada uma:
+
+| #   | opção                                                                            | custo                                                                                           |
+| --- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| A   | adotar **30 dias**, alinhando com `VAL-01` e com a Greens                        | o paciente vê "vencida" antes; é o que a farmácia vai dizer de qualquer jeito                   |
+| B   | validade **por finalidade**: 30 dias para dispensação, sem prazo para importação | é o mais correto tecnicamente, e exige saber a finalidade no momento da emissão                 |
+| C   | manter 6 meses                                                                   | **não recomendado** — sem fonte, e diverge da farmácia. Se ficar, precisa de fonte que sustente |
+
+⚠️ **Nenhuma delas se decide sem o médico responsável.** Validade de receita é ato médico com
+consequência assistencial: encurtar faz o paciente voltar mais cedo; alongar faz ele ser
+recusado no balcão.
+
 ### Importação por pessoa física — RDC 660/2022
 
 | ID       | o que a norma diz, textual                                                                                                                                                                                                  | artigo           |

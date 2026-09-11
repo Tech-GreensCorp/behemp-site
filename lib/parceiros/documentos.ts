@@ -55,10 +55,26 @@ export function rotuloDoDocumento(chave: string): string {
 export function normalizarManifesto(cru: unknown): DocumentoDoFluxo[] {
   if (!Array.isArray(cru)) return [];
   const validos = new Set<string>(DOCUMENTOS_DO_FLUXO);
+  /**
+   * ⚠️ ACEITA AS DUAS FORMAS, e isso é retrocompatibilidade deliberada.
+   *
+   * O contrato original era uma lista de NOMES — `['documento_identidade', 'laudo_medico']`.
+   * Desde 10/09/2026 o parceiro também pode mandar OBJETOS, com a URL do arquivo junto. As
+   * linhas já gravadas no banco estão no formato antigo, e um parceiro que ainda não mudou
+   * continua funcionando: quebrar os dois no dia da mudança seria escolher o pior momento.
+   *
+   * De qualquer uma das formas, o que sai daqui é sempre a lista de nomes — é ela que
+   * `pendenciasDe` usa para dizer o que ainda falta.
+   */
+  const nomes = cru.map((d) => {
+    if (typeof d === 'string') return d;
+    if (d && typeof d === 'object' && 'tipo' in d) return String((d as { tipo: unknown }).tipo);
+    return null;
+  });
   // ⚠️ Descarta o desconhecido em silêncio em vez de recusar a chamada inteira: um
   // documento novo do lado deles não pode derrubar o cadastro de um paciente aqui.
   return [
-    ...new Set(cru.filter((d): d is DocumentoDoFluxo => typeof d === 'string' && validos.has(d))),
+    ...new Set(nomes.filter((d): d is DocumentoDoFluxo => typeof d === 'string' && validos.has(d))),
   ];
 }
 
@@ -72,9 +88,29 @@ export interface Pendencia {
 }
 
 /** O que ainda falta, dado o que o parceiro declarou ter. */
-export function pendenciasDe(manifesto: string[] | null | undefined): Pendencia[] {
-  const tem = new Set(manifesto ?? []);
+export function pendenciasDe(manifesto: unknown): Pendencia[] {
+  // Passa pelo normalizador: assim a tela funciona igual com a lista de nomes antiga e com
+  // a lista mista que traz os arquivos.
+  const tem = new Set<string>(normalizarManifesto(manifesto));
   return DOCUMENTOS_DO_FLUXO.filter((d) => !tem.has(d)).map((chave) => ({
+    chave,
+    rotulo: rotuloDoDocumento(chave),
+    opcional: DOCUMENTOS_OPCIONAIS.includes(chave),
+    resolvemosAqui: DOCUMENTOS_QUE_RESOLVEMOS.includes(chave),
+  }));
+}
+
+/**
+ * O QUE O PARCEIRO JÁ MANDOU — o espelho de `pendenciasDe`.
+ *
+ * Levantado pelo dono em 10/09/2026: _"deveria aparecer também as documentações enviadas
+ * não?"_. A tela dizia só o que FALTA. Quem preencheu o formulário da Greens e subiu RG e
+ * comprovante não via nenhuma confirmação de que aquilo chegou — e a dúvida "será que
+ * perderam meus documentos?" é o tipo de coisa que faz o paciente parar e ligar.
+ */
+export function recebidosDe(manifesto: unknown): Pendencia[] {
+  const tem = new Set<string>(normalizarManifesto(manifesto));
+  return DOCUMENTOS_DO_FLUXO.filter((d) => tem.has(d)).map((chave) => ({
     chave,
     rotulo: rotuloDoDocumento(chave),
     opcional: DOCUMENTOS_OPCIONAIS.includes(chave),

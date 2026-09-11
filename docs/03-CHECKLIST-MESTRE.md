@@ -366,8 +366,76 @@ isso impede reconhecer paciente por telefone em **qualquer** lugar do sistema, n
 A proporção de dados sujos **não foi medida**: o banco local tem 1 paciente e 0 telefones.
 Normalizar o campo exige migração de dados e autorização.
 
+### 🔴 Achado de 10/09/2026 — CORRIGIDO no mesmo dia
+
+**Nenhum deploy chegou a produção entre 14/08 e 10/09.** O Actions reportava sucesso e o site
+servia um build antigo: `pm2 restart` reusa o caminho gravado e não relê o script
+(Unitech/pm2#3054), o `pnpm build` perdoava a própria falha com `|| true`, e nada conferia se
+produção passou a servir o build novo.
+
+⚠️ **Consequência para o planejamento:** os 19 commits do PR #36 — IA clínica com revisão
+humana, cadeia conduta-prescrição-titulação, `tab-prescricoes`, `tab-dosagem`, ChatPro,
+cadastro por link e handoff de parceiros — **nunca estiveram em produção**. Não se perdeu
+nada: está tudo na `main`. O que faltava era o processo executar o que já lhe entregavam.
+
+Diagnóstico completo, risco medido e o que ficou de fora: `docs/04-LISTA-DE-AFAZERES.md`
+Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
+
+### ⚪ Achado de 10/09/2026 — o índice de ADRs está 11 entradas atrás
+
+`docs/adr/README.md` lista até a **0007**. As ADRs **0008 a 0018** existem em disco e não estão
+lá. Quem consultar o índice para saber se algo já foi decidido vai concluir que não foi.
+
+**O custo já apareceu:** ao responder sobre o wizard da IA clínica, eu li o documento que
+descreve o VidAI e não a ADR-0004 que decidiu o que fazer com ele — e afirmei ao dono que
+faltava implementar algo que tinha sido **rejeitado com fundamento**. Índice incompleto não é
+desorganização: é decisão perdida.
+
+Correção: uma linha por ADR, e o status conferido contra o arquivo. Trabalho próprio.
+
+### 🔴 Achado de 10/09/2026 — os crons NUNCA rodaram neste servidor
+
+`vercel.json` declara três crons — validade de documento, recompra e revisão de dosagem. **O
+projeto não roda na Vercel** (EC2 + PM2, DT-006/DT-008), e não existe nenhum workflow com
+`schedule:`. Logo: os três nunca foram executados.
+
+E as duas filas novas herdam o mesmo buraco: `/api/chatpro/processar` e `/api/parceiros/enviar`
+existem, funcionam quando chamados, e **ninguém os chama**. O webhook do ChatPro aceita com 202 —
+medido em produção — e o evento fica `pendente` para sempre.
+
+Bloqueia o QA. Diagnóstico, as três opções e a recomendação: `docs/adr/ADR-0020-ajustes-pre-QA.md`
+§4.
+
+### 🔴 Achado de 10/09/2026 — NÃO LIGAR os 3 crons antigos sem medir antes
+
+Ao criar o workflow que esvazia as filas novas, a tentação óbvia era ligar junto os três crons
+que estavam no `vercel.json` e nunca rodaram: `verificar-validade-documentos`,
+`verificar-recompra-medicamentos` e `verificar-revisoes-dosagem`.
+
+⚠️ **Não foram ligados, de propósito.** O primeiro deles chama
+`enviarEmailRenovacaoDocumentoEquipe` via Brevo (`app/api/cron/verificar-validade-documentos/route.ts:308`).
+Ele nunca rodou **neste servidor** — então há meses de documentos vencidos acumulados, e a
+primeira execução dispararia a enxurrada toda de uma vez, para pessoas reais.
+
+**Antes de ligar, medir:** quantos registros a query devolveria hoje · quantos e-mails sairiam ·
+para quem. Se for volume grande, o primeiro disparo precisa de janela ou de corte por data.
+
+Ligar um cron parado não é retomar de onde parou: é executar meses de acúmulo em um minuto.
+
 ## Concluído
 
+- [x] 🔴 **A TELA DO CONSENTIMENTO — o ato que faltava** · 11/09 · `feat/a-tela-do-consentimento`.
+      A P5 lia um consentimento que **nenhuma tela colhia**: havia módulo, tipo e regra, e não
+      havia lugar onde o paciente dissesse sim. Pior, `prepararTransferencia` recebia as
+      finalidades **por parâmetro** — quem envia alegava o consentimento de quem é enviado.
+      Entregue: tabela `consentimentos` (migration `0034`), leitura/escrita em
+      `lib/parceiros/consentimento-registrado.ts`, bloco no **cadastro por link**, tela
+      `/paciente/privacidade` com **revogação** (art. 8º §5º), e a P5 passando a **ler** do
+      banco — inclusive o `texto` e a `versao` que o paciente leu, não os de hoje. Guarda
+      `o-consentimento-e-colhido-antes-de-sair` com **45 casos**, provado por **17 sabotagens**
+      (uma achou defeito meu: o caso do `revalidatePath` media presença, e havia duas chamadas).
+      Decisão nova: **ADR-0021 D-06** — caixas desmarcadas, e o consentimento **não trava** o
+      cadastro.
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
       _"você está atualizando as docs obrigatórias... inclusive criando as ADRs com nossas
       decisões certo?"_. **Ele estava certo.** As decisões dele de 24/08 estavam só nas ADRs

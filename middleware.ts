@@ -26,6 +26,14 @@ const isPublicRoute = createRouteMatcher([
   '/politica-de-privacidade',
   '/termos-de-uso',
   '/redirect',
+  /**
+   * P4 — a tela que pergunta se o paciente já tem conta (fluxo Greens 3, recompra).
+   *
+   * Pública por natureza: quem chega ainda não provou quem é, e ela não revela nada — só
+   * oferece dois caminhos que já são públicos. Protegê-la mandaria para o login justamente
+   * quem não sabe se tem login.
+   */
+  '/acesso',
   // Previsualização de layout — SÓ existe fora de produção.
   // A própria rota faz `notFound()` quando NODE_ENV=production, então liberá-la aqui não abre
   // nada em produção: lá ela não existe. Sem esta linha, o middleware manda para o Clerk antes

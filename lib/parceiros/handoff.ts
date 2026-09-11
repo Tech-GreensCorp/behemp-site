@@ -11,6 +11,11 @@ import {
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarManifesto } from './documentos';
+import {
+  materializarArquivos,
+  normalizarEntradas,
+  type ArquivoMaterializado,
+} from './documentos-do-parceiro';
 import { urlDeRetornoPermitida } from './retorno';
 
 /**
@@ -31,6 +36,38 @@ import { urlDeRetornoPermitida } from './retorno';
  * ser absorvida em silêncio, não virar erro 500.
  */
 
+/**
+ * Monta o que vai para `documentos_do_parceiro`, baixando o que vier com URL.
+ *
+ * O campo guarda uma lista MISTA de propósito: nome puro para o que o parceiro só declarou
+ * ter, e objeto `{ tipo, urlBlob, ... }` para o que ele mandou de fato. `normalizarManifesto`
+ * extrai os nomes das duas formas, então a tela de pendências não muda.
+ *
+ * ⚠️ Nunca lança: `materializarArquivos` engole a falha e devolve o que conseguiu. Documento
+ * é conveniência; o cadastro do paciente é o que não pode falhar.
+ */
+async function manifestoComArquivos(
+  documentos: Array<string | Record<string, unknown>> | null | undefined,
+  referencia: string,
+): Promise<Array<string | ArquivoMaterializado>> {
+  const { manifesto, comArquivo } = normalizarEntradas(
+    documentos as Parameters<typeof normalizarEntradas>[0],
+  );
+  if (comArquivo.length === 0) return normalizarManifesto(manifesto);
+
+  const { arquivos, recusados } = await materializarArquivos(comArquivo, referencia);
+  if (recusados.length > 0) {
+    // Só o tipo e o motivo — nunca a URL, que pode conter assinatura de acesso.
+    console.warn(
+      '[parceiros] documentos recusados:',
+      recusados.map((r) => `${r.tipo}:${r.motivo}`).join(','),
+    );
+  }
+  const comArquivoPorTipo = new Set(arquivos.map((a) => a.tipo));
+  const semArquivo = normalizarManifesto(manifesto).filter((n) => !comArquivoPorTipo.has(n));
+  return [...semArquivo, ...arquivos];
+}
+
 export interface EntradaDoHandoff {
   parceiro: string;
   eventoId: string;
@@ -40,8 +77,14 @@ export interface EntradaDoHandoff {
   cpf?: string | null;
   /** O id do pedido no sistema do parceiro, quando houver. */
   pedidoDoParceiro?: string | null;
-  /** Manifesto: quais dos 5 documentos o parceiro já tem. */
-  documentos?: string[] | null;
+  /**
+   * Quais dos 5 documentos o parceiro já tem.
+   *
+   * Duas formas aceitas (10/09/2026): a lista de NOMES, como sempre foi, ou objetos com a
+   * URL do arquivo — `{ tipo, url, dataEmissao?, nomeArquivo? }`. Com URL, o arquivo é
+   * baixado e re-hospedado aqui, e o paciente não precisa reenviar na procuração da ANVISA.
+   */
+  documentos?: Array<string | Record<string, unknown>> | null;
   /** Para onde devolver o paciente ao terminar. Conferida antes de gravar. */
   urlDeRetorno?: string | null;
 }
@@ -111,7 +154,7 @@ export class ServicoDeHandoff {
           ...(entrada.cpf ? { cpf: somenteDigitosDoCpf(entrada.cpf) } : {}),
           ...(entrada.pedidoDoParceiro ? { pedidoDoParceiro: entrada.pedidoDoParceiro } : {}),
           ...(entrada.documentos
-            ? { documentosDoParceiro: normalizarManifesto(entrada.documentos) }
+            ? { documentosDoParceiro: await manifestoComArquivos(entrada.documentos, existente.id) }
             : {}),
           ...(urlDeRetornoPermitida(entrada.urlDeRetorno)
             ? { urlDeRetorno: urlDeRetornoPermitida(entrada.urlDeRetorno) }
@@ -140,7 +183,7 @@ export class ServicoDeHandoff {
         parceiro: entrada.parceiro,
         eventoDoParceiro: entrada.eventoId,
         pedidoDoParceiro: entrada.pedidoDoParceiro?.trim() || null,
-        documentosDoParceiro: normalizarManifesto(entrada.documentos),
+        documentosDoParceiro: await manifestoComArquivos(entrada.documentos, protocolo),
         // 🔴 Conferida contra a lista de origens ANTES de gravar. Guardar primeiro e
         // validar na hora de exibir espalharia a checagem por toda tela que a use — e
         // bastaria uma esquecer para virar redirecionamento aberto.

@@ -8,7 +8,7 @@ import {
   type MotivoDeRecusa,
 } from '@/lib/chatpro/token-de-cadastro';
 import { Button } from '@/components/ui/button';
-import { pendenciasDe } from '@/lib/parceiros/documentos';
+import { pendenciasDe, recebidosDe } from '@/lib/parceiros/documentos';
 
 import { FormularioDeCadastro } from './_components/formulario-de-cadastro';
 
@@ -134,12 +134,40 @@ export default async function CadastroPorLinkPage({
         token={token}
         protocolo={resultado.protocolo}
         pendencias={pendenciasDe(resultado.documentosDoParceiro)}
+        /**
+         * 🔴 O QUE JÁ CHEGOU TAMBÉM APARECE.
+         *
+         * Levantado pelo dono em 10/09/2026: a tela dizia só o que FALTA. Quem preencheu o
+         * formulário da Greens e subiu RG e comprovante não via confirmação nenhuma de que
+         * aquilo chegou — e "será que perderam meus documentos?" é o tipo de dúvida que faz
+         * o paciente parar no meio e ligar para o atendimento.
+         */
+        recebidos={recebidosDe(resultado.documentosDoParceiro)}
         urlDeRetorno={resultado.urlDeRetorno}
         // ⚠️ Qualquer um destes pode ser null — existe contato de WhatsApp sem nome
         // nenhum. O formulário pede o que faltar em vez de assumir presença.
         nomeInicial={resultado.nomeCompleto}
         emailInicial={resultado.email}
         telefoneInicial={resultado.telefone}
+        cpfInicial={resultado.cpf}
+        /**
+         * 🔴 QUEM VEIO DO FORMULÁRIO DO PARCEIRO NÃO DIGITA NADA DE NOVO.
+         *
+         * Ele já preencheu nome, CPF, telefone e e-mail lá. A tela CONFIRMA o que chegou e
+         * pede só o que ainda não existe: a senha e o código do e-mail. Pedir tudo de novo é
+         * fazer o trabalho duas vezes, e é onde se perde gente no meio do cadastro.
+         */
+        veioDeParceiro={!!resultado.parceiro}
+        /**
+         * 🔴 QUEM VEIO DO FORMULÁRIO DO PARCEIRO JÁ RESPONDEU SOBRE A ANVISA.
+         *
+         * No formulário da Greens ele marcou se tem ou não a autorização, e anexou o que
+         * tinha. Repetir a pergunta aqui é pedir a mesma resposta duas vezes.
+         *
+         * ⚠️ `parceiro` não serve para isso: o BOT da Greens também grava `parceiro:
+         * 'greens'`, e ele não perguntou nada. Quem responde é a ORIGEM.
+         */
+        jaDeclarouSobreAnvisa={resultado.origem === 'greens_handoff'}
       />
     </div>
   );

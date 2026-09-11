@@ -282,7 +282,7 @@ export default function DocumentosPacientePage() {
                           )}>
                             {vencido ? 'Vencido' : 'Válido'}
                           </Badge>
-                          <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
                             <Button variant="outline" size="sm" className="gap-1.5 rounded-full text-xs h-8 border-border/40 hover:bg-accent">
                               <ExternalLink size={13} /> Ver
                             </Button>

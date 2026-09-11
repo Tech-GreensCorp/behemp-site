@@ -41,10 +41,39 @@ jobs:
         run: node scripts/conferir-baseline.mjs
 
       - name: Build do projeto (Next.js)
-        # Passar variáveis públicas necessárias para o build
+        # 🔴 TODA `NEXT_PUBLIC_*` PRECISA EXISTIR AQUI, E NÃO NO SERVIDOR.
+        #
+        # Elas são substituídas pelo VALOR durante o `next build` e viajam dentro do
+        # JavaScript que o navegador baixa. Quem não existe no build não vira valor: vira
+        # acesso a uma propriedade que, no navegador, é `undefined`.
+        #
+        # O que isso custou, em 10/09/2026: o build que rodava em produção tinha sido feito
+        # À MÃO NO SERVIDOR, onde o `.env` completo existia — então as chaves do Pusher
+        # estavam congeladas dentro dele e a teleconsulta funcionava. Quando o deploy passou
+        # a entregar o build do CI, que não recebia essas variáveis, o bundle saiu com
+        #
+        #     let t = env.NEXT_PUBLIC_PUSHER_KEY, s = env.NEXT_PUBLIC_PUSHER_CLUSTER;
+        #     if (!t || !s) throw Error("[Pusher Client] … devem estar …")
+        #
+        # e a teleconsulta passou a morrer em "Erro ao iniciar a sala" — sem erro no
+        # servidor, porque a falha acontece no navegador.
+        #
+        # ⚠️ Isto NÃO se resolve escrevendo a variável no `.env` do servidor. O `.env` do
+        # servidor alimenta o código que roda no servidor; o navegador só recebe o que foi
+        # embutido no build. É a diferença que o nome `NEXT_PUBLIC_` anuncia e que é fácil
+        # ler como "pública, então qualquer lugar serve".
+        #
+        # Valor de `NEXT_PUBLIC_*` NÃO é segredo — ele é servido a qualquer visitante dentro
+        # do bundle. Está em `secrets` por conveniência de gestão, não por sigilo.
         env:
           NEXT_PUBLIC_APP_URL: 'https://be4hope.org'
           DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
+          NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_WHATSAPP_BEHEMP: ${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}
+          NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: ${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}
+          NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED: ${{ secrets.NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED }}
         run: pnpm build
 
       - name: Limpar .next antigo no servidor antes do deploy
@@ -138,6 +167,17 @@ jobs:
             gravar PARCEIRO_GREENS_SEGREDO_SAIDA   "${{ secrets.PARCEIRO_GREENS_SEGREDO_SAIDA }}"
             gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
             gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
+            gravar PARCEIRO_ORIGENS_DE_DOCUMENTO  "${{ secrets.PARCEIRO_ORIGENS_DE_DOCUMENTO }}"
+            # 🔴 A CHAVE QUE LIGA A TRANSFERÊNCIA DE CADASTRO (P5, ADR-0021).
+            #
+            # Vazia = nada sai. Só `1` liga. Ligada por decisão do dono em 11/09/2026, para
+            # demonstrar o fluxo à direção antes de levar ao Jurídico — a plataforma ainda não
+            # tem paciente real, então o que trafega é fictício.
+            #
+            # ⚠️ DESLIGAR É UM COMANDO, e isso é de propósito: a trava fica no código, e o que
+            # muda é o valor. Se o Jurídico pedir para parar, some da lista de secrets e o
+            # próximo deploy já sai desligado — sem precisar reverter código.
+            gravar PARCEIRO_TRANSFERENCIA_ATIVA   "${{ secrets.PARCEIRO_TRANSFERENCIA_ATIVA }}"
             gravar CHATPRO_INTAKE_SECRET           "${{ secrets.CHATPRO_INTAKE_SECRET }}"
             gravar CHATPRO_INTAKE_SECRET_GREENS    "${{ secrets.CHATPRO_INTAKE_SECRET_GREENS }}"
             gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"
@@ -148,6 +188,30 @@ jobs:
             gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
 
             chmod 600 "$ENVFILE"
+
+            # ── O QUE O PM2 ESTÁ RODANDO HOJE, ANTES DE MUDAR QUALQUER COISA ────────
+            #
+            # Não muda nada: só imprime. Existe porque em 10/09/2026 descobrimos que o
+            # processo em produção não servia o build entregue — e ninguém tinha como
+            # saber, porque o caminho que o PM2 usa nunca aparecia em lugar nenhum.
+            echo "[diag] diretório do deploy:  $(pwd)"
+            echo "[diag] server.js entregue:   $(ls -l --time-style=+%F_%T .next/standalone/server.js 2>/dev/null || echo AUSENTE)"
+            pm2 describe behemp-site 2>/dev/null | grep -E "script path|exec cwd|status|uptime" \
+              || echo "[diag] nenhum processo behemp-site no PM2"
+
+            # ── PRESERVA O AMBIENTE QUE SÓ EXISTE DENTRO DO PROCESSO ───────────────
+            #
+            # 🔴 SEM ISTO, RECRIAR O PROCESSO DERRUBA O SITE INTEIRO.
+            #
+            # O deploy escreve 12 variáveis no `.env`; o `lib/env.ts` declara 61. As
+            # outras — CLERK_SECRET_KEY, BREVO_API_KEY, PUSHER_SECRET, DOCUSIGN_* —
+            # nunca foram escritas em arquivo nenhum: vivem só na memória do processo,
+            # herdadas do primeiro `pm2 start` manual. Foi o que o deploy #37 revelou.
+            #
+            # Reproduzido em 10/09/2026: sem CLERK_SECRET_KEY, TODA rota responde 500,
+            # inclusive as públicas. O script copia para o `.env` apenas as chaves que o
+            # app declara em `lib/env.ts`, e imprime somente NOMES.
+            node scripts/preservar-ambiente-do-pm2.mjs
 
             # 🔴 CARREGA O `.env` NO AMBIENTE DESTE SHELL.
             #
@@ -189,8 +253,105 @@ jobs:
             cp -r public .next/standalone/
             cp -r .next/static .next/standalone/.next/
 
-            # Reinicia o processo com cwd no standalone
+            # ── O PROCESSO PRECISA APONTAR PARA O server.js DESTE DEPLOY ───────────
+            #
+            # 🔴 `pm2 restart` NÃO RELÊ O CAMINHO DO SCRIPT. Ele reusa o que foi gravado
+            # no `pm2 start` original — comportamento conhecido (Unitech/pm2#3054, onde
+            # o usuário trocou `index.js` por `dist/app.js` e o PM2 seguiu executando o
+            # antigo). Nem `--update-env`, nem `reload`, nem `startOrReload` corrigem.
+            #
+            # Era a causa da falha de 10/09/2026: o rsync entregava o build novo, o
+            # `pm2 restart` reiniciava OUTRO server.js, e o site servia um build de dias
+            # antes. Todo deploy passava verde. Nenhuma rota nova aparecia.
+            CAMINHO_ATUAL="$(node scripts/pm2-do-app.mjs --caminho || true)"
+
             cd .next/standalone
-            pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
+
+            # 1) Nada destrutivo antes de o arquivo novo existir de fato.
+            if [ ! -f server.js ]; then
+              echo "[pm2] ✗ server.js não está aqui — o build não chegou."
+              echo "[pm2]   Abortando SEM tocar no processo: o site continua no ar como está."
+              exit 1
+            fi
+
+            CAMINHO_ESPERADO="$(pwd)/server.js"
+            echo "[pm2] o processo roda:  ${CAMINHO_ATUAL:-<nenhum processo>}"
+            echo "[pm2] o deploy entrega: $CAMINHO_ESPERADO"
+
+            if [ "$CAMINHO_ATUAL" = "$CAMINHO_ESPERADO" ]; then
+              # Caminho certo: restart preserva o processo e não tem janela de queda.
+              echo "[pm2] mesmo caminho — restart basta."
+              pm2 restart behemp-site --update-env
+            else
+              # Caminho diferente (ou processo inexistente): só recriar resolve.
+              #
+              # `pm2 delete` NÃO apaga arquivo, log nem código — remove o registro do
+              # processo e o mata. O que ele descarta é o ambiente vivo, e é por isso
+              # que o passo de preservação acima roda ANTES, nunca depois.
+              echo "[pm2] caminho diferente — restart reusaria o antigo. Recriando."
+              pm2 delete behemp-site 2>/dev/null || true
+              pm2 start server.js --name "behemp-site" --update-env
+            fi
+
             pm2 save
-            pm2 save
+
+      # ── ⛔ O PORTÃO QUE IMPEDE "DEPLOY VERDE COM PRODUÇÃO PARADA" ──────────────
+      #
+      # Todo passo acima pode ter sucesso e ainda assim o site continuar servindo um
+      # build antigo — foi exatamente o que aconteceu entre 14/08 e 10/09/2026, e o
+      # que o diagnóstico da Dryelle mediu no servidor (`server.js` com mtime de
+      # 14 de agosto enquanto o Actions reportava sucesso em ~15s).
+      #
+      # COMO ELE PROVA: cada build gera chunks com hash NOVO em `.next/static/chunks`.
+      # Quem serve esses arquivos é o próprio processo Node, a partir do build que ele
+      # carregou. Se o processo for outro, o arquivo não existe lá e a resposta é 404 —
+      # medido em produção em 10/09/2026, com um chunk do build da vez.
+      #
+      # Portanto: 200 aqui significa que o processo em produção É este build. É a única
+      # afirmação deste workflow que não depende de nenhum passo ter "dado certo".
+      - name: Produção está servindo ESTE build?
+        run: |
+          set -e
+          ALVO=$(ls -S .next/static/chunks/*.js 2>/dev/null | head -1 || true)
+          if [ -z "$ALVO" ]; then
+            echo "✗ nenhum chunk em .next/static/chunks — o build não produziu o que deveria."
+            exit 1
+          fi
+          URL="https://be4hope.org/_next/static/chunks/$(basename "$ALVO")"
+          echo "conferindo: $URL"
+
+          for i in $(seq 1 20); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo 000)
+            if [ "$CODIGO" = "200" ]; then
+              echo "  o build deste deploy está sendo servido."
+
+              # 🔴 E O SITE PRECISA RESPONDER, NÃO SÓ EXISTIR.
+              #
+              # Em 10/09/2026 este portão passou VERDE com a produção inteira em HTTP 500:
+              # o chunk estático é servido mesmo quando o app falha em toda rota, porque o
+              # erro estava na autenticação, não no empacotamento.
+              #
+              # Servir arquivo não é estar de pé. A home tem que responder.
+              HOME_CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://be4hope.org/" || echo 000)
+              if [ "$HOME_CODIGO" = "200" ]; then
+                echo "✓ produção está servindo ESTE build, e a home responde 200."
+                exit 0
+              fi
+              echo "  ✗ o build é este, mas a home responde HTTP $HOME_CODIGO."
+              echo "    O processo subiu com o build certo e está falhando em runtime —"
+              echo "    tipicamente variável de ambiente ausente. Ver o passo do PM2 acima:"
+              echo "    a linha [ambiente] diz quantas chaves foram recuperadas e de onde."
+              exit 1
+            fi
+            echo "  tentativa $i/20: HTTP $CODIGO (o processo pode estar subindo)"
+            sleep 5
+          done
+
+          echo ""
+          echo "✗ DEPOIS DE 100s, PRODUÇÃO NÃO SERVE UM ARQUIVO DESTE BUILD."
+          echo ""
+          echo "  Os arquivos foram entregues e o PM2 reiniciou — e mesmo assim o site"
+          echo "  responde a partir de outro build. O passo 'Reiniciar Servidor (PM2)'"
+          echo "  acima imprime o caminho que o processo usa e o que o deploy entrega:"
+          echo "  comparar os dois diz se o rsync e o PM2 estão em diretórios diferentes."
+          exit 1

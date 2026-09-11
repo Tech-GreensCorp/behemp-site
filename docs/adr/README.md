@@ -17,10 +17,17 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0005](ADR-0005-a-cadeia-conduta-prescricao-dosagem-titulacao.md)      | conduta → prescrição **e** dosagem → titulação: cadeia sequencial                    | 📋 proposta |
 | [0006](ADR-0006-como-a-saida-da-ia-aparece-na-tela.md)                 | confiança da IA em faixa categórica, nunca percentual                                | 📋 proposta |
 | [0007](ADR-0007-consentimento-da-gravacao-de-teleconsulta.md)          | o consentimento da gravação é **do paciente**, versionado e revogável                | 📋 proposta |
+| [0019](ADR-0019-ajuste-modulo-clinico.md)                              | o wizard segue rejeitado; o que falta é progresso na trilha e doc que não mente      | 📋 proposta |
+| [0020](ADR-0020-ajustes-pre-QA.md)                                     | os três bloqueios do QA, em ordem de execução: Pusher, TURN e a fila sem processador | 📋 proposta |
+| [0021](ADR-0021-os-oito-fluxos-e-os-webhooks-entre-as-empresas.md)     | os 8 fluxos colapsam em 5 peças; o envio à Greens depende de base legal              | 📋 proposta |
 
 🔴 **Quatro estão como proposta.** As 0004, 0005 e 0006 precisam de aceite antes das Sprints 3,
 4 e 5. A **0007** nasceu da auditoria da Sprint 1 e depende de **texto do dono e decisão do
 Jurídico** — ver a §4 dela.
+
+⚠️ **Esta tabela está incompleta.** As ADRs **0008 a 0018** existem em disco e nunca foram
+indexadas aqui — dívida registrada no `docs/03-CHECKLIST-MESTRE.md` em 10/09/2026. Até a
+correção, `ls docs/adr/` é a fonte completa.
 
 As decisões técnicas **anteriores** deste projeto não estão aqui: vivem em
 [`../DECISOES_TECNICAS.md`](../DECISOES_TECNICAS.md), como **DT-001 a DT-010**. Elas

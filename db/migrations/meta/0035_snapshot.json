@@ -1,6 +1,6 @@
 {
-  "id": "ce0545ba-c855-4f36-817d-867cca9587b2",
-  "prevId": "38f8ac2b-9d4e-4919-93ae-41d5123debed",
+  "id": "38f8ac2b-9d4e-4919-93ae-41d5123debed",
+  "prevId": "287679fb-fd1a-4e10-83e4-292a928df4ac",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -889,13 +889,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'reservada'"
-        },
-        "expira_em": {
-          "name": "expira_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
+          "default": "'agendada'"
         },
         "google_event_id": {
           "name": "google_event_id",
@@ -911,24 +905,6 @@
         },
         "observacoes": {
           "name": "observacoes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_paciente_enviado_em": {
-          "name": "email_paciente_enviado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_medico_enviado_em": {
-          "name": "email_medico_enviado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "google_calendar_erro": {
-          "name": "google_calendar_erro",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -997,43 +973,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "consultas_expira_idx": {
-          "name": "consultas_expira_idx",
-          "columns": [
-            {
-              "expression": "expira_em",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "consultas_medico_datahora_ativa_idx": {
-          "name": "consultas_medico_datahora_ativa_idx",
-          "columns": [
-            {
-              "expression": "medico_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "data_hora",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"consultas\".\"status\" in ('reservada', 'agendada', 'confirmada') and \"consultas\".\"deleted_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -5200,305 +5139,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.pagamentos": {
-      "name": "pagamentos",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "consulta_id": {
-          "name": "consulta_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paciente_id": {
-          "name": "paciente_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "medico_id": {
-          "name": "medico_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "data_hora": {
-          "name": "data_hora",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "valor": {
-          "name": "valor",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "moeda": {
-          "name": "moeda",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'BRL'"
-        },
-        "status": {
-          "name": "status",
-          "type": "pagamento_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pendente'"
-        },
-        "gateway_provider": {
-          "name": "gateway_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "gateway_referencia_id": {
-          "name": "gateway_referencia_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "gateway_checkout_url": {
-          "name": "gateway_checkout_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pago_em": {
-          "name": "pago_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "observacoes": {
-          "name": "observacoes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "iniciado_em": {
-          "name": "iniciado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "pagamento_iniciado_em": {
-          "name": "pagamento_iniciado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pagamento_concluido_em": {
-          "name": "pagamento_concluido_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pagamento_erro_em": {
-          "name": "pagamento_erro_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmado_em": {
-          "name": "confirmado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "erro_confirmacao": {
-          "name": "erro_confirmacao",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "pagamentos_consulta_idx": {
-          "name": "pagamentos_consulta_idx",
-          "columns": [
-            {
-              "expression": "consulta_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "pagamentos_paciente_idx": {
-          "name": "pagamentos_paciente_idx",
-          "columns": [
-            {
-              "expression": "paciente_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "pagamentos_medico_idx": {
-          "name": "pagamentos_medico_idx",
-          "columns": [
-            {
-              "expression": "medico_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "pagamentos_status_idx": {
-          "name": "pagamentos_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "pagamentos_consulta_id_consultas_id_fk": {
-          "name": "pagamentos_consulta_id_consultas_id_fk",
-          "tableFrom": "pagamentos",
-          "tableTo": "consultas",
-          "columnsFrom": [
-            "consulta_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pagamentos_paciente_id_pacientes_id_fk": {
-          "name": "pagamentos_paciente_id_pacientes_id_fk",
-          "tableFrom": "pagamentos",
-          "tableTo": "pacientes",
-          "columnsFrom": [
-            "paciente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pagamentos_medico_id_medicos_id_fk": {
-          "name": "pagamentos_medico_id_medicos_id_fk",
-          "tableFrom": "pagamentos",
-          "tableTo": "medicos",
-          "columnsFrom": [
-            "medico_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.pagamentos_config": {
-      "name": "pagamentos_config",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "valor_consulta_padrao": {
-          "name": "valor_consulta_padrao",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'150.00'"
-        },
-        "moeda_padrao": {
-          "name": "moeda_padrao",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'BRL'"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.procuracoes_especificas": {
       "name": "procuracoes_especificas",
       "schema": "",
@@ -7757,17 +7397,6 @@
         "em_tratamento",
         "concluido",
         "arquivado"
-      ]
-    },
-    "public.pagamento_status": {
-      "name": "pagamento_status",
-      "schema": "public",
-      "values": [
-        "pendente",
-        "pago",
-        "isento",
-        "cancelado",
-        "estornado"
       ]
     },
     "public.parceiro_evento_saida_status": {

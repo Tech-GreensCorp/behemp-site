@@ -125,7 +125,7 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     const blobPath = `documentos/${pacienteId}/${nomeSeguro}`;
 
     const blob = await put(blobPath, file, {
-      access: 'public',
+      access: 'private',
       token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
     });
 

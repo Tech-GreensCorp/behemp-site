@@ -22,9 +22,39 @@ export interface SolicitacaoValidada {
   nomeCompleto: string | null;
   email: string | null;
   telefone: string | null;
+  /** Só existe quando veio do parceiro — o bot do WhatsApp não pede CPF. */
+  cpf: string | null;
+  /**
+   * Qual parceiro encaminhou, ou `null` quando o paciente veio direto pelo nosso WhatsApp.
+   *
+   * 🔴 É o que decide se a tela PEDE os dados ou apenas os CONFIRMA: quem preencheu o
+   * formulário da Greens já digitou nome, CPF, telefone e e-mail lá.
+   */
+  parceiro: string | null;
+  /**
+   * 🔴 DE ONDE A SOLICITAÇÃO NASCEU — e é o que decide o que PERGUNTAR.
+   *
+   * `greens_handoff` = o paciente preencheu o formulário do parceiro. Lá ele já declarou o
+   * que tem e o que não tem, e já anexou o que tinha. Perguntar de novo aqui é pedir que ele
+   * responda duas vezes a mesma coisa — foi o apontamento do dono em 10/09/2026.
+   *
+   * Qualquer outra origem (o bot do WhatsApp, de qualquer conta) não coletou nada disso: aí
+   * a pergunta é a única forma de saber.
+   *
+   * ⚠️ Não confundir com `parceiro`. O bot da Greens também grava `parceiro: 'greens'` —
+   * mas não passou por formulário nenhum. Quem responde "ele já declarou?" é a ORIGEM.
+   */
+  origem: string;
   expiraEm: Date;
   /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
-  documentosDoParceiro: string[] | null;
+  /**
+   * Lista mista: nome puro, ou objeto com o arquivo já re-hospedado aqui. Quem só precisa
+   * saber o que falta usa `normalizarManifesto`, que lê as duas formas.
+   */
+  documentosDoParceiro: Array<
+    | string
+    | { tipo: string; urlBlob: string; nomeArquivo: string | null; dataEmissao: string | null }
+  > | null;
   /** Destino de volta, JÁ conferido contra a lista de origens quando foi gravado. */
   urlDeRetorno: string | null;
 }
@@ -80,6 +110,9 @@ export async function validarTokenDeCadastro(
     nomeCompleto: linha.nomeCompleto,
     email: linha.email,
     telefone: linha.telefone,
+    cpf: linha.cpf,
+    parceiro: linha.parceiro,
+    origem: linha.origem,
     expiraEm: linha.expiraEm,
     documentosDoParceiro: linha.documentosDoParceiro ?? null,
     urlDeRetorno: linha.urlDeRetorno ?? null,

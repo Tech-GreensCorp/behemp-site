@@ -27,6 +27,24 @@ import { solicitacaoCadastroOrigemEnum, solicitacaoCadastroStatusEnum } from './
  * A chave é `chatproLeadId` quando existe, senão o telefone em E.164. Sem isso, o paciente
  * que volta ao menu do bot recebe dois links, e o painel enche de solicitações fantasma.
  */
+/**
+ * O que o parceiro mandou sobre cada documento.
+ *
+ * Duas formas na mesma coluna, desde 10/09/2026: o NOME puro, para o que ele só declarou ter,
+ * e o objeto, para o que ele mandou de fato — já baixado e re-hospedado aqui.
+ *
+ * Sem migration de propósito: a coluna é `jsonb`, e as linhas antigas (arrays de nome) seguem
+ * válidas. `normalizarManifesto` lê as duas.
+ */
+export type DocumentoDoParceiro =
+  | string
+  | {
+      tipo: string;
+      urlBlob: string;
+      nomeArquivo: string | null;
+      dataEmissao: string | null;
+    };
+
 export const solicitacoesCadastro = pgTable(
   'solicitacoes_cadastro',
   {
@@ -134,7 +152,14 @@ export const solicitacoesCadastro = pgTable(
      * ⚠️ PENDÊNCIA NÃO BLOQUEIA. Quem chega sem receita é justamente quem mais precisa da
      * teleconsulta; barrá-lo na porta é recusar quem o produto existe para atender.
      */
-    documentosDoParceiro: jsonb('documentos_do_parceiro').$type<string[]>(),
+    /**
+     * Lista MISTA desde 10/09/2026: nome puro para o que o parceiro só declarou ter, e
+     * `{ tipo, urlBlob, nomeArquivo, dataEmissao }` para o que ele mandou de fato.
+     *
+     * Sem migration de propósito — a coluna é `jsonb` e as linhas antigas (arrays de nome)
+     * continuam válidas. `normalizarManifesto` lê as duas formas.
+     */
+    documentosDoParceiro: jsonb('documentos_do_parceiro').$type<DocumentoDoParceiro[]>(),
     /**
      * Para onde devolver o paciente quando ele terminar aqui (ADR-0016 D-08).
      *

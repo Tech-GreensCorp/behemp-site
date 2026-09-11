@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { lerCabecalhos, verificarAssinatura } from '@/lib/parceiros/assinatura';
+import {
+  cabecalhosDoLimite,
+  consumir,
+  identificarChamador,
+} from '@/lib/seguranca/limite-de-requisicao';
+
+/** Largo para servidor-a-servidor, estreito para quem martela. */
+const LIMITE_DO_HANDOFF = 120;
 import { ErroDeContatoInsuficiente, ServicoDeHandoff } from '@/lib/parceiros/handoff';
 import { mascararEmail, mascararTelefone } from '@/lib/chatpro/telefone';
 
@@ -37,12 +45,41 @@ const esquema = z.object({
   cpf: z.string().trim().max(20).optional().nullable(),
   pedidoDoParceiro: z.string().trim().max(64).optional().nullable(),
   /** Quais dos 5 documentos o parceiro JÁ tem. O que faltar vira pendência não bloqueante. */
-  documentos: z.array(z.string()).max(20).optional().nullable(),
+  /**
+   * Duas formas, desde 10/09/2026: a lista de NOMES (como sempre foi) ou objetos com a URL
+   * do arquivo. Com URL, baixamos e re-hospedamos — o paciente não reenvia na procuração.
+   * O `passthrough` deixa o objeto passar inteiro; quem valida o formato dele é
+   * `entradaDeDocumentoSchema`, que também confere a origem contra a allowlist (SSRF).
+   */
+  documentos: z
+    .array(z.union([z.string(), z.record(z.unknown())]))
+    .max(20)
+    .optional()
+    .nullable(),
   /** Para onde devolver o paciente. Conferida contra a lista de origens permitidas. */
   urlDeRetorno: z.string().trim().max(500).optional().nullable(),
 });
 
 export async function POST(request: Request) {
+  /**
+   * 🔴 LIMITE ANTES DA ASSINATURA — OWASP API4:2023.
+   *
+   * A verificação HMAC é em tempo constante, o que protege contra ataque de temporização.
+   * Não protege contra **tentar um milhão de vezes**: sem limite, o segredo de 32 bytes
+   * continua inviável de adivinhar, mas o servidor gasta CPU em cada tentativa, e é assim
+   * que se derruba um endpoint sem invadir nada.
+   *
+   * 120/min é largo para servidor-a-servidor — a Greens manda um handoff por paciente, não
+   * por segundo — e estreito para quem está martelando.
+   */
+  const limite = consumir(identificarChamador(request.headers, 'handoff'), LIMITE_DO_HANDOFF, 60);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { sucesso: false, erro: 'Muitas requisições', codigo: 'LIMITE' },
+      { status: 429, headers: cabecalhosDoLimite(limite, LIMITE_DO_HANDOFF) },
+    );
+  }
+
   /**
    * 🔴 O CORPO É LIDO COMO TEXTO, E ESSA ORDEM É OBRIGATÓRIA.
    * A assinatura cobre os bytes exatos que chegaram. `request.json()` faria o parse antes,
