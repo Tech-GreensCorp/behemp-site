@@ -167,7 +167,22 @@ export default async function CadastroPorLinkPage({
          * ⚠️ `parceiro` não serve para isso: o BOT da Greens também grava `parceiro:
          * 'greens'`, e ele não perguntou nada. Quem responde é a ORIGEM.
          */
-        jaDeclarouSobreAnvisa={resultado.origem === 'greens_handoff'}
+        jaDeclarouSobreAnvisa={
+          resultado.origem === 'greens_handoff' || resultado.declarouTerAutorizacaoAnvisa !== null
+        }
+        /**
+         * 🔴 SEPARADA DA ANVISA desde 11/09/2026 (Item 33).
+         *
+         * Antes, uma flag só decidia as DUAS perguntas: quem viesse do formulário da Greens
+         * não era perguntado sobre receita, mesmo que ninguém lá tivesse perguntado. Agora
+         * cada pergunta olha a própria declaração.
+         *
+         * ⚠️ `!== null` e não `=== true`: quem respondeu "não tenho" também já respondeu, e
+         * repetir a pergunta a ele é o mesmo defeito.
+         */
+        jaDeclarouSobreReceita={
+          resultado.origem === 'greens_handoff' || resultado.declarouTerReceitaMedica !== null
+        }
       />
     </div>
   );

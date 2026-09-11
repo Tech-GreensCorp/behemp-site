@@ -1,6 +1,6 @@
 {
-  "id": "68b0e3da-8c5c-47ec-8dc7-46c92c1e9813",
-  "prevId": "ce0545ba-c855-4f36-817d-867cca9587b2",
+  "id": "ce0545ba-c855-4f36-817d-867cca9587b2",
+  "prevId": "38f8ac2b-9d4e-4919-93ae-41d5123debed",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -923,12 +923,6 @@
         },
         "email_medico_enviado_em": {
           "name": "email_medico_enviado_em",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_reserva_enviado_em": {
-          "name": "email_reserva_enviado_em",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -5505,157 +5499,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.medicos_pagamento_config": {
-      "name": "medicos_pagamento_config",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "medico_id": {
-          "name": "medico_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pix_habilitado": {
-          "name": "pix_habilitado",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "boleto_habilitado": {
-          "name": "boleto_habilitado",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "cartao_credito_habilitado": {
-          "name": "cartao_credito_habilitado",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "cartao_debito_habilitado": {
-          "name": "cartao_debito_habilitado",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "pix_tipo_chave": {
-          "name": "pix_tipo_chave",
-          "type": "pix_tipo_chave",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pix_chave": {
-          "name": "pix_chave",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_nome": {
-          "name": "banco_nome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_agencia": {
-          "name": "banco_agencia",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_conta": {
-          "name": "banco_conta",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_conta_tipo": {
-          "name": "banco_conta_tipo",
-          "type": "conta_bancaria_tipo",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_titular_nome": {
-          "name": "banco_titular_nome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banco_titular_documento": {
-          "name": "banco_titular_documento",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "observacoes": {
-          "name": "observacoes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "medicos_pagamento_config_medico_id_medicos_id_fk": {
-          "name": "medicos_pagamento_config_medico_id_medicos_id_fk",
-          "tableFrom": "medicos_pagamento_config",
-          "tableTo": "medicos",
-          "columnsFrom": [
-            "medico_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "medicos_pagamento_config_medico_id_unique": {
-          "name": "medicos_pagamento_config_medico_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "medico_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.procuracoes_especificas": {
       "name": "procuracoes_especificas",
       "schema": "",
@@ -6999,6 +6842,18 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "declarou_ter_autorizacao_anvisa": {
+          "name": "declarou_ter_autorizacao_anvisa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "declarou_ter_receita_medica": {
+          "name": "declarou_ter_receita_medica",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -7927,14 +7782,6 @@
         "ocasional"
       ]
     },
-    "public.conta_bancaria_tipo": {
-      "name": "conta_bancaria_tipo",
-      "schema": "public",
-      "values": [
-        "corrente",
-        "poupanca"
-      ]
-    },
     "public.documento_tipo": {
       "name": "documento_tipo",
       "schema": "public",
@@ -8087,17 +7934,6 @@
         "dia",
         "semana",
         "mes"
-      ]
-    },
-    "public.pix_tipo_chave": {
-      "name": "pix_tipo_chave",
-      "schema": "public",
-      "values": [
-        "cpf",
-        "cnpj",
-        "email",
-        "telefone",
-        "aleatoria"
       ]
     },
     "public.prescricao_status": {

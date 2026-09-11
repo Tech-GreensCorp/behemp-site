@@ -31,7 +31,10 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { solicitacoesCadastro } from '@/db/schema';
+import { documentos as tabelaDeDocumentos, solicitacoesCadastro } from '@/db/schema';
+
+import { assinarLinkDoDocumento, VALIDADE_DO_LINK_EM_SEGUNDOS } from './link-do-documento';
+import { planoDoEnvio } from './documentos-que-viajam';
 
 import { FINALIDADES, type Finalidade } from './consentimento';
 import { consentimentosVigentes } from './consentimento-registrado';
@@ -58,7 +61,15 @@ export interface CorpoDaTransferencia {
    * URL assinada de vida curta, como a Greens faz conosco. Mandar o arquivo em base64 dobraria
    * o tamanho do corpo e deixaria dado de saúde num log de requisição se alguém o registrar.
    */
-  documentos: Array<{ tipo: string; url: string; nomeArquivo: string | null }>;
+  /**
+   * O MESMO formato que a Greens usa ao mandar para cá: objeto quando o arquivo viaja, e
+   * apenas o `tipo` quando não viaja. Eles aceitam as duas formas no mesmo array — e quem
+   * recebe define o formato, então a nossa parte é falar a língua deles.
+   */
+  documentos: Array<
+    | { tipo: string; url: string; nomeArquivo?: string | null; dataEmissao?: string | null }
+    | { tipo: string }
+  >;
   consentimento: {
     versao: string;
     finalidades: Finalidade[];
@@ -124,6 +135,8 @@ export async function prepararTransferencia(params: {
   // um estouro em produção no dia em que a regra mudar de forma.
   if (!autorizadora) return { pronta: false, motivo: 'sem_consentimento' };
 
+  const arquivos = await documentosParaEnviar(solicitacao.pacienteId);
+
   return {
     pronta: true,
     corpo: {
@@ -134,24 +147,7 @@ export async function prepararTransferencia(params: {
         telefone: solicitacao.telefone,
         cpf: solicitacao.cpf,
       },
-      /**
-       * ⚠️ AINDA VAZIO, e o motivo mudou — vale registrar a diferença.
-       *
-       * Até 10/09 o motivo era o store público: mandar URL assinada de um bucket aberto seria
-       * enfeite. Isso foi corrigido — os caminhos novos gravam privado, e a entrega passa por
-       * `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
-       *
-       * O que falta agora é outra coisa: **decidir COMO a Greens acessa**. Duas opções, e a
-       * escolha é do lado que recebe:
-       *
-       *   a) URL assinada de vida curta, como eles fazem conosco — exige gerar a assinatura
-       *      aqui e aceitar que quem tiver o link lê, pela validade
-       *   b) a nossa rota autenticada, com credencial de máquina para eles — mais controle,
-       *      mas exige um caminho de autenticação que não existe entre as empresas hoje
-       *
-       * Preencher antes dessa decisão seria escolher por eles. Está no §6 da ADR-0021.
-       */
-      documentos: [],
+      documentos: arquivos,
       consentimento: {
         versao: autorizadora.versao,
         finalidades: vigentes.map((c) => c.finalidade),
@@ -161,3 +157,81 @@ export async function prepararTransferencia(params: {
     },
   };
 }
+
+/**
+ * Os documentos do paciente, com URL assinada de vida curta para quem viaja.
+ *
+ * 🔴 É A DECISÃO DA ADR-0016, não uma escolha nova: _"URL assinada de vida curta na origem,
+ * validação de MIME e tamanho no destino, store privado e prazo de retenção"_.
+ *
+ * ⚠️ FALHA AO ASSINAR NÃO DERRUBA A TRANSFERÊNCIA — a mesma escolha que a Greens fez do lado
+ * deles. O documento cai para a forma "só o tipo": o manifesto continua verdadeiro e o cadastro
+ * chega. Perder a transferência inteira por causa de uma URL seria trocar o essencial pelo
+ * acessório.
+ */
+async function documentosParaEnviar(
+  pacienteId: string,
+): Promise<CorpoDaTransferencia['documentos']> {
+  const segredo = process.env.PARCEIRO_GREENS_SEGREDO_SAIDA;
+
+  const linhas = await db
+    .select({
+      id: tabelaDeDocumentos.id,
+      tipo: tabelaDeDocumentos.tipo,
+      nomeArquivo: tabelaDeDocumentos.nomeArquivo,
+      dataEmissao: tabelaDeDocumentos.dataEmissao,
+    })
+    .from(tabelaDeDocumentos)
+    .where(
+      and(eq(tabelaDeDocumentos.pacienteId, pacienteId), isNull(tabelaDeDocumentos.deletedAt)),
+    );
+
+  const plano = planoDoEnvio(
+    linhas.map((l) => ({
+      id: l.id,
+      tipo: l.tipo,
+      nomeArquivo: l.nomeArquivo,
+      dataEmissao: l.dataEmissao,
+    })),
+  );
+
+  const semArquivo: string[] = [];
+  const saida: CorpoDaTransferencia['documentos'] = [];
+
+  for (const e of plano) {
+    if (e.motivoSemArquivo || !segredo?.trim()) {
+      semArquivo.push(`${e.tipo}:${e.motivoSemArquivo ?? 'sem_segredo'}`);
+      saida.push({ tipo: e.tipo });
+      continue;
+    }
+
+    try {
+      const token = assinarLinkDoDocumento({ documentoId: e.documentoId, segredoDeSaida: segredo });
+      saida.push({
+        tipo: e.tipo,
+        url: `${urlBase()}/api/parceiros/documento/${token}`,
+        ...(e.nomeArquivo ? { nomeArquivo: e.nomeArquivo } : {}),
+        ...(e.dataEmissao ? { dataEmissao: e.dataEmissao } : {}),
+      });
+    } catch {
+      semArquivo.push(`${e.tipo}:falha_ao_assinar`);
+      saida.push({ tipo: e.tipo });
+    }
+  }
+
+  if (semArquivo.length > 0) {
+    // 🔴 Nunca a URL, nunca o nome do arquivo — só o tipo e o motivo. Nome de arquivo de
+    // paciente costuma trazer o nome da pessoa.
+    console.info('[parceiros] documentos sem arquivo na transferência', { semArquivo });
+  }
+
+  return saida;
+}
+
+/** A base pública, para montar o link que o parceiro vai abrir. */
+function urlBase(): string {
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') || 'http://localhost:3000';
+}
+
+/** Quanto tempo o link entregue vale. Exportado para o guarda medir a simetria com a Greens. */
+export const VALIDADE_DO_LINK = VALIDADE_DO_LINK_EM_SEGUNDOS;

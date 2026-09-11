@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { notificarParceiro } from '@/lib/parceiros/notificar';
+import { avisarAnvisaAprovada } from '@/lib/anvisa/avisar-aprovacao';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
@@ -58,6 +59,18 @@ export async function POST(request: NextRequest) {
    */
   if (status === 'aprovado' && atualizado?.pacienteId) {
     await notificarParceiro({ pacienteId: atualizado.pacienteId, tipo: 'anvisa_aprovada' });
+
+    /**
+     * 🔴 E O PACIENTE TAMBÉM É AVISADO (Item 29) — até 11/09/2026 havia só o Pusher, que é
+     * tempo real: quem não estava com a aba aberta nunca soube que a autorização saiu.
+     *
+     * Nunca lança, pelo mesmo motivo do aviso ao parceiro: a aprovação já foi gravada, e um
+     * provedor de e-mail fora do ar não pode desfazer isso.
+     */
+    await avisarAnvisaAprovada({
+      pacienteId: atualizado.pacienteId,
+      numeroProcesso: numeroProcesso ?? null,
+    });
   }
 
   // Notificar paciente via Pusher

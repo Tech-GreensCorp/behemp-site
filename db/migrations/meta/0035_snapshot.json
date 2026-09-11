@@ -1,5 +1,5 @@
 {
-  "id": "38f8ac2b-9d4e-4919-93ae-41d5123debed",
+  "id": "359ac3c8-3ddb-4456-b332-34b7cf5dc668",
   "prevId": "287679fb-fd1a-4e10-83e4-292a928df4ac",
   "version": "7",
   "dialect": "postgresql",
@@ -6377,6 +6377,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "declarou_ter_autorizacao_anvisa": {
+          "name": "declarou_ter_autorizacao_anvisa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "declarou_ter_receita_medica": {
+          "name": "declarou_ter_receita_medica",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
         "token_hash": {
           "name": "token_hash",
           "type": "text",
@@ -7394,7 +7406,6 @@
       "name": "consulta_status",
       "schema": "public",
       "values": [
-        "reservada",
         "agendada",
         "confirmada",
         "realizada",

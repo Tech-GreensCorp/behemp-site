@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
+import { lerManifestoDaUrl } from '@/lib/chatpro/manifesto-da-url';
 import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
 import { ErroDeContatoNaoConfirmado, ServicoDeSolicitacao } from '@/lib/chatpro/solicitacao';
 import {
@@ -88,6 +89,24 @@ export async function GET(request: NextRequest) {
 
   const q = request.nextUrl.searchParams;
 
+  /**
+   * 🔴 O QUE O PACIENTE JÁ TEM, declarado pelo bot.
+   *
+   * Sem isto a solicitação nascia sem manifesto, e o cadastro considerava que **falta tudo** —
+   * o que mandava o paciente de recompra para a mesma tela do paciente novo. Ver
+   * `lib/chatpro/manifesto-da-url.ts` para por que chave desconhecida é ignorada em vez de
+   * recusar a chamada.
+   */
+  const manifesto = lerManifestoDaUrl(q);
+  if (manifesto.ignorados.length > 0) {
+    // Nomes de documento não são dado pessoal — podem ir ao log, e é assim que um typo no
+    // painel deixa de ser invisível.
+    console.warn('[chatpro] bot-link: documentos não reconhecidos no manifesto', {
+      ignorados: manifesto.ignorados,
+      conta: conta.id,
+    });
+  }
+
   try {
     const { mensagem } = await new ServicoDeSolicitacao().linkParaOBot({
       // 🔴 Vem do SEGREDO, nunca da URL. Decide o `parceiro` da solicitação e para onde
@@ -101,6 +120,7 @@ export async function GET(request: NextRequest) {
       email: q.get('email') ?? q.get('e-mail'),
       telefone: q.get('phone') ?? q.get('telefone'),
       number: q.get('number'),
+      documentosDeclarados: manifesto.declarado ? manifesto.documentos : null,
     });
 
     return textoPuro(mensagem, 200);

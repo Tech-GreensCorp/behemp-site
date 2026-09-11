@@ -157,22 +157,29 @@ describe('a retratação fica escrita', () => {
    * próxima pessoa a ler um dado que não existe. Apagar sem registrar deixaria o mesmo erro
    * livre para voltar.
    */
-  it('o componente registra que a declaração NÃO é persistida', () => {
+  it('o componente registra a retratação — a afirmação falsa não pode voltar em silêncio', () => {
     expect(fontes.componente).toContain('RETRATAÇÃO, 11/09/2026');
-    expect(fontes.componente).toMatch(/n[ãa]o existe\*\* coluna|N[ÃA]O grava/i);
   });
 
-  it('e o cadastro realmente não persiste a declaração — se persistir, a retratação mente', () => {
-    const cadastro = ler('app/_actions/cadastro-por-link.ts');
+  /**
+   * 🔴 ESTE CASO MUDOU DE LADO EM 11/09/2026, e é o guarda funcionando como planejado.
+   *
+   * Ele dizia: _"a coluna passou a existir: atualize a retratação e faça o aviso ler a
+   * declaração"_. A coluna passou a existir (Item 33), o caso ficou vermelho, e a retratação
+   * foi atualizada no mesmo movimento.
+   *
+   * O que ele vigia agora é o **erro oposto**: a declaração existe, é tentadora, e o aviso
+   * NÃO pode passar a usá-la. Ela diz o que o paciente respondeu; quem decide se falta a
+   * autorização é `autorizacoes_anvisa` — o que existe, não o que ele lembrou. Trocar uma
+   * pela outra faria o aviso sumir para quem declarou ter e nunca enviou.
+   */
+  it('🔴 a coluna existe — e o aviso continua NÃO a usando', () => {
     const schema = ler('db/schema/solicitacoes-cadastro.ts');
-    const temColuna =
-      /declarou_ter_autorizacao_anvisa|declarouTerAutorizacaoAnvisa:\s*(boolean|text)\(/.test(
-        schema,
-      );
-    expect(
-      temColuna,
-      'a coluna passou a existir: atualize a retratação e faça o aviso ler a declaração',
-    ).toBe(false);
-    expect(cadastro).toContain('declarouTerAutorizacaoAnvisa');
+    expect(schema).toContain('declarou_ter_autorizacao_anvisa');
+    expect(ler('app/_actions/cadastro-por-link.ts')).toContain('declarouTerAutorizacaoAnvisa');
+
+    // O aviso decide pelo ESTADO. A declaração não entra nem no componente nem na consulta.
+    expect(codigo.componente).not.toMatch(/declarou/i);
+    expect(codigo.dados).not.toMatch(/declarou_ter|declarouTer/);
   });
 });

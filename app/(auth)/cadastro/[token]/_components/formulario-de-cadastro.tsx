@@ -99,6 +99,14 @@ interface Props {
    * novamente".
    */
   jaDeclarouSobreAnvisa?: boolean;
+  /**
+   * O mesmo, para a receita — separado desde 11/09/2026 (Item 33).
+   *
+   * Uma flag só para as duas perguntas escondia o caso de quem veio do formulário da Greens,
+   * onde ninguém pergunta sobre receita: ele não era perguntado aqui tampouco, e o destino
+   * saía errado.
+   */
+  jaDeclarouSobreReceita?: boolean;
 }
 
 /**
@@ -192,6 +200,7 @@ export function FormularioDeCadastro({
   cpfInicial = null,
   veioDeParceiro = false,
   jaDeclarouSobreAnvisa = false,
+  jaDeclarouSobreReceita = false,
 }: Props) {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -281,7 +290,7 @@ export function FormularioDeCadastro({
     (p) => p.chave !== 'receita_medica' && p.chave !== 'autorizacao_anvisa',
   );
   const perguntarSobreReceita =
-    !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'receita_medica');
+    !jaDeclarouSobreReceita && pendencias.some((p) => p.chave === 'receita_medica');
 
   /**
    * 🔴 O DESTINO PASSA A CONSIDERAR O QUE ELE ACABOU DE RESPONDER.
