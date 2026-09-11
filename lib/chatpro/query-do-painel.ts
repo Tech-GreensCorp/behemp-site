@@ -32,28 +32,31 @@
  * chamadas por máquina, com segredo no cabeçalho — não há caso em que um `?` literal dentro de
  * um valor seja intencional.
  *
- * 🔴 RECEBE `request.url` (string), NUNCA `request.nextUrl` — e o porquê é honesto: eu ainda
- * NÃO sei qual é a causa em produção.
+ * 🔴 A CAUSA, ENFIM MEDIDA: O SEGUNDO `?` CHEGA COMO `%3F`.
  *
- * A primeira versão passava `request.nextUrl` e **não funcionou em produção**, com o código já
- * no servidor. Medido depois do deploy, com telefones novos e pausa entre as chamadas:
+ * Duas tentativas falharam antes desta, e as duas por eu adivinhar. A resposta veio quando
+ * criei `GET /api/chatpro/eco` e **perguntei ao servidor o que ele tinha recebido**:
  *
- *     ?tem=autorizacao_anvisa**&**sessionId=…  →  "já recebemos": 1 seção
- *     ?tem=autorizacao_anvisa**?**sessionId=…  →  "já recebemos": 0 seções
+ * ```jsonc
+ * "crua": "https://0.0.0.0:3000/api/chatpro/eco?tem=autorizacao_anvisa%3FsessionId%3Dabc&name=X"
+ * //                                                              ↑ %3F, não `?`
+ * "temSeparadorErrado": false      // não havia `?` literal para trocar
+ * ```
  *
- * ⚠️ RETRATAÇÃO: eu tinha escrito aqui que o `NextURL` normaliza a query. **Medi, e é falso.**
- * Com `new NextRequest(url)` no Node, `nextUrl.search` preserva o `?` e devolve exatamente o
- * mesmo que `new URL(request.url)`. A causa em produção é outra, e não a isolei.
+ * O `0.0.0.0:3000` entrega o resto da história: quem chega ao Next é o request **reescrito
+ * pelo proxy reverso**, e é ele que percent-encoda o segundo `?` (e o `=` seguinte, como
+ * `%3D`). Nenhuma das duas versões anteriores podia funcionar — as duas procuravam um `?` que
+ * já não existia ali.
  *
- * **Por que ainda assim mudei para `request.url`:** ela é a string que o runtime recebeu, sem
- * nenhum parser intermediário entre o cliente e esta função. Se houver normalização em algum
- * ponto do caminho — proxy, runtime, ou construção do `NextURL` a partir do request HTTP real,
- * que é diferente de construí-lo de uma string —, é o `request.url` que tem a melhor chance de
- * escapar dela. É uma hipótese com custo baixo, não uma causa provada.
+ * ⚠️ RETRATAÇÃO DUPLA, e as duas ficam escritas porque o caminho ensina mais que o destino:
  *
- * 🔴 **O QUE FAZER SE CONTINUAR FALHANDO DEPOIS DESTE DEPLOY:** o próximo passo é fazer o
- * servidor dizer o que viu — um campo no `/api/parceiros/health`, ou um log que se consiga ler.
- * Sem isso, a próxima tentativa é adivinhação outra vez, e já gastamos um deploy assim.
+ *   1. escrevi que o `NextURL` normalizava a query. **Falso** — medido com `new NextRequest`,
+ *      `nextUrl.search` preserva o `?` e é idêntico a `new URL(request.url)`;
+ *   2. troquei para `request.url` chamando de "hipótese de custo baixo". Era hipótese mesmo, e
+ *      **estava errada**: a reescrita acontece antes das duas leituras.
+ *
+ * 🔴 A LIÇÃO, que vale mais que a correção: **eu gastei dois deploys porque não havia como
+ * perguntar ao servidor o que ele via.** O instrumento custou menos que a segunda tentativa.
  */
 
 /**
@@ -65,11 +68,34 @@ export function parametrosDoPainel(urlCrua: string): URLSearchParams {
   const inicio = urlCrua.indexOf('?');
   if (inicio === -1) return new URLSearchParams();
   const bruto = urlCrua.slice(inicio + 1);
-  return new URLSearchParams(bruto.replace(/\?/g, '&'));
+
+  /**
+   * Primeiro o `?` literal — o caso de quem chama sem passar por proxy, como um `curl` direto
+   * ou um teste. Depois o `%3F`, que é como ele chega em produção.
+   */
+  const semLiteral = bruto.replace(/\?/g, '&');
+
+  /**
+   * 🔴 O QUE VEM DEPOIS DO `%3F` FOI CODIFICADO COMO SE FOSSE VALOR, e por isso o `=` do
+   * primeiro par virou `%3D` e um eventual `&` virou `%26`. Decodificar só **nesses segmentos**
+   * é o que separa "conserto" de "estrago": decodificar a query inteira quebraria qualquer
+   * valor legítimo que contenha `=` ou `&` escapados de propósito.
+   */
+  const partes = semLiteral.split(/%3F/i);
+  if (partes.length === 1) return new URLSearchParams(semLiteral);
+
+  const remontado = partes
+    .map((parte, i) => (i === 0 ? parte : parte.replace(/%3D/gi, '=').replace(/%26/gi, '&')))
+    .join('&');
+
+  return new URLSearchParams(remontado);
 }
 
 /** `true` quando a URL veio com o separador errado — para o log dizer que isso aconteceu. */
 export function separadorFoiCorrigido(urlCrua: string): boolean {
   const inicio = urlCrua.indexOf('?');
-  return inicio !== -1 && urlCrua.slice(inicio + 1).includes('?');
+  if (inicio === -1) return false;
+  const query = urlCrua.slice(inicio + 1);
+  // As duas formas: o `?` literal e o `%3F` que o proxy produz.
+  return query.includes('?') || /%3F/i.test(query);
 }

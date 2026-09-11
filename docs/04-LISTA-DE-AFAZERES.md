@@ -19,6 +19,93 @@
 
 ---
 
+## 🔴 Item 36 — CATALOGADO em 11/09/2026: produção autentica por uma instância de DESENVOLVIMENTO do Clerk
+
+**Achado pela Greens**, testando o handoff em produção. Ao clicar em "Criar conta e continuar",
+a tela diz _"Não conseguimos concluir agora"_ e o devtools mostra:
+
+```
+POST https://relative-blowfish-96.clerk.accounts.dev/v1/client/sign_ups?…   → 400
+GET  https://challenges.cloudflare.com/cdn-cgi/challenge-platform/…         → 401
+```
+
+### O diagnóstico, medido — não inferido
+
+Eles suspeitaram pelo `pk_test` do `.env.example`. **Perguntei à própria instância**
+(`GET /v1/environment`), e ela responde por escrito:
+
+| campo                                      | valor             |
+| ------------------------------------------ | ----------------- |
+| `display_config.instance_environment_type` | **`development`** |
+| `user_settings.sign_up.captcha_enabled`    | `true`            |
+| `display_config.captcha_provider`          | `turnstile`       |
+| `display_config.captcha_widget_type`       | `smart`           |
+
+E reproduzi o `400` fora do navegador, contra a mesma instância. São **dois** códigos, na ordem
+em que o navegador os encontra:
+
+| #   | `errors[].code`                     | quando                                                                      |
+| --- | ----------------------------------- | --------------------------------------------------------------------------- |
+| 1   | `dev_browser_unauthenticated` (401) | sem o cookie do dev browser — **só existe em instância de desenvolvimento** |
+| 2   | `captcha_missing_token` (400)       | com o dev browser resolvido, que é o caso do paciente                       |
+
+🔴 **`captcha_missing_token` fecha o circuito com o `401` que a Greens viu.** O
+`GET challenges.cloudflare.com → 401` é o widget do Turnstile falhando; widget que falha não
+produz token; sem token, o `sign_ups` devolve 400 com esse código. As duas linhas do devtools
+são o mesmo evento, em dois atos.
+
+⚠️ **O limite da medição, dito por escrito:** um `curl` nunca resolve um Turnstile, então o
+`captcha_missing_token` do meu teste é esperado _por construção_. O que ele prova é que **a bot
+protection está ligada e é obrigatória no cadastro**. O `401` da Greens é que prova o resto.
+
+### O que NÃO é a causa — conferido antes de acusar
+
+- **O `<div id="clerk-captcha" />` existe nos dois fluxos:**
+  `app/(auth)/registrar-se/[[...sign-up]]/page.tsx:582` e
+  `app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx:1130`.
+  A doc do Clerk diz que, sem ele, o SDK _"transparently fall back to an invisible widget"_ —
+  que bloqueia sem dar ao usuário chance de provar que é humano. Não é o nosso caso.
+- **O CSP não bloqueia nada:** `next.config.ts:105` emite
+  `Content-Security-Policy-Report-Only`, não `Content-Security-Policy`. Que
+  `challenges.cloudflare.com` não esteja listado gera ruído no console e nada mais.
+  🔴 Retrato minha leitura anterior — eu disse "o CSP já permite os domínios do Clerk", o que
+  estava certo pelo motivo errado. Ele não permite nem proíbe; **observa**.
+
+### 🔴 `clerk.be4hope.org` está no CSP e NÃO EXISTE
+
+```
+$ getent hosts clerk.be4hope.org
+  (nada — não resolve)
+```
+
+O domínio entrou em `next.config.ts:108,112` como preparação para a instância de produção, e
+**ela nunca foi criada**. Produção autentica hoje por uma instância de desenvolvimento, com bot
+protection de desenvolvimento, num domínio real e com tráfego real.
+
+### O perigo de mexer, medido
+
+| eixo                                 | medição                                                                                                                                                                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| está em produção?                    | **sim** — é o login e o cadastro de todo mundo                                                                                                                                                                                                       |
+| quantos pontos de chamada            | a chave pública é substituída **no build** (`deploy.yml:73`); o guarda `next-public-existe-no-build` cobre a ausência, não a troca                                                                                                                   |
+| existe teste que prove antes/depois? | **não**, e não pode haver: instância do Clerk é infraestrutura externa                                                                                                                                                                               |
+| o que quebra em quem consome hoje    | 🔴 **risco aberto: não medi se a base de usuários atravessa de uma instância para a outra.** A doc de deploy do Clerk é silenciosa sobre migração de usuários — fala de SSO, integrações e paths que _não_ são copiados, e não diz nada sobre contas |
+| custo de fazer                       | domínio próprio + registros DNS + certificados. A doc do Clerk: _"It can take up to 48hrs for DNS records to fully propagate"_                                                                                                                       |
+| custo de deixar                      | cadastro falhando de forma intermitente em produção, sem mensagem que ajude o paciente                                                                                                                                                               |
+
+### O que falta decidir — e é do dono, não meu
+
+1. **Criar a instância de produção do Clerk?** É decisão de negócio (custo do plano, janela de
+   DNS, e o risco da base de usuários).
+2. **Antes disso: medir se os usuários existentes sobrevivem à troca.** Enquanto não estiver
+   medido, isto é risco aberto — não detalhe de configuração.
+
+**Fonte:** doc de erros do Clerk (`dev_browser_unauthenticated`, 401, _"Unable to authenticate
+this browser for your development instance"_) e o guia de bot protection em fluxo customizado.
+Registrado no §12 do `CONTRATO-S2-BEHEMP-PARA-GREENS.md`, que era a resposta que eles pediram.
+
+---
+
 ## ✅ Item 35 — RESOLVIDO em 11/09/2026: a confirmação do e-mail tinha dois becos
 
 **Achado pelo dono testando em produção**, horas antes da apresentação: _"a validação do código
