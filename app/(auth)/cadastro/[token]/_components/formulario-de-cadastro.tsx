@@ -327,6 +327,15 @@ export function FormularioDeCadastro({
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
   /**
+   * 🔴 O REENVIO PRECISA DAR RETORNO — achado em 11/09/2026, com o dono testando.
+   *
+   * "Reenviar código" não mudava nada na tela. Quem clica e não vê resposta clica de novo, e
+   * **cada reenvio invalida o código anterior**: o paciente digita o do primeiro e-mail e a
+   * tela responde "código incorreto". O defeito parece do código; é da falta de retorno.
+   */
+  const [reenviado, setReenviado] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  /**
    * 🔴 D-07 — o e-mail já tem conta aqui.
    *
    * Antes isto era só uma mensagem de erro do Clerk, e o paciente ficava PRESO: lia
@@ -392,6 +401,28 @@ export function FormularioDeCadastro({
 
     const partes = nome.trim().split(/\s+/);
     try {
+      /**
+       * 🔴 VOLTAR E ENVIAR DE NOVO NÃO PODE VIRAR BECO — achado em 11/09/2026.
+       *
+       * "Corrigir meus dados" leva de volta a esta etapa. Chamar `signUp.create` outra vez
+       * com um cadastro já pendente faz o Clerk responder `form_identifier_exists`, e a tela
+       * dizia **"Já existe uma conta com este e-mail"** — para alguém que estava no meio do
+       * próprio cadastro, e que NÃO tem conta. O caminho de correção virava saída.
+       *
+       * Quando o cadastro pendente é do MESMO e-mail, só reenviamos o código e seguimos.
+       */
+      const emailAlvo = email.trim().toLowerCase();
+      const pendenteDoMesmoEmail =
+        Boolean(signUp.status) && signUp.emailAddress?.toLowerCase() === emailAlvo;
+
+      if (pendenteDoMesmoEmail) {
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+        setCodigo('');
+        setReenviado(true);
+        setEtapa('codigo');
+        return;
+      }
+
       await signUp.create({
         emailAddress: email.trim().toLowerCase(),
         password: senha,
@@ -474,12 +505,23 @@ export function FormularioDeCadastro({
   }
 
   async function reenviarCodigo() {
-    if (!isLoaded) return;
+    if (!isLoaded || reenviando) return;
     setErro('');
+    setReenviando(true);
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      /**
+       * 🔴 LIMPA O CAMPO. O código que estava digitado é o ANTERIOR, e ele acabou de deixar
+       * de valer. Manter os dígitos na tela convida a confirmar o código morto — e o erro
+       * que aparece ("código incorreto") aponta para o lugar errado.
+       */
+      setCodigo('');
+      setReenviado(true);
+      campoCodigo.current?.focus();
     } catch (err) {
       setErro(traduzirErro(err));
+    } finally {
+      setReenviando(false);
     }
   }
 
@@ -522,11 +564,30 @@ export function FormularioDeCadastro({
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={codigo}
-                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => {
+                  setCodigo(e.target.value.replace(/\D/g, ''));
+                  // O aviso já foi lido quando ele começa a digitar.
+                  if (reenviado) setReenviado(false);
+                }}
                 placeholder="000000"
                 className="h-14 rounded-xl text-center font-mono text-2xl tracking-[0.5em]"
               />
             </div>
+
+            {/*
+              🔴 O RETORNO DO REENVIO. Sem ele o paciente clica de novo — e cada reenvio
+              invalida o código anterior, o que faz o código certo do e-mail ERRADO ser
+              recusado. Diz também que o anterior deixou de valer, porque é isso que explica
+              o e-mail antigo na caixa de entrada.
+            */}
+            {reenviado && !erro && (
+              <div className="animate-fade-in border-primary/25 bg-primary/5 rounded-xl border px-4 py-3">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Enviamos um código novo. <strong>O anterior deixou de valer</strong> — use o
+                  e-mail mais recente.
+                </p>
+              </div>
+            )}
 
             {erro && <Aviso texto={erro} />}
 
@@ -563,9 +624,10 @@ export function FormularioDeCadastro({
               <button
                 type="button"
                 onClick={reenviarCodigo}
-                className="text-primary font-medium transition-opacity hover:opacity-70"
+                disabled={reenviando}
+                className="text-primary font-medium transition-opacity hover:opacity-70 disabled:opacity-50"
               >
-                Reenviar código
+                {reenviando ? 'Enviando…' : 'Reenviar código'}
               </button>
             </div>
           </form>
