@@ -247,13 +247,17 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
       setHistorico((atual) => [
         {
           id: res.dados!.consultaId,
+          medicoId: medicoSelecionado.id,
           medicoNome: medicoSelecionado.nome,
+          medicoEspecialidade: medicoSelecionado.especialidade,
           medicoAvatarUrl: medicoSelecionado.avatarUrl,
           dataHora: dataHora.toISOString(),
           status: 'reservada',
           valor: res.dados!.valor,
           moeda: res.dados!.moeda,
           expiraEm: res.dados!.expiraEm,
+          observacoes: observacoes || null,
+          remarcadaPeloPacienteEm: null,
         },
         ...atual,
       ]);
