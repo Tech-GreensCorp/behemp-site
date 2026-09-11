@@ -49,34 +49,32 @@ const BASE = 'https://be4hope.org/api/chatpro/bot-link';
 // ─────────────────────────────────────────────────────────────────────────────
 describe('a leitura tolera o separador errado', () => {
   it('🔴 com `?` no lugar de `&`, TODOS os parâmetros sobrevivem', () => {
-    const p = parametrosDoPainel(new URL(`${BASE}?tem=receita_medica?sessionId=abc?name=Ana`));
+    const p = parametrosDoPainel(`${BASE}?tem=receita_medica?sessionId=abc?name=Ana`);
     expect(p.get('tem')).toBe('receita_medica');
     expect(p.get('sessionId')).toBe('abc');
     expect(p.get('name')).toBe('Ana');
   });
 
   it('e com `&` correto continua idêntico — a correção não muda o caminho feliz', () => {
-    const p = parametrosDoPainel(new URL(`${BASE}?tem=receita_medica&sessionId=abc&name=Ana`));
+    const p = parametrosDoPainel(`${BASE}?tem=receita_medica&sessionId=abc&name=Ana`);
     expect(p.get('tem')).toBe('receita_medica');
     expect(p.get('sessionId')).toBe('abc');
     expect(p.get('name')).toBe('Ana');
   });
 
   it('mistura de `?` e `&` também', () => {
-    const p = parametrosDoPainel(new URL(`${BASE}?tem=receita_medica&name=Ana?sessionId=abc`));
+    const p = parametrosDoPainel(`${BASE}?tem=receita_medica&name=Ana?sessionId=abc`);
     expect(p.get('tem')).toBe('receita_medica');
     expect(p.get('name')).toBe('Ana');
     expect(p.get('sessionId')).toBe('abc');
   });
 
   it('sem query nenhuma não estoura', () => {
-    expect(parametrosDoPainel(new URL(BASE)).get('tem')).toBeNull();
+    expect(parametrosDoPainel(BASE).get('tem')).toBeNull();
   });
 
   it('🔴 e o manifesto volta a ser lido — que é o que se perdia', () => {
-    const p = parametrosDoPainel(
-      new URL(`${BASE}?tem=receita_medica,documento_identidade?sessionId=abc`),
-    );
+    const p = parametrosDoPainel(`${BASE}?tem=receita_medica,documento_identidade?sessionId=abc`);
     const m = lerManifestoDaUrl(p);
     expect(m.documentos).toEqual(['receita_medica', 'documento_identidade']);
     expect(m.declarado).toBe(true);
@@ -89,10 +87,31 @@ describe('a leitura tolera o separador errado', () => {
     expect(lerManifestoDaUrl(cru).declarado).toBe(false);
   });
 
+  /**
+   * 🔴 O CASO QUE FALTAVA, e que deixou o defeito passar para produção.
+   *
+   * A primeira versão recebia `request.nextUrl`. Os testes passavam e **produção continuava
+   * perdendo o manifesto**, com o código já no servidor.
+   *
+   * ⚠️ E a explicação que eu tinha escrito estava ERRADA: medi `new NextRequest(url)` e o
+   * `nextUrl.search` **preserva** o `?`, igual ao `request.url`. A causa em produção não foi
+   * isolada — a mudança para a string crua é hipótese de custo baixo, não causa provada.
+   *
+   * O que este caso garante continua valendo: a função lê a string crua, sem parser
+   * intermediário. Se a próxima medição em produção continuar falhando, o problema está antes
+   * daqui, e é preciso fazer o servidor dizer o que viu.
+   */
+  it('🔴 lê a string crua, sem passar por parser de URL', () => {
+    const crua = `${BASE}?tem=receita_medica?sessionId=abc`;
+    expect(parametrosDoPainel(crua).get('tem')).toBe('receita_medica');
+    // E o que um parser faria com a mesma string — o comportamento que me enganou.
+    expect(new URL(crua).searchParams.get('tem')).toBe('receita_medica?sessionId=abc');
+  });
+
   it('a correção é detectável, para o log poder avisar', () => {
-    expect(separadorFoiCorrigido(new URL(`${BASE}?a=1?b=2`))).toBe(true);
-    expect(separadorFoiCorrigido(new URL(`${BASE}?a=1&b=2`))).toBe(false);
-    expect(separadorFoiCorrigido(new URL(BASE))).toBe(false);
+    expect(separadorFoiCorrigido(`${BASE}?a=1?b=2`)).toBe(true);
+    expect(separadorFoiCorrigido(`${BASE}?a=1&b=2`)).toBe(false);
+    expect(separadorFoiCorrigido(BASE)).toBe(false);
   });
 });
 
@@ -134,5 +153,52 @@ describe('as três rotas do painel usam a leitura tolerante', () => {
         expect(l, `${proibido} em: ${l}`).not.toMatch(new RegExp(`\\b${proibido}\\b`, 'i'));
       }
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a rota de eco existe, e é instrumento — não produto', () => {
+  /**
+   * 🔴 ELA NASCEU DE UM DEPLOY DESPERDIÇADO. A correção subiu, produção continuou falhando, e
+   * não havia como perguntar ao servidor o que ele viu: log não é acessível daqui, e a
+   * resposta do `bot-link` é a mensagem do paciente. O passo seguinte teria sido outra
+   * hipótese e outro deploy.
+   */
+  const eco = semComentarios(ler('app/api/chatpro/eco/route.ts'));
+
+  it('exige o mesmo segredo do bot-link', () => {
+    expect(eco).toContain('identificarConta(lerSegredoDoCabecalho(request.headers))');
+    expect(eco).toMatch(/status: 401/);
+  });
+
+  it('tem limite de requisição — rota que ecoa entrada é ferramenta de sondagem', () => {
+    expect(eco).toContain('consumir(');
+    expect(eco).toMatch(/if \(!limite\.permitido\)/);
+  });
+
+  /**
+   * ⚠️ `lastIndexOf`, não `indexOf`. A primeira versão fatiava do PRIMEIRO
+   * `NextResponse.json` — o do 429 — e apanhava o `request.headers` legítimo da checagem de
+   * segredo, que vem depois. Escopo errado acusa inocente.
+   */
+  it('🔴 NÃO ecoa cabeçalho — devolveria o próprio segredo a quem o mandou', () => {
+    const corpo = eco.slice(eco.lastIndexOf('return NextResponse.json('));
+    expect(corpo).not.toMatch(/request\.headers/);
+    expect(corpo).not.toMatch(/\bsegredo\b/i);
+  });
+
+  it('nem corpo da requisição', () => {
+    expect(eco).not.toMatch(/request\.(json|text|formData)\(/);
+  });
+
+  it('mostra as DUAS leituras lado a lado — é essa diferença que responde a pergunta', () => {
+    expect(eco).toContain('comoONextLe');
+    expect(eco).toContain('comoNosLemos');
+    expect(eco).toContain('nextUrlSearch');
+    expect(eco).toContain('crua: request.url');
+  });
+
+  it('e não entra em cache', () => {
+    expect(eco).toContain("'cache-control': 'no-store'");
   });
 });

@@ -35,7 +35,7 @@ function urlBase(): string {
 }
 
 export async function GET(request: NextRequest) {
-  const q = parametrosDoPainel(request.nextUrl);
+  const q = parametrosDoPainel(request.url);
 
   try {
     const resultado = await new ServicoDeSolicitacao().start({

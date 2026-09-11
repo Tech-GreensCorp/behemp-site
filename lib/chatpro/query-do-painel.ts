@@ -31,6 +31,29 @@
  * ⚠️ Vale para o que o PAINEL monta, não para o que o paciente digita. Estas rotas são
  * chamadas por máquina, com segredo no cabeçalho — não há caso em que um `?` literal dentro de
  * um valor seja intencional.
+ *
+ * 🔴 RECEBE `request.url` (string), NUNCA `request.nextUrl` — e o porquê é honesto: eu ainda
+ * NÃO sei qual é a causa em produção.
+ *
+ * A primeira versão passava `request.nextUrl` e **não funcionou em produção**, com o código já
+ * no servidor. Medido depois do deploy, com telefones novos e pausa entre as chamadas:
+ *
+ *     ?tem=autorizacao_anvisa**&**sessionId=…  →  "já recebemos": 1 seção
+ *     ?tem=autorizacao_anvisa**?**sessionId=…  →  "já recebemos": 0 seções
+ *
+ * ⚠️ RETRATAÇÃO: eu tinha escrito aqui que o `NextURL` normaliza a query. **Medi, e é falso.**
+ * Com `new NextRequest(url)` no Node, `nextUrl.search` preserva o `?` e devolve exatamente o
+ * mesmo que `new URL(request.url)`. A causa em produção é outra, e não a isolei.
+ *
+ * **Por que ainda assim mudei para `request.url`:** ela é a string que o runtime recebeu, sem
+ * nenhum parser intermediário entre o cliente e esta função. Se houver normalização em algum
+ * ponto do caminho — proxy, runtime, ou construção do `NextURL` a partir do request HTTP real,
+ * que é diferente de construí-lo de uma string —, é o `request.url` que tem a melhor chance de
+ * escapar dela. É uma hipótese com custo baixo, não uma causa provada.
+ *
+ * 🔴 **O QUE FAZER SE CONTINUAR FALHANDO DEPOIS DESTE DEPLOY:** o próximo passo é fazer o
+ * servidor dizer o que viu — um campo no `/api/parceiros/health`, ou um log que se consiga ler.
+ * Sem isso, a próxima tentativa é adivinhação outra vez, e já gastamos um deploy assim.
  */
 
 /**
@@ -38,13 +61,15 @@
  *
  * O primeiro `?` separa caminho de query; do segundo em diante, vira `&`.
  */
-export function parametrosDoPainel(url: URL): URLSearchParams {
-  const bruto = url.search.startsWith('?') ? url.search.slice(1) : url.search;
-  if (!bruto.includes('?')) return url.searchParams;
+export function parametrosDoPainel(urlCrua: string): URLSearchParams {
+  const inicio = urlCrua.indexOf('?');
+  if (inicio === -1) return new URLSearchParams();
+  const bruto = urlCrua.slice(inicio + 1);
   return new URLSearchParams(bruto.replace(/\?/g, '&'));
 }
 
 /** `true` quando a URL veio com o separador errado — para o log dizer que isso aconteceu. */
-export function separadorFoiCorrigido(url: URL): boolean {
-  return url.search.slice(1).includes('?');
+export function separadorFoiCorrigido(urlCrua: string): boolean {
+  const inicio = urlCrua.indexOf('?');
+  return inicio !== -1 && urlCrua.slice(inicio + 1).includes('?');
 }
