@@ -422,7 +422,14 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+            {/*
+              Uma única grade com as 3 partes lado a lado (médico | calendário | horários),
+              em vez de grades aninhadas com colunas de largura igual — isso deixava um vão
+              morto entre o calendário (mais estreito que sua coluna) e a coluna de horários.
+              `auto` faz o calendário ocupar só a largura que precisa; `1fr` faz os horários
+              começarem logo em seguida e usarem o resto do espaço.
+            */}
+            <div className="grid gap-8 md:grid-cols-[220px_auto_1fr] md:items-start">
               {/* Resumo do médico selecionado */}
               <div className="flex md:flex-col items-center gap-3 rounded-xl border border-border/60 p-4 md:items-start">
                 {medicoSelecionado.avatarUrl ? (
@@ -447,136 +454,114 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                 </div>
               </div>
 
-              <div className="grid gap-8 sm:grid-cols-2 sm:items-start">
-                {/* Calendário */}
-                <div>
-                  <Calendar
-                    mode="single"
-                    selected={dataSelecionada}
-                    onSelect={handleDataChange}
-                    locale={ptBR}
-                    disabled={(date) => {
-                      const hoje = new Date();
-                      hoje.setHours(0, 0, 0, 0);
-                      return date < hoje || date.getDay() === 0 || date.getDay() === 6;
-                    }}
-                    className="rounded-xl border"
-                  />
-                  <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Info size={12} />
-                    Horários exibidos no fuso de Brasília
-                  </p>
-                </div>
+              {/* Calendário */}
+              <div>
+                <Calendar
+                  mode="single"
+                  selected={dataSelecionada}
+                  onSelect={handleDataChange}
+                  locale={ptBR}
+                  disabled={(date) => {
+                    const hoje = new Date();
+                    hoje.setHours(0, 0, 0, 0);
+                    return date < hoje || date.getDay() === 0 || date.getDay() === 6;
+                  }}
+                  className="rounded-xl border"
+                />
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Info size={12} />
+                  Horários exibidos no fuso de Brasília
+                </p>
+              </div>
 
-                {/* Horários */}
-                <div>
-                  {!dataSelecionada ? (
-                    <div className="space-y-5">
-                      <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
-                        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
-                          <CalendarDays size={20} className="text-primary" />
-                        </div>
-                        <p className="text-sm font-medium">Selecione uma data no calendário</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Os horários disponíveis daquele dia aparecem aqui.
-                        </p>
-                      </div>
-
-                      <div className="space-y-3">
-                        {[
-                          { n: 1, texto: 'Escolha uma data disponível no calendário' },
-                          { n: 2, texto: 'Selecione um dos horários livres' },
-                          { n: 3, texto: 'Revise e reserve — o pagamento vem na próxima etapa' },
-                        ].map((passo) => (
-                          <div key={passo.n} className="flex items-center gap-3">
-                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                              {passo.n}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{passo.texto}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : carregandoHorarios ? (
-                    <div className="flex items-center justify-center rounded-xl border border-dashed border-border/60 py-16">
-                      <Loader2 size={22} className="animate-spin text-primary" />
-                    </div>
-                  ) : horariosLivres.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
-                      <CalendarDays size={24} className="mx-auto mb-2 text-muted-foreground/40" />
-                      <p className="text-sm font-medium">Nenhum horário disponível nesta data</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Tente escolher outro dia no calendário
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="mb-4 text-sm font-medium">
-                        {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
-                        <span className="ml-1.5 font-normal text-muted-foreground">
-                          — {horariosLivres.length}{' '}
-                          {horariosLivres.length === 1
-                            ? 'horário disponível'
-                            : 'horários disponíveis'}
-                        </span>
-                      </p>
-
-                      {agruparHorariosPorPeriodo(horariosLivres).map((grupo) => (
-                        <div key={grupo.label} className="mb-5">
-                          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                            <grupo.icon size={13} />
-                            {grupo.label}
-                          </p>
-                          <div className="grid grid-cols-3 gap-2">
-                            {grupo.horarios.map((h) => (
-                              <button
-                                key={h}
-                                onClick={() => setHorarioSelecionado(h)}
-                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                                  horarioSelecionado === h
-                                    ? 'border-primary bg-primary text-primary-foreground'
-                                    : 'border-border hover:border-primary/40'
-                                }`}
-                              >
-                                {h}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-
-                      {horarioSelecionado && (
-                        <div className="mb-5">
-                          <Textarea
-                            value={observacoes}
-                            onChange={(e) => setObservacoes(e.target.value)}
-                            placeholder="Observações para o médico (opcional)"
-                            className="min-h-[72px]"
-                          />
-                          <Button
-                            onClick={handleReservar}
-                            disabled={reservando}
-                            className="mt-4 w-full gap-2"
-                          >
-                            {reservando ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <ChevronRight size={14} />
-                            )}
-                            Continuar
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
-                    <Video size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      Consulta por videochamada, com duração aproximada de 1 hora. Você pode
-                      trocar de médico ou data a qualquer momento antes de reservar o horário.
+              {/* Horários */}
+              <div className="md:min-w-[240px]">
+                {!dataSelecionada ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Clock size={28} className="mb-2 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma data para ver os horários disponíveis
                     </p>
                   </div>
+                ) : carregandoHorarios ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 size={22} className="animate-spin text-primary" />
+                  </div>
+                ) : horariosLivres.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <CalendarDays size={28} className="mb-2 text-muted-foreground/40" />
+                    <p className="text-sm font-medium">Nenhum horário disponível nesta data</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Tente escolher outro dia no calendário
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="mb-4 text-sm font-medium">
+                      {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
+                      <span className="ml-1.5 font-normal text-muted-foreground">
+                        — {horariosLivres.length}{' '}
+                        {horariosLivres.length === 1
+                          ? 'horário disponível'
+                          : 'horários disponíveis'}
+                      </span>
+                    </p>
+
+                    {agruparHorariosPorPeriodo(horariosLivres).map((grupo) => (
+                      <div key={grupo.label} className="mb-5">
+                        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <grupo.icon size={13} />
+                          {grupo.label}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {grupo.horarios.map((h) => (
+                            <button
+                              key={h}
+                              onClick={() => setHorarioSelecionado(h)}
+                              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                horarioSelecionado === h
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border hover:border-primary/40'
+                              }`}
+                            >
+                              {h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {horarioSelecionado && (
+                      <div className="mb-5">
+                        <Textarea
+                          value={observacoes}
+                          onChange={(e) => setObservacoes(e.target.value)}
+                          placeholder="Observações para o médico (opcional)"
+                          className="min-h-[72px]"
+                        />
+                        <Button
+                          onClick={handleReservar}
+                          disabled={reservando}
+                          className="mt-4 w-full gap-2"
+                        >
+                          {reservando ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
+                          Continuar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
+                  <Video size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Consulta por videochamada, com duração aproximada de 1 hora. Você pode
+                    trocar de médico ou data a qualquer momento antes de reservar o horário.
+                  </p>
                 </div>
               </div>
             </div>
