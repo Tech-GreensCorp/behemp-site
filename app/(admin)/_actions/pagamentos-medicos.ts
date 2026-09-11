@@ -66,7 +66,10 @@ export async function listarMedicosComConfigPagamento(): Promise<
       avatarUrl: m.avatarUrl,
       especialidade: m.especialidade,
       configurado: Boolean(
-        m.pixHabilitado || m.boletoHabilitado || m.cartaoCreditoHabilitado || m.cartaoDebitoHabilitado,
+        m.pixHabilitado ||
+          m.boletoHabilitado ||
+          m.cartaoCreditoHabilitado ||
+          m.cartaoDebitoHabilitado,
       ),
     }));
 

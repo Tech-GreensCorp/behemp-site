@@ -19,7 +19,7 @@ export default async function PagamentosConfiguracoesPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Configuração de pagamentos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Valor padrão da consulta — o pagamento vai direto para o médico
           </p>
         </div>

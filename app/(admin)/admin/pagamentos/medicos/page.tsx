@@ -29,7 +29,7 @@ export default async function PagamentosMedicosPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Meios de pagamento por médico</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             {totalConfigurados} de {medicos.length} médico{medicos.length !== 1 ? 's' : ''} com
             algum método configurado
           </p>
@@ -39,9 +39,9 @@ export default async function PagamentosMedicosPage() {
       {medicos.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Landmark size={48} className="mb-4 text-muted-foreground/40" />
+            <Landmark size={48} className="text-muted-foreground/40 mb-4" />
             <p className="text-lg font-medium">Nenhum médico cadastrado</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               Cadastre médicos em Médicos para poder configurar os meios de pagamento.
             </p>
           </CardContent>
@@ -52,7 +52,7 @@ export default async function PagamentosMedicosPage() {
             <Link
               key={m.medicoId}
               href={`/admin/pagamentos/medicos/${m.medicoId}`}
-              className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:bg-accent/30"
+              className="group border-border/50 bg-card hover:border-primary/50 hover:bg-accent/30 flex items-center gap-3 rounded-xl border p-4 transition-all"
             >
               {m.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -68,14 +68,14 @@ export default async function PagamentosMedicosPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{m.nome}</p>
-                <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
+                <p className="text-muted-foreground truncate text-xs">{m.especialidade}</p>
               </div>
               <Badge variant={m.configurado ? 'default' : 'secondary'}>
                 {m.configurado ? 'Configurado' : 'Pendente'}
               </Badge>
               <ChevronRight
                 size={16}
-                className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1"
+                className="text-muted-foreground shrink-0 transition-transform group-hover:translate-x-1"
               />
             </Link>
           ))}

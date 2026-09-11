@@ -65,7 +65,9 @@ export async function listarPagamentos(params?: {
 
     const conditions = [];
     if (params?.status) {
-      conditions.push(eq(pagamentos.status, params.status as typeof pagamentos.$inferSelect.status));
+      conditions.push(
+        eq(pagamentos.status, params.status as typeof pagamentos.$inferSelect.status),
+      );
     }
     if (params?.atencao) {
       conditions.push(and(isNotNull(pagamentos.erroConfirmacao), isNull(pagamentos.confirmadoEm)));
@@ -126,36 +128,34 @@ export async function listarPagamentos(params?: {
  * Detalhe de uma tentativa de agendamento/pagamento — inclui paciente, médico e o
  * rastreamento completo do funil.
  */
-export async function obterPagamento(id: string): Promise<ActionResult<{
-  id: string;
-  status: string;
-  valor: string;
-  moeda: string;
-  gatewayProvider: string | null;
-  gatewayReferenciaId: string | null;
-  createdAt: Date;
-  pagoEm: Date | null;
-  observacoes: string | null;
-  dataHora: Date;
-  pacienteNome: string;
-  medicoNome: string;
-  consultaId: string | null;
-  iniciadoEm: Date;
-  pagamentoIniciadoEm: Date | null;
-  pagamentoConcluidoEm: Date | null;
-  pagamentoErroEm: Date | null;
-  confirmadoEm: Date | null;
-  erroConfirmacao: string | null;
-}>> {
+export async function obterPagamento(id: string): Promise<
+  ActionResult<{
+    id: string;
+    status: string;
+    valor: string;
+    moeda: string;
+    gatewayProvider: string | null;
+    gatewayReferenciaId: string | null;
+    createdAt: Date;
+    pagoEm: Date | null;
+    observacoes: string | null;
+    dataHora: Date;
+    pacienteNome: string;
+    medicoNome: string;
+    consultaId: string | null;
+    iniciadoEm: Date;
+    pagamentoIniciadoEm: Date | null;
+    pagamentoConcluidoEm: Date | null;
+    pagamentoErroEm: Date | null;
+    confirmadoEm: Date | null;
+    erroConfirmacao: string | null;
+  }>
+> {
   try {
     const auth = await verificarAdmin();
     if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
 
-    const [pagamento] = await db
-      .select()
-      .from(pagamentos)
-      .where(eq(pagamentos.id, id))
-      .limit(1);
+    const [pagamento] = await db.select().from(pagamentos).where(eq(pagamentos.id, id)).limit(1);
 
     if (!pagamento) return { sucesso: false, erro: 'Pagamento não encontrado' };
 
@@ -266,10 +266,12 @@ const configPagamentosSchema = z.object({
   moedaPadrao: z.string().min(1),
 });
 
-export async function buscarConfigPagamentos(): Promise<ActionResult<{
-  valorConsultaPadrao: string;
-  moedaPadrao: string;
-}>> {
+export async function buscarConfigPagamentos(): Promise<
+  ActionResult<{
+    valorConsultaPadrao: string;
+    moedaPadrao: string;
+  }>
+> {
   try {
     const auth = await verificarAdmin();
     if (!auth.autorizado) return { sucesso: false, erro: auth.erro };

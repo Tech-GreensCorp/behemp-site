@@ -34,7 +34,7 @@ export default async function PagamentoMedicoPage({ params }: Props) {
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{config.medicoNome}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             {config.especialidade} — meios de pagamento
           </p>
         </div>
