@@ -1797,7 +1797,7 @@ decorativo e o teste verde. Corrigido para medir o caminho de falha, não a pres
 - **IP Elástico na EC2** (recomendação da Dryelle). Não é causa deste incidente; evita que o
   `SERVER_IP` fique obsoleto num reboot.
 
-## Item 29 — 🟠 PENDENTE: a aprovação da ANVISA não avisa o paciente por e-mail nem WhatsApp
+## Item 29 — 🟡 PARCIAL (11/09/2026): e-mail e sistema feitos; WhatsApp bloqueado por falta de doc
 
 **Adiado pelo dono em 10/09/2026**, ao descrever o fluxo 1 da Greens: _"isso nós fazemos depois,
 deixe anotado como pendência"_. O passo 7 do fluxo dele pede _"recebe notificação email, celular
@@ -1839,6 +1839,36 @@ o guarda `o-aviso-ao-parceiro-nao-se-perde` já aplica ao aviso que vai para a G
 Quando for implementado: o aviso ao paciente não pode carregar dado clínico, e a falha de um
 canal não pode impedir os outros — nem derrubar a atualização de status, que é o fato que
 importa.
+
+### ✅ O que foi feito em 11/09/2026
+
+`lib/anvisa/avisar-aprovacao.ts`, chamado por `app/api/anvisa/atualizar-status/route.ts` quando
+o status vira `aprovado`:
+
+| canal                  | estado                                     | nota                                                          |
+| ---------------------- | ------------------------------------------ | ------------------------------------------------------------- |
+| **no sistema**         | ✅ linha em `notificacoes`, com `linkAcao` | vem **primeiro**: é o único canal que não depende de terceiro |
+| **e-mail**             | ✅ Brevo, `enviarEmailAnvisaAprovada`      | leva o número do processo; **nada clínico**                   |
+| **celular (WhatsApp)** | 🔴 **não**                                 | ver abaixo                                                    |
+
+O Pusher continua — ele é o canal **imediato**, não o substituto. O defeito era ele ser o
+**único**: tempo real significa que quem não estava com a aba aberta nunca soube, e a
+autorização demora semanas.
+
+### 🔴 Item 29b — por que o WhatsApp NÃO entrou
+
+**Não é esquecimento, é ausência de fonte.** `lib/chatpro/cliente.ts` só **busca** contato e
+sessão — não tem método de envio. Procurei o endpoint de envio ativo nos **dois** repositórios
+em 11/09/2026: a única ocorrência é o valor de enum `v5_send_message` em
+`greens-corp-backend/src/modules/chatpro/types/chatpro.ts`, **sem nenhuma implementação**. Nem
+o lado da Greens envia mensagem ativa.
+
+Deduzir o path daria um envio que **falha em silêncio** — pior que canal ausente, porque
+alguém passa a contar com ele.
+
+**O que destrava:** a documentação do ChatPro para envio ativo, ou o endpoint confirmado pelo
+painel. Há caso de guarda (`a-anvisa-aprovada-avisa-o-paciente`) que fica **vermelho** se
+alguém acrescentar envio ao cliente sem essa conversa acontecer.
 
 ## Item 30 — 🟡 O store privado começou pelos caminhos novos (Item 6 segue aberto)
 
