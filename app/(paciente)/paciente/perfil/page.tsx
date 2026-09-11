@@ -46,10 +46,10 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
-import { 
-  obterPerfilCompletoPaciente, 
+import {
+  obterPerfilCompletoPaciente,
   atualizarPerfilCompletoPaciente,
-  excluirMinhaConta
+  excluirMinhaConta,
 } from '@/app/_actions/perfil-paciente';
 
 export default function PerfilPacientePage() {
@@ -243,7 +243,7 @@ export default function PerfilPacientePage() {
   if (!isLoaded || carregandoPerfil) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -258,14 +258,20 @@ export default function PerfilPacientePage() {
     if (!user) return;
     const nome = firstName.trim();
     const sobrenome = lastName.trim();
-    if (!nome) { toast.error('O nome não pode estar em branco.'); return; }
+    if (!nome) {
+      toast.error('O nome não pode estar em branco.');
+      return;
+    }
     setSalvandoNome(true);
     try {
       await user.update({ firstName: nome, lastName: sobrenome });
       toast.success('Nome updated com sucesso!');
       setEditandoNome(false);
-    } catch { toast.error('Erro ao atualizar o nome.'); }
-    finally { setSalvandoNome(false); }
+    } catch {
+      toast.error('Erro ao atualizar o nome.');
+    } finally {
+      setSalvandoNome(false);
+    }
   }
 
   function cancelarEdicao() {
@@ -279,17 +285,22 @@ export default function PerfilPacientePage() {
     try {
       await user.setProfileImage({ file });
       toast.success('Foto atualizada!');
-    } catch { toast.error('Erro ao enviar a foto.'); }
-    finally { setUploadandoAvatar(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch {
+      toast.error('Erro ao enviar a foto.');
+    } finally {
+      setUploadandoAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   }
 
   const nomeCompleto = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Paciente';
   const email = user?.emailAddresses[0]?.emailAddress || 'Não informado';
-  const docsPendentes = docs.filter((d) => d.dataValidade && new Date(d.dataValidade) < new Date()).length;
+  const docsPendentes = docs.filter(
+    (d) => d.dataValidade && new Date(d.dataValidade) < new Date(),
+  ).length;
 
   return (
     <div className="space-y-12">
-
       {/* ── Top Header Section (Estilo Editorial Landing Page) ── */}
       <div className="animate-fade-up">
         <p className="text-primary mb-3 text-xs font-semibold tracking-[0.25em] uppercase">
@@ -299,26 +310,28 @@ export default function PerfilPacientePage() {
           Meu <span className="text-accent-italic">Perfil</span>
         </h1>
         <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-relaxed">
-          Gerencie suas informações pessoais, dados de contato e acompanhe com transparência os documentos vinculados ao seu tratamento.
+          Gerencie suas informações pessoais, dados de contato e acompanhe com transparência os
+          documentos vinculados ao seu tratamento.
         </p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3 items-start animate-fade-up delay-100">
-
+      <div className="animate-fade-up grid items-start gap-8 delay-100 lg:grid-cols-3">
         {/* Coluna da Esquerda (Identidade + Dados Pessoais) */}
-        <div className="lg:col-span-2 space-y-8">
-
+        <div className="space-y-8 lg:col-span-2">
           {/* Card de Identidade */}
-          <Card className="border border-border/30 bg-card shadow-sm rounded-3xl p-6 grain relative overflow-hidden transition-all hover:shadow-md">
+          <Card className="border-border/30 bg-card grain relative overflow-hidden rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-
               {/* Avatar (Fixo/Sem movimento) */}
-              <div className="relative shrink-0 w-fit">
-                <div className="h-24 w-24 overflow-hidden rounded-2xl border-4 border-background shadow-md sm:h-28 sm:w-28 bg-muted">
+              <div className="relative w-fit shrink-0">
+                <div className="border-background bg-muted h-24 w-24 overflow-hidden rounded-2xl border-4 shadow-md sm:h-28 sm:w-28">
                   {user?.imageUrl ? (
-                    <img src={user.imageUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+                    <img
+                      src={user.imageUrl}
+                      alt="Foto de perfil"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                    <div className="from-primary/20 to-primary/5 flex h-full w-full items-center justify-center bg-gradient-to-br">
                       <User size={38} className="text-primary/60" />
                     </div>
                   )}
@@ -331,34 +344,72 @@ export default function PerfilPacientePage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadandoAvatar}
-                  className="absolute -right-1 -bottom-1 flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                  className="bg-primary text-primary-foreground absolute -right-1 -bottom-1 flex h-8 w-8 items-center justify-center rounded-xl shadow-md transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
                   aria-label="Alterar foto"
                 >
                   <Camera size={14} />
                 </button>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
               </div>
 
               {/* Nome + Badges */}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 {editandoNome ? (
-                  <div className="max-w-sm space-y-3 animate-fade-in">
+                  <div className="animate-fade-in max-w-sm space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label htmlFor="fn" className="text-xs text-muted-foreground">Nome</Label>
-                        <Input id="fn" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-9 rounded-xl text-sm border-border/40 focus:ring-primary/20" autoFocus onKeyDown={(e) => e.key === 'Enter' && salvarNome()} />
+                        <Label htmlFor="fn" className="text-muted-foreground text-xs">
+                          Nome
+                        </Label>
+                        <Input
+                          id="fn"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="border-border/40 focus:ring-primary/20 h-9 rounded-xl text-sm"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && salvarNome()}
+                        />
                       </div>
                       <div className="space-y-1">
-                        <Label htmlFor="ln" className="text-xs text-muted-foreground">Sobrenome</Label>
-                        <Input id="ln" value={lastName} onChange={(e) => setLastName(e.target.value)} className="h-9 rounded-xl text-sm border-border/40 focus:ring-primary/20" onKeyDown={(e) => e.key === 'Enter' && salvarNome()} />
+                        <Label htmlFor="ln" className="text-muted-foreground text-xs">
+                          Sobrenome
+                        </Label>
+                        <Input
+                          id="ln"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="border-border/40 focus:ring-primary/20 h-9 rounded-xl text-sm"
+                          onKeyDown={(e) => e.key === 'Enter' && salvarNome()}
+                        />
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={salvarNome} disabled={salvandoNome} className="gap-1.5 rounded-full bg-primary hover:bg-primary/95 text-white">
-                        {salvandoNome ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      <Button
+                        size="sm"
+                        onClick={salvarNome}
+                        disabled={salvandoNome}
+                        className="bg-primary hover:bg-primary/95 gap-1.5 rounded-full text-white"
+                      >
+                        {salvandoNome ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
                         Salvar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={cancelarEdicao} disabled={salvandoNome} className="gap-1.5 rounded-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={cancelarEdicao}
+                        disabled={salvandoNome}
+                        className="gap-1.5 rounded-full"
+                      >
                         <X className="h-3.5 w-3.5" /> Cancelar
                       </Button>
                     </div>
@@ -366,17 +417,19 @@ export default function PerfilPacientePage() {
                 ) : (
                   <div className="group">
                     <div className="flex items-center gap-3">
-                      <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground truncate">{nomeCompleto}</h2>
+                      <h2 className="font-heading text-foreground truncate text-2xl font-bold tracking-tight">
+                        {nomeCompleto}
+                      </h2>
                       <button
                         onClick={iniciarEdicao}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                        className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100"
                         aria-label="Editar nome"
                       >
                         <Pencil size={12} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary uppercase tracking-wider border border-primary/20">
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="bg-primary/10 text-primary border-primary/20 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold tracking-wider uppercase">
                         Paciente
                       </span>
                     </div>
@@ -387,16 +440,23 @@ export default function PerfilPacientePage() {
           </Card>
 
           {/* Card de Dados Pessoais */}
-          <Card className="border border-border/30 bg-card shadow-sm rounded-3xl grain overflow-hidden transition-all hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/20">
+          <Card className="border-border/30 bg-card grain overflow-hidden rounded-3xl border shadow-sm transition-all hover:shadow-md">
+            <CardHeader className="border-border/20 flex flex-row items-center justify-between border-b pb-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <User className="h-5 w-5 text-primary" />
+                <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-xl">
+                  <User className="text-primary h-5 w-5" />
                 </div>
-                <CardTitle className="text-base font-semibold text-foreground">Dados Pessoais</CardTitle>
+                <CardTitle className="text-foreground text-base font-semibold">
+                  Dados Pessoais
+                </CardTitle>
               </div>
               {!editandoPessoal && (
-                <Button variant="ghost" size="sm" onClick={() => setEditandoPessoal(true)} className="h-8 gap-1 rounded-xl text-xs text-muted-foreground hover:text-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditandoPessoal(true)}
+                  className="text-muted-foreground hover:text-foreground h-8 gap-1 rounded-xl text-xs"
+                >
                   <Pencil size={12} /> Editar
                 </Button>
               )}
@@ -406,20 +466,38 @@ export default function PerfilPacientePage() {
               {editandoPessoal ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <Label htmlFor="cpf" className="text-xs text-muted-foreground">CPF</Label>
-                    <Input id="cpf" value={pessoalForm.cpf} onChange={(e) => setPessoalForm({ ...pessoalForm, cpf: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="000.000.000-00" />
+                    <Label htmlFor="cpf" className="text-muted-foreground text-xs">
+                      CPF
+                    </Label>
+                    <Input
+                      id="cpf"
+                      value={pessoalForm.cpf}
+                      onChange={(e) => setPessoalForm({ ...pessoalForm, cpf: e.target.value })}
+                      className="h-9 rounded-xl text-sm"
+                      placeholder="000.000.000-00"
+                    />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="rg" className="text-xs text-muted-foreground">RG</Label>
-                    <Input id="rg" value={pessoalForm.rg} onChange={(e) => setPessoalForm({ ...pessoalForm, rg: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="00.000.000-0" />
+                    <Label htmlFor="rg" className="text-muted-foreground text-xs">
+                      RG
+                    </Label>
+                    <Input
+                      id="rg"
+                      value={pessoalForm.rg}
+                      onChange={(e) => setPessoalForm({ ...pessoalForm, rg: e.target.value })}
+                      className="h-9 rounded-xl text-sm"
+                      placeholder="00.000.000-0"
+                    />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="genero" className="text-xs text-muted-foreground">Gênero</Label>
+                    <Label htmlFor="genero" className="text-muted-foreground text-xs">
+                      Gênero
+                    </Label>
                     <select
                       id="genero"
                       value={pessoalForm.genero}
                       onChange={(e) => setPessoalForm({ ...pessoalForm, genero: e.target.value })}
-                      className="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="border-input bg-background focus-visible:ring-ring flex h-9 w-full rounded-xl border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
                     >
                       <option value="">Não informado</option>
                       <option value="Masculino">Masculino</option>
@@ -428,15 +506,48 @@ export default function PerfilPacientePage() {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="nasc" className="text-xs text-muted-foreground">Data de Nascimento</Label>
-                    <Input id="nasc" type="date" value={pessoalForm.dataNascimento} onChange={(e) => setPessoalForm({ ...pessoalForm, dataNascimento: e.target.value })} className="h-9 rounded-xl text-sm" />
+                    <Label htmlFor="nasc" className="text-muted-foreground text-xs">
+                      Data de Nascimento
+                    </Label>
+                    <Input
+                      id="nasc"
+                      type="date"
+                      value={pessoalForm.dataNascimento}
+                      onChange={(e) =>
+                        setPessoalForm({ ...pessoalForm, dataNascimento: e.target.value })
+                      }
+                      className="h-9 rounded-xl text-sm"
+                    />
                   </div>
-                  <div className="sm:col-span-2 flex gap-2 pt-2">
-                    <Button size="sm" onClick={salvarPessoal} disabled={salvandoPessoal} className="gap-1.5 rounded-full bg-primary hover:bg-primary/95 text-white">
-                      {salvandoPessoal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  <div className="flex gap-2 pt-2 sm:col-span-2">
+                    <Button
+                      size="sm"
+                      onClick={salvarPessoal}
+                      disabled={salvandoPessoal}
+                      className="bg-primary hover:bg-primary/95 gap-1.5 rounded-full text-white"
+                    >
+                      {salvandoPessoal ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
                       Salvar
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setEditandoPessoal(false); setPessoalForm({ cpf: perfil?.cpf ?? '', rg: perfil?.rg ?? '', genero: perfil?.genero ?? '', dataNascimento: perfil?.dataNascimento ?? '' }); }} disabled={salvandoPessoal} className="gap-1.5 rounded-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditandoPessoal(false);
+                        setPessoalForm({
+                          cpf: perfil?.cpf ?? '',
+                          rg: perfil?.rg ?? '',
+                          genero: perfil?.genero ?? '',
+                          dataNascimento: perfil?.dataNascimento ?? '',
+                        });
+                      }}
+                      disabled={salvandoPessoal}
+                      className="gap-1.5 rounded-full"
+                    >
                       <X className="h-3.5 w-3.5" /> Cancelar
                     </Button>
                   </div>
@@ -444,32 +555,56 @@ export default function PerfilPacientePage() {
               ) : (
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div className="flex items-start gap-3 py-1">
-                    <Fingerprint size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <Fingerprint size={18} className="text-primary/70 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">CPF</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.cpf || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                      <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                        CPF
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-semibold">
+                        {perfil?.cpf || (
+                          <span className="text-muted-foreground font-normal">Não informado</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 py-1">
-                    <FileText size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <FileText size={18} className="text-primary/70 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">RG</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.rg || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                      <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                        RG
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-semibold">
+                        {perfil?.rg || (
+                          <span className="text-muted-foreground font-normal">Não informado</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 py-1">
-                    <Heart size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <Heart size={18} className="text-primary/70 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Gênero</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.genero || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                      <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                        Gênero
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-semibold">
+                        {perfil?.genero || (
+                          <span className="text-muted-foreground font-normal">Não informado</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 py-1">
-                    <CalendarDays size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <CalendarDays size={18} className="text-primary/70 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Data de Nascimento</p>
-                      <p className="text-sm font-semibold text-foreground mt-0.5">
-                        {perfil?.dataNascimento ? new Date(perfil.dataNascimento + 'T00:00:00').toLocaleDateString('pt-BR') : <span className="text-muted-foreground font-normal">Não informado</span>}
+                      <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                        Data de Nascimento
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-semibold">
+                        {perfil?.dataNascimento ? (
+                          new Date(perfil.dataNascimento + 'T00:00:00').toLocaleDateString('pt-BR')
+                        ) : (
+                          <span className="text-muted-foreground font-normal">Não informado</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -481,93 +616,197 @@ export default function PerfilPacientePage() {
 
         {/* Coluna da Direita (Informações de Contato) */}
         <div>
-          <Card className="border border-border/30 bg-card shadow-sm rounded-3xl grain overflow-hidden transition-all hover:shadow-md h-full flex flex-col justify-between">
+          <Card className="border-border/30 bg-card grain flex h-full flex-col justify-between overflow-hidden rounded-3xl border shadow-sm transition-all hover:shadow-md">
             <div>
-              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/20">
+              <CardHeader className="border-border/20 flex flex-row items-center justify-between border-b pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                    <Smartphone className="h-5 w-5 text-primary" />
+                  <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-xl">
+                    <Smartphone className="text-primary h-5 w-5" />
                   </div>
-                  <CardTitle className="text-base font-semibold text-foreground">Contato</CardTitle>
+                  <CardTitle className="text-foreground text-base font-semibold">Contato</CardTitle>
                 </div>
                 {!editandoContato && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditandoContato(true)} className="h-8 gap-1 rounded-xl text-xs text-muted-foreground hover:text-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditandoContato(true)}
+                    className="text-muted-foreground hover:text-foreground h-8 gap-1 rounded-xl text-xs"
+                  >
                     <Pencil size={12} /> Editar
                   </Button>
                 )}
               </CardHeader>
 
-              <CardContent className="p-6 space-y-5 text-sm">
+              <CardContent className="space-y-5 p-6 text-sm">
                 {editandoContato ? (
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <Label htmlFor="tel" className="text-xs text-muted-foreground">Telefone</Label>
-                      <Input id="tel" value={contatoForm.telefone} onChange={(e) => setContatoForm({ ...contatoForm, telefone: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="(11) 99999-9999" />
+                      <Label htmlFor="tel" className="text-muted-foreground text-xs">
+                        Telefone
+                      </Label>
+                      <Input
+                        id="tel"
+                        value={contatoForm.telefone}
+                        onChange={(e) =>
+                          setContatoForm({ ...contatoForm, telefone: e.target.value })
+                        }
+                        className="h-9 rounded-xl text-sm"
+                        placeholder="(11) 99999-9999"
+                      />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="cep" className="text-xs text-muted-foreground">CEP</Label>
-                      <Input id="cep" value={contatoForm.cep} onChange={(e) => setContatoForm({ ...contatoForm, cep: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="00000-000" />
+                      <Label htmlFor="cep" className="text-muted-foreground text-xs">
+                        CEP
+                      </Label>
+                      <Input
+                        id="cep"
+                        value={contatoForm.cep}
+                        onChange={(e) => setContatoForm({ ...contatoForm, cep: e.target.value })}
+                        className="h-9 rounded-xl text-sm"
+                        placeholder="00000-000"
+                      />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="end" className="text-xs text-muted-foreground">Endereço</Label>
-                      <Input id="end" value={contatoForm.endereco} onChange={(e) => setContatoForm({ ...contatoForm, endereco: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="Rua, número, complemento" />
+                      <Label htmlFor="end" className="text-muted-foreground text-xs">
+                        Endereço
+                      </Label>
+                      <Input
+                        id="end"
+                        value={contatoForm.endereco}
+                        onChange={(e) =>
+                          setContatoForm({ ...contatoForm, endereco: e.target.value })
+                        }
+                        className="h-9 rounded-xl text-sm"
+                        placeholder="Rua, número, complemento"
+                      />
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="col-span-2 space-y-1">
-                        <Label htmlFor="cid" className="text-xs text-muted-foreground">Cidade</Label>
-                        <Input id="cid" value={contatoForm.cidade} onChange={(e) => setContatoForm({ ...contatoForm, cidade: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="Cidade" />
+                        <Label htmlFor="cid" className="text-muted-foreground text-xs">
+                          Cidade
+                        </Label>
+                        <Input
+                          id="cid"
+                          value={contatoForm.cidade}
+                          onChange={(e) =>
+                            setContatoForm({ ...contatoForm, cidade: e.target.value })
+                          }
+                          className="h-9 rounded-xl text-sm"
+                          placeholder="Cidade"
+                        />
                       </div>
                       <div className="space-y-1">
-                        <Label htmlFor="uf" className="text-xs text-muted-foreground">UF</Label>
-                        <Input id="uf" value={contatoForm.uf} onChange={(e) => setContatoForm({ ...contatoForm, uf: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="SP" maxLength={2} />
+                        <Label htmlFor="uf" className="text-muted-foreground text-xs">
+                          UF
+                        </Label>
+                        <Input
+                          id="uf"
+                          value={contatoForm.uf}
+                          onChange={(e) => setContatoForm({ ...contatoForm, uf: e.target.value })}
+                          className="h-9 rounded-xl text-sm"
+                          placeholder="SP"
+                          maxLength={2}
+                        />
                       </div>
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <Button size="sm" onClick={salvarContato} disabled={salvandoContato} className="gap-1.5 rounded-full bg-primary hover:bg-primary/95 text-white">
-                        {salvandoContato ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      <Button
+                        size="sm"
+                        onClick={salvarContato}
+                        disabled={salvandoContato}
+                        className="bg-primary hover:bg-primary/95 gap-1.5 rounded-full text-white"
+                      >
+                        {salvandoContato ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
                         Salvar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setEditandoContato(false); setContatoForm({ telefone: perfil?.telefone ?? '', cep: perfil?.cep ?? '', endereco: perfil?.endereco ?? '', cidade: perfil?.cidade ?? '', uf: perfil?.uf ?? '' }); }} disabled={salvandoContato} className="gap-1.5 rounded-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditandoContato(false);
+                          setContatoForm({
+                            telefone: perfil?.telefone ?? '',
+                            cep: perfil?.cep ?? '',
+                            endereco: perfil?.endereco ?? '',
+                            cidade: perfil?.cidade ?? '',
+                            uf: perfil?.uf ?? '',
+                          });
+                        }}
+                        disabled={salvandoContato}
+                        className="gap-1.5 rounded-full"
+                      >
                         <X className="h-3.5 w-3.5" /> Cancelar
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex items-start gap-3 pb-3 border-b border-border/10">
-                      <Mail size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <div className="border-border/10 flex items-start gap-3 border-b pb-3">
+                      <Mail size={18} className="text-primary/70 mt-0.5 shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">E-mail</p>
-                        <p className="truncate text-sm font-semibold text-foreground mt-0.5">{email}</p>
+                        <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                          E-mail
+                        </p>
+                        <p className="text-foreground mt-0.5 truncate text-sm font-semibold">
+                          {email}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 pb-3 border-b border-border/10">
-                      <Smartphone size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <div className="border-border/10 flex items-start gap-3 border-b pb-3">
+                      <Smartphone size={18} className="text-primary/70 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Telefone</p>
-                        <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.telefone || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                        <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                          Telefone
+                        </p>
+                        <p className="text-foreground mt-0.5 text-sm font-semibold">
+                          {perfil?.telefone || (
+                            <span className="text-muted-foreground font-normal">Não informado</span>
+                          )}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 pb-3 border-b border-border/10">
-                      <MapPin size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <div className="border-border/10 flex items-start gap-3 border-b pb-3">
+                      <MapPin size={18} className="text-primary/70 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">CEP</p>
-                        <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.cep || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                        <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                          CEP
+                        </p>
+                        <p className="text-foreground mt-0.5 text-sm font-semibold">
+                          {perfil?.cep || (
+                            <span className="text-muted-foreground font-normal">Não informado</span>
+                          )}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 pb-3 border-b border-border/10">
-                      <Home size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                    <div className="border-border/10 flex items-start gap-3 border-b pb-3">
+                      <Home size={18} className="text-primary/70 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Endereço</p>
-                        <p className="text-sm font-semibold text-foreground mt-0.5">{perfil?.endereco || <span className="text-muted-foreground font-normal">Não informado</span>}</p>
+                        <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                          Endereço
+                        </p>
+                        <p className="text-foreground mt-0.5 text-sm font-semibold">
+                          {perfil?.endereco || (
+                            <span className="text-muted-foreground font-normal">Não informado</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <Map size={18} className="text-primary/70 shrink-0 mt-0.5" />
+                      <Map size={18} className="text-primary/70 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Cidade / UF</p>
-                        <p className="text-sm font-semibold text-foreground mt-0.5">
-                          {perfil?.cidade || perfil?.uf ? `${perfil.cidade || ''} - ${perfil.uf || ''}` : <span className="text-muted-foreground font-normal">Não informado</span>}
+                        <p className="text-muted-foreground/50 text-[10px] font-bold tracking-wider uppercase">
+                          Cidade / UF
+                        </p>
+                        <p className="text-foreground mt-0.5 text-sm font-semibold">
+                          {perfil?.cidade || perfil?.uf ? (
+                            `${perfil.cidade || ''} - ${perfil.uf || ''}`
+                          ) : (
+                            <span className="text-muted-foreground font-normal">Não informado</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -575,26 +814,27 @@ export default function PerfilPacientePage() {
                 )}
               </CardContent>
             </div>
-            <div className="p-4 text-[11px] text-muted-foreground border-t border-border/15 bg-muted/20">
+            <div className="text-muted-foreground border-border/15 bg-muted/20 border-t p-4 text-[11px]">
               O e-mail é gerido através do sistema seguro Be4Hope.
             </div>
           </Card>
         </div>
-
       </div>
 
       {/* ═══════════════════════════════════════════════════════
           DOCUMENTOS
           ═══════════════════════════════════════════════════════ */}
-      <section className="animate-fade-up delay-200 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <section className="animate-fade-up space-y-6 delay-200">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="font-heading text-foreground text-2xl font-bold tracking-tight">
               Meus <span className="text-accent-italic">Documentos</span>
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Gerenciamento de documentos vinculados ao seu tratamento</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Gerenciamento de documentos vinculados ao seu tratamento
+            </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex shrink-0 items-center gap-3">
             {docsPendentes > 0 && (
               <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-700">
                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -603,7 +843,7 @@ export default function PerfilPacientePage() {
             )}
             <Link
               href="/paciente/documentos"
-              className="inline-flex items-center gap-2 rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border-0 bg-[#16a34a] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#148f43] hover:shadow-lg"
             >
               <Upload className="h-4 w-4 shrink-0" />
               <span>Enviar Documento</span>
@@ -614,17 +854,19 @@ export default function PerfilPacientePage() {
         {/* Lista de documentos reais */}
         {carregandoDocs ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
           </div>
         ) : docs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/60 py-12 text-center bg-card">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+          <div className="border-border/60 bg-card flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed py-12 text-center">
+            <div className="bg-muted text-muted-foreground flex h-12 w-12 items-center justify-center rounded-2xl">
               <FileText className="h-6 w-6" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Nenhum documento enviado ainda</p>
+            <p className="text-muted-foreground text-sm font-medium">
+              Nenhum documento enviado ainda
+            </p>
             <Link
               href="/paciente/documentos"
-              className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-background px-4 py-2 text-xs font-semibold shadow-sm transition-colors hover:bg-accent text-foreground"
+              className="border-secondary/30 bg-background hover:bg-accent text-foreground mt-1 inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold shadow-sm transition-colors"
             >
               <Upload className="h-3.5 w-3.5" /> Enviar agora
             </Link>
@@ -632,47 +874,75 @@ export default function PerfilPacientePage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {docs.slice(0, 4).map((doc: any) => {
-              const vencido = doc.dataValidade && new Date(doc.dataValidade + 'T00:00:00') < new Date();
+              const vencido =
+                doc.dataValidade && new Date(doc.dataValidade + 'T00:00:00') < new Date();
               const TIPO_LABELS: Record<string, string> = {
-                rg: 'RG', receita_medica: 'Receita Médica',
+                rg: 'RG',
+                receita_medica: 'Receita Médica',
                 comprovante_residencia: 'Comprovante de Residência',
                 autorizacao_anvisa: 'Autorização Anvisa',
                 oficio_anvisa: 'Ofício da Anvisa',
                 documento_pessoal: 'Documento Pessoal',
               };
               return (
-                <div key={doc.id} className="group flex items-center gap-4 rounded-3xl border border-border/40 bg-card px-5 py-4 transition-all hover:border-primary/20 hover:shadow-md">
+                <div
+                  key={doc.id}
+                  className="group border-border/40 bg-card hover:border-primary/20 flex items-center gap-4 rounded-3xl border px-5 py-4 transition-all hover:shadow-md"
+                >
                   {/* Ícone */}
-                  <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', vencido ? 'bg-red-500/10' : 'bg-primary/10')}>
-                    <FileCheck className={cn('h-5 w-5', vencido ? 'text-red-500' : 'text-primary')} />
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                      vencido ? 'bg-red-500/10' : 'bg-primary/10',
+                    )}
+                  >
+                    <FileCheck
+                      className={cn('h-5 w-5', vencido ? 'text-red-500' : 'text-primary')}
+                    />
                   </div>
 
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold leading-snug text-foreground">{TIPO_LABELS[doc.tipo] ?? doc.tipo}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{doc.nomeArquivo}</p>
+                    <p className="text-foreground text-sm leading-snug font-semibold">
+                      {TIPO_LABELS[doc.tipo] ?? doc.tipo}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                      {doc.nomeArquivo}
+                    </p>
                   </div>
 
                   {/* Validade + Status */}
                   <div className="hidden items-center gap-3 sm:flex">
                     {doc.dataValidade && (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="text-muted-foreground flex items-center gap-1 text-xs">
                         <Clock className="h-3.5 w-3.5" />
                         {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </span>
                     )}
-                    <span className={cn(
-                      'flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold',
-                      vencido ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-700'
-                    )}>
-                      <span className={cn('h-1.5 w-1.5 rounded-full', vencido ? 'bg-red-500' : 'bg-emerald-500')} />
+                    <span
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold',
+                        vencido
+                          ? 'bg-red-500/10 text-red-600'
+                          : 'bg-emerald-500/10 text-emerald-700',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'h-1.5 w-1.5 rounded-full',
+                          vencido ? 'bg-red-500' : 'bg-emerald-500',
+                        )}
+                      />
                       {vencido ? 'Vencido' : 'Válido'}
                     </span>
                   </div>
 
                   {/* Ver */}
-                  <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                  <a
+                    href={`/api/documentos/${doc.id}/arquivo`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100"
                     aria-label="Visualizar"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -684,7 +954,10 @@ export default function PerfilPacientePage() {
         )}
 
         {docs.length > 0 && (
-          <Link href="/paciente/documentos" className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/80 py-4 text-sm font-semibold text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary bg-card/30">
+          <Link
+            href="/paciente/documentos"
+            className="border-border/80 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary bg-card/30 mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-4 text-sm font-semibold transition-all"
+          >
             Ver todos os documentos
             <ChevronRight className="h-4 w-4" />
           </Link>
@@ -692,73 +965,88 @@ export default function PerfilPacientePage() {
       </section>
 
       {/* ── Dados Clínicos, Preferências & Segurança/Conta ── */}
-      <div className="grid gap-8 md:grid-cols-3 animate-fade-up delay-300">
-
+      <div className="animate-fade-up grid gap-8 delay-300 md:grid-cols-3">
         {/* Dados Clínicos Card */}
-        <Card className="border border-border/30 bg-white shadow-sm rounded-3xl p-6 grain flex flex-col justify-between">
+        <Card className="border-border/30 grain flex flex-col justify-between rounded-3xl border bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#2D4F3C]/10">
               <ShieldCheck className="h-6 w-6 text-[#2D4F3C]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-foreground">Dados Clínicos</h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                Diagnóstico, posologias e histórico clínico são geridos estritamente pelo seu médico Be4Hope habilitado. Para solicitar alterações ou novas consultas, contate o atendimento.
+              <h3 className="text-foreground text-base font-bold">Dados Clínicos</h3>
+              <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+                Diagnóstico, posologias e histórico clínico são geridos estritamente pelo seu médico
+                Be4Hope habilitado. Para solicitar alterações ou novas consultas, contate o
+                atendimento.
               </p>
             </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-border/20">
-            <Link href="/paciente/chat" className="inline-flex items-center text-xs font-semibold text-primary hover:underline underline-offset-4">
+          <div className="border-border/20 mt-6 border-t pt-4">
+            <Link
+              href="/paciente/chat"
+              className="text-primary inline-flex items-center text-xs font-semibold underline-offset-4 hover:underline"
+            >
               Falar com a equipe Be4Hope →
             </Link>
           </div>
         </Card>
 
         {/* Preferências e Notificações */}
-        <Card className="border border-border/40 shadow-sm bg-card grain rounded-3xl p-6 flex flex-col justify-between">
+        <Card className="border-border/40 bg-card grain flex flex-col justify-between rounded-3xl border p-6 shadow-sm">
           <div className="space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-border/20">
+            <div className="border-border/20 flex items-center gap-3 border-b pb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
                 <Bell className="h-5 w-5 text-amber-600" />
               </div>
-              <CardTitle className="text-base font-semibold text-foreground">Notificações</CardTitle>
+              <CardTitle className="text-foreground text-base font-semibold">
+                Notificações
+              </CardTitle>
             </div>
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center py-1 border-b border-border/10">
+              <div className="border-border/10 flex items-center justify-between border-b py-1">
                 <span className="text-muted-foreground">E-mail de recompra</span>
-                <Badge className="bg-emerald-500/10 text-emerald-700 border-0 font-bold text-[10px] py-0.5 px-2 rounded-full">Ativo</Badge>
+                <Badge className="rounded-full border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  Ativo
+                </Badge>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-border/10">
+              <div className="border-border/10 flex items-center justify-between border-b py-1">
                 <span className="text-muted-foreground">Lembrete de consulta</span>
-                <Badge className="bg-emerald-500/10 text-emerald-700 border-0 font-bold text-[10px] py-0.5 px-2 rounded-full">Ativo</Badge>
+                <Badge className="rounded-full border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  Ativo
+                </Badge>
               </div>
-              <div className="flex justify-between items-center py-1">
+              <div className="flex items-center justify-between py-1">
                 <span className="text-muted-foreground">Validade de documento</span>
-                <Badge className="bg-emerald-500/10 text-emerald-700 border-0 font-bold text-[10px] py-0.5 px-2 rounded-full">Ativo</Badge>
+                <Badge className="rounded-full border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  Ativo
+                </Badge>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Segurança e Configurações de Conta */}
-        <Card className="border border-border/40 shadow-sm bg-card grain rounded-3xl p-6 flex flex-col justify-between">
+        <Card className="border-border/40 bg-card grain flex flex-col justify-between rounded-3xl border p-6 shadow-sm">
           <div className="space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-border/20">
+            <div className="border-border/20 flex items-center gap-3 border-b pb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C34C32]/10">
-                <Lock className="h-5 w-5 text-primary" />
+                <Lock className="text-primary h-5 w-5" />
               </div>
-              <CardTitle className="text-base font-semibold text-foreground">Segurança e Conta</CardTitle>
+              <CardTitle className="text-foreground text-base font-semibold">
+                Segurança e Conta
+              </CardTitle>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Gerencie suas credenciais de acesso ou solicite a exclusão de sua conta conforme os direitos garantidos pela LGPD.
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Gerencie suas credenciais de acesso ou solicite a exclusão de sua conta conforme os
+              direitos garantidos pela LGPD.
             </p>
           </div>
-          <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-border/20">
+          <div className="border-border/20 mt-4 flex flex-col gap-2 border-t pt-4">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setModalSenhaAberto(true)}
-              className="w-full rounded-xl text-xs font-semibold gap-1.5 h-9"
+              className="h-9 w-full gap-1.5 rounded-xl text-xs font-semibold"
             >
               <Lock className="h-3.5 w-3.5" /> Alterar Senha
             </Button>
@@ -766,35 +1054,40 @@ export default function PerfilPacientePage() {
               variant="destructive"
               size="sm"
               onClick={() => setModalExcluirAberto(true)}
-              className="w-full rounded-xl text-xs font-semibold gap-1.5 h-9"
+              className="h-9 w-full gap-1.5 rounded-xl text-xs font-semibold"
             >
               <X className="h-3.5 w-3.5" />
               Excluir Minha Conta
             </Button>
           </div>
         </Card>
-
       </div>
 
       {/* ── Modal de Alterar Senha ── */}
       <Dialog open={modalSenhaAberto} onOpenChange={setModalSenhaAberto}>
-        <DialogContent showCloseButton={false} className="sm:max-w-md bg-white border border-border/30 rounded-3xl p-0 shadow-xl overflow-hidden grain">
-          <div className="relative p-6 w-full h-full">
-            <DialogClose className="absolute top-4 right-4 z-50 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer border-0 bg-transparent">
+        <DialogContent
+          showCloseButton={false}
+          className="border-border/30 grain overflow-hidden rounded-3xl border bg-white p-0 shadow-xl sm:max-w-md"
+        >
+          <div className="relative h-full w-full p-6">
+            <DialogClose className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-4 right-4 z-50 cursor-pointer rounded-md border-0 bg-transparent p-1.5 transition-colors">
               <X className="h-4 w-4" />
             </DialogClose>
-            
-            <DialogHeader className="space-y-2 text-center pb-4 border-b border-border/10">
-              <DialogTitle className="font-display text-2xl font-bold text-foreground">
+
+            <DialogHeader className="border-border/10 space-y-2 border-b pb-4 text-center">
+              <DialogTitle className="font-display text-foreground text-2xl font-bold">
                 Alterar <span className="text-accent-italic">Senha</span>
               </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
+              <DialogDescription className="text-muted-foreground text-sm">
                 Insira as informações abaixo para atualizar sua senha de acesso.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4 text-sm text-left">
+            <div className="space-y-4 py-4 text-left text-sm">
               <div className="space-y-1.5">
-                <Label htmlFor="senha-atual" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label
+                  htmlFor="senha-atual"
+                  className="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
+                >
                   Senha Atual
                 </Label>
                 <Input
@@ -802,12 +1095,15 @@ export default function PerfilPacientePage() {
                   type="password"
                   value={senhaAtual}
                   onChange={(e) => setSenhaAtual(e.target.value)}
-                  className="bg-background border-border/40 rounded-xl h-10 px-3 py-2 text-sm focus:ring-1 focus:ring-primary"
+                  className="bg-background border-border/40 focus:ring-primary h-10 rounded-xl px-3 py-2 text-sm focus:ring-1"
                   placeholder="Sua senha atual"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="nova-senha" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label
+                  htmlFor="nova-senha"
+                  className="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
+                >
                   Nova Senha
                 </Label>
                 <Input
@@ -815,12 +1111,15 @@ export default function PerfilPacientePage() {
                   type="password"
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
-                  className="bg-background border-border/40 rounded-xl h-10 px-3 py-2 text-sm focus:ring-1 focus:ring-primary"
+                  className="bg-background border-border/40 focus:ring-primary h-10 rounded-xl px-3 py-2 text-sm focus:ring-1"
                   placeholder="Mínimo 8 caracteres"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="confirmar-senha" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label
+                  htmlFor="confirmar-senha"
+                  className="text-muted-foreground text-xs font-semibold tracking-wider uppercase"
+                >
                   Confirmar Nova Senha
                 </Label>
                 <Input
@@ -828,24 +1127,24 @@ export default function PerfilPacientePage() {
                   type="password"
                   value={confirmarNovaSenha}
                   onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                  className="bg-background border-border/40 rounded-xl h-10 px-3 py-2 text-sm focus:ring-1 focus:ring-primary"
+                  className="bg-background border-border/40 focus:ring-primary h-10 rounded-xl px-3 py-2 text-sm focus:ring-1"
                   placeholder="Repita a nova senha"
                 />
               </div>
             </div>
-            <DialogFooter className="flex gap-2 sm:justify-end mt-4 pt-4 border-t border-border/10">
+            <DialogFooter className="border-border/10 mt-4 flex gap-2 border-t pt-4 sm:justify-end">
               <Button
                 variant="outline"
                 onClick={() => setModalSenhaAberto(false)}
                 disabled={salvandoSenha}
-                className="rounded-full px-5 text-xs font-semibold h-10"
+                className="h-10 rounded-full px-5 text-xs font-semibold"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleAlterarSenha}
                 disabled={salvandoSenha}
-                className="rounded-full px-6 text-xs font-semibold bg-primary text-white hover:bg-primary/90 h-10 cursor-pointer"
+                className="bg-primary hover:bg-primary/90 h-10 cursor-pointer rounded-full px-6 text-xs font-semibold text-white"
               >
                 {salvandoSenha ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar Alteração'}
               </Button>
@@ -856,29 +1155,34 @@ export default function PerfilPacientePage() {
 
       {/* ── Modal de Confirmação de Exclusão de Conta ── */}
       <Dialog open={modalExcluirAberto} onOpenChange={setModalExcluirAberto}>
-        <DialogContent showCloseButton={false} className="sm:max-w-md bg-white border border-border/30 rounded-3xl p-0 shadow-xl overflow-hidden grain">
-          <div className="relative p-6 w-full h-full">
-            <DialogClose className="absolute top-4 right-4 z-50 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer border-0 bg-transparent">
+        <DialogContent
+          showCloseButton={false}
+          className="border-border/30 grain overflow-hidden rounded-3xl border bg-white p-0 shadow-xl sm:max-w-md"
+        >
+          <div className="relative h-full w-full p-6">
+            <DialogClose className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-4 right-4 z-50 cursor-pointer rounded-md border-0 bg-transparent p-1.5 transition-colors">
               <X className="h-4 w-4" />
             </DialogClose>
 
-            <DialogHeader className="space-y-2 text-center pb-4 border-b border-border/10">
-              <DialogTitle className="font-heading text-xl font-bold text-foreground">
+            <DialogHeader className="border-border/10 space-y-2 border-b pb-4 text-center">
+              <DialogTitle className="font-heading text-foreground text-xl font-bold">
                 Confirmar Exclusão de Conta
               </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-                Você realmente deseja excluir permanentemente sua conta e todos os dados associados a ela?
+              <DialogDescription className="text-muted-foreground text-sm leading-relaxed">
+                Você realmente deseja excluir permanentemente sua conta e todos os dados associados
+                a ela?
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4 text-sm text-muted-foreground text-center">
-              Esta ação não pode ser desfeita. Todos os seus dados pessoais, histórico e documentos serão removidos.
+            <div className="text-muted-foreground py-4 text-center text-sm">
+              Esta ação não pode ser desfeita. Todos os seus dados pessoais, histórico e documentos
+              serão removidos.
             </div>
-            <DialogFooter className="flex gap-2 sm:justify-end mt-4 pt-4 border-t border-border/10">
+            <DialogFooter className="border-border/10 mt-4 flex gap-2 border-t pt-4 sm:justify-end">
               <Button
                 variant="outline"
                 onClick={() => setModalExcluirAberto(false)}
                 disabled={excluindoConta}
-                className="rounded-full px-5 text-xs font-semibold h-10"
+                className="h-10 rounded-full px-5 text-xs font-semibold"
               >
                 Cancelar
               </Button>
@@ -886,15 +1190,18 @@ export default function PerfilPacientePage() {
                 variant="destructive"
                 onClick={executarExclusaoConta}
                 disabled={excluindoConta}
-                className="rounded-full px-6 text-xs font-semibold h-10 bg-red-600 hover:bg-red-700 text-white"
+                className="h-10 rounded-full bg-red-600 px-6 text-xs font-semibold text-white hover:bg-red-700"
               >
-                {excluindoConta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Excluir Conta'}
+                {excluindoConta ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  'Excluir Conta'
+                )}
               </Button>
             </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

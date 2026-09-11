@@ -85,7 +85,18 @@ export async function uploadDocumento(
     const blob = await put(
       `documentos/${pacienteId}/${tipo}_${Date.now()}_${arquivo.name}`,
       arquivo,
-      { access: 'public' },
+      {
+        /**
+         * 🔴 PRIVADO desde 11/09/2026 — o Item 6 fechando ponto a ponto.
+         *
+         * Store público significa: quem tem a URL lê, sem autenticação. O que está aqui é RG,
+         * laudo, receita e comprovante. Obscuridade de URL não é controle de acesso.
+         *
+         * A entrega é por `/api/documentos/<id>/arquivo`, que autentica, confere escopo de
+         * objeto e audita. As telas deste projeto já apontam para lá.
+         */
+        access: 'private',
+      },
     );
 
     // Calcular validade

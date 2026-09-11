@@ -5,7 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -19,22 +25,21 @@ import {
 } from '@/components/ui/alert-dialog';
 import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-paciente';
 import { toast } from 'sonner';
-import {
-  Download,
-  ExternalLink,
-  FileCheck,
-  Loader2,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { Download, ExternalLink, FileCheck, Loader2, Plus, Trash2 } from 'lucide-react';
 
 const TIPO_LABELS: Record<string, string> = {
-  documento_pessoal: 'Documento Pessoal', comprovante_residencia: 'Comprovante de Residência',
-  oficio_anvisa: 'Ofício da Anvisa', receita_medica: 'Receita Médica',
-  rg: 'RG', rg_responsavel: 'RG Responsável', autorizacao_anvisa: 'Autorização Anvisa',
+  documento_pessoal: 'Documento Pessoal',
+  comprovante_residencia: 'Comprovante de Residência',
+  oficio_anvisa: 'Ofício da Anvisa',
+  receita_medica: 'Receita Médica',
+  rg: 'RG',
+  rg_responsavel: 'RG Responsável',
+  autorizacao_anvisa: 'Autorização Anvisa',
 };
 
-interface TabDocumentosProps { pacienteId: string }
+interface TabDocumentosProps {
+  pacienteId: string;
+}
 
 export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
   const [docs, setDocs] = useState<any[]>([]);
@@ -56,11 +61,16 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
     setCarregando(false);
   }, [pacienteId]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   async function handleUpload() {
     const file = fileRef.current?.files?.[0];
-    if (!file || !tipo || !dataEmissao) { toast.error('Preencha todos os campos obrigatórios'); return; }
+    if (!file || !tipo || !dataEmissao) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
     setSalvando(true);
     try {
       const fd = new FormData();
@@ -77,7 +87,9 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
 
       if (res.sucesso) {
         toast.success('Documento enviado com sucesso!');
-        setMostrarForm(false); setTipo(''); setDataEmissao('');
+        setMostrarForm(false);
+        setTipo('');
+        setDataEmissao('');
         if (fileRef.current) fileRef.current.value = '';
         await carregar();
       } else {
@@ -136,23 +148,34 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
     return acc;
   }, {});
 
-  if (carregando) return <div className="flex justify-center py-16"><Loader2 size={32} className="animate-spin text-primary" /></div>;
+  if (carregando)
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 size={32} className="text-primary animate-spin" />
+      </div>
+    );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Documentos</h2>
-        {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><Plus size={14} /> Enviar Documento</Button>}
+        {!mostrarForm && (
+          <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}>
+            <Plus size={14} /> Enviar Documento
+          </Button>
+        )}
       </div>
 
       {mostrarForm && (
         <Card className="border-border/40 shadow-sm">
-          <CardHeader className="border-b border-border/30 pb-4"><CardTitle className="font-heading text-base">Enviar Documento</CardTitle></CardHeader>
+          <CardHeader className="border-border/30 border-b pb-4">
+            <CardTitle className="font-heading text-base">Enviar Documento</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4 pt-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Tipo de Documento *</Label>
-                <Select value={tipo} onValueChange={v => setTipo(v ?? '')}>
+                <Select value={tipo} onValueChange={(v) => setTipo(v ?? '')}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione">
                       {tipo ? (TIPO_LABELS[tipo] ?? tipo) : undefined}
@@ -160,21 +183,36 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="documento_pessoal">Documento Pessoal</SelectItem>
-                    <SelectItem value="comprovante_residencia">Comprovante de Residência</SelectItem>
+                    <SelectItem value="comprovante_residencia">
+                      Comprovante de Residência
+                    </SelectItem>
                     <SelectItem value="oficio_anvisa">Ofício da Anvisa</SelectItem>
                     <SelectItem value="receita_medica">Receita Médica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Data do Documento *</Label><Input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)} /></div>
+              <div>
+                <Label>Data do Documento *</Label>
+                <Input
+                  type="date"
+                  value={dataEmissao}
+                  onChange={(e) => setDataEmissao(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <Label>Arquivo (máx. 100MB) — PDF, JPG, PNG</Label>
               <Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
-              <Button onClick={handleUpload} disabled={salvando || !tipo || !dataEmissao} className="gap-2 rounded-xl">
+              <Button variant="outline" onClick={() => setMostrarForm(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={salvando || !tipo || !dataEmissao}
+                className="gap-2 rounded-xl"
+              >
                 {salvando ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 {salvando ? 'Enviando...' : 'Enviar'}
               </Button>
@@ -184,18 +222,27 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
       )}
 
       {Object.keys(agrupados).length === 0 && !mostrarForm ? (
-        <Card className="border-border/40 shadow-sm"><CardContent className="flex flex-col items-center justify-center py-16">
-          <p className="text-lg font-medium">Nenhum documento enviado</p>
-          <p className="text-sm text-muted-foreground">Clique em &quot;Enviar Documento&quot; para adicionar</p>
-        </CardContent></Card>
+        <Card className="border-border/40 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <p className="text-lg font-medium">Nenhum documento enviado</p>
+            <p className="text-muted-foreground text-sm">
+              Clique em &quot;Enviar Documento&quot; para adicionar
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         Object.entries(agrupados).map(([tipoKey, items]) => (
           <div key={tipoKey} className="space-y-3">
-            <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">{TIPO_LABELS[tipoKey] ?? tipoKey}</h3>
+            <h3 className="font-heading text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+              {TIPO_LABELS[tipoKey] ?? tipoKey}
+            </h3>
             {items.map((doc: any) => {
               const vencido = new Date(doc.dataValidade) < new Date();
               return (
-                <Card key={doc.id} className="border-border/40 shadow-sm transition-shadow hover:shadow-md">
+                <Card
+                  key={doc.id}
+                  className="border-border/40 shadow-sm transition-shadow hover:shadow-md"
+                >
                   <CardContent className="flex items-center justify-between gap-4 p-4">
                     {/* Info do arquivo */}
                     <div className="flex min-w-0 items-center gap-3">
@@ -204,10 +251,12 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{doc.nomeArquivo}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        <p className="text-muted-foreground text-xs">
+                          Emissão:{' '}
+                          {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
                           {' · '}
-                          Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          Validade:{' '}
+                          {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </p>
                       </div>
                     </div>
@@ -219,7 +268,11 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                       </Badge>
 
                       {/* Visualizar */}
-                      <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={`/api/documentos/${doc.id}/arquivo`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <ExternalLink size={13} />
                           Ver
@@ -241,8 +294,10 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
-                        onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
+                        className="text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive gap-1.5"
+                        onClick={() =>
+                          setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })
+                        }
                       >
                         <Trash2 size={13} />
                         Excluir
@@ -257,13 +312,18 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
       )}
 
       {/* Diálogo de confirmação de exclusão */}
-      <AlertDialog open={!!docParaExcluir} onOpenChange={(open) => { if (!open) setDocParaExcluir(null); }}>
+      <AlertDialog
+        open={!!docParaExcluir}
+        onOpenChange={(open) => {
+          if (!open) setDocParaExcluir(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
             <AlertDialogDescription>
-              O arquivo <strong>{docParaExcluir?.nome}</strong> será removido permanentemente do perfil do paciente.
-              Esta ação não pode ser desfeita.
+              O arquivo <strong>{docParaExcluir?.nome}</strong> será removido permanentemente do
+              perfil do paciente. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

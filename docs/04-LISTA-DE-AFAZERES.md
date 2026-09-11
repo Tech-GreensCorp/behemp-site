@@ -1757,9 +1757,38 @@ compartilhado.
 é entregue por streaming autenticado. Assim a tela usa **um endereço** para qualquer documento,
 e terminar o Item 6 não vai exigir tocar em tela nenhuma.
 
-### 🔴 O que ainda falta — e é o Item 6
+### ✅ 11/09/2026 — o grupo da tabela `documentos` foi fechado
 
-**12 pontos de upload continuam gravando público.** Eles não foram tocados: mexer em 14 lugares
+Decisão do dono: _"AGORA É O MOMENTO de ajustarmos isso"_.
+
+**Quatro pontos** passaram a gravar privado, e as **três telas** que os abriam passaram a
+apontar para a rota autenticada — a tela ANTES do upload, que é a ordem que impede o documento
+de sumir:
+
+| ponto                                      | tela que o abre                |
+| ------------------------------------------ | ------------------------------ |
+| `app/_actions/documentos.ts`               | `tab-documentos.tsx` (médico)  |
+| `app/_actions/documentos-paciente.ts`      | `paciente/perfil/page.tsx`     |
+| `app/_actions/documentos-paciente-self.ts` | `paciente/documentos/page.tsx` |
+| `app/api/upload-documento/route.ts`        | as três acima                  |
+
+### 🔴 O que ainda falta, e por que cada um é um caso diferente
+
+**Sete pontos continuam gravando público, e eles NÃO são iguais entre si:**
+
+| grupo                      | pontos                                                              | por que ainda não                                                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **ANVISA** (jsonb, sem id) | `anvisa/upload-documento`, `anvisa/procuracao`, `webhooks/docusign` | 🔴 os documentos vivem num **jsonb dentro de `autorizacoes_anvisa`**, não na tabela `documentos` — **não têm id**, e a rota atual endereça por id. Precisa de rota própria, ou de migrar para a tabela |
+| **exames**                 | `_actions/exames.ts`, `api/upload-exame`                            | tabela própria (`exames`) — mesma solução, rota própria                                                                                                                                                |
+| **chat**                   | `_actions/chat.ts`                                                  | anexo de conversa; escopo é o grupo, não o paciente                                                                                                                                                    |
+| **avatar**                 | `api/upload-avatar`                                                 | ⚠️ **decisão: fica público.** Foto de perfil não é dado de saúde, e privá-la só acrescentaria uma rota autenticada em todo carregamento de tela                                                        |
+| **relatório**              | `api/upload-relatorio`                                              | verificar o que contém antes de decidir                                                                                                                                                                |
+
+⚠️ **O caso da ANVISA é o mais importante e o mais caro** — é onde está a procuração assinada.
+Ele exige decidir se aqueles documentos migram para a tabela `documentos` (o que resolveria de
+uma vez, e daria id a eles) ou se ganham rota própria endereçada por autorização + tipo.
+
+**Antes eram 12; são 7.** Eles não foram tocados: mexer em 14 lugares
 no meio de outra tarefa é exatamente o que o `CLAUDE.md` proíbe, e cada um tem uma tela que lê
 `urlBlob` direto.
 

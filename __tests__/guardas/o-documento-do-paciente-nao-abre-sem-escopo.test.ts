@@ -37,6 +37,52 @@ function semComentarios(fonte: string): string {
     .join('\n');
 }
 
+/**
+ * 11/09/2026 — o Item 6 fechando ponto a ponto.
+ *
+ * Decisão do dono: _"AGORA É O MOMENTO de ajustarmos isso"_. Os quatro pontos que gravam na
+ * tabela `documentos` passaram a gravar privado, e as três telas que os abriam passaram a
+ * apontar para a rota autenticada.
+ *
+ * 🔴 A ORDEM IMPORTA, e é o que este bloco protege: **a tela vem antes do upload**. Trocar o
+ * upload sem trocar a tela deixa o documento INVISÍVEL — e invisível é pior que público,
+ * porque some sem ninguém perceber.
+ */
+describe('os pontos que gravam em `documentos` não gravam mais público', () => {
+  const PONTOS = [
+    'app/_actions/documentos.ts',
+    'app/_actions/documentos-paciente.ts',
+    'app/_actions/documentos-paciente-self.ts',
+    'app/api/upload-documento/route.ts',
+  ];
+
+  it.each(PONTOS.map((p) => [p] as const))('%s grava privado', (ponto) => {
+    const codigo = semComentarios(ler(ponto));
+    expect(codigo).toContain("access: 'private'");
+    expect(codigo).not.toContain("access: 'public'");
+  });
+});
+
+describe('as telas abrem pela rota autenticada, nunca pela URL do blob', () => {
+  const TELAS = [
+    'app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx',
+    'app/(paciente)/paciente/perfil/page.tsx',
+    'app/(paciente)/paciente/documentos/page.tsx',
+  ];
+
+  it.each(TELAS.map((t) => [t] as const))('%s', (tela) => {
+    const codigo = ler(tela);
+    expect(codigo).toContain('/api/documentos/${doc.id}/arquivo');
+    /**
+     * 🔴 E NÃO PODE SOBRAR O href DIRETO.
+     *
+     * Um blob privado não abre por link — a tela que ficou para trás mostra um erro para o
+     * paciente no pior momento, e ninguém descobre até alguém reclamar.
+     */
+    expect(codigo).not.toContain('href={doc.urlBlob}');
+  });
+});
+
 describe('os caminhos novos gravam privado', () => {
   it('o anexo do cadastro', () => {
     expect(semComentarios(ler(ANEXO))).toContain("access: 'private'");
