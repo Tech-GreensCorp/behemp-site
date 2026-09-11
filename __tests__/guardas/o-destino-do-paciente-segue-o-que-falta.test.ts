@@ -228,10 +228,32 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   });
 
   it('🔴 e só aparece quando a autorização está pendente', () => {
-    // Quem chegou pelo parceiro COM a autorização não deve ser perguntado: a resposta já
-    // existe, e perguntar de novo é desconfiar do que ele acabou de mandar.
-    expect(codigo).toContain('const anvisaPendente = pendencias.some(');
-    expect(codigo).toMatch(/\{anvisaPendente && \(/);
+    expect(codigo).toContain('pendencias.some(');
+    expect(codigo).toMatch(/\{perguntarSobreAnvisa && \(/);
+  });
+
+  /**
+   * 🔴 NEM TODA PENDÊNCIA É UMA PERGUNTA EM ABERTO.
+   *
+   * Quem veio do formulário do parceiro JÁ declarou lá se tem a autorização — e a pendência
+   * aqui é a CONSEQUÊNCIA daquela resposta, não uma dúvida nova. Perguntar de novo é pedir
+   * que ele responda duas vezes a mesma coisa.
+   *
+   * Apontado pelo dono em 10/09/2026: "lá ele já marcou a opção que não tem anvisa, então já
+   * vem, não precisa perguntá-lo novamente".
+   *
+   * ⚠️ E `parceiro` NÃO serve para decidir isso: o bot da Greens também grava
+   * `parceiro: 'greens'` e não perguntou nada. Quem responde é a ORIGEM.
+   */
+  it('não pergunta a quem já respondeu no formulário do parceiro', () => {
+    expect(codigo).toContain('jaDeclarouSobreAnvisa');
+    expect(codigo).toMatch(/!jaDeclarouSobreAnvisa &&/);
+    const pagina = readFileSync(
+      path.join(process.cwd(), 'app/(auth)/cadastro/[token]/page.tsx'),
+      'utf8',
+    );
+    // pela ORIGEM, não pelo parceiro
+    expect(pagina).toContain("jaDeclarouSobreAnvisa={resultado.origem === 'greens_handoff'}");
   });
 
   it('o campo de arquivo só nasce depois do "sim"', () => {
@@ -246,7 +268,7 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   });
 
   it('a declaração é enviada mesmo sem anexo — "não tenho" é informação', () => {
-    expect(codigo).toContain('temAutorizacaoAnvisa: anvisaPendente ? temAnvisa : null');
+    expect(codigo).toContain('temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null');
   });
 
   it('o "ainda não" não é beco — a tela diz o que vem depois', () => {
