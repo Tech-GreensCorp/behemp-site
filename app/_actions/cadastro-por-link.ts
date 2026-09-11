@@ -28,6 +28,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { pacientes, solicitacoesCadastro, users } from '@/db/schema';
 import { db } from '@/lib/db';
 import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
+import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
@@ -47,6 +48,23 @@ const esquema = z.object({
   telefone: z.string().trim().min(8, 'Informe seu telefone'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
   jaFazTratamento: z.boolean(),
+  /**
+   * 🔴 O PACIENTE DECLARA SE JÁ TEM A AUTORIZAÇÃO DA ANVISA.
+   *
+   * `null` = não respondeu (o fluxo do parceiro que já mandou a autorização nem pergunta).
+   * `false` = declarou que NÃO tem — e é justamente essa informação que permite oferecer a
+   * procuração depois da consulta, sem perguntar de novo.
+   */
+  temAutorizacaoAnvisa: z.boolean().optional().nullable(),
+  /** O arquivo, quando ele respondeu que tem e anexou ali mesmo. */
+  anexoAnvisa: z
+    .object({
+      nomeArquivo: z.string().trim().min(1).max(200),
+      tipoMime: z.string().trim().max(100),
+      conteudoBase64: z.string().min(1),
+    })
+    .optional()
+    .nullable(),
   tratamentoAtual: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -213,6 +231,23 @@ export async function concluirCadastroPorLink(
      * documento não pode desfazer um cadastro que já deu certo. A função nunca lança; no pior
      * caso o paciente envia o documento manualmente, como sempre pôde.
      */
+    /**
+     * 8b ── O documento que ELE anexou no formulário, quando anexou.
+     *
+     * Mesma posição e mesmo motivo do bloco acima: `documentos.paciente_id` é `notNull`, e a
+     * ficha só existe agora. Fora da transação — anexo que falha não desfaz cadastro que deu
+     * certo.
+     */
+    let anexouAnvisa = false;
+    if (dados.anexoAnvisa) {
+      anexouAnvisa = await anexarDocumentoDoCadastro({
+        pacienteId,
+        tipo: 'autorizacao_anvisa',
+        anexo: dados.anexoAnvisa,
+        protocolo: solicitacao.protocolo,
+      });
+    }
+
     const copiados = await materializarDocumentosDoParceiro({
       pacienteId,
       documentosDoParceiro: solicitacao.documentosDoParceiro,
@@ -231,6 +266,10 @@ export async function concluirCadastroPorLink(
         protocolo: solicitacao.protocolo,
         origem: 'link_whatsapp',
         documentosRecebidosDoParceiro: copiados.inseridos,
+        // Registra a DECLARAÇÃO, não só o arquivo: "não tenho" é o que permite oferecer a
+        // procuração depois sem perguntar de novo.
+        declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
+        anexouAutorizacaoAnvisa: anexouAnvisa,
         declarouTratamentoEmCurso: dados.jaFazTratamento,
         linkConsumidoAgora: consumiu,
       },

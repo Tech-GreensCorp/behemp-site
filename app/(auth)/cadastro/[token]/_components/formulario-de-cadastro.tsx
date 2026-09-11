@@ -90,6 +90,27 @@ interface Props {
   veioDeParceiro?: boolean;
 }
 
+/**
+ * Converte o arquivo escolhido em base64 para viajar na Server Action.
+ *
+ * ⚠️ Vai no payload em vez de num endpoint de upload porque, neste momento, o paciente ainda
+ * NÃO TEM SESSÃO — a conta nasce no fim do mesmo ato. Um endpoint aberto a quem não tem sessão
+ * seria um lugar para qualquer um despejar arquivo; aqui o token de uso único do link é a
+ * credencial, e ela já é conferida.
+ */
+async function lerAnexo(arquivo: File | null) {
+  if (!arquivo) return null;
+  const buffer = await arquivo.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binario = '';
+  for (let i = 0; i < bytes.byteLength; i += 1) binario += String.fromCharCode(bytes[i]);
+  return {
+    nomeArquivo: arquivo.name,
+    tipoMime: arquivo.type,
+    conteudoBase64: btoa(binario),
+  };
+}
+
 /** Uma linha de dado já confirmado: rótulo à esquerda, valor à direita. */
 function LinhaConfirmada({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -186,6 +207,20 @@ export function FormularioDeCadastro({
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
   const [jaFazTratamento, setJaFazTratamento] = useState<boolean | null>(null);
+
+  /**
+   * 🔴 A PERGUNTA DA ANVISA — e por que ela só aparece quando a autorização falta.
+   *
+   * Quem chegou pelo parceiro com a autorização já enviada não deve ser perguntado: a
+   * resposta já existe, e perguntar de novo é desconfiar do que ele acabou de mandar.
+   *
+   * E a resposta "não tenho" vale por si: é ela que permite, depois da consulta, oferecer a
+   * procuração sem precisar perguntar outra vez.
+   */
+  const [temAnvisa, setTemAnvisa] = useState<boolean | null>(null);
+  const [arquivoAnvisa, setArquivoAnvisa] = useState<File | null>(null);
+  const [erroDoAnexo, setErroDoAnexo] = useState('');
+  const anvisaPendente = pendencias.some((p) => p.chave === 'autorizacao_anvisa');
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
   /**
@@ -295,6 +330,12 @@ export function FormularioDeCadastro({
         telefone: telefone.trim(),
         email: email.trim().toLowerCase(),
         jaFazTratamento: jaFazTratamento === true,
+        /**
+         * A declaração vai mesmo sem arquivo: "não tenho" é informação, não ausência dela.
+         * `null` quando a pergunta nem apareceu — o parceiro já tinha mandado a autorização.
+         */
+        temAutorizacaoAnvisa: anvisaPendente ? temAnvisa : null,
+        anexoAnvisa: await lerAnexo(arquivoAnvisa),
         tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       });
 
@@ -626,6 +667,103 @@ export function FormularioDeCadastro({
             )}
 
             <Separador />
+
+            {anvisaPendente && (
+              <>
+                <Secao titulo="Autorização da ANVISA" icone={FileText}>
+                  <fieldset className="space-y-3">
+                    <legend className="text-muted-foreground mb-3 text-sm">
+                      Você já tem a Autorização de Importação da ANVISA?
+                    </legend>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { valor: true, rotulo: 'Sim, já tenho' },
+                        { valor: false, rotulo: 'Ainda não' },
+                      ].map((opcao) => {
+                        const escolhido = temAnvisa === opcao.valor;
+                        return (
+                          <button
+                            key={String(opcao.valor)}
+                            type="button"
+                            onClick={() => {
+                              setTemAnvisa(opcao.valor);
+                              // Trocar para "ainda não" descarta o arquivo escolhido antes:
+                              // enviar documento que ele acabou de dizer que não tem seria
+                              // gravar uma contradição.
+                              if (!opcao.valor) {
+                                setArquivoAnvisa(null);
+                                setErroDoAnexo('');
+                              }
+                            }}
+                            aria-pressed={escolhido}
+                            className={cn(
+                              'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
+                              'transition-all duration-300 ease-out',
+                              escolhido
+                                ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
+                                : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                            )}
+                          >
+                            {escolhido && <CheckCircle2 size={15} className="text-primary" />}
+                            {opcao.rotulo}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/*
+                      O campo de arquivo só nasce depois do "sim" — pelo mesmo motivo da caixa
+                      de texto do tratamento: pedir antes da resposta é ruído, e esconder por
+                      CSS deixa um campo invisível no DOM.
+                    */}
+                    {temAnvisa === true && (
+                      <div className="animate-fade-up space-y-2 pt-1">
+                        <Label htmlFor="anexo-anvisa">Anexe o documento</Label>
+                        <Input
+                          id="anexo-anvisa"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={(e) => {
+                            const arquivo = e.target.files?.[0] ?? null;
+                            setErroDoAnexo('');
+                            if (arquivo && arquivo.size > 8 * 1024 * 1024) {
+                              setErroDoAnexo(
+                                'O arquivo passa de 8 MB. Tente uma foto menor ou um PDF.',
+                              );
+                              setArquivoAnvisa(null);
+                              return;
+                            }
+                            setArquivoAnvisa(arquivo);
+                          }}
+                          className="h-12 rounded-xl"
+                        />
+                        {erroDoAnexo ? (
+                          <p className="text-destructive text-xs">{erroDoAnexo}</p>
+                        ) : (
+                          <p className="text-muted-foreground text-xs">
+                            PDF ou foto, até 8 MB. Se preferir, pode enviar depois pela sua área —
+                            isso não impede você de continuar.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/*
+                      🔴 O "ainda não" NÃO é um beco: é o começo do caminho da procuração.
+                      Dizer isso aqui evita que ele ache que respondeu errado.
+                    */}
+                    {temAnvisa === false && (
+                      <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
+                        Sem problema — nós resolvemos isso com você. Depois da consulta, a
+                        procuração da ANVISA fica disponível na sua área.
+                      </p>
+                    )}
+                  </fieldset>
+                </Secao>
+
+                <Separador />
+              </>
+            )}
 
             <Secao titulo="Sobre o seu tratamento" icone={Sparkles}>
               <fieldset className="space-y-3">

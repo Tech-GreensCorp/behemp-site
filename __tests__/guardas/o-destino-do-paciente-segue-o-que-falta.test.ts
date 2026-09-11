@@ -211,3 +211,95 @@ describe('a tela confirma o que já recebeu', () => {
     expect(pagina).toContain('recebidosDe(resultado.documentosDoParceiro)');
   });
 });
+
+/**
+ * A PERGUNTA DA ANVISA NO CADASTRO — e o que ela habilita depois.
+ *
+ * Desenho do dono em 10/09/2026, ao ver o fluxo 2: perguntar se ele já tem a autorização e,
+ * se tiver, deixar que anexe ali. Se não tiver, o sistema registra — e é essa declaração que
+ * permite oferecer a procuração depois da consulta, sem perguntar de novo.
+ *
+ * 🔴 A DECLARAÇÃO VALE MESMO SEM ARQUIVO. "Não tenho" é informação, não ausência dela. Um
+ * "conserto" que só gravasse quando há anexo perderia exatamente o caso que interessa.
+ */
+describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
+  it('a pergunta existe', () => {
+    expect(codigo).toContain('Você já tem a Autorização de Importação da ANVISA?');
+  });
+
+  it('🔴 e só aparece quando a autorização está pendente', () => {
+    // Quem chegou pelo parceiro COM a autorização não deve ser perguntado: a resposta já
+    // existe, e perguntar de novo é desconfiar do que ele acabou de mandar.
+    expect(codigo).toContain('const anvisaPendente = pendencias.some(');
+    expect(codigo).toMatch(/\{anvisaPendente && \(/);
+  });
+
+  it('o campo de arquivo só nasce depois do "sim"', () => {
+    expect(codigo).toMatch(/\{temAnvisa === true && \(/);
+    expect(codigo).toContain('type="file"');
+  });
+
+  it('e trocar para "ainda não" descarta o arquivo — não se grava contradição', () => {
+    const i = codigo.indexOf('setTemAnvisa(opcao.valor)');
+    const bloco = codigo.slice(i, i + 400);
+    expect(bloco).toContain('setArquivoAnvisa(null)');
+  });
+
+  it('a declaração é enviada mesmo sem anexo — "não tenho" é informação', () => {
+    expect(codigo).toContain('temAutorizacaoAnvisa: anvisaPendente ? temAnvisa : null');
+  });
+
+  it('o "ainda não" não é beco — a tela diz o que vem depois', () => {
+    expect(codigo).toMatch(/procuração da ANVISA fica disponível/i);
+  });
+
+  it('a action recebe a declaração e o anexo', () => {
+    const action = readFileSync(
+      path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
+      'utf8',
+    );
+    expect(action).toContain('temAutorizacaoAnvisa');
+    expect(action).toContain('anexoAnvisa');
+    expect(action).toContain('anexarDocumentoDoCadastro({');
+  });
+
+  it('e o anexo só vira documento DEPOIS de o paciente existir', () => {
+    const action = readFileSync(
+      path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
+      'utf8',
+    );
+    const criacao = action.indexOf('const pacienteId = await db.transaction');
+    const anexo = action.indexOf('anexarDocumentoDoCadastro({');
+    expect(anexo).toBeGreaterThan(criacao);
+  });
+
+  it('o anexo tem limite de tamanho e tipo, nos DOIS lados', () => {
+    // Só no cliente seria conselho: quem manda POST direto ignora.
+    expect(codigo).toMatch(/8 \* 1024 \* 1024/);
+    const lib = readFileSync(
+      path.join(process.cwd(), 'lib/documentos/anexo-do-cadastro.ts'),
+      'utf8',
+    );
+    /**
+     * 🔴 DECLARAR A CONSTANTE NÃO É USÁ-LA.
+     *
+     * A primeira versão deste caso conferia só que os nomes apareciam no arquivo. Trocar
+     * `TIPOS_ACEITOS_NO_ANEXO.includes(...)` por `[].includes(...)` mantinha a constante
+     * declarada, recusava todo arquivo, e o guarda ficava verde. A sabotagem mostrou isso em
+     * 10/09/2026 — décima primeira vez desta classe no repositório.
+     *
+     * O que importa é a constante aparecer na COMPARAÇÃO, não na declaração.
+     */
+    expect(lib).toMatch(/TIPOS_ACEITOS_NO_ANEXO\.includes\(/);
+    expect(lib).toMatch(/> TAMANHO_MAXIMO_DO_ANEXO/);
+  });
+
+  it('e falha de anexo não derruba o cadastro', () => {
+    const lib = readFileSync(
+      path.join(process.cwd(), 'lib/documentos/anexo-do-cadastro.ts'),
+      'utf8',
+    );
+    expect(lib).toMatch(/catch \(erro\)/);
+    expect(lib).toMatch(/return false/);
+  });
+});

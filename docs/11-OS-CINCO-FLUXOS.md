@@ -52,8 +52,10 @@ paciente **vê** o que a Greens mandou (e pode corrigir se estiver errado), mas 
 | 1   | ChatPro **da Greens** envia o link do site da BeHemp                        | 🟡     | endpoint pronto; **falta o bloco no diagrama do bot deles** |
 | 2   | mesmo link de formulário, com os dados básicos da pessoa                    | ✅     | `/cadastro/<token>`                                         |
 | 3   | dados restantes ficam pendentes como aviso                                  | ✅     | `pendenciasDe` — a tela mostra o que falta                  |
+| 3b  | **pergunta se já tem a ANVISA; se tiver, anexa ali mesmo**                  | ✅     | 10/09 — a declaração é gravada mesmo sem arquivo            |
 | 4   | encaminha direto para agendar a primeira consulta                           | ✅     | `destinoDepoisDoCadastro` → `/agendamento`                  |
 | 5   | receita feita pelo médico e enviada à Greens, com aviso **e consentimento** | 🟡     | aviso ✅ (`receita_emitida`); **consentimento 🔴**          |
+| 5b  | **depois da receita, aviso com botão para a procuração**                    | 🔴     | a declaração já está gravada; falta o aviso                 |
 
 ⚠️ **O "consentimento" do passo 5 é requisito novo** (versão de 10/09/2026). O aviso hoje sai
 automático quando a receita é emitida. Se o envio passa a depender de um ato do paciente, o
