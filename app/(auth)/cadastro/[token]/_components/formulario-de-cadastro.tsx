@@ -54,6 +54,12 @@ import type { Finalidade } from '@/lib/parceiros/consentimento';
 interface Props {
   token: string;
   protocolo: string;
+  /**
+   * O protocolo do PARCEIRO, quando o paciente veio de um. Mostrado ao lado do nosso porque
+   * os dois usam o mesmo formato `SOL-000000` e o paciente não tem como saber que são
+   * numerações diferentes.
+   */
+  pedidoDoParceiro?: string | null;
   /** O que o parceiro ainda não tem. Aparece como aviso — nunca bloqueia (ADR-0016 D-06). */
   pendencias?: {
     chave: string;
@@ -191,6 +197,7 @@ function traduzirErro(err: unknown): string {
 export function FormularioDeCadastro({
   token,
   protocolo,
+  pedidoDoParceiro = null,
   pendencias = [],
   recebidos = [],
   urlDeRetorno = null,
@@ -527,7 +534,12 @@ export function FormularioDeCadastro({
 
   return (
     <div className="relative mx-auto w-full max-w-xl">
-      <Cabecalho protocolo={protocolo} etapa={etapa} textos={textos} />
+      <Cabecalho
+        protocolo={protocolo}
+        pedidoDoParceiro={pedidoDoParceiro}
+        etapa={etapa}
+        textos={textos}
+      />
 
       <div
         className={cn(
@@ -1196,10 +1208,12 @@ export function FormularioDeCadastro({
 
 function Cabecalho({
   protocolo,
+  pedidoDoParceiro,
   etapa,
   textos,
 }: {
   protocolo: string;
+  pedidoDoParceiro?: string | null;
   etapa: string;
   /** O que a tela promete — vem do destino, não de texto fixo. Ver `textosDoDestino`. */
   textos: ReturnType<typeof textosDoDestino>;
@@ -1207,7 +1221,18 @@ function Cabecalho({
   const passo = etapa === 'dados' ? 1 : etapa === 'codigo' ? 2 : 3;
   return (
     <div className="animate-fade-up mb-7 text-center">
-      <span className="eyebrow">Protocolo {protocolo}</span>
+      <span className="eyebrow">
+        Protocolo {protocolo}
+        {/*
+          🔴 OS DOIS NÚMEROS, quando há dois. Medido em 11/09/2026: os dois sistemas numeram
+          com o MESMO formato `SOL-000000`, em sequências independentes. Mostrar só o nosso faz
+          quem anotou o do parceiro achar que perdeu o pedido — e citar o número errado ao
+          atendimento é pior ainda, porque manda a pessoa certa procurar no lugar errado.
+        */}
+        {pedidoDoParceiro ? (
+          <span className="text-muted-foreground"> · pedido {pedidoDoParceiro}</span>
+        ) : null}
+      </span>
       <h1 className="font-display text-foreground mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
         {etapa === 'pronto' ? (
           'Tudo certo!'
