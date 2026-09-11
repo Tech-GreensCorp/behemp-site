@@ -133,6 +133,14 @@ export default async function CadastroPorLinkPage({
       <FormularioDeCadastro
         token={token}
         protocolo={resultado.protocolo}
+        /**
+         * 🔴 O NÚMERO QUE ELE VIU NA TELA DO PARCEIRO.
+         *
+         * Os dois lados numeram com o MESMO formato `SOL-000000`, em sequências
+         * independentes — medido em 11/09/2026. Sem mostrar os dois, o paciente vê um número
+         * diferente do que anotou e conclui que algo se perdeu.
+         */
+        pedidoDoParceiro={resultado.pedidoDoParceiro}
         pendencias={pendenciasDe(resultado.documentosDoParceiro)}
         /**
          * 🔴 O QUE JÁ CHEGOU TAMBÉM APARECE.

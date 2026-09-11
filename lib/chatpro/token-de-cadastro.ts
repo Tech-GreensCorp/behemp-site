@@ -69,6 +69,17 @@ export interface SolicitacaoValidada {
    */
   declarouTerAutorizacaoAnvisa: boolean | null;
   declarouTerReceitaMedica: boolean | null;
+  /**
+   * 🔴 O PROTOCOLO DO PARCEIRO — o número que o paciente viu na tela DELES.
+   *
+   * Medido em 11/09/2026, respondendo a uma pergunta da Greens: os dois lados numeram com o
+   * **mesmo formato** `SOL-000000`, em sequências independentes. O paciente vê `SOL-000019`
+   * lá e `SOL-000045` aqui, e nada na tela diz que são sistemas diferentes — ou ele acha que
+   * perdeu o número, ou cita o errado ao atendimento.
+   *
+   * `null` para quem não veio de parceiro, que é a maioria.
+   */
+  pedidoDoParceiro: string | null;
 }
 
 export interface SolicitacaoRecusada {
@@ -130,6 +141,7 @@ export async function validarTokenDeCadastro(
     urlDeRetorno: linha.urlDeRetorno ?? null,
     declarouTerAutorizacaoAnvisa: linha.declarouTerAutorizacaoAnvisa ?? null,
     declarouTerReceitaMedica: linha.declarouTerReceitaMedica ?? null,
+    pedidoDoParceiro: linha.pedidoDoParceiro ?? null,
   };
 }
 

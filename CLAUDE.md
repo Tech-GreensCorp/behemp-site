@@ -90,7 +90,7 @@ Siga primeiro `AGENTS.md`. Este arquivo define apenas o modo operacional do Clau
 Runner: **Vitest 4** desde a Sprint 0 (20/08/2026). `pnpm test` roda todos.
 
 🔴 **Os números abaixo foram MEDIDOS com `pnpm test`, não estimados.** Última medição:
-**11/09/2026 — 1006 casos em 34 guardas.** (Eram 199 em 8 na medição de 24/08, quando três
+**11/09/2026 — 1015 casos em 35 guardas.** (Eram 199 em 8 na medição de 24/08, quando três
 estavam errados — ver a retratação ao pé da tabela.)
 
 | guarda                                         | quebra o build se…                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | como rodar                           |
@@ -129,6 +129,7 @@ estavam errados — ver a retratação ao pé da tabela.)
 | `a-confirmacao-do-email-nao-e-beco`            | "Reenviar código" voltar a não dar **retorno** (quem clica e não vê resposta clica de novo, e cada reenvio invalida o código anterior — o paciente digita o código do e-mail velho e lê "código incorreto"), o reenvio deixar de **limpar o campo**, ou "Corrigir meus dados" voltar a chamar `signUp.create` com cadastro pendente, o que faz o Clerk responder `form_identifier_exists` e a tela dizer **"já existe uma conta"** a quem está no meio do próprio cadastro — **15 casos**, provados por **8 sabotagens**                                                                     | `pnpm test`                          |
 | `o-s2-tem-destino-proprio-e-gatilho`           | o cadastro (S2) voltar a sair pelo **caminho e segredo do aviso** — poderes diferentes não dividem chave: quem tem o do aviso mente que uma receita ficou pronta, quem tem o do cadastro **cria solicitações lá e faz a Greens buscar URLs que escolher** —, `prepararTransferencia` voltar a ser **órfã** (existia com guarda e ninguém a chamava; a Greens achou com `grep` antes de nós), o gatilho vir **antes** de gravar o consentimento, ou o `idioma` viajar da constante de hoje em vez do registro — **24 casos**, provados por **14 sabotagens**                                  | `pnpm test`                          |
 | `o-segredo-cadastrado-chega-ao-servidor`       | uma variável de integração lida pelo código **não** estar na lista `gravar` do `deploy.yml` — cadastrar o secret no GitHub **não basta**, o deploy escreve uma lista FIXA e o que fica fora nunca chega ao processo. Aconteceu **três vezes**: `PARCEIRO_ORIGENS_DE_DOCUMENTO`, `PARCEIRO_TRANSFERENCIA_ATIVA` e `PARCEIRO_GREENS_SEGREDO_CADASTRO` — as duas primeiras ganharam caso pelo NOME, e por isso a terceira passou. Este deriva do código, e cobre o acesso **indireto** (`variavel: 'X'` em `contas.ts`) que uma sabotagem revelou — **27 casos**, provados por **7 sabotagens** | `pnpm test`                          |
+| `os-dois-protocolos-nao-se-confundem`          | o paciente vindo de parceiro voltar a ver **só o nosso** protocolo. Os dois sistemas numeram com o **mesmo formato** `SOL-000000`, em sequências independentes: ele anota `SOL-000019` lá e lê `SOL-000045` aqui. Ou conclui que perdeu o pedido, ou cita o número errado ao atendimento — que manda a pessoa certa procurar no lugar errado. Também fica vermelho se o nosso for **substituído** pelo do parceiro, ou se a ausência virar ruído na tela — **9 casos**, provados por **7 sabotagens**                                                                                        | `pnpm test`                          |
 | portão de baseline                             | lint, Prettier ou type-check **piorarem** em relação a `baseline.json`. Não exige zero — exige não piorar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `node scripts/conferir-baseline.mjs` |
 
 Os **dois** guardas dos hooks ficam (`DO-19`): o `.sh` roda **sem `node_modules`**, o `.ts` roda
@@ -187,6 +188,32 @@ decisões desta sessão que **ainda não viraram ADR** · o que foi retratado.
 
 Descartável: output bruto de ferramenta, listagem de diretório, conteúdo de arquivo já
 lido.
+
+## 🔴 NÃO MESCLAR PARA `main` SEM PEDIR — decisão do dono, 11/09/2026
+
+**Palavras dele:** _"você behemp só pode lançar pra main me pedindo, pois a Dryelle está
+atualizando também e temos que ficar de olho nisso pra não lançar no mesmo momento"_.
+
+**Não é sobre permissão, é sobre colisão.** Duas pessoas mesclam em `main` no mesmo dia, e cada
+merge dispara um deploy que aplica migration em produção **sem rollback**. Dois deploys
+concorrentes disputam o mesmo servidor e o mesmo banco.
+
+**O que já aconteceu em 11/09, e originou a regra:**
+
+- mesclei o **#61** lendo um _"vamos fazer isso"_ como aval — o dono esperava fazer o deploy
+  depois, e não existe passo separado: **o merge É o deploy**;
+- o deploy do **#63** (da Dryelle) e o do **#62** falharam **um por causa do outro** — o
+  primeiro deixou 11 arquivos fora do Prettier, e o portão barrou os dois.
+
+**O procedimento:**
+
+1. abrir o PR, com o que foi medido;
+2. **entregar o comando de merge ao dono** e parar;
+3. só acompanhar o deploy **depois** que ele mesclar.
+
+⚠️ **"Vamos fazer isso" não é autorização de merge.** Autorização de merge é o dono dizendo
+`merge`, `mescle`, `pode subir` — ou rodando o comando. Na dúvida, perguntar custa uma frase;
+o inverso custa um deploy concorrente.
 
 ## Git, conflitos e o que os hooks bloqueiam
 
