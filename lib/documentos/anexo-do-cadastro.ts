@@ -88,12 +88,17 @@ export async function anexarDocumentoDoCadastro(params: {
       bytes,
       {
         /**
-         * ⚠️ `public` é o padrão de todo o resto do projeto, e a tela da ANVISA lê `urlBlob`
-         * direto. Gravar privado aqui deixaria o documento invisível para quem precisa dele.
-         * É o achado do Item 6, e ele fica pior a cada arquivo novo — a correção é única
-         * para todos, e está catalogada.
+         * 🔴 PRIVADO. Decisão do dono em 10/09/2026: _"então vamos colocar no nosso store
+         * privado"_.
+         *
+         * Store público significa: quem tem a URL lê, sem autenticação — e o que está aqui é
+         * RG, receita e laudo. Obscuridade de URL não é controle de acesso.
+         *
+         * ⚠️ Um blob privado NÃO abre por link direto, e é esse o ponto. A entrega passa por
+         * `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e registra
+         * a leitura. Quem escrever tela nova deve usar aquela rota, nunca `urlBlob`.
          */
-        access: 'public',
+        access: 'private',
         contentType: params.anexo.tipoMime,
       },
     );

@@ -215,16 +215,14 @@ export async function materializarArquivos(
       }
 
       /**
-       * ⚠️ `access: 'public'` é o padrão que TODO o resto do projeto usa hoje
-       * (`app/_actions/documentos.ts:95`), e a tela da ANVISA lê `urlBlob` direto. Gravar
-       * privado aqui deixaria o documento invisível justamente para quem precisa dele.
+       * 🔴 PRIVADO — e aqui pesa mais que em qualquer outro lugar: são documentos de
+       * pacientes de OUTRA empresa, que a Greens nos confiou. Ela mediu o bucket dela e
+       * provou que é privado (403, e não 404); receber e guardar em público seria devolver
+       * um cuidado com descuido.
        *
-       * 🔴 Isto é o achado do Item 6 — store público com RG, laudo e receita — e ele fica
-       * PIOR com este arquivo, porque agora entram documentos de outra empresa. A correção
-       * é única para todos e está catalogada; centralizei a decisão nesta constante para
-       * que mudar seja mexer em um lugar só.
+       * A entrega é por `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
        */
-      const ACESSO_DO_BLOB = 'public' as const;
+      const ACESSO_DO_BLOB = 'private' as const;
 
       const nome = entrada.nomeArquivo?.replace(/[^\w.-]/g, '_') ?? `${entrada.tipo}`;
       const blob = await put(
