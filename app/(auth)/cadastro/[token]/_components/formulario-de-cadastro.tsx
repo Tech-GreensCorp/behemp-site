@@ -48,6 +48,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { cpfEhValido, formatarCpf, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
+import { ConsentimentoDoCompartilhamento } from '@/components/paciente/ConsentimentoDoCompartilhamento';
+import type { Finalidade } from '@/lib/parceiros/consentimento';
 
 interface Props {
   token: string;
@@ -305,6 +307,14 @@ export function FormularioDeCadastro({
   const textos = textosDoDestino(
     destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave)),
   );
+  /**
+   * 🔴 COMEÇA VAZIO — nenhuma finalidade vem marcada.
+   *
+   * Pré-marcar seria gravar como escolha dele algo que ele não fez (art. 8º §4º). E ficar
+   * fora de `podeEnviar` também é decisão: consentimento que trava o cadastro não é livre
+   * (art. 8º §3º), e o que o cadastro precisa mesmo se sustenta na tutela da saúde.
+   */
+  const [finalidadesConsentidas, setFinalidadesConsentidas] = useState<Finalidade[]>([]);
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
   /**
@@ -422,6 +432,8 @@ export function FormularioDeCadastro({
         temReceitaMedica: perguntarSobreReceita ? temReceita : null,
         anexos: await lerAnexos(anexos),
         tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
+        // Pode ser lista vazia, e vazia é uma resposta: ele leu e não autorizou nada.
+        finalidadesConsentidas,
       });
 
       if (!gravado.sucesso) {
@@ -1027,6 +1039,12 @@ export function FormularioDeCadastro({
                 </div>
               </fieldset>
             </Secao>
+
+            <ConsentimentoDoCompartilhamento
+              selecionadas={finalidadesConsentidas}
+              onChange={setFinalidadesConsentidas}
+              desabilitado={carregando}
+            />
 
             {/*
               🔴 ONDE O CLERK DESENHA O CAPTCHA. Sem este elemento no DOM, o

@@ -88,6 +88,31 @@ de lá — pedido no §6. Até chegar, o que fica definido é a **estrutura**, n
 ⚠️ **O envio lê o consentimento, nunca o supõe.** Um envio que acontece porque "o paciente
 clicou em algum momento" é o que transforma consentimento em formalidade.
 
+### 🔴 RETIFICAÇÃO, 11/09/2026 — a estrutura existia e o ATO não acontecia
+
+Ao implementar, apareceu o que a ADR não tinha previsto: **a P5 lia um consentimento que
+nenhuma tela colhia**. Havia o módulo (`lib/parceiros/consentimento.ts`), havia o tipo, havia
+a regra (`podeTransferir`) — e não havia lugar nenhum onde o paciente dissesse sim. O sistema
+_parecia_ pronto, que é o modo mais caro de não estar.
+
+E a peça que faltava escondia a falha mais séria: `prepararTransferencia` recebia
+`finalidadesConsentidas` **por parâmetro**. Qualquer chamador podia passar
+`[retorno_ao_parceiro]` e o envio saía. **Consentimento alegado por quem envia não é
+consentimento** — é a palavra do remetente sobre a vontade de outra pessoa.
+
+**O que mudou, e passou a valer:**
+
+| antes                                           | agora                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------- |
+| finalidades vinham por parâmetro                | `prepararTransferencia({ solicitacaoId })` **lê** do banco |
+| `versao` e `texto` saíam das constantes de hoje | saem do **registro** do paciente (art. 8º §6º)             |
+| nenhuma tela colhia                             | cadastro por link **e** `/paciente/privacidade`            |
+| não havia como revogar                          | mesma tela, mesmo botão (art. 8º §5º)                      |
+
+🔴 **A versão gravada com a redação de hoje era um defeito próprio, achado ao escrever o
+guarda:** mandar `versao: '2026-09-10.v1'` junto do texto atual afirmaria que o paciente leu
+uma redação que ele nunca viu. Os dois saem da mesma linha, agora.
+
 ## §4 — Os oito fluxos, e o que cada um exige da BeHemp
 
 Legenda: ✅ pronto · 🟡 parcial · 🔴 falta · ⏸️ adiado por decisão
@@ -241,6 +266,30 @@ confirmar".** Confirmar o que ele acabou de responder é desconfiar dele, e cust
 
 Como o S1 já é. **Rejeitado: `fetch` direto no clique do consentimento.** Com a Greens fora do
 ar, o paciente veria um erro por algo que não é problema dele — e o dado se perderia.
+
+### D-06 — As caixas nascem desmarcadas, e o consentimento não trava o cadastro
+
+**Decidido em 11/09/2026, ao construir a tela.**
+
+Duas tentações práticas, as duas recusadas:
+
+1. **Pré-marcar as finalidades** para não perder ninguém. Caixa pré-marcada não é
+   manifestação: a LGPD exige consentimento **livre, informado e inequívoco** (art. 5º, XII) e
+   declara nulas as autorizações genéricas (art. 8º §4º). O mesmo está com todas as letras no
+   Recital 32 do GDPR — _"silence, pre-ticked boxes or inactivity should not constitute
+   consent"_. Marcar por ele e gravar como escolha dele é registrar uma afirmação falsa.
+2. **Exigir o consentimento para concluir o cadastro.** Aceite obtido como pedágio é viciado
+   (art. 8º §3º). E não é preciso: a avaliação médica se sustenta na **tutela da saúde**
+   (art. 11, II, "f"); o que **depende** de consentimento é o compartilhamento com a outra
+   empresa — e é exatamente isso que se pergunta.
+
+⚠️ É a mesma lição que já está escrita no guarda `consentimento-governa-a-ia-nao-a-consulta`,
+de 20/08: **o consentimento governa o que é opcional, nunca o cuidado.**
+
+**A consequência aceita:** um paciente pode se cadastrar sem autorizar o retorno à Greens, e
+aí o pedido dele lá não avança sozinho. A tela diz isso **antes** de ele decidir — o efeito de
+recusar aparece ao lado de cada caixa, porque informação clara é requisito de validade
+(art. 9º §1º), e isso inclui o que acontece se a resposta for não.
 
 ### D-05 — O formulário completo é UM, com as seções que o caso exige
 

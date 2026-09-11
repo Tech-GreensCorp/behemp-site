@@ -33,8 +33,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { solicitacoesCadastro } from '@/db/schema';
 
-import { TEXTO_DO_CONSENTIMENTO, VERSAO_DO_CONSENTIMENTO, type Finalidade } from './consentimento';
-import { podeTransferir, type MotivoDeRecusa } from './pode-transferir';
+import { FINALIDADES, type Finalidade } from './consentimento';
+import { consentimentosVigentes } from './consentimento-registrado';
+import { podeTransferir, transferenciaAtiva, type MotivoDeRecusa } from './pode-transferir';
 
 /**
  * O corpo que a Greens recebe.
@@ -77,14 +78,13 @@ export interface CorpoDaTransferencia {
  */
 export async function prepararTransferencia(params: {
   solicitacaoId: string;
-  /** As finalidades que o paciente aceitou, lidas do registro — nunca inferidas. */
-  finalidadesConsentidas: Finalidade[];
-  concedidoEm: Date;
 }): Promise<
   { pronta: true; corpo: CorpoDaTransferencia } | { pronta: false; motivo: MotivoDeRecusa }
 > {
-  const permissao = podeTransferir(params.finalidadesConsentidas);
-  if (!permissao.pode) return { pronta: false, motivo: permissao.motivo! };
+  /**
+   * A trava vem antes de tocar o banco: desligado é desligado, e nem a consulta acontece.
+   */
+  if (!transferenciaAtiva()) return { pronta: false, motivo: 'desligada' };
 
   const [solicitacao] = await db
     .select({
@@ -107,6 +107,22 @@ export async function prepararTransferencia(params: {
 
   if (!solicitacao) return { pronta: false, motivo: 'paciente_nao_encontrado' };
   if (!solicitacao.parceiro) return { pronta: false, motivo: 'sem_parceiro' };
+  // Sem ficha de paciente não há a quem atribuir consentimento — e sem ele nada sai.
+  if (!solicitacao.pacienteId) return { pronta: false, motivo: 'sem_consentimento' };
+
+  const vigentes = await consentimentosVigentes(solicitacao.pacienteId);
+  const permissao = podeTransferir(vigentes.map((c) => c.finalidade));
+  if (!permissao.pode) return { pronta: false, motivo: permissao.motivo! };
+
+  /**
+   * A versão e a data saem do REGISTRO da finalidade que autoriza o envio, não da constante
+   * do módulo. Se a redação mudou depois que ele consentiu, o que vale — e o que a Greens
+   * precisa poder provar — é a versão que ele leu (art. 8º §6º).
+   */
+  const autorizadora = vigentes.find((c) => c.finalidade === FINALIDADES.retornoAoParceiro);
+  // `podeTransferir` já garantiu que ela existe. A checagem fica porque um `!` aqui viraria
+  // um estouro em produção no dia em que a regra mudar de forma.
+  if (!autorizadora) return { pronta: false, motivo: 'sem_consentimento' };
 
   return {
     pronta: true,
@@ -137,10 +153,10 @@ export async function prepararTransferencia(params: {
        */
       documentos: [],
       consentimento: {
-        versao: VERSAO_DO_CONSENTIMENTO,
-        finalidades: params.finalidadesConsentidas,
-        texto: TEXTO_DO_CONSENTIMENTO,
-        concedidoEm: params.concedidoEm.toISOString(),
+        versao: autorizadora.versao,
+        finalidades: vigentes.map((c) => c.finalidade),
+        texto: autorizadora.textoApresentado,
+        concedidoEm: autorizadora.concedidoEm.toISOString(),
       },
     },
   };

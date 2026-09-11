@@ -66,3 +66,29 @@ export interface RegistroDeConsentimento {
   /** De qual tela partiu — o mesmo texto pode ser oferecido em lugares diferentes. */
   origem: string;
 }
+
+/**
+ * O rótulo de cada finalidade na tela, e o efeito real de recusá-la.
+ *
+ * 🔴 O EFEITO É PARTE DA INFORMAÇÃO. O art. 9º §1º diz que o consentimento é **nulo** se a
+ * informação não foi clara, e "clara" inclui o que acontece se a pessoa disser não. Uma caixa
+ * sem consequência declarada convida a marcar tudo sem ler — que é o oposto do que o artigo
+ * quer.
+ */
+export const ROTULOS_DAS_FINALIDADES: Record<
+  Finalidade,
+  { titulo: string; efeitoSeRecusar: string }
+> = {
+  [FINALIDADES.avaliacaoMedica]: {
+    titulo: 'Avaliação médica por um profissional da Be4Hope',
+    efeitoSeRecusar: 'Sem isto não conseguimos agendar a sua consulta.',
+  },
+  [FINALIDADES.apoioAnvisa]: {
+    titulo: 'Apoio na autorização da Anvisa',
+    efeitoSeRecusar: 'Você continua podendo pedir a autorização por conta própria.',
+  },
+  [FINALIDADES.retornoAoParceiro]: {
+    titulo: 'Informar à Greens Corp os documentos emitidos para você',
+    efeitoSeRecusar: 'O seu pedido na Greens não avança sozinho: você levaria os documentos.',
+  },
+};

@@ -424,6 +424,18 @@ Ligar um cron parado não é retomar de onde parou: é executar meses de acúmul
 
 ## Concluído
 
+- [x] 🔴 **A TELA DO CONSENTIMENTO — o ato que faltava** · 11/09 · `feat/a-tela-do-consentimento`.
+      A P5 lia um consentimento que **nenhuma tela colhia**: havia módulo, tipo e regra, e não
+      havia lugar onde o paciente dissesse sim. Pior, `prepararTransferencia` recebia as
+      finalidades **por parâmetro** — quem envia alegava o consentimento de quem é enviado.
+      Entregue: tabela `consentimentos` (migration `0034`), leitura/escrita em
+      `lib/parceiros/consentimento-registrado.ts`, bloco no **cadastro por link**, tela
+      `/paciente/privacidade` com **revogação** (art. 8º §5º), e a P5 passando a **ler** do
+      banco — inclusive o `texto` e a `versao` que o paciente leu, não os de hoje. Guarda
+      `o-consentimento-e-colhido-antes-de-sair` com **45 casos**, provado por **17 sabotagens**
+      (uma achou defeito meu: o caso do `revalidatePath` media presença, e havia duas chamadas).
+      Decisão nova: **ADR-0021 D-06** — caixas desmarcadas, e o consentimento **não trava** o
+      cadastro.
 - [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
       _"você está atualizando as docs obrigatórias... inclusive criando as ADRs com nossas
       decisões certo?"_. **Ele estava certo.** As decisões dele de 24/08 estavam só nas ADRs

@@ -19,6 +19,33 @@
 
 ---
 
+## 🔴 Item 32 — CONCLUÍDO em 11/09/2026: a tela do consentimento
+
+**O diagnóstico, que só apareceu ao ligar a P5:** `lib/parceiros/transferencia-de-cadastro.ts`
+recebia `finalidadesConsentidas: Finalidade[]` por parâmetro. A regra estava certa e o dado
+que ela julgava vinha de quem chama — um consentimento **alegado**, não lido.
+
+**Onde ficou:**
+
+| peça                                                           | o quê                                              |
+| -------------------------------------------------------------- | -------------------------------------------------- |
+| `db/schema/consentimentos.ts` + `db/migrations/0034_*.sql`     | uma linha por finalidade; aditiva, sem `DROP`      |
+| `lib/parceiros/consentimento-registrado.ts`                    | ler / conceder / revogar — sem auth, sem `next/*`  |
+| `app/(paciente)/_actions/consentimento.ts`                     | paciente vem da **sessão**, nunca do formulário    |
+| `components/paciente/ConsentimentoDoCompartilhamento.tsx`      | o texto integral, as 3 caixas, o efeito de recusar |
+| `app/(paciente)/paciente/privacidade/`                         | ver e **revogar** (art. 8º §5º)                    |
+| `app/(auth)/cadastro/[token]/…/formulario-de-cadastro.tsx:+18` | o bloco no cadastro por link                       |
+| `app/_actions/cadastro-por-link.ts:+40`                        | grava pelo mesmo caminho, sem `insert` próprio     |
+
+**O que ficou de fora, e por quê:**
+
+- 🟠 **O consentimento não aparece no formulário completo (P3)** — só no cadastro por link e no
+  painel. Quem chega pela P3 ainda não tem onde consentir na própria tela; ele consegue pelo
+  `/paciente/privacidade` depois. **Fica como pendência.**
+- 🟠 **Revogar não avisa a Greens.** O S1 `consentimento_revogado` foi aceito em conversa com o
+  lado deles e **ainda não foi implementado** — hoje a revogação impede envios **futuros**, e
+  o que já foi continua lá. A tela diz isso ao paciente, em vez de prometer o que não cumpre.
+
 ## Item 1 — 🔴 A migration estreia contra a produção, sem ensaio
 
 Achado ao ler o pipeline para dimensionar o custo de ~10 tabelas novas. Não veio de

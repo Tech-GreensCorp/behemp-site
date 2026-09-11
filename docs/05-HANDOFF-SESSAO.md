@@ -14,6 +14,37 @@
 
 ---
 
+## 🔴 A TAREFA DA MANHÃ DE 12/09/2026 — revisar o fluxo do ChatPro da BeHemp
+
+**Combinado pelo dono em 11/09, ao fim da noite de trabalho:** _"AMANHÃ VAMOS REVISAR TAMBÉM
+TODO FLUXO DO CHATPRO DA BEHEMP PARA INTEGRAR 8 FLUXOS (OS QUE FOREM COERENTES DA BEHEMP). VOU
+MANDAR IMAGEM DO QUE TEMOS E NÓS REVISAREMOS UM POR UM PARA ADAPTAR AOS FLUXOS QUE NÓS
+MONTAMOS."_
+
+**O que isso quer dizer, em concreto:** o construtor de fluxo do ChatPro da BeHemp foi montado
+antes da ADR-0021. Os oito fluxos de lá pressupõem perguntas, respostas e rotas que o diagrama
+atual pode não ter — e alguns blocos do diagrama atual podem não ter mais lugar.
+
+**Como conduzir (o dono pediu um por vez, e já corrigiu isso antes):** ele manda a imagem, e a
+revisão vai **bloco a bloco** — texto, depois parâmetros, depois ações. Não despejar o diagrama
+inteiro de uma vez; foi exatamente a correção dele em 10/09: _"calma, vc ta colocando muita
+informação, vamo um passo de vez"_.
+
+**O que já existe do nosso lado, e que a revisão precisa respeitar:**
+
+| peça                               | onde                                        | o que o fluxo do ChatPro precisa saber                              |
+| ---------------------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| triagem (decide se oferece o link) | `GET /api/chatpro/triagem`                  | responde **texto puro**; motivo vai no cabeçalho `x-triagem-motivo` |
+| geração do link de cadastro        | `/api/chatpro/bot-link`                     | link de uso único, 7 dias                                           |
+| handoff da Greens (com CPF)        | `/api/parceiros/...`                        | assinado, idempotente, janela de 300 s                              |
+| destino depois do cadastro         | `lib/parceiros/destino-do-paciente.ts`      | sai do que **falta**, não do fluxo declarado (ADR-0021 D-01)        |
+| consentimento                      | cadastro por link + `/paciente/privacidade` | **não trava** o cadastro (ADR-0021 D-06)                            |
+
+⚠️ **Abrir junto:** `docs/adr/ADR-0021-os-oito-fluxos-e-os-webhooks-entre-as-empresas.md` §4 (os
+oito fluxos, passo a passo) e `docs/11-OS-OITO-FLUXOS.md`.
+
+---
+
 ## §1 — O que está no ar agora
 
 | onde                                    | o quê                                                                                           | desde                |
