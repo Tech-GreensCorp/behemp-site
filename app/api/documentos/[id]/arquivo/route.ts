@@ -29,12 +29,54 @@ import { head } from '@vercel/blob';
 
 import { garantirLeitorDoDocumento } from '@/lib/auth/escopo-documento';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  cabecalhosDoLimite,
+  consumir,
+  identificarChamador,
+} from '@/lib/seguranca/limite-de-requisicao';
+
+/**
+ * 🔴 30 LEITURAS POR MINUTO, POR CHAMADOR — OWASP API4:2023.
+ *
+ * Esta rota responde 404 tanto para "não existe" quanto para "não é seu", de propósito, para
+ * não virar oráculo. Mas sem limite, alguém percorre ids até achar os que respondem 200: o
+ * `cuid2` torna isso caro, e caro não é impossível.
+ *
+ * 30/min é folgado para uso real — um paciente abre 3 ou 4 documentos numa sessão — e
+ * estreito para varredura.
+ */
+const LIMITE = 30;
+const JANELA_EM_SEGUNDOS = 60;
+
+/**
+ * 🔴 30 LEITURAS POR MINUTO, POR CHAMADOR.
+ *
+ * Esta rota responde 404 tanto para "não existe" quanto para "não é seu" — de propósito, para
+ * não virar oráculo. Mas sem limite, alguém autenticado percorre ids até achar os que
+ * respondem 200; o `cuid2` torna isso caro, e caro não é impossível.
+ *
+ * 30/min é folgado para uso real — um paciente abre 3 ou 4 documentos numa sessão — e
+ * estreito para varredura.
+ */
 
 /** Lê dado de saúde: nunca pode ser servida de cache compartilhado. */
 export const dynamic = 'force-dynamic';
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  /**
+   * O limite vem ANTES da autenticação de propósito: conferir sessão primeiro faria cada
+   * tentativa custar uma consulta ao banco — NOSSA, não de quem tenta. É o inverso do que se
+   * quer numa defesa contra consumo.
+   */
+  const limite = consumir(identificarChamador(request.headers, 'doc'), LIMITE, JANELA_EM_SEGUNDOS);
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { erro: 'Muitas requisições. Tente novamente em instantes.' },
+      { status: 429, headers: cabecalhosDoLimite(limite, LIMITE) },
+    );
+  }
 
   const escopo = await garantirLeitorDoDocumento(id);
   if (!escopo.ok) {

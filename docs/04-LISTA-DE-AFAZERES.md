@@ -1781,3 +1781,39 @@ por vez, com a tela junto.
 
 ⚠️ E os arquivos **já gravados** continuam públicos. Torná-los privados exige copiá-los, o que
 é migração de dado — trabalho próprio, com o histórico preservado (proibição 4).
+
+## Item 31 — 🟡 O limite de requisição é por PROCESSO, não compartilhado
+
+**Criado junto com a defesa**, em 10/09/2026, e registrado no mesmo movimento porque é o tipo
+de limitação que some da memória de quem não a escreveu.
+
+`lib/seguranca/limite-de-requisicao.ts` guarda o contador **na memória do processo**. Isso
+funciona hoje porque há **uma instância** (EC2 + PM2 — DT-006/DT-008).
+
+| cenário              | efeito                                             |
+| -------------------- | -------------------------------------------------- |
+| uma instância (hoje) | o limite vale o que diz                            |
+| duas instâncias      | cada uma conta metade — o limite efetivo **dobra** |
+| reinício do processo | o contador **zera**                                |
+
+**Quando trocar:** no dia em que houver mais de uma instância, ou um balanceador. A troca é
+substituir a função `consumir` por uma sobre store compartilhado (Redis, ou a própria tabela
+com `FOR UPDATE SKIP LOCKED`, que o projeto já usa nas filas). **Quem chama não muda** — foi
+desenhado assim de propósito.
+
+⚠️ **Não é motivo para adiar nada.** Sem limite nenhum, o custo de cada tentativa de força
+bruta era do servidor. Com este, o atacante precisa de muitas origens para o mesmo efeito.
+Melhor que nada por uma margem enorme, pior que compartilhado por uma margem conhecida.
+
+### Como a auditoria chegou aqui
+
+Contra o **OWASP API Security Top 10 (2023)**, medido em 10/09/2026:
+
+| risco                           | estado                                                 |
+| ------------------------------- | ------------------------------------------------------ |
+| API1 — BOLA                     | ✅ escopo de objeto em 9 pontos                        |
+| API2 — autenticação quebrada    | ✅ `timingSafeEqual` nos dois segredos                 |
+| API3 — exposição de propriedade | ✅ guardas contra PII em log e dado clínico no payload |
+| **API4 — consumo irrestrito**   | 🔴 **era o único sem defesa nenhuma** → corrigido aqui |
+| replay                          | ✅ janela de 300 s com `Math.abs`                      |
+| enumeração de identificador     | ✅ `cuid2`, não sequencial                             |
