@@ -121,6 +121,20 @@ jeito que já perguntamos pela ANVISA.
 
 ---
 
+# As cinco peças — estado em 10/09/2026
+
+| peça                                      | fecha    | estado                                            |
+| ----------------------------------------- | -------- | ------------------------------------------------- |
+| **P1** pergunta "já tem receita?"         | BeHemp 1 | ✅ **feita**                                      |
+| **P2** aviso pós-consulta com ação rápida | 4 passos | ✅ **componente pronto** — falta plugar nas telas |
+| **P3** formulário com anexo do que falta  | 5 fluxos | ✅ **feita**                                      |
+| **P4** tela de escolha (tenho conta?)     | Greens 3 | ✅ **feita** — `/acesso`                          |
+| **P5** envio à Greens com consentimento   | 5 passos | 🟡 texto e estrutura ✅ · envio 🔴 (Jurídico)     |
+
+⚠️ **A P2 existe como componente e ainda não está numa tela.** Onde ela entra — depois do
+agendamento, no painel do paciente, ou nos dois — é decisão de produto, e o componente foi
+escrito para caber nos três lugares sem mudança.
+
 # As três peças que faltam, e elas se repetem
 
 ## 1 · O **formulário completo** — pedido por 4 dos 7 fluxos

@@ -473,3 +473,76 @@ describe('o consentimento tem versão, texto e finalidades separadas', () => {
     }
   });
 });
+
+/**
+ * P4 — a tela de escolha, e P2 — o aviso da procuração.
+ *
+ * As duas peças menores da ADR-0021, e as duas têm a mesma armadilha: são telas que parecem
+ * decorativas e não são. A P4 evita que o paciente de recompra tente criar conta que já existe;
+ * a P2 é o único lugar onde a declaração "não tenho ANVISA" vira ação.
+ */
+describe('P4 — a tela de escolha não obriga a acertar de primeira', () => {
+  const tela = readFileSync(path.join(process.cwd(), 'app/(auth)/acesso/page.tsx'), 'utf8');
+
+  it('oferece os dois caminhos', () => {
+    expect(tela).toContain('href="/entrar"');
+    expect(tela).toContain('href="/registrar-se"');
+  });
+
+  /**
+   * 🔴 O PACIENTE DE RECOMPRA NÃO LEMBRA SE TEM CONTA AQUI.
+   *
+   * Ele lembra de ter comprado na Greens. Sem uma saída para a dúvida, escolhe no chute — e
+   * metade dos chutes termina em "e-mail já cadastrado", que é um erro que ele não resolve
+   * sozinho.
+   */
+  it('e dá uma saída para quem não sabe responder', () => {
+    expect(tela).toMatch(/Não lembra se já tem conta/i);
+  });
+
+  it('a rota é pública — quem chega ainda não provou quem é', () => {
+    const middleware = readFileSync(path.join(process.cwd(), 'middleware.ts'), 'utf8');
+    expect(middleware).toContain("'/acesso',");
+  });
+});
+
+describe('P2 — o aviso da procuração avisa, não bloqueia', () => {
+  const aviso = readFileSync(
+    path.join(process.cwd(), 'components/paciente/AvisoDaProcuracao.tsx'),
+    'utf8',
+  );
+
+  it('só aparece quando a procuração é mesmo necessária', () => {
+    expect(aviso).toContain('if (!precisaDaProcuracao || fechado) return null;');
+  });
+
+  it('leva à procuração em um clique', () => {
+    expect(aviso).toContain('/paciente/anvisa');
+    expect(aviso).toMatch(/Fazer a procuração agora/);
+  });
+
+  /**
+   * 🔴 PODE SER FECHADO — é aviso, não pedágio (ADR-0016 D-06).
+   *
+   * Barrar quem não tem autorização seria barrar justamente quem veio resolver isso.
+   */
+  it('pode ser fechado', () => {
+    expect(aviso).toContain('setFechado(true)');
+  });
+
+  /**
+   * ⚠️ E o fechar vale para a SESSÃO, não para sempre.
+   *
+   * Persistir "ele fechou" esconderia o aviso de quem fechou sem ler, com a autorização ainda
+   * faltando — o sistema teria decidido por ele que o assunto acabou.
+   */
+  it('e fechar não é decisão definitiva — o estado é local', () => {
+    expect(aviso).toContain('const [fechado, setFechado] = useState(false)');
+    expect(aviso).not.toMatch(/localStorage|fetch\(|action/i);
+  });
+
+  it('não pergunta de novo o que o paciente já respondeu no cadastro', () => {
+    // A declaração é gravada desde a P1/ANVISA. Perguntar aqui seria repetir.
+    expect(aviso).not.toMatch(/Você já tem|Sim, já tenho/);
+  });
+});
