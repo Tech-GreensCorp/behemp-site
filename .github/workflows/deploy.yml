@@ -168,6 +168,16 @@ jobs:
             gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
             gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
             gravar PARCEIRO_ORIGENS_DE_DOCUMENTO  "${{ secrets.PARCEIRO_ORIGENS_DE_DOCUMENTO }}"
+            # 🔴 A CHAVE QUE LIGA A TRANSFERÊNCIA DE CADASTRO (P5, ADR-0021).
+            #
+            # Vazia = nada sai. Só `1` liga. Ligada por decisão do dono em 11/09/2026, para
+            # demonstrar o fluxo à direção antes de levar ao Jurídico — a plataforma ainda não
+            # tem paciente real, então o que trafega é fictício.
+            #
+            # ⚠️ DESLIGAR É UM COMANDO, e isso é de propósito: a trava fica no código, e o que
+            # muda é o valor. Se o Jurídico pedir para parar, some da lista de secrets e o
+            # próximo deploy já sai desligado — sem precisar reverter código.
+            gravar PARCEIRO_TRANSFERENCIA_ATIVA   "${{ secrets.PARCEIRO_TRANSFERENCIA_ATIVA }}"
             gravar CHATPRO_INTAKE_SECRET           "${{ secrets.CHATPRO_INTAKE_SECRET }}"
             gravar CHATPRO_INTAKE_SECRET_GREENS    "${{ secrets.CHATPRO_INTAKE_SECRET_GREENS }}"
             gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"

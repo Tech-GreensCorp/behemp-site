@@ -154,3 +154,32 @@ describe('controle — o guarda não pode acusar inocente', () => {
     }
   });
 });
+
+/**
+ * A variável só vale se chegar ao servidor.
+ *
+ * 🔴 CADASTRAR O SECRET NO GITHUB NÃO BASTA. O `deploy.yml` escreve uma lista FIXA de chaves
+ * no `.env` — um secret fora dela fica no GitHub e nunca chega ao processo. Já aconteceu com
+ * `PARCEIRO_ORIGENS_DE_DOCUMENTO` em 10/09/2026.
+ *
+ * Aqui o efeito seria o inverso do perigoso — a transferência ficaria desligada achando que
+ * está ligada —, mas o diagnóstico é igualmente confuso: ninguém entende por que o corpo não
+ * sai, e a variável "está cadastrada".
+ */
+describe('a chave que liga a transferência chega ao servidor', () => {
+  it('o deploy escreve PARCEIRO_TRANSFERENCIA_ATIVA no .env', () => {
+    const yaml = readFileSync(path.join(process.cwd(), '.github/workflows/deploy.yml'), 'utf8');
+    expect(yaml).toMatch(/gravar PARCEIRO_TRANSFERENCIA_ATIVA\s+"\$\{\{ secrets\./);
+  });
+
+  /**
+   * ⚠️ E A TRAVA CONTINUA NO CÓDIGO.
+   *
+   * O dono pediu para ligar, não para remover o mecanismo. Desligar tem de seguir sendo um
+   * comando — some o secret, e o próximo deploy sai desligado, sem reverter código.
+   */
+  it('e a trava continua existindo — ligar é um valor, não uma remoção', () => {
+    expect(regra).toContain('transferenciaAtiva()');
+    expect(regra).toMatch(/=== '1'/);
+  });
+});
