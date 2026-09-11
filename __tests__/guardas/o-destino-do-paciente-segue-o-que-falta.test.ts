@@ -325,3 +325,63 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
     expect(lib).toMatch(/return false/);
   });
 });
+
+/**
+ * A PERGUNTA DA RECEITA — e por que a resposta do paciente vence o manifesto.
+ *
+ * O bot não sabe o que o paciente já tem. Sem perguntar, o sistema considera que falta tudo e
+ * manda todo mundo para o agendamento — inclusive quem só precisa da procuração e já tem
+ * receita válida. Era o buraco do fluxo BeHemp 1, apontado em 10/09/2026.
+ */
+describe('a pergunta da receita, e o destino que a considera', () => {
+  it('a pergunta existe', () => {
+    expect(codigo).toContain('Você já tem uma receita médica de cannabis medicinal válida?');
+  });
+
+  it('e vem ANTES da ANVISA na tela — sem receita não há o que autorizar', () => {
+    const receita = codigo.indexOf('{perguntarSobreReceita && (');
+    const anvisa = codigo.indexOf('{perguntarSobreAnvisa && (');
+    expect(receita).toBeGreaterThan(-1);
+    expect(anvisa).toBeGreaterThan(-1);
+    expect(receita).toBeLessThan(anvisa);
+  });
+
+  /**
+   * 🔴 A RESPOSTA DO PACIENTE VENCE O MANIFESTO.
+   *
+   * O manifesto diz o que o PARCEIRO mandou; a resposta diz o que o PACIENTE tem. Quando
+   * discordam, vale o paciente — ele é a fonte sobre a própria vida, e o parceiro pode
+   * simplesmente ainda não ter recebido o documento.
+   *
+   * É a mesma regra que `a-triagem-roteia-e-nao-julga` aplica ao bot.
+   */
+  it('o destino usa as pendências CORRIGIDAS pelas respostas, não as cruas', () => {
+    expect(codigo).toContain('pendenciasDepoisDasRespostas');
+    expect(codigo).toMatch(
+      /destinoDepoisDoCadastro\(pendenciasDepoisDasRespostas\.map\(\(p\) => p\.chave\)\)/,
+    );
+    // e as pendências cruas não podem mais alimentar o destino
+    expect(codigo).not.toMatch(/destinoDepoisDoCadastro\(pendencias\.map/);
+  });
+
+  it('dizer "tenho receita" tira a receita das pendências', () => {
+    expect(codigo).toMatch(/p\.chave === 'receita_medica' && temReceita === true/);
+  });
+
+  it('dizer "tenho ANVISA" tira a ANVISA das pendências', () => {
+    expect(codigo).toMatch(/p\.chave === 'autorizacao_anvisa' && temAnvisa === true/);
+  });
+
+  it('o "ainda não" da receita explica o que vem depois', () => {
+    expect(codigo).toMatch(/é justamente para isso que existe a teleconsulta/i);
+  });
+
+  it('a action recebe a declaração e o anexo da receita', () => {
+    const action = readFileSync(
+      path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
+      'utf8',
+    );
+    expect(action).toContain('temReceitaMedica');
+    expect(action).toContain("tipo: 'receita_medica',");
+  });
+});

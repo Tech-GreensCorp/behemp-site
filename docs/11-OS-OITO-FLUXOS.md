@@ -1,4 +1,4 @@
-# Os sete fluxos — Greens e BeHemp
+# Os oito fluxos — Greens e BeHemp
 
 > 🔴 **Documento vivo.** O dono mantém os fluxos; esta cópia acompanha. Quando ele mandar uma
 > versão nova, **o texto dos fluxos se substitui** e a coluna de estado se remede — nunca o
@@ -108,6 +108,16 @@ jeito que já perguntamos pela ANVISA.
 | 2   | preenche e vai para o agendamento                                              | ✅     | `/agendamento`                       |
 | 3   | ao finalizar o agendamento, aviso de que não tem ANVISA + oferta da procuração | 🔴     | mesma peça do 5b                     |
 | 4   | consentimento + recomendação → Greens recebe e cria a conta                    | 🔴     | a peça grande — ver abaixo           |
+
+## Fluxo BeHemp 4 — paciente **novo, sem nada**
+
+| #   | passo                                                          | estado | o que falta                |
+| --- | -------------------------------------------------------------- | ------ | -------------------------- |
+| 1   | ChatPro da BeHemp envia o **formulário completo**              | 🔴     | o formulário completo (P3) |
+| 2   | preenche tudo, com senha e código do e-mail nas etapas         | 🟡     | as etapas existem          |
+| 3   | direcionamento para o agendamento                              | ✅     | `/agendamento`             |
+| 4   | depois de agendar, aviso com ação rápida para a procuração     | 🔴     | P2                         |
+| 5   | pergunta se **consente** em enviar dados e documentos à Greens | 🔴     | P5 — depende de base legal |
 
 ---
 

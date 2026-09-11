@@ -195,14 +195,6 @@ export function FormularioDeCadastro({
   );
   const [corrigindo, setCorrigindo] = useState(false);
 
-  /**
-   * 🔴 O QUE A TELA PROMETE VEM DO DESTINO, não de um texto fixo.
-   *
-   * Os dois fluxos terminavam com "Criar conta e agendar consulta" — inclusive o do paciente
-   * que já tem receita e vai para a procuração da ANVISA. Prometer consulta a quem não vai
-   * ter consulta confunde no clique e desmente a tela seguinte.
-   */
-  const textos = textosDoDestino(destinoDepoisDoCadastro(pendencias.map((p) => p.chave)));
   const confirmandoDados = dadosVieramDoParceiro && !corrigindo;
 
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
@@ -228,6 +220,15 @@ export function FormularioDeCadastro({
    * procuração sem precisar perguntar outra vez.
    */
   const [temAnvisa, setTemAnvisa] = useState<boolean | null>(null);
+  /**
+   * 🔴 A MESMA PERGUNTA, PARA A RECEITA — e ela decide para onde ele vai.
+   *
+   * O bot não sabe o que o paciente já tem. Sem perguntar, consideramos que falta tudo e o
+   * destino vira sempre o agendamento — inclusive para quem só precisa da procuração e já tem
+   * receita válida. Era o buraco do fluxo BeHemp 1.
+   */
+  const [temReceita, setTemReceita] = useState<boolean | null>(null);
+  const [arquivoReceita, setArquivoReceita] = useState<File | null>(null);
   const [arquivoAnvisa, setArquivoAnvisa] = useState<File | null>(null);
   const [erroDoAnexo, setErroDoAnexo] = useState('');
   /**
@@ -238,6 +239,33 @@ export function FormularioDeCadastro({
    */
   const perguntarSobreAnvisa =
     !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'autorizacao_anvisa');
+  const perguntarSobreReceita =
+    !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'receita_medica');
+
+  /**
+   * 🔴 O DESTINO PASSA A CONSIDERAR O QUE ELE ACABOU DE RESPONDER.
+   *
+   * O manifesto do parceiro diz o que ELE mandou; a resposta na tela diz o que o PACIENTE
+   * tem. Quando os dois discordam, vale o paciente — ele é a fonte sobre a própria vida, e o
+   * parceiro pode simplesmente não ter recebido o documento ainda.
+   *
+   * É a mesma regra que o guarda `a-triagem-roteia-e-nao-julga` já aplica ao bot: a resposta
+   * do paciente vence a base.
+   */
+  const pendenciasDepoisDasRespostas = pendencias
+    .filter((p) => !(p.chave === 'autorizacao_anvisa' && temAnvisa === true))
+    .filter((p) => !(p.chave === 'receita_medica' && temReceita === true));
+
+  /**
+   * 🔴 O QUE A TELA PROMETE VEM DO DESTINO, não de um texto fixo.
+   *
+   * Os dois fluxos terminavam com "Criar conta e agendar consulta" — inclusive o do paciente
+   * que já tem receita e vai para a procuração da ANVISA. Prometer consulta a quem não vai
+   * ter consulta confunde no clique e desmente a tela seguinte.
+   */
+  const textos = textosDoDestino(
+    destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave)),
+  );
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
   /**
@@ -353,6 +381,8 @@ export function FormularioDeCadastro({
          */
         temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null,
         anexoAnvisa: await lerAnexo(arquivoAnvisa),
+        temReceitaMedica: perguntarSobreReceita ? temReceita : null,
+        anexoReceita: await lerAnexo(arquivoReceita),
         tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       });
 
@@ -375,7 +405,7 @@ export function FormularioDeCadastro({
        *
        * A regra e o porquê da ordem moram em `lib/parceiros/destino-do-paciente.ts`.
        */
-      const destino = destinoDepoisDoCadastro(pendencias.map((p) => p.chave));
+      const destino = destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave));
       setTimeout(() => router.push(destino), 1400);
     } catch (err) {
       setErro(traduzirErro(err));
@@ -684,6 +714,88 @@ export function FormularioDeCadastro({
             )}
 
             <Separador />
+
+            {perguntarSobreReceita && (
+              <>
+                {/*
+                  🔴 A RECEITA VEM ANTES DA ANVISA NA TELA, pelo mesmo motivo que vem antes no
+                  destino: sem receita não há o que autorizar. Perguntar pela autorização primeiro
+                  sugere uma ordem que a norma não permite.
+                */}
+                <Secao titulo="Receita médica" icone={FileText}>
+                  <fieldset className="space-y-3">
+                    <legend className="text-muted-foreground mb-3 text-sm">
+                      Você já tem uma receita médica de cannabis medicinal válida?
+                    </legend>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { valor: true, rotulo: 'Sim, já tenho' },
+                        { valor: false, rotulo: 'Ainda não' },
+                      ].map((opcao) => {
+                        const escolhido = temReceita === opcao.valor;
+                        return (
+                          <button
+                            key={String(opcao.valor)}
+                            type="button"
+                            onClick={() => {
+                              setTemReceita(opcao.valor);
+                              if (!opcao.valor) setArquivoReceita(null);
+                            }}
+                            aria-pressed={escolhido}
+                            className={cn(
+                              'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
+                              'transition-all duration-300 ease-out',
+                              escolhido
+                                ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
+                                : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                            )}
+                          >
+                            {escolhido && <CheckCircle2 size={15} className="text-primary" />}
+                            {opcao.rotulo}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {temReceita === true && (
+                      <div className="animate-fade-up space-y-2 pt-1">
+                        <Label htmlFor="anexo-receita">Anexe a receita</Label>
+                        <Input
+                          id="anexo-receita"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={(e) => {
+                            const arquivo = e.target.files?.[0] ?? null;
+                            setErroDoAnexo('');
+                            if (arquivo && arquivo.size > 8 * 1024 * 1024) {
+                              setErroDoAnexo(
+                                'O arquivo passa de 8 MB. Tente uma foto menor ou um PDF.',
+                              );
+                              setArquivoReceita(null);
+                              return;
+                            }
+                            setArquivoReceita(arquivo);
+                          }}
+                          className="h-12 rounded-xl"
+                        />
+                        <p className="text-muted-foreground text-xs">
+                          PDF ou foto, até 8 MB. O médico confere na consulta.
+                        </p>
+                      </div>
+                    )}
+
+                    {temReceita === false && (
+                      <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
+                        Tudo bem — é justamente para isso que existe a teleconsulta. O médico avalia
+                        o seu caso e, havendo indicação, a receita sai na própria consulta.
+                      </p>
+                    )}
+                  </fieldset>
+                </Secao>
+
+                <Separador />
+              </>
+            )}
 
             {perguntarSobreAnvisa && (
               <>

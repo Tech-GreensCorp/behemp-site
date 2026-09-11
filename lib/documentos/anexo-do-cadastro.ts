@@ -50,7 +50,7 @@ export interface AnexoDoCadastro {
  */
 export async function anexarDocumentoDoCadastro(params: {
   pacienteId: string;
-  tipo: 'autorizacao_anvisa';
+  tipo: 'autorizacao_anvisa' | 'receita_medica';
   anexo: AnexoDoCadastro;
   protocolo: string;
 }): Promise<boolean> {
