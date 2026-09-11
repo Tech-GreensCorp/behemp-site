@@ -165,6 +165,20 @@ jobs:
 
             gravar PARCEIRO_GREENS_SEGREDO_ENTRADA "${{ secrets.PARCEIRO_GREENS_SEGREDO_ENTRADA }}"
             gravar PARCEIRO_GREENS_SEGREDO_SAIDA   "${{ secrets.PARCEIRO_GREENS_SEGREDO_SAIDA }}"
+            # 🔴 O SEGREDO DO S2 — par PRÓPRIO, não o do aviso (§1 do contrato com a Greens).
+            # Quem tem o do aviso mente que uma receita ficou pronta; quem tem o do cadastro
+            # cria solicitações lá e faz a Greens buscar URLs que escolher.
+            gravar PARCEIRO_GREENS_SEGREDO_CADASTRO "${{ secrets.PARCEIRO_GREENS_SEGREDO_CADASTRO }}"
+            gravar PARCEIRO_GREENS_CAMINHO_CADASTRO "${{ secrets.PARCEIRO_GREENS_CAMINHO_CADASTRO }}"
+            gravar PARCEIRO_GREENS_CAMINHO_RETORNO  "${{ secrets.PARCEIRO_GREENS_CAMINHO_RETORNO }}"
+            # ⚠️ Estas três TÊM valor de reserva no código e funcionam sem o secret. Ficam aqui
+            # para serem CONFIGURÁVEIS sem deploy — `gravar` com valor vazio não sobrescreve,
+            # então listá-las não muda nada enquanto o secret não existir.
+            gravar CHATPRO_CADASTRO_PATH           "${{ secrets.CHATPRO_CADASTRO_PATH }}"
+            gravar CHATPRO_LINK_TTL_HORAS          "${{ secrets.CHATPRO_LINK_TTL_HORAS }}"
+            gravar CHATPRO_CONFIRMAR_NO_INTAKE     "${{ secrets.CHATPRO_CONFIRMAR_NO_INTAKE }}"
+            gravar CHATPRO_CHAT_API_URL            "${{ secrets.CHATPRO_CHAT_API_URL }}"
+            gravar CHATPRO_START_SEM_CONFIRMACAO   "${{ secrets.CHATPRO_START_SEM_CONFIRMACAO }}"
             gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
             gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
             gravar PARCEIRO_ORIGENS_DE_DOCUMENTO  "${{ secrets.PARCEIRO_ORIGENS_DE_DOCUMENTO }}"

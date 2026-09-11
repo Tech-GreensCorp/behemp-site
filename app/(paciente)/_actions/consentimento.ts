@@ -21,6 +21,10 @@ import { obterUsuarioAtual } from '@/lib/auth/permissions';
 import { FINALIDADES, type Finalidade } from '@/lib/parceiros/consentimento';
 import { conceder, finalidadesVigentes, revogar } from '@/lib/parceiros/consentimento-registrado';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
+import { db as bancoDaSolicitacao } from '@/lib/db';
+import { solicitacoesCadastro } from '@/db/schema';
+import { desc } from 'drizzle-orm';
 
 type Resultado = { sucesso: true } | { sucesso: false; erro: string };
 
@@ -90,6 +94,21 @@ export async function registrarConsentimento(entrada: {
       dadosDepois: { finalidades: analise.data.finalidades, origem: analise.data.origem },
     }).catch(() => {});
 
+    /**
+     * 🔴 O SEGUNDO GATILHO DO S2 (§7 do contrato-ponte, 11/09/2026).
+     *
+     * Quem consentiu no cadastro já foi enfileirado lá. Este é o outro caminho real: o
+     * paciente que **recusou na hora e mudou de ideia depois**, no painel. Sem este gatilho,
+     * consentir no painel não teria efeito nenhum sobre o envio — e o paciente acreditaria
+     * que autorizou.
+     *
+     * ⚠️ Só quando a finalidade que autoriza o envio está entre as concedidas agora. Consentir
+     * com a avaliação médica não dispara transferência nenhuma.
+     */
+    if (analise.data.finalidades.includes(FINALIDADES.retornoAoParceiro)) {
+      await enfileirarDoPainel(paciente.id);
+    }
+
     // 'layout' de propósito: `revalidatePath('/paciente')` sozinho não alcança as rotas
     // filhas, e é em `/paciente/privacidade` que o estado aparece.
     revalidatePath('/paciente', 'layout');
@@ -132,4 +151,41 @@ export async function meusConsentimentos(): Promise<Finalidade[]> {
   const paciente = await pacienteDaSessao();
   if (!paciente) return [];
   return finalidadesVigentes(paciente.id);
+}
+
+/**
+ * Acha a solicitação de parceiro deste paciente e enfileira a transferência.
+ *
+ * ⚠️ A MAIS RECENTE, e só com parceiro. Um paciente pode ter mais de uma solicitação; a que
+ * vale é a do encaminhamento vigente — a mesma regra que `notificar.ts` já aplica ao aviso.
+ *
+ * ⚠️ Nunca lança: é chamada de dentro de uma action cujo trabalho principal (gravar o
+ * consentimento) já terminou com sucesso.
+ */
+async function enfileirarDoPainel(pacienteId: string): Promise<void> {
+  try {
+    const [solicitacao] = await bancoDaSolicitacao
+      .select({ id: solicitacoesCadastro.id, parceiro: solicitacoesCadastro.parceiro })
+      .from(solicitacoesCadastro)
+      .where(
+        and(
+          eq(solicitacoesCadastro.pacienteId, pacienteId),
+          isNull(solicitacoesCadastro.deletedAt),
+        ),
+      )
+      .orderBy(desc(solicitacoesCadastro.createdAt))
+      .limit(1);
+
+    // Paciente que não veio de parceiro nenhum não gera transferência — é a maioria.
+    if (!solicitacao?.parceiro) return;
+
+    await enfileirarTransferencia({
+      solicitacaoId: solicitacao.id,
+      parceiro: solicitacao.parceiro,
+    });
+  } catch (erro) {
+    console.error('[consentimento] falha ao enfileirar transferência do painel', {
+      erro: erro instanceof Error ? erro.name : 'desconhecida',
+    });
+  }
 }

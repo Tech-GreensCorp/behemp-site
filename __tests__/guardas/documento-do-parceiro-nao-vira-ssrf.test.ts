@@ -229,3 +229,65 @@ describe('a variável da allowlist chega ao servidor', () => {
     expect(i).toBeLessThan(j);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('os downloads acontecem em paralelo, sem perder proteção', () => {
+  /**
+   * 🔴 ACRESCENTADO EM 11/09/2026, depois de a Greens medir do lado deles:
+   *
+   *   "cria conta → baixa 3 arquivos (sequencial) → responde   ← 15-45 s"
+   *
+   * O handoff deles ESPERA esta função. Em fila, três documentos viram quase um minuto, e o
+   * timeout de 30 s que eles puseram é curativo. Paralelizar derruba o pior caso para o do
+   * documento mais lento.
+   *
+   * ⚠️ O RISCO DE PARALELIZAR É PERDER UMA CHECAGEM no caminho — por isso os casos abaixo
+   * medem que cada proteção continua DENTRO do caminho de cada documento.
+   */
+  const fonte = readFileSync(
+    path.join(process.cwd(), 'lib/parceiros/documentos-do-parceiro.ts'),
+    'utf8',
+  );
+  const semComent = fonte
+    .split('\n')
+    .filter((l) => !/^\s*(\/\/|\/\*|\*)/.test(l))
+    .join('\n');
+  const fn = semComent.slice(semComent.indexOf('export async function materializarArquivos'));
+
+  it('🔴 não baixa em fila — `for` sequencial com `await` dentro some', () => {
+    expect(fn).toContain('await Promise.all(');
+    expect(fn).not.toMatch(/for \(const entrada of entradas\)/);
+  });
+
+  it('cada documento continua passando pela allowlist', () => {
+    expect(fn).toContain('await origemAutorizada(entrada.url)');
+  });
+
+  it('cada download continua recusando redirect', () => {
+    expect(fn).toContain("redirect: 'error'");
+  });
+
+  it('cada download continua com tempo limite', () => {
+    expect(fn).toContain('AbortSignal.timeout(TEMPO_LIMITE_MS)');
+  });
+
+  it('o MIME e o tamanho continuam conferidos por documento', () => {
+    expect(fn).toContain('TIPOS_ACEITOS.has(mime)');
+    expect(fn).toContain('bytes.byteLength > TAMANHO_MAXIMO');
+  });
+
+  it('e o blob continua privado', () => {
+    expect(fn).toMatch(/ACESSO_DO_BLOB = 'private'/);
+  });
+
+  it('🔴 uma falha não derruba as outras — cada documento tem o próprio catch', () => {
+    expect(fn).toMatch(/catch \(erro\)[\s\S]{0,220}erro_desconhecido/);
+    // `Promise.all` com rejeição derrubaria o lote inteiro; aqui nada rejeita.
+    expect(fn).not.toContain('Promise.allSettled');
+    expect(fn).not.toMatch(/^\s*throw /m);
+  });
+
+  it('o recusado continua sendo reportado, com o motivo', () => {
+    expect(fn).toMatch(/recusados\.push\(\{ tipo: r\.tipo, motivo: r\.motivo \}\)/);
+  });
+});

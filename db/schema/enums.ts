@@ -399,6 +399,15 @@ export const parceiroEventoSaidaStatusEnum = pgEnum('parceiro_evento_saida_statu
 export const parceiroEventoTipoEnum = pgEnum('parceiro_evento_tipo', [
   'receita_emitida',
   'anvisa_aprovada',
+  /**
+   * 🔴 O S2 — a transferência de cadastro. Acrescentado em 11/09/2026, pedido no §7 do
+   * contrato-ponte com a Greens.
+   *
+   * ⚠️ Vai para OUTRA rota e OUTRO segredo, não os do aviso. Poderes diferentes não dividem
+   * chave: quem tem o segredo do aviso consegue mentir que uma receita ficou pronta; quem tem
+   * o do cadastro consegue **criar solicitações e fazer a Greens buscar URLs que escolher**.
+   */
+  'cadastro_transferido',
 ]);
 
 /** Os dois catálogos que o ChatPro expõe e que chegam como UUID nos webhooks. */
