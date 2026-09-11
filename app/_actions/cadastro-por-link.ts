@@ -30,6 +30,8 @@ import { db } from '@/lib/db';
 import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
 import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
+import { FINALIDADES } from '@/lib/parceiros/consentimento';
+import { conceder } from '@/lib/parceiros/consentimento-registrado';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
@@ -92,6 +94,18 @@ const esquema = z.object({
    */
   temReceitaMedica: z.boolean().optional().nullable(),
   tratamentoAtual: z.string().trim().max(2000).optional().nullable(),
+  /**
+   * 🔴 O QUE ELE AUTORIZOU, uma finalidade por vez (LGPD art. 11, I).
+   *
+   * `z.enum` fecha a lista de propósito: `z.string()` aceitaria uma finalidade que nenhum
+   * consumidor lê, e gravaria um consentimento inerte — que parece registro e não autoriza
+   * nada. Lista vazia é resposta válida: ele leu e não autorizou.
+   */
+  finalidadesConsentidas: z
+    .array(
+      z.enum([FINALIDADES.avaliacaoMedica, FINALIDADES.apoioAnvisa, FINALIDADES.retornoAoParceiro]),
+    )
+    .optional(),
 });
 
 export type EntradaDoCadastro = z.input<typeof esquema>;
@@ -275,6 +289,30 @@ export async function concluirCadastroPorLink(
       if (gravou) tiposAnexados.push(anexo.tipo);
     }
 
+    /**
+     * 8c ── O CONSENTIMENTO, gravado como ato.
+     *
+     * ⚠️ Fora da transação, pelo mesmo motivo dos blocos acima — e com o erro caindo para o
+     * lado seguro: se esta gravação falhar, o que acontece é que **nada é enviado à Greens**
+     * (a P5 lê daqui antes de montar qualquer envio). Um cadastro sem consentimento gravado
+     * custa ao paciente marcar de novo no painel; o inverso custaria dado de saúde saindo da
+     * empresa sem registro que o autorize.
+     */
+    if (dados.finalidadesConsentidas?.length) {
+      try {
+        await conceder({
+          pacienteId,
+          finalidades: dados.finalidadesConsentidas,
+          origem: 'cadastro_por_link',
+        });
+      } catch (erroDoConsentimento) {
+        console.error('[cadastro] consentimento não gravado', {
+          protocolo: solicitacao.protocolo,
+          erro: erroDoConsentimento instanceof Error ? erroDoConsentimento.name : 'desconhecida',
+        });
+      }
+    }
+
     const copiados = await materializarDocumentosDoParceiro({
       pacienteId,
       documentosDoParceiro: solicitacao.documentosDoParceiro,
@@ -297,6 +335,8 @@ export async function concluirCadastroPorLink(
         // procuração depois sem perguntar de novo.
         declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
         declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
+        // As finalidades autorizadas. Sem o texto — ele está na tabela `consentimentos`.
+        finalidadesConsentidas: dados.finalidadesConsentidas ?? [],
         // Só os TIPOS — nunca o nome do arquivo, que costuma trazer o nome da pessoa.
         documentosAnexadosNoCadastro: tiposAnexados,
         declarouTratamentoEmCurso: dados.jaFazTratamento,

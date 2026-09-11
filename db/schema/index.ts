@@ -51,3 +51,4 @@ export * from './chatpro-eventos';
 export * from './chatpro-diretorio';
 export * from './chatpro-sessoes';
 export * from './parceiro-eventos-saida';
+export * from './consentimentos';

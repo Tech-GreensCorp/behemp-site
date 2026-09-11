@@ -19,6 +19,95 @@
 
 ---
 
+## 🔴 Item 34 — o aviso `consentimento_revogado` NÃO cabe no S1 como ele é hoje
+
+**Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado em
+11/09**, por um motivo que só apareceu ao tentar: o S1 não consegue avisar a mesma coisa duas
+vezes.
+
+**A medição.** `db/schema/parceiro-eventos-saida.ts:70`:
+
+```
+uniqueIndex('parceiro_eventos_saida_fato_idx').on(t.parceiro, t.tipo, t.solicitacaoId)
+```
+
+E `lib/parceiros/notificar.ts` usa `onConflictDoNothing` nesse alvo — de propósito, para que o
+mesmo fato chamado duas vezes não vire dois avisos. O guarda `o-aviso-ao-parceiro-nao-se-perde`
+**quebra o build** se esse índice virar comum (caso _"🔴 o índice do fato é ÚNICO"_).
+
+**A consequência, se eu simplesmente acrescentasse o tipo:** o paciente que **revoga,
+reconsente e revoga de novo** geraria UM aviso. O segundo seria engolido em silêncio, e a
+Greens seguiria usando dado de saúde de alguém que retirou o consentimento. Um aviso que às
+vezes não sai é pior que aviso nenhum: cria a crença de que o outro lado foi avisado.
+
+**As opções, com o custo de cada uma** — a escolha é do dono:
+
+| #   | opção                                                               | custo                                                               | risco                                                              |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| a   | acrescentar `ocorrenciaId` (cuid2) ao índice único                  | migration + ajustar o guarda do S1 + rever os dois tipos existentes | mexe no índice que protege a idempotência de `receita_emitida`     |
+| b   | tabela própria de avisos de consentimento, com o seu próprio índice | migration aditiva; não toca no S1 nem no guarda dele                | dois caminhos de saída para o parceiro, que podem divergir         |
+| c   | um aviso por revogação, aceitando um por solicitação                | trivial                                                             | 🔴 **o caso "revoga de novo" fica silencioso** — recusado por isso |
+
+**Recomendação: (b).** Ela não toca na idempotência de `receita_emitida`, que decide **gateway
+e desconto** do lado da Greens — e essa é exatamente a peça que não se mexe por causa de outra.
+
+⚠️ **O que vale ENQUANTO isso não existe, e precisa ser dito ao paciente:** revogar impede
+envios **futuros** (a P5 lê o consentimento vigente a cada envio), e o que já foi enviado
+continua com quem recebeu. A tela `/paciente/privacidade` diz isso, em vez de prometer o que o
+sistema não cumpre.
+
+## 🟠 Item 33 — a declaração "não tenho ANVISA" NÃO é persistida
+
+**Achado em 11/09/2026, ao plugar a P2.** `app/_actions/cadastro-por-link.ts:298-299` grava
+`declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` **apenas dentro de
+`registrarAuditoria`**. Não existe coluna para nenhuma das duas — nem em
+`solicitacoes_cadastro`, nem em `pacientes`. Log de auditoria não é fonte de leitura de
+produto.
+
+**O que isso custou:** o comentário de `components/paciente/AvisoDaProcuracao.tsx` afirmava que
+o cadastro gravava a declaração. Afirmação falsa, que sobreviveu porque **o componente não era
+renderizado por tela nenhuma** — ninguém a exercitou. Retratado no próprio arquivo em 11/09.
+
+**Como ficou funcionando sem isso:** o aviso passou a sair do **estado real** —
+`autorizacoes_anvisa` sem linha `aprovado` dentro da validade. É informação melhor: descreve o
+que existe, em vez do que o paciente lembrou de responder.
+
+**O que ainda se perde sem a coluna:** não conseguimos deixar de repetir a pergunta em outras
+telas, que era o propósito original da declaração. E o fluxo BeHemp 1 continua sem saber
+distinguir _"declarou que não tem"_ de _"nunca respondeu"_.
+
+**Perigo de corrigir (medido):** migration **aditiva**, duas colunas `boolean` nullable em
+`solicitacoes_cadastro`. Nenhum ponto de chamada quebra — nada lê hoje. O risco real é o de
+sempre: `main` é produção e push aplica migration sem rollback. **Não corrigir de passagem:**
+é trabalho próprio, em commit próprio, com autorização.
+
+## 🔴 Item 32 — CONCLUÍDO em 11/09/2026: a tela do consentimento
+
+**O diagnóstico, que só apareceu ao ligar a P5:** `lib/parceiros/transferencia-de-cadastro.ts`
+recebia `finalidadesConsentidas: Finalidade[]` por parâmetro. A regra estava certa e o dado
+que ela julgava vinha de quem chama — um consentimento **alegado**, não lido.
+
+**Onde ficou:**
+
+| peça                                                           | o quê                                              |
+| -------------------------------------------------------------- | -------------------------------------------------- |
+| `db/schema/consentimentos.ts` + `db/migrations/0034_*.sql`     | uma linha por finalidade; aditiva, sem `DROP`      |
+| `lib/parceiros/consentimento-registrado.ts`                    | ler / conceder / revogar — sem auth, sem `next/*`  |
+| `app/(paciente)/_actions/consentimento.ts`                     | paciente vem da **sessão**, nunca do formulário    |
+| `components/paciente/ConsentimentoDoCompartilhamento.tsx`      | o texto integral, as 3 caixas, o efeito de recusar |
+| `app/(paciente)/paciente/privacidade/`                         | ver e **revogar** (art. 8º §5º)                    |
+| `app/(auth)/cadastro/[token]/…/formulario-de-cadastro.tsx:+18` | o bloco no cadastro por link                       |
+| `app/_actions/cadastro-por-link.ts:+40`                        | grava pelo mesmo caminho, sem `insert` próprio     |
+
+**O que ficou de fora, e por quê:**
+
+- 🟠 **O consentimento não aparece no formulário completo (P3)** — só no cadastro por link e no
+  painel. Quem chega pela P3 ainda não tem onde consentir na própria tela; ele consegue pelo
+  `/paciente/privacidade` depois. **Fica como pendência.**
+- 🟠 **Revogar não avisa a Greens.** O S1 `consentimento_revogado` foi aceito em conversa com o
+  lado deles e **ainda não foi implementado** — hoje a revogação impede envios **futuros**, e
+  o que já foi continua lá. A tela diz isso ao paciente, em vez de prometer o que não cumpre.
+
 ## Item 1 — 🔴 A migration estreia contra a produção, sem ensaio
 
 Achado ao ler o pipeline para dimensionar o custo de ~10 tabelas novas. Não veio de

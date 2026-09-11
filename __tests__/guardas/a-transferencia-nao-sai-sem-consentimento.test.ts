@@ -108,9 +108,21 @@ describe('o consentimento é lido, nunca presumido', () => {
 });
 
 describe('o que o corpo leva, e o que ele não leva', () => {
+  /**
+   * 🔴 RETIFICADO EM 11/09/2026 — este caso exigia as CONSTANTES no corpo, e passou a acusar
+   * uma correção.
+   *
+   * Até então a P5 mandava `VERSAO_DO_CONSENTIMENTO` e `TEXTO_DO_CONSENTIMENTO`, os valores de
+   * hoje. Estava errado: se a redação mudar depois que o paciente consentiu, o corpo afirmaria
+   * que ele leu um texto que nunca viu. Agora os dois saem do REGISTRO dele (art. 8º §6º).
+   *
+   * O que o caso garante continua sendo o mesmo — que texto e versão VIAJEM. Mudou de onde
+   * saem, e essa parte quem cobre é `o-consentimento-e-colhido-antes-de-sair`.
+   */
   it('o texto e a versão do consentimento viajam junto', () => {
-    expect(codigo).toContain('VERSAO_DO_CONSENTIMENTO');
-    expect(codigo).toContain('TEXTO_DO_CONSENTIMENTO');
+    const corpo = codigo.slice(codigo.indexOf('consentimento: {'));
+    expect(corpo).toMatch(/versao: \w+\.versao/);
+    expect(corpo).toMatch(/texto: \w+\.textoApresentado/);
   });
 
   /**

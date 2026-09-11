@@ -49,6 +49,14 @@ export interface DadosDashboard {
     temPrescricao: boolean;
   } | null;
   userId: string | null;
+  /**
+   * 🔴 SAI DO ESTADO REAL, não da declaração do cadastro.
+   *
+   * O paciente precisa da procuração quando não tem autorização da ANVISA válida. A
+   * declaração "não tenho" que ele dá no cadastro **não é persistida em coluna** (Item 33) —
+   * e mesmo que fosse, o que existe vale mais que o que ele lembrou de responder.
+   */
+  precisaDaProcuracao: boolean;
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -63,7 +71,7 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, consultaRecenteRes, userIdRes] = await Promise.all([
+    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, consultaRecenteRes, userIdRes, anvisaRes] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -194,6 +202,25 @@ export async function obterDadosDashboard(): Promise<{
         WHERE u.clerk_id = ${auth.clerkId}
         LIMIT 1
       `),
+      /**
+       * 10. Tem autorização da ANVISA valendo?
+       *
+       * ⚠️ `data_validade IS NULL` conta como válida: autorização aprovada sem validade
+       * registrada é lacuna de dado nosso, e tratá-la como vencida faria o sistema cobrar
+       * procuração de quem já tem autorização.
+       */
+      db.execute(sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM autorizacoes_anvisa a
+          JOIN pacientes p ON p.id = a.paciente_id
+          JOIN users u ON u.id = p.user_id
+          WHERE u.clerk_id = ${auth.clerkId}
+            AND a.status = 'aprovado'
+            AND a.deleted_at IS NULL
+            AND (a.data_validade IS NULL OR a.data_validade >= CURRENT_DATE)
+        ) AS "temAnvisa"
+      `),
     ]);
 
     // Processar médico
@@ -258,6 +285,8 @@ export async function obterDadosDashboard(): Promise<{
 
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
 
+    const precisaDaProcuracao = !anvisaRes.rows[0]?.temAnvisa;
+
     return {
       sucesso: true,
       dados: {
@@ -270,6 +299,7 @@ export async function obterDadosDashboard(): Promise<{
         teleconsultaAtiva,
         consultaRecenteRealizada,
         userId,
+        precisaDaProcuracao,
       },
     };
   } catch (error) {

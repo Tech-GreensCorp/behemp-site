@@ -7,9 +7,25 @@
  * BeHemp 3 (3) e BeHemp 4 (4). Sempre a mesma coisa — terminada a consulta, avisar que falta a
  * autorização e levar à procuração em um clique.
  *
- * 🔴 A PARTE DIFÍCIL JÁ ESTAVA FEITA. Desde 10/09 o cadastro grava a declaração "não tenho
- * ANVISA". Este componente não pergunta nada: usa o que o paciente já respondeu. Perguntar de
- * novo seria o mesmo erro que o dono apontou na tela de cadastro.
+ * 🔴 RETRATAÇÃO, 11/09/2026 — o comentário que estava aqui afirmava algo falso.
+ *
+ * Ele dizia: _"Desde 10/09 o cadastro grava a declaração 'não tenho ANVISA'"_. **Não grava.**
+ * Ao plugar este componente numa tela, medi: `declarouTerAutorizacaoAnvisa` aparece em
+ * `app/_actions/cadastro-por-link.ts` apenas dentro de `registrarAuditoria`, e **não existe
+ * coluna** para ela em `solicitacoes_cadastro` nem em `pacientes`. A declaração vira log — e
+ * log de auditoria não é fonte de leitura de produto.
+ *
+ * O componente ficou quatro semanas sem ser plugado em tela nenhuma, e por isso a afirmação
+ * nunca foi exercitada. Componente que ninguém renderiza não tem comentário testado.
+ *
+ * 🔴 DE ONDE O AVISO SAI AGORA: do estado real, não da declaração. O paciente precisa da
+ * procuração quando **não tem autorização da ANVISA válida** — `autorizacoes_anvisa` sem
+ * linha `aprovado` dentro da validade. É informação mais confiável que a declaração: ela
+ * descreve o que existe, em vez do que ele lembrou de responder num formulário.
+ *
+ * ⚠️ A declaração continua útil e continua **não persistida** — está catalogada no
+ * `docs/04-LISTA-DE-AFAZERES.md` como Item 33. Ela é o que permitiria não repetir a pergunta
+ * em outras telas.
  *
  * ⚠️ AVISA, NÃO BLOQUEIA (ADR-0016 D-06). Ele pode fechar e seguir usando a plataforma. A
  * procuração é um caminho oferecido, não um pedágio — barrar quem não tem autorização seria

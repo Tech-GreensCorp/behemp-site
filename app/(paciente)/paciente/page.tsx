@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
+import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -270,6 +271,17 @@ export default function PacienteDashboardPage() {
               </Card>
             </div>
           )}
+
+          {/*
+            ── P2: o aviso da procuração ──────────────────────
+            🔴 FICA DEPOIS DO PÓS-CONSULTA e antes dos KPIs, de propósito. "Sua consulta
+            acabou e a prescrição está pronta" é mais urgente; os KPIs são resumo, e resumo
+            não compete com uma pendência que trava o tratamento.
+
+            ⚠️ AVISA, NÃO BLOQUEIA (ADR-0016 D-06). O componente decide sozinho se aparece —
+            passar `precisaDaProcuracao` falso simplesmente não renderiza nada.
+          */}
+          <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
 
           {/* ── KPIs principais ── */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-up delay-75">

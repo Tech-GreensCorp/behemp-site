@@ -536,13 +536,25 @@ describe('P2 — o aviso da procuração avisa, não bloqueia', () => {
    * Persistir "ele fechou" esconderia o aviso de quem fechou sem ler, com a autorização ainda
    * faltando — o sistema teria decidido por ele que o assunto acabou.
    */
+  /**
+   * 🔴 CORRIGIDO EM 11/09/2026 — este caso varria o arquivo COM os comentários e acusou a
+   * própria retratação: o texto novo cita o caminho `app/_actions/cadastro-por-link.ts`, e
+   * `_actions` casa com `/action/i`.
+   *
+   * É "menção vs uso", a décima quarta vez desta classe no repositório. O helper
+   * `semComentarios` existe neste mesmo arquivo desde sempre — faltava usá-lo aqui.
+   */
   it('e fechar não é decisão definitiva — o estado é local', () => {
     expect(aviso).toContain('const [fechado, setFechado] = useState(false)');
-    expect(aviso).not.toMatch(/localStorage|fetch\(|action/i);
+    expect(semComentarios(aviso)).not.toMatch(/localStorage|fetch\(|action/i);
   });
 
+  /**
+   * ⚠️ O comentário que estava aqui dizia _"a declaração é gravada desde a P1/ANVISA"_ — e
+   * **não é**: ela só vai para o log de auditoria (Item 33, medido em 11/09). O caso continua
+   * valendo por outro motivo: o aviso oferece a procuração, não reabre o interrogatório.
+   */
   it('não pergunta de novo o que o paciente já respondeu no cadastro', () => {
-    // A declaração é gravada desde a P1/ANVISA. Perguntar aqui seria repetir.
     expect(aviso).not.toMatch(/Você já tem|Sim, já tenho/);
   });
 });
