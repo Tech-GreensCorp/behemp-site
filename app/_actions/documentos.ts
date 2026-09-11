@@ -85,7 +85,7 @@ export async function uploadDocumento(
     const blob = await put(
       `documentos/${pacienteId}/${tipo}_${Date.now()}_${arquivo.name}`,
       arquivo,
-      { access: 'public' },
+      { access: 'private' },
     );
 
     // Calcular validade

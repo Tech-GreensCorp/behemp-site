@@ -219,7 +219,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                       </Badge>
 
                       {/* Visualizar */}
-                      <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
+                      <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <ExternalLink size={13} />
                           Ver

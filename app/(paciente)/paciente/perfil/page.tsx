@@ -671,7 +671,7 @@ export default function PerfilPacientePage() {
                   </div>
 
                   {/* Ver */}
-                  <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer"
+                  <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
                     aria-label="Visualizar"
                   >
