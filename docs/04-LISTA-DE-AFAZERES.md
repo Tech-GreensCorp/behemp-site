@@ -19,42 +19,52 @@
 
 ---
 
-## 🔴 Item 34 — o aviso `consentimento_revogado` NÃO cabe no S1 como ele é hoje
+## 🔴 Item 34 — o aviso `consentimento_revogado` depende do lado da Greens, não só do nosso
 
-**Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado em
-11/09**, por um motivo que só apareceu ao tentar: o S1 não consegue avisar a mesma coisa duas
-vezes.
+**Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado**. O
+diagnóstico mudou em 11/09/2026, depois de eu ler o código deles.
 
-**A medição.** `db/schema/parceiro-eventos-saida.ts:70`:
+### 🔴 RETRATAÇÃO — a primeira versão deste item errou duas coisas
 
+Eu escrevi que o obstáculo era **só o nosso índice** e que um evento recusado ficaria **"em
+retry para sempre"**. As duas estão erradas, e a medição está no código:
+
+| eu escrevi                         | o que o código mostra                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| o obstáculo é o nosso índice único | **o validator deles rejeita o tipo antes disso**                                                           |
+| um 400 ficaria em retry eterno     | `lib/parceiros/enviador.ts:40` — `VALE_TENTAR_DE_NOVO` não inclui 400; o evento vira **falhado**, não loop |
+
+**O bloqueio real**, medido em
+`greens-corp-backend/src/modules/parceiros/behemp/behempValidator.ts`:
+
+```ts
+tipo: z.enum(["receita_emitida", "anvisa_aprovada"]),
 ```
-uniqueIndex('parceiro_eventos_saida_fato_idx').on(t.parceiro, t.tipo, t.solicitacaoId)
-```
 
-E `lib/parceiros/notificar.ts` usa `onConflictDoNothing` nesse alvo — de propósito, para que o
-mesmo fato chamado duas vezes não vire dois avisos. O guarda `o-aviso-ao-parceiro-nao-se-perde`
-**quebra o build** se esse índice virar comum (caso _"🔴 o índice do fato é ÚNICO"_).
+Um `consentimento_revogado` é recusado com **400** na porta deles. Implementar do nosso lado
+antes que eles aceitem o tipo é construir contra um contrato que não existe — e o resultado
+seria um evento falhado por paciente que revoga, sem ninguém do outro lado sabendo.
 
-**A consequência, se eu simplesmente acrescentasse o tipo:** o paciente que **revoga,
-reconsente e revoga de novo** geraria UM aviso. O segundo seria engolido em silêncio, e a
-Greens seguiria usando dado de saúde de alguém que retirou o consentimento. Um aviso que às
-vezes não sai é pior que aviso nenhum: cria a crença de que o outro lado foi avisado.
+### O que o nosso lado ainda precisa, quando o deles aceitar
 
-**As opções, com o custo de cada uma** — a escolha é do dono:
+1. `consentimento_revogado` no enum `parceiro_evento_tipo` (migration de enum).
+2. **Um caminho que permita mais de um aviso por solicitação.** O índice
+   `uniqueIndex(parceiro, tipo, solicitacaoId)` faz um por solicitação, para sempre — e quem
+   revoga, reconsente e revoga de novo geraria **um**. O segundo seria engolido pelo
+   `onConflictDoNothing`, que existe de propósito para `receita_emitida`.
 
-| #   | opção                                                               | custo                                                               | risco                                                              |
-| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| a   | acrescentar `ocorrenciaId` (cuid2) ao índice único                  | migration + ajustar o guarda do S1 + rever os dois tipos existentes | mexe no índice que protege a idempotência de `receita_emitida`     |
-| b   | tabela própria de avisos de consentimento, com o seu próprio índice | migration aditiva; não toca no S1 nem no guarda dele                | dois caminhos de saída para o parceiro, que podem divergir         |
-| c   | um aviso por revogação, aceitando um por solicitação                | trivial                                                             | 🔴 **o caso "revoga de novo" fica silencioso** — recusado por isso |
+   **Recomendação: tabela própria**, com o seu próprio índice. Não toca na idempotência de
+   `receita_emitida`, que decide **gateway e desconto** do lado deles — e essa é exatamente a
+   peça que não se mexe por causa de outra.
 
-**Recomendação: (b).** Ela não toca na idempotência de `receita_emitida`, que decide **gateway
-e desconto** do lado da Greens — e essa é exatamente a peça que não se mexe por causa de outra.
+### ⚠️ O que vale ENQUANTO isso não existe
 
-⚠️ **O que vale ENQUANTO isso não existe, e precisa ser dito ao paciente:** revogar impede
-envios **futuros** (a P5 lê o consentimento vigente a cada envio), e o que já foi enviado
-continua com quem recebeu. A tela `/paciente/privacidade` diz isso, em vez de prometer o que o
-sistema não cumpre.
+Revogar impede envios **futuros** — a P5 lê o consentimento vigente a cada envio, e há guarda
+provando. O que já foi enviado continua com quem recebeu. A tela `/paciente/privacidade` diz
+isso ao paciente, em vez de prometer o que o sistema não cumpre.
+
+**Bloqueado por:** a Greens aceitar o tipo no `atualizacaoBehempValidator`. Está no prompt que
+vai para eles.
 
 ## ✅ Item 33 — RESOLVIDO em 11/09/2026: a declaração virou coluna
 
