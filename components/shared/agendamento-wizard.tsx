@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,8 +12,11 @@ import {
   listarHorariosLivres,
   reservarConsulta,
   iniciarAguardoPagamento,
+  type ReservaAtivaAgendamento,
+  type HistoricoAgendamentoItem,
 } from '@/app/(public)/_actions/agendamento';
 import { AgendamentoPagamentoStep } from '@/components/shared/agendamento-pagamento-step';
+import { AgendamentoHistorico } from '@/components/shared/agendamento-historico';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,6 +45,10 @@ import {
  * 2. Confirmação da reserva — dentro do prazo, avança para pagamento (`iniciarAguardoPagamento`).
  *    A consulta continua 'reservada' (aguardando pagamento) até uma confirmação real existir.
  * 3. Pagamento — layout de PIX/boleto/cartão, sem integração real de gateway ainda.
+ *
+ * A etapa inicial NÃO nasce sempre em 0: `reservaAtivaInicial` vem do servidor
+ * (`obterEstadoAgendamentoPaciente`, chamada pela Server Component da página) e reflete a
+ * reserva real no banco — reload ou saída da tela não faz o paciente perder o lugar.
  */
 
 interface Medico {
@@ -52,6 +60,11 @@ interface Medico {
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
+}
+
+interface AgendamentoWizardProps {
+  reservaAtivaInicial: ReservaAtivaAgendamento | null;
+  historicoInicial: HistoricoAgendamentoItem[];
 }
 
 function formatarValor(v: number): string {
@@ -74,26 +87,62 @@ const STEPS = [
   { label: 'Pagamento', icon: CreditCard },
 ];
 
-export function AgendamentoWizard() {
-  const [step, setStep] = useState(0);
+export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: AgendamentoWizardProps) {
+  const router = useRouter();
+
+  const [step, setStep] = useState(() => {
+    if (!reservaAtivaInicial) return 0;
+    return reservaAtivaInicial.aguardandoPagamento ? 3 : 2;
+  });
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(null);
-  const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>();
+  const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(() =>
+    reservaAtivaInicial
+      ? {
+          id: reservaAtivaInicial.medicoId,
+          nome: reservaAtivaInicial.medicoNome,
+          especialidade: reservaAtivaInicial.medicoEspecialidade,
+          bio: null,
+          crm: null,
+          avatarUrl: reservaAtivaInicial.medicoAvatarUrl,
+          valorConsulta: reservaAtivaInicial.valor,
+          googleConectado: false,
+        }
+      : null,
+  );
+  const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>(() =>
+    reservaAtivaInicial ? new Date(reservaAtivaInicial.dataHora) : undefined,
+  );
   const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
-  const [horarioSelecionado, setHorarioSelecionado] = useState<string | null>(null);
-  const [observacoes, setObservacoes] = useState('');
-  const [carregando, setCarregando] = useState(true);
+  const [horarioSelecionado, setHorarioSelecionado] = useState<string | null>(() =>
+    reservaAtivaInicial ? format(new Date(reservaAtivaInicial.dataHora), 'HH:mm') : null,
+  );
+  const [observacoes, setObservacoes] = useState(() => reservaAtivaInicial?.observacoes ?? '');
+  const [carregando, setCarregando] = useState(() => !reservaAtivaInicial);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [reservando, setReservando] = useState(false);
   const [avancandoPagamento, setAvancandoPagamento] = useState(false);
+  const [historico, setHistorico] = useState<HistoricoAgendamentoItem[]>(historicoInicial);
   const [reserva, setReserva] = useState<{
     consultaId: string;
     expiraEm: string;
     valor: number | null;
     moeda: string;
-  } | null>(null);
+  } | null>(() =>
+    reservaAtivaInicial
+      ? {
+          consultaId: reservaAtivaInicial.consultaId,
+          expiraEm: reservaAtivaInicial.expiraEm,
+          valor: reservaAtivaInicial.valor,
+          moeda: reservaAtivaInicial.moeda,
+        }
+      : null,
+  );
 
   useEffect(() => {
+    // Retomando direto na confirmação/pagamento: `carregando` já nasceu `false` (ver
+    // inicializador acima) — não precisa da lista de médicos nem de um fetch aqui.
+    if (reservaAtivaInicial) return;
+
     async function carregarMedicos() {
       setCarregando(true);
       const res = await listarMedicosDisponiveis();
@@ -103,6 +152,7 @@ export function AgendamentoWizard() {
       setCarregando(false);
     }
     carregarMedicos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const carregarHorarios = useCallback(async (data: Date) => {
@@ -162,6 +212,22 @@ export function AgendamentoWizard() {
     if (res.sucesso && res.dados) {
       setReserva(res.dados);
       setStep(2); // Confirmação
+
+      // Atualização otimista do histórico — evita esperar um reload para o paciente ver
+      // a reserva que acabou de criar na lista abaixo do wizard.
+      setHistorico((atual) => [
+        {
+          id: res.dados!.consultaId,
+          medicoNome: medicoSelecionado.nome,
+          medicoAvatarUrl: medicoSelecionado.avatarUrl,
+          dataHora: dataHora.toISOString(),
+          status: 'reservada',
+          valor: res.dados!.valor,
+          moeda: res.dados!.moeda,
+          expiraEm: res.dados!.expiraEm,
+        },
+        ...atual,
+      ]);
     } else {
       toast.error(res.erro ?? 'Não foi possível reservar este horário. Tente novamente.');
     }
@@ -182,6 +248,26 @@ export function AgendamentoWizard() {
     } else {
       toast.error(res.erro ?? 'Erro ao avançar para o pagamento');
     }
+  }
+
+  // Prazo da reserva expirou enquanto o paciente estava na tela de pagamento — o backend
+  // já vai liberar o horário (cron ou próxima leitura de `obterEstadoAgendamentoPaciente`);
+  // aqui só refletimos isso na tela na hora, sem esperar reload.
+  function handleReservaExpirada() {
+    if (!reserva) return;
+    toast.error('O prazo para pagamento acabou. Escolha um novo horário.');
+    setHistorico((atual) =>
+      atual.map((item) =>
+        item.id === reserva.consultaId ? { ...item, status: 'cancelada' as const } : item,
+      ),
+    );
+    setStep(0);
+    setMedicoSelecionado(null);
+    setDataSelecionada(undefined);
+    setHorarioSelecionado(null);
+    setObservacoes('');
+    setReserva(null);
+    router.refresh();
   }
 
   const dataHoraReserva = horarioSelecionadoParaData();
@@ -537,8 +623,12 @@ export function AgendamentoWizard() {
           valor={reserva.valor}
           moeda={reserva.moeda}
           expiraEm={reserva.expiraEm}
+          onExpirar={handleReservaExpirada}
         />
       )}
+
+      {/* Histórico/resumo — sempre visível, independente da etapa atual */}
+      <AgendamentoHistorico items={historico} />
     </div>
   );
 }

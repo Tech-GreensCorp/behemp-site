@@ -1,0 +1,1 @@
+DROP TABLE "pagamentos_config" CASCADE;

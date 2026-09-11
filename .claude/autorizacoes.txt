@@ -461,6 +461,27 @@ path:db/schema/consultas.ts
 path:db/migrations/0035_huge_sugar_man.sql
 path:db/migrations/meta/0035_snapshot.json
 
+# ── Autorizada pela Dryelle Ebelin em 11/09/2026, ajuste do fluxo de pagamento ──
+# Pedido literal no chat: "Remova a tela de configuração de pagamentos e qualquer
+# configuração de 'valor padrão'. O valor da consulta é individual por médico e já é
+# configurado na tela de Médicos, durante o cadastro/edição do médico."
+#
+# O QUE A MIGRATION FAZ: DROP TABLE pagamentos_config — singleton (no máximo 1 linha,
+# `valorConsultaPadrao`/`moedaPadrao`) que só existia para alimentar um fallback em
+# `reservarConsulta` quando o médico não tinha valor próprio configurado. Esse fallback
+# foi removido: `reservarConsulta` agora exige `medicos.valorConsulta` e recusa a reserva
+# com erro claro se estiver ausente, em vez de usar um valor "mágico" que ninguém escolheu.
+#
+# PERIGO MEDIDO: a tabela tem no máximo 1 linha, sem FK de ninguém apontando para ela
+# (confirmado — nenhuma outra tabela referencia `pagamentos_config`), e nenhum guarda em
+# `__tests__/guardas/` a exercita. Perda de dado possível: só o valor padrão global (ex.
+# R$150) que deixa de ter uso depois desta mudança. Como se desfaz: recriar a tabela e o
+# valor não é recuperável do banco (DROP não tem rollback), mas é reconstituível manualmente
+# se algum dia voltar a fazer sentido.
+path:db/schema/pagamentos-config.ts
+path:db/migrations/0040_flippant_morg.sql
+path:db/migrations/meta/0040_snapshot.json
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 11/09/2026 — §7 do contrato-ponte com a Greens: o S2 ganha caminho, segredo e gatilho
 #
@@ -489,3 +510,23 @@ path:db/migrations/meta/0035_snapshot.json
 # sido escolhido com cuidado.
 path:db/migrations/0039_secret_randall.sql
 path:db/migrations/meta/0039_snapshot.json
+
+# ── Retificação em 11/09/2026 — incidente de produção causado por mim (Claude) ──
+# Ao aplicar a migration acima (DROP TABLE pagamentos_config, autorização anterior
+# nesta mesma sessão) contra o banco Neon do .env, não percebi que esse banco é o
+# MESMO que a produção (be4hope.org) usa — e que o código então deployado em `main`
+# (PR #63, sem as mudanças de remoção desta branch) ainda chamava
+# `db.query.pagamentosConfig.findFirst()` dentro de `reservarConsulta`. Resultado:
+# a reserva de horário quebrou em produção com "Erro interno ao reservar horário"
+# até a Dryelle reportar.
+#
+# CORREÇÃO APLICADA (autorizada pela Dryelle em 11/09/2026, no chat, ao ser avisada
+# do incidente): recriei a tabela `pagamentos_config` manualmente, com a estrutura
+# idêntica à original e uma linha padrão (R$150/BRL), restaurando o comportamento
+# do código que está de fato em produção. Esta migration (0040) continua removendo
+# a tabela para quem rodar `db:migrate` do zero — o ponto é que **produção e
+# desenvolvimento compartilham o mesmo banco**, então uma migration destrutiva só
+# deve rodar contra ele quando o código que depende da tabela removida já não
+# estiver mais deployado. Lição para a próxima vez: antes de um DROP, conferir se
+# `main` (produção) ainda depende do que está sendo removido — não basta a branch
+# atual não depender mais.

@@ -151,7 +151,10 @@ export async function obterDadosDashboard(): Promise<{
       // 6. Mensagens não lidas
       contarMensagensNaoLidas(),
 
-      // 7. Teleconsulta ativa
+      // 7. Teleconsulta ativa — só conta como "ao vivo" se começou há pouco tempo.
+      // Sem esse filtro, uma sala 'aguardando'/'em_andamento' nunca encerrada (médico
+      // fechou a aba sem finalizar, por exemplo) fica aparecendo como "entrar agora"
+      // pro paciente pra sempre — não existe hoje nenhum job que feche sala parada.
       db.execute(sql`
         SELECT
           t.room_id     AS "roomId",
@@ -166,6 +169,7 @@ export async function obterDadosDashboard(): Promise<{
           AND p.deleted_at IS NULL
           AND t.deleted_at IS NULL
           AND t.status IN ('aguardando', 'em_andamento')
+          AND t.iniciada_em >= NOW() - INTERVAL '4 hours'
         ORDER BY t.iniciada_em DESC
         LIMIT 1
       `),

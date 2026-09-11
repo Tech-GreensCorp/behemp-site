@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,9 @@ interface AgendamentoPagamentoStepProps {
   moeda: string;
   /** ISO — prazo para pagar antes da reserva ser liberada automaticamente. */
   expiraEm: string;
+  /** Disparado uma única vez quando o prazo chega a zero — quem usa decide o que fazer
+   *  (ex.: voltar para a etapa de escolha de horário). */
+  onExpirar?: () => void;
 }
 
 /**
@@ -43,8 +46,10 @@ export function AgendamentoPagamentoStep({
   valor,
   moeda,
   expiraEm,
+  onExpirar,
 }: AgendamentoPagamentoStepProps) {
   const [agora, setAgora] = useState(() => Date.now());
+  const expirarAvisadoRef = useRef(false);
 
   useEffect(() => {
     const intervalo = setInterval(() => setAgora(Date.now()), 1000);
@@ -55,8 +60,15 @@ export function AgendamentoPagamentoStep({
   const expirado = msRestante <= 0;
   const valorFormatado = valor !== null ? `${moeda} ${formatarValor(valor)}` : 'A confirmar';
 
+  useEffect(() => {
+    if (expirado && !expirarAvisadoRef.current) {
+      expirarAvisadoRef.current = true;
+      onExpirar?.();
+    }
+  }, [expirado, onExpirar]);
+
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-2xl space-y-4">
       <Card className="border-0 shadow-sm">
         <CardContent className="space-y-4 py-8">
           <div className="flex items-center gap-4">
@@ -194,48 +206,52 @@ export function AgendamentoPagamentoStep({
             </TabsContent>
 
             <TabsContent value="credito" className="mt-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
+              <div className="max-w-xs space-y-4">
+                <div className="space-y-1.5">
                   <Label>Número do cartão</Label>
                   <Input disabled placeholder="0000 0000 0000 0000" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Validade</Label>
-                  <Input disabled placeholder="MM/AA" />
+                <div className="flex gap-3">
+                  <div className="w-24 space-y-1.5">
+                    <Label>Validade</Label>
+                    <Input disabled placeholder="MM/AA" />
+                  </div>
+                  <div className="w-20 space-y-1.5">
+                    <Label>CVV</Label>
+                    <Input disabled placeholder="123" />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>CVV</Label>
-                  <Input disabled placeholder="123" />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
                   <Label>Nome impresso no cartão</Label>
                   <Input disabled placeholder="Nome completo" />
                 </div>
-                <Button disabled className="sm:col-span-2">
+                <Button disabled className="w-full">
                   Pagar com cartão de crédito
                 </Button>
               </div>
             </TabsContent>
 
             <TabsContent value="debito" className="mt-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
+              <div className="max-w-xs space-y-4">
+                <div className="space-y-1.5">
                   <Label>Número do cartão</Label>
                   <Input disabled placeholder="0000 0000 0000 0000" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Validade</Label>
-                  <Input disabled placeholder="MM/AA" />
+                <div className="flex gap-3">
+                  <div className="w-24 space-y-1.5">
+                    <Label>Validade</Label>
+                    <Input disabled placeholder="MM/AA" />
+                  </div>
+                  <div className="w-20 space-y-1.5">
+                    <Label>CVV</Label>
+                    <Input disabled placeholder="123" />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>CVV</Label>
-                  <Input disabled placeholder="123" />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
                   <Label>Nome impresso no cartão</Label>
                   <Input disabled placeholder="Nome completo" />
                 </div>
-                <Button disabled className="sm:col-span-2">
+                <Button disabled className="w-full">
                   Pagar com cartão de débito
                 </Button>
               </div>
