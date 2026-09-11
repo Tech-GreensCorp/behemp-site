@@ -8,7 +8,11 @@ import { verificarPaciente } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { revalidatePath } from 'next/cache';
 import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
-import { enviarEmailConsultaAgendada, enviarEmailConsultaMedico } from '@/lib/email/consultas';
+import {
+  enviarEmailConsultaAgendada,
+  enviarEmailConsultaMedico,
+  enviarEmailReservaAguardandoPagamento,
+} from '@/lib/email/consultas';
 import { format } from 'date-fns';
 
 /**
@@ -38,6 +42,10 @@ const reservarConsultaSchema = z.object({
 });
 
 const confirmarAgendamentoSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+});
+
+const iniciarAguardoPagamentoSchema = z.object({
   consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
 });
 
@@ -426,6 +434,138 @@ export async function confirmarAgendamento(
 }
 
 /**
+ * Sai da etapa de confirmação para a etapa de pagamento (layout, sem gateway real).
+ *
+ * Ao contrário de `confirmarAgendamento`, esta action NÃO muda `consultas.status`
+ * (a reserva já nasceu 'reservada' em `reservarConsulta` e continua assim), NÃO toca
+ * Google Calendar e NÃO envia o e-mail de "consulta confirmada" — isso ficaria
+ * enganoso antes do pagamento existir de verdade. Só valida que a reserva ainda é
+ * do paciente e está dentro do prazo, e dispara o aviso de "aguardando pagamento".
+ *
+ * `confirmarAgendamento` continua intocada no código para ser chamada futuramente
+ * quando existir confirmação real de pagamento (ex.: webhook de gateway).
+ */
+export async function iniciarAguardoPagamento(
+  dados: z.infer<typeof iniciarAguardoPagamentoSchema>,
+): Promise<ActionResult<{ consultaId: string }>> {
+  try {
+    const parsed = iniciarAguardoPagamentoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const { consultaId } = parsed.data;
+
+    const auth = await verificarPaciente();
+    if (!auth.autorizado || !auth.clerkId) {
+      return { sucesso: false, erro: 'Autenticação necessária para agendar' };
+    }
+
+    const [userInterno] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId))
+      .limit(1);
+
+    if (!userInterno) {
+      return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+    }
+
+    const [pacienteAuto] = await db
+      .select({ id: pacientes.id })
+      .from(pacientes)
+      .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (!pacienteAuto) {
+      return {
+        sucesso: false,
+        erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+      };
+    }
+
+    const pacienteId = pacienteAuto.id;
+
+    const [reserva] = await db
+      .select()
+      .from(consultas)
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
+
+    if (!reserva) {
+      return { sucesso: false, erro: 'Reserva não encontrada.' };
+    }
+
+    if (reserva.status !== 'reservada') {
+      return {
+        sucesso: false,
+        erro: reserva.status === 'cancelada'
+          ? 'Sua reserva expirou ou foi cancelada. Escolha um novo horário.'
+          : 'Este agendamento já foi confirmado anteriormente.',
+      };
+    }
+
+    if (reserva.expiraEm && reserva.expiraEm.getTime() < Date.now()) {
+      await db
+        .update(consultas)
+        .set({ status: 'cancelada', expiraEm: null })
+        .where(eq(consultas.id, consultaId));
+      const mensagem = 'O prazo da reserva expirou.';
+      await marcarErroConfirmacao(consultaId, mensagem);
+      return { sucesso: false, erro: `${mensagem} Escolha um novo horário.` };
+    }
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, reserva.medicoId))
+      .limit(1);
+
+    const [paciente] = await db
+      .select()
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    if (!medico || !paciente) {
+      return { sucesso: false, erro: 'Erro ao carregar dados da reserva' };
+    }
+
+    const [pagamento] = await db
+      .select({ valor: pagamentos.valor, moeda: pagamentos.moeda })
+      .from(pagamentos)
+      .where(eq(pagamentos.consultaId, consultaId))
+      .limit(1);
+
+    // Best-effort — a reserva já existe independente do envio do e-mail.
+    try {
+      await enviarEmailReservaAguardandoPagamento({
+        pacienteNome: paciente.users.nome,
+        pacienteEmail: paciente.users.email,
+        medicoNome: medico.users.nome,
+        dataHora: reserva.dataHora,
+        valor: pagamento ? Number(pagamento.valor) : null,
+        moeda: pagamento?.moeda ?? 'BRL',
+        expiraEm: reserva.expiraEm ?? new Date(),
+      });
+      await db
+        .update(consultas)
+        .set({ emailReservaEnviadoEm: new Date() })
+        .where(eq(consultas.id, consultaId));
+    } catch (emailError) {
+      console.error('[Action] Erro ao enviar e-mail de reserva aguardando pagamento:', emailError);
+    }
+
+    return { sucesso: true, dados: { consultaId } };
+  } catch (error) {
+    console.error('[Action] Erro ao iniciar aguardo de pagamento:', error);
+    return { sucesso: false, erro: 'Erro interno ao processar a reserva' };
+  }
+}
+
+/**
  * Lista médicos disponíveis para agendamento público.
  * Retorna apenas nome, especialidade e disponibilidade (se Google Calendar conectado).
  */
@@ -434,6 +574,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
   nome: string;
   especialidade: string;
   bio: string | null;
+  crm: string | null;
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
@@ -445,6 +586,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
         nome: users.nome,
         especialidade: medicos.especialidade,
         bio: medicos.bio,
+        crm: medicos.crm,
         avatarUrl: users.avatarUrl,
         valorConsulta: medicos.valorConsulta,
         googleRefreshToken: medicos.googleRefreshToken,
@@ -459,6 +601,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
       nome: m.nome,
       especialidade: m.especialidade,
       bio: m.bio,
+      crm: m.crm,
       avatarUrl: m.avatarUrl,
       valorConsulta: m.valorConsulta !== null ? Number(m.valorConsulta) : null,
       googleConectado: !!m.googleRefreshToken,

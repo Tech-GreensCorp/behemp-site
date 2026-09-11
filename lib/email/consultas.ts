@@ -1090,3 +1090,71 @@ export async function enviarEmailTeleconsultaIniciada(params: {
     to: [{ email: params.pacienteEmail, name: params.pacienteNome }],
   });
 }
+
+// ── E-mail: Reserva aguardando pagamento ──────────────────────
+// Disparado ao sair da etapa de confirmação do wizard, ANTES de qualquer pagamento —
+// o horário está reservado (status 'reservada'), não confirmado. Não usar o e-mail de
+// "consulta confirmada" aqui, para não afirmar algo que ainda depende do pagamento.
+
+export async function enviarEmailReservaAguardandoPagamento(params: {
+  pacienteNome: string;
+  pacienteEmail: string;
+  medicoNome: string;
+  dataHora: Date;
+  valor: number | null;
+  moeda: string;
+  expiraEm: Date;
+}): Promise<void> {
+  const primeiroNome = escapeHtml(params.pacienteNome.split(' ')[0]);
+  const medicoNomeEscapado = escapeHtml(params.medicoNome);
+  const dataHoraFormatada = formatarData(params.dataHora);
+  const prazoFormatado = formatarData(params.expiraEm);
+  const valorFormatado =
+    params.valor !== null
+      ? `${params.moeda} ${params.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'a confirmar';
+
+  const corpo = `
+    <p style="margin:0 0 20px;font-size:14px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Olá, <strong>${primeiroNome}</strong>! Seu horário com <strong>Dr(a). ${medicoNomeEscapado}</strong> está
+      reservado. Falta só o pagamento para garantir a consulta.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      <tr><td style="background:${CORES.bg};border-radius:12px;padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:8px 0;border-bottom:1px solid ${CORES.divider};">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Consulta</p>
+            <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:${CORES.textPrimary};">${dataHoraFormatada}</p>
+          </td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid ${CORES.divider};">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Valor</p>
+            <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:${CORES.textPrimary};">${valorFormatado}</p>
+          </td></tr>
+          <tr><td style="padding:8px 0 0;">
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${CORES.textMuted};">Prazo para pagar</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:${CORES.primary};">${prazoFormatado}</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:${CORES.textMuted};text-align:center;line-height:1.6;">
+      ⚠️ Se o pagamento não for feito até o prazo acima, a reserva é liberada automaticamente e o
+      horário volta a ficar disponível para outros pacientes.
+    </p>`;
+
+  const html = templateBase({
+    emoji: '⏳',
+    badge: 'Aguardando pagamento',
+    badgeCor: CORES.goldBg,
+    titulo: 'Horário reservado — falta pagar',
+    corpo,
+  });
+
+  const client = criarClienteBrevo();
+  await client.transactionalEmails.sendTransacEmail({
+    subject: `⏳ Horário reservado — finalize o pagamento até ${prazoFormatado}`,
+    htmlContent: html,
+    sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+    to: [{ email: params.pacienteEmail, name: params.pacienteNome }],
+  });
+}

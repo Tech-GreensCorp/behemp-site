@@ -30,6 +30,7 @@ const LABEL_JORNADA: Record<string, string> = {
 
 
 const LABEL_STATUS_CONSULTA: Record<string, string> = {
+  reservada: 'Aguardando pagamento',
   agendada: 'Agendada',
   confirmada: 'Confirmada',
   realizada: 'Realizada',

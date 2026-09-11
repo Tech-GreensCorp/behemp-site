@@ -34,7 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Geral',
     items: [
       { label: 'Dashboard', href: '/paciente', icon: LayoutDashboard },
-      { label: 'Agendamento', href: '/paciente/agendamento', icon: CalendarDays },
+      { label: 'Agendar Consulta', href: '/paciente/agendamento', icon: CalendarDays },
     ],
   },
   {
