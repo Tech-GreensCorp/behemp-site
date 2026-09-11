@@ -56,7 +56,7 @@ envios **futuros** (a P5 lê o consentimento vigente a cada envio), e o que já 
 continua com quem recebeu. A tela `/paciente/privacidade` diz isso, em vez de prometer o que o
 sistema não cumpre.
 
-## 🟠 Item 33 — a declaração "não tenho ANVISA" NÃO é persistida
+## ✅ Item 33 — RESOLVIDO em 11/09/2026: a declaração virou coluna
 
 **Achado em 11/09/2026, ao plugar a P2.** `app/_actions/cadastro-por-link.ts:298-299` grava
 `declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` **apenas dentro de
@@ -76,10 +76,25 @@ que existe, em vez do que o paciente lembrou de responder.
 telas, que era o propósito original da declaração. E o fluxo BeHemp 1 continua sem saber
 distinguir _"declarou que não tem"_ de _"nunca respondeu"_.
 
-**Perigo de corrigir (medido):** migration **aditiva**, duas colunas `boolean` nullable em
-`solicitacoes_cadastro`. Nenhum ponto de chamada quebra — nada lê hoje. O risco real é o de
-sempre: `main` é produção e push aplica migration sem rollback. **Não corrigir de passagem:**
-é trabalho próprio, em commit próprio, com autorização.
+**Corrigido em 11/09/2026**, com autorização escrita em `.claude/autorizacoes.txt`. Migration
+`0035_huge_sugar_man.sql`: dois `ADD COLUMN … boolean` nullable — o Postgres 11+ faz isso sem
+reescrever a tabela.
+
+**E ao corrigir apareceu um segundo defeito, de acoplamento:** uma flag só
+(`jaDeclarouSobreAnvisa`) decidia **as duas** perguntas. Quem vinha do formulário da Greens não
+era perguntado sobre **receita** — e lá ninguém pergunta sobre receita. O destino saía errado
+por isso, e era invisível porque a flag tinha nome de ANVISA. Agora cada pergunta olha a
+própria declaração.
+
+**Três estados, e o terceiro é o motivo de a coluna existir:** `true` = tem · `false` =
+declarou que **não** tem · `null` = **nunca respondeu**. A tela usa `!== null`, não
+`=== true` — quem respondeu "não tenho" também já respondeu, e repetir a pergunta a ele é o
+mesmo defeito que o dono apontou em 10/09.
+
+⚠️ **E o aviso da procuração continua NÃO usando a declaração.** Ela diz o que o paciente
+respondeu; quem decide se falta a autorização é `autorizacoes_anvisa` — o que **existe**, não o
+que ele lembrou. Trocar uma pela outra faria o aviso sumir para quem declarou ter e nunca
+enviou. Há caso de guarda exatamente para isso.
 
 ## 🔴 Item 32 — CONCLUÍDO em 11/09/2026: a tela do consentimento
 

@@ -397,3 +397,33 @@ path:db/migrations/meta/0033_snapshot.json
 #
 # E `set -e` no script remoto, que é a correção que impede a próxima falha de ser invisível.
 path:.github/workflows/deploy.yml
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11/09/2026 — Item 33: a declaração da ANVISA e da receita vira coluna
+#
+# QUEM AUTORIZOU: o dono, em 11/09/2026, nestas palavras:
+#   "vamos resolver isso também, tudo que falta"
+#   "vamos resolver toda pendencia de código e webhook para que os 2 fluxos tanto da
+#    behemp quanto da greens estejam conectados pronto para testar"
+#
+# POR QUÊ: `declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` existiam apenas
+# dentro de `registrarAuditoria`, em `app/_actions/cadastro-por-link.ts`. Log de auditoria
+# não é fonte de leitura de produto — e a ausência já custou uma afirmação falsa no
+# comentário de `components/paciente/AvisoDaProcuracao.tsx`, que dizia que o cadastro
+# gravava a declaração. Não gravava.
+#
+# O QUE A MIGRATION FAZ (medido, `db/migrations/0035_huge_sugar_man.sql`):
+#   ALTER TABLE solicitacoes_cadastro ADD COLUMN declarou_ter_autorizacao_anvisa boolean;
+#   ALTER TABLE solicitacoes_cadastro ADD COLUMN declarou_ter_receita_medica boolean;
+#
+# PERIGO MEDIDO: aditiva. Duas colunas NULLABLE, sem default e sem NOT NULL — o Postgres
+# 11+ faz `ADD COLUMN` nullable sem reescrever a tabela, então não há lock longo. Nenhum
+# DROP, nenhuma alteração de coluna existente. Nada lê estas colunas hoje, portanto nenhum
+# ponto de chamada quebra. Como se desfaz: `ALTER TABLE ... DROP COLUMN`, sem perda de
+# outro dado.
+#
+# ⚠️ TRÊS ESTADOS, e o terceiro é o motivo de existirem: `true` = tem · `false` = declarou
+# que NÃO tem · `null` = nunca respondeu. Sem o `null`, quem não foi perguntado ficaria
+# indistinguível de quem disse não.
+path:db/migrations/0035_huge_sugar_man.sql
+path:db/migrations/meta/0035_snapshot.json

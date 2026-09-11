@@ -96,6 +96,29 @@ export const solicitacoesCadastro = pgTable(
      */
     tratamentoAtual: text('tratamento_atual'),
 
+    /**
+     * 🔴 O QUE ELE DECLAROU SOBRE A ANVISA E A RECEITA — Item 33, 11/09/2026.
+     *
+     * Até aqui estas duas respostas só existiam no LOG DE AUDITORIA
+     * (`cadastro-por-link.ts`, dentro de `registrarAuditoria`). Log não é fonte de leitura de
+     * produto: ninguém consulta auditoria para desenhar uma tela, e não deve mesmo.
+     *
+     * O preço foi um comentário que afirmava o contrário, em `AvisoDaProcuracao.tsx` —
+     * "desde 10/09 o cadastro grava a declaração". Não gravava, e a afirmação sobreviveu
+     * porque o componente não era renderizado por tela nenhuma.
+     *
+     * ⚠️ TRÊS ESTADOS, E O TERCEIRO É O QUE IMPORTA. `true` = tem · `false` = **declarou que
+     * não tem** · `null` = **nunca respondeu**. Sem o `null`, quem não foi perguntado fica
+     * indistinguível de quem disse não — e é exatamente essa distinção que evita repetir a
+     * pergunta em outra tela (a correção que o dono pediu em 10/09).
+     *
+     * ⚠️ E ISTO NÃO SUBSTITUI O ESTADO REAL. Quem decide se falta a autorização é
+     * `autorizacoes_anvisa`; isto aqui diz apenas **o que ele respondeu**, e serve para não
+     * perguntar de novo.
+     */
+    declarouTerAutorizacaoAnvisa: boolean('declarou_ter_autorizacao_anvisa'),
+    declarouTerReceitaMedica: boolean('declarou_ter_receita_medica'),
+
     // ── O link ──────────────────────────────────────────────────────────────────
     /** SHA-256 do token. O valor cru só existe na resposta que vai ao paciente. */
     tokenHash: text('token_hash').notNull(),

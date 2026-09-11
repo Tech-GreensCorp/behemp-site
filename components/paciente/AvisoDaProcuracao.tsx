@@ -23,9 +23,14 @@
  * linha `aprovado` dentro da validade. É informação mais confiável que a declaração: ela
  * descreve o que existe, em vez do que ele lembrou de responder num formulário.
  *
- * ⚠️ A declaração continua útil e continua **não persistida** — está catalogada no
- * `docs/04-LISTA-DE-AFAZERES.md` como Item 33. Ela é o que permitiria não repetir a pergunta
- * em outras telas.
+ * ✅ ATUALIZADO EM 11/09/2026 — a declaração PASSOU a ser persistida (Item 33, resolvido).
+ * `solicitacoes_cadastro.declarou_ter_autorizacao_anvisa` existe, com três estados: `true`,
+ * `false` ("declarou que não tem") e `null` ("nunca respondeu").
+ *
+ * ⚠️ E MESMO ASSIM O AVISO NÃO A USA. A declaração serve para **não repetir a pergunta**; ela
+ * não serve para decidir se falta a autorização. Quem decide isso é `autorizacoes_anvisa` —
+ * o que EXISTE, não o que ele lembrou de responder num formulário há semanas. Trocar uma pela
+ * outra faria o aviso sumir para quem declarou ter e nunca enviou.
  *
  * ⚠️ AVISA, NÃO BLOQUEIA (ADR-0016 D-06). Ele pode fechar e seguir usando a plataforma. A
  * procuração é um caminho oferecido, não um pedágio — barrar quem não tem autorização seria
