@@ -59,6 +59,14 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
 
 ## 🔴 Prioridade 1 — risco agora
 
+- [ ] **Item 36** — 🔴 **produção autentica por uma instância de DESENVOLVIMENTO do Clerk**
+      (`relative-blowfish-96.clerk.accounts.dev`, `pk_test`). Medido na própria instância:
+      `instance_environment_type = "development"` e `captcha_enabled = true`. O cadastro falha
+      com `captcha_missing_token` (400) depois de o Turnstile recusar o challenge (401) — os
+      dois códigos reproduzidos fora do navegador. O `clerk.be4hope.org` está no CSP
+      (`next.config.ts:108,112`) e **não resolve**: a instância de produção nunca foi criada.
+      🔴 **Risco aberto não medido:** se a base de usuários atravessa de uma instância para a
+      outra. **Decisão do dono**, com o custo em [04 — Item 36](04-LISTA-DE-AFAZERES.md).
 - [ ] **Item 6** — 🔴🔴 **todo upload está em store PÚBLICO do Vercel Blob**: 10+ pontos, com
       RG, comprovante de residência, laudo médico, receita, exames e procuração assinada. Quem
       tem a URL lê **sem autenticação**. E `db/schema/prescricoes.ts:23` **afirma** _"URL

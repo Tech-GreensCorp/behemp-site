@@ -3,6 +3,7 @@ import { mascararTelefone, removerSufixoWhatsapp } from '@/lib/chatpro/telefone'
 import { situacaoDoContato } from '@/lib/chatpro/triagem';
 import { interpretarResposta } from '@/lib/chatpro/resposta-do-paciente';
 import { textoDaTriagem } from '@/lib/chatpro/texto-da-triagem';
+import { parametrosDoPainel } from '@/lib/chatpro/query-do-painel';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +32,12 @@ export async function GET(request: Request) {
     return new Response('Não autorizado', { status: 401 });
   }
 
-  const url = new URL(request.url);
-  const p = (n: string[]) => n.map((k) => url.searchParams.get(k)).find((v) => v?.trim()) ?? null;
+  /**
+   * 🔴 Tolera `?` usado como separador — a mesma armadilha do `bot-link`, e esta rota é
+   * chamada pelo mesmo painel. Ver `query-do-painel.ts`.
+   */
+  const parametros = parametrosDoPainel(request.url);
+  const p = (n: string[]) => n.map((k) => parametros.get(k)).find((v) => v?.trim()) ?? null;
 
   const telefone = removerSufixoWhatsapp(p(['phone', 'telefone', 'number']) ?? '');
   const nome = p(['name', 'nome']);
