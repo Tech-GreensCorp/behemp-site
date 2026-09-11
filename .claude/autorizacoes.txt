@@ -460,3 +460,24 @@ path:db/schema/consultas.ts
 # indistinguível de quem disse não.
 path:db/migrations/0035_huge_sugar_man.sql
 path:db/migrations/meta/0035_snapshot.json
+
+# ── Autorizada pela Dryelle Ebelin em 11/09/2026, ajuste do fluxo de pagamento ──
+# Pedido literal no chat: "Remova a tela de configuração de pagamentos e qualquer
+# configuração de 'valor padrão'. O valor da consulta é individual por médico e já é
+# configurado na tela de Médicos, durante o cadastro/edição do médico."
+#
+# O QUE A MIGRATION FAZ: DROP TABLE pagamentos_config — singleton (no máximo 1 linha,
+# `valorConsultaPadrao`/`moedaPadrao`) que só existia para alimentar um fallback em
+# `reservarConsulta` quando o médico não tinha valor próprio configurado. Esse fallback
+# foi removido: `reservarConsulta` agora exige `medicos.valorConsulta` e recusa a reserva
+# com erro claro se estiver ausente, em vez de usar um valor "mágico" que ninguém escolheu.
+#
+# PERIGO MEDIDO: a tabela tem no máximo 1 linha, sem FK de ninguém apontando para ela
+# (confirmado — nenhuma outra tabela referencia `pagamentos_config`), e nenhum guarda em
+# `__tests__/guardas/` a exercita. Perda de dado possível: só o valor padrão global (ex.
+# R$150) que deixa de ter uso depois desta mudança. Como se desfaz: recriar a tabela e o
+# valor não é recuperável do banco (DROP não tem rollback), mas é reconstituível manualmente
+# se algum dia voltar a fazer sentido.
+path:db/schema/pagamentos-config.ts
+path:db/migrations/0039_flippant_morg.sql
+path:db/migrations/meta/0039_snapshot.json

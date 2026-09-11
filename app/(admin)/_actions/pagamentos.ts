@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { medicos, pacientes, pagamentos, pagamentosConfig, users } from '@/db/schema';
+import { medicos, pacientes, pagamentos, users } from '@/db/schema';
 import { eq, and, or, isNotNull, isNull, sql, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
@@ -258,84 +258,5 @@ export async function atualizarStatusPagamento(
   } catch (error) {
     console.error('[Admin] Erro ao atualizar status do pagamento:', error);
     return { sucesso: false, erro: 'Erro ao atualizar status' };
-  }
-}
-
-const configPagamentosSchema = z.object({
-  valorConsultaPadrao: z.coerce.number().positive('Valor deve ser maior que zero'),
-  moedaPadrao: z.string().min(1),
-});
-
-export async function buscarConfigPagamentos(): Promise<ActionResult<{
-  valorConsultaPadrao: string;
-  moedaPadrao: string;
-}>> {
-  try {
-    const auth = await verificarAdmin();
-    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
-
-    const config = await db.query.pagamentosConfig.findFirst();
-    if (!config) {
-      return {
-        sucesso: true,
-        dados: { valorConsultaPadrao: '150.00', moedaPadrao: 'BRL' },
-      };
-    }
-
-    return {
-      sucesso: true,
-      dados: {
-        valorConsultaPadrao: config.valorConsultaPadrao,
-        moedaPadrao: config.moedaPadrao,
-      },
-    };
-  } catch (error) {
-    console.error('[Admin] Erro ao buscar config de pagamentos:', error);
-    return { sucesso: false, erro: 'Erro ao buscar configuração' };
-  }
-}
-
-export async function salvarConfigPagamentos(
-  dados: z.infer<typeof configPagamentosSchema>,
-): Promise<ActionResult> {
-  try {
-    const auth = await verificarAdmin();
-    if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
-
-    const parsed = configPagamentosSchema.safeParse(dados);
-    if (!parsed.success) {
-      return { sucesso: false, erro: parsed.error.errors[0].message };
-    }
-
-    const valores = {
-      valorConsultaPadrao: parsed.data.valorConsultaPadrao.toFixed(2),
-      moedaPadrao: parsed.data.moedaPadrao,
-    };
-
-    const atual = await db.query.pagamentosConfig.findFirst();
-
-    if (atual) {
-      await db.update(pagamentosConfig).set(valores).where(eq(pagamentosConfig.id, atual.id));
-    } else {
-      await db.insert(pagamentosConfig).values(valores);
-    }
-
-    const userIdInterno = await obterUserIdInterno(auth.clerkId);
-    if (userIdInterno) {
-      await registrarAuditoria({
-        userId: userIdInterno,
-        acao: 'atualizar',
-        entidade: 'pagamentos_config',
-        dadosAntes: atual ?? undefined,
-        dadosDepois: valores,
-      });
-    }
-
-    revalidatePath('/admin/pagamentos/configuracoes');
-
-    return { sucesso: true };
-  } catch (error) {
-    console.error('[Admin] Erro ao salvar config de pagamentos:', error);
-    return { sucesso: false, erro: 'Erro ao salvar configuração' };
   }
 }

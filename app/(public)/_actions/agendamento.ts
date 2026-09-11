@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { consultas, medicos, pacientes, pagamentos, users } from '@/db/schema';
-import { eq, and, gte, lte, isNull, asc } from 'drizzle-orm';
+import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarPaciente } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
@@ -128,6 +128,14 @@ export async function reservarConsulta(
       return { sucesso: false, erro: 'Médico não encontrado' };
     }
 
+    if (medico.valorConsulta === null || medico.valorConsulta === undefined) {
+      return {
+        sucesso: false,
+        erro:
+          'Este médico ainda não tem o valor da consulta configurado. Peça para o administrador configurar em Médicos.',
+      };
+    }
+
     const dataConsulta = new Date(dataHora);
     const expiraEm = new Date(Date.now() + RESERVA_TTL_MINUTOS * 60 * 1000);
 
@@ -165,11 +173,8 @@ export async function reservarConsulta(
       dadosDepois: { medicoId, dataHora: dataConsulta.toISOString(), status: 'reservada', expiraEm: expiraEm.toISOString() },
     });
 
-    const config = await db.query.pagamentosConfig.findFirst();
-    const moeda = config?.moedaPadrao ?? 'BRL';
-    const valor = medico.valorConsulta !== null && medico.valorConsulta !== undefined
-      ? Number(medico.valorConsulta)
-      : Number(config?.valorConsultaPadrao ?? 150);
+    const moeda = 'BRL';
+    const valor = Number(medico.valorConsulta);
 
     try {
       await db.insert(pagamentos).values({
@@ -562,6 +567,207 @@ export async function iniciarAguardoPagamento(
   } catch (error) {
     console.error('[Action] Erro ao iniciar aguardo de pagamento:', error);
     return { sucesso: false, erro: 'Erro interno ao processar a reserva' };
+  }
+}
+
+/** Resolve o pacienteId do usuário autenticado — usado só pelas funções de estado abaixo. */
+async function resolverPacienteIdAutenticado(): Promise<
+  { sucesso: true; pacienteId: string } | { sucesso: false; erro: string }
+> {
+  const auth = await verificarPaciente();
+  if (!auth.autorizado || !auth.clerkId) {
+    return { sucesso: false, erro: 'Autenticação necessária' };
+  }
+
+  const [userInterno] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, auth.clerkId))
+    .limit(1);
+
+  if (!userInterno) {
+    return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+  }
+
+  const [pacienteAuto] = await db
+    .select({ id: pacientes.id })
+    .from(pacientes)
+    .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+    .limit(1);
+
+  if (!pacienteAuto) {
+    return {
+      sucesso: false,
+      erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+    };
+  }
+
+  return { sucesso: true, pacienteId: pacienteAuto.id };
+}
+
+/**
+ * Libera (marca 'cancelada') qualquer reserva do paciente cujo prazo já passou — mesma
+ * lógica de `liberarReservasExpiradas` (Inngest, roda a cada 5 min), mas disparada na hora
+ * em que o paciente abre a tela de agendamento, para o status já vir correto sem esperar
+ * o próximo ciclo do cron.
+ */
+async function expirarReservasVencidasDoPaciente(pacienteId: string): Promise<void> {
+  const expiradas = await db
+    .select({ id: consultas.id })
+    .from(consultas)
+    .where(
+      and(
+        eq(consultas.pacienteId, pacienteId),
+        eq(consultas.status, 'reservada'),
+        lte(consultas.expiraEm, new Date()),
+      ),
+    );
+
+  if (expiradas.length === 0) return;
+
+  await db
+    .update(consultas)
+    .set({ status: 'cancelada', expiraEm: null })
+    .where(
+      and(
+        eq(consultas.pacienteId, pacienteId),
+        eq(consultas.status, 'reservada'),
+        lte(consultas.expiraEm, new Date()),
+      ),
+    );
+
+  await Promise.all(
+    expiradas.map((e) => marcarErroConfirmacao(e.id, 'O prazo da reserva expirou.')),
+  );
+}
+
+export interface ReservaAtivaAgendamento {
+  consultaId: string;
+  medicoId: string;
+  medicoNome: string;
+  medicoEspecialidade: string;
+  medicoAvatarUrl: string | null;
+  dataHora: string;
+  observacoes: string | null;
+  expiraEm: string;
+  valor: number | null;
+  moeda: string;
+  /** true = já passou pela confirmação e está na etapa de pagamento; false = ainda está
+   *  na etapa de confirmação da reserva. */
+  aguardandoPagamento: boolean;
+}
+
+export interface HistoricoAgendamentoItem {
+  id: string;
+  medicoNome: string;
+  medicoAvatarUrl: string | null;
+  dataHora: string;
+  status: 'reservada' | 'agendada' | 'confirmada' | 'realizada' | 'cancelada';
+  valor: number | null;
+  moeda: string;
+  expiraEm: string | null;
+}
+
+/**
+ * Estado do agendamento do paciente para retomar a tela exatamente de onde parou:
+ * reserva ativa (se houver, dentro do prazo) + histórico recente. Chamada pela Server
+ * Component de `/paciente/agendamento` a cada carregamento — a etapa do wizard é sempre
+ * derivada daqui, nunca só do estado local do componente.
+ */
+export async function obterEstadoAgendamentoPaciente(): Promise<
+  ActionResult<{ reservaAtiva: ReservaAtivaAgendamento | null; historico: HistoricoAgendamentoItem[] }>
+> {
+  try {
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    // Corrige o status de qualquer reserva vencida ANTES de ler — sem isso, uma reserva
+    // expirada há 2 minutos ainda apareceria como "reservada" até o próximo ciclo do cron.
+    await expirarReservasVencidasDoPaciente(pacienteId);
+
+    const [reservaRow] = await db
+      .select({
+        id: consultas.id,
+        medicoId: consultas.medicoId,
+        medicoNome: users.nome,
+        medicoEspecialidade: medicos.especialidade,
+        medicoAvatarUrl: users.avatarUrl,
+        dataHora: consultas.dataHora,
+        observacoes: consultas.observacoes,
+        expiraEm: consultas.expiraEm,
+        emailReservaEnviadoEm: consultas.emailReservaEnviadoEm,
+      })
+      .from(consultas)
+      .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(
+        and(
+          eq(consultas.pacienteId, pacienteId),
+          eq(consultas.status, 'reservada'),
+          isNull(consultas.deletedAt),
+        ),
+      )
+      .orderBy(desc(consultas.createdAt))
+      .limit(1);
+
+    let reservaAtiva: ReservaAtivaAgendamento | null = null;
+    if (reservaRow && reservaRow.expiraEm) {
+      const [pagamentoRow] = await db
+        .select({ valor: pagamentos.valor, moeda: pagamentos.moeda })
+        .from(pagamentos)
+        .where(eq(pagamentos.consultaId, reservaRow.id))
+        .limit(1);
+
+      reservaAtiva = {
+        consultaId: reservaRow.id,
+        medicoId: reservaRow.medicoId,
+        medicoNome: reservaRow.medicoNome,
+        medicoEspecialidade: reservaRow.medicoEspecialidade,
+        medicoAvatarUrl: reservaRow.medicoAvatarUrl,
+        dataHora: reservaRow.dataHora.toISOString(),
+        observacoes: reservaRow.observacoes,
+        expiraEm: reservaRow.expiraEm.toISOString(),
+        valor: pagamentoRow ? Number(pagamentoRow.valor) : null,
+        moeda: pagamentoRow?.moeda ?? 'BRL',
+        aguardandoPagamento: reservaRow.emailReservaEnviadoEm !== null,
+      };
+    }
+
+    const historicoRows = await db
+      .select({
+        id: consultas.id,
+        medicoNome: users.nome,
+        medicoAvatarUrl: users.avatarUrl,
+        dataHora: consultas.dataHora,
+        status: consultas.status,
+        expiraEm: consultas.expiraEm,
+        valor: pagamentos.valor,
+        moeda: pagamentos.moeda,
+      })
+      .from(consultas)
+      .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .leftJoin(pagamentos, eq(pagamentos.consultaId, consultas.id))
+      .where(and(eq(consultas.pacienteId, pacienteId), isNull(consultas.deletedAt)))
+      .orderBy(desc(consultas.dataHora))
+      .limit(8);
+
+    const historico: HistoricoAgendamentoItem[] = historicoRows.map((r) => ({
+      id: r.id,
+      medicoNome: r.medicoNome,
+      medicoAvatarUrl: r.medicoAvatarUrl,
+      dataHora: r.dataHora.toISOString(),
+      status: r.status,
+      valor: r.valor !== null ? Number(r.valor) : null,
+      moeda: r.moeda ?? 'BRL',
+      expiraEm: r.expiraEm ? r.expiraEm.toISOString() : null,
+    }));
+
+    return { sucesso: true, dados: { reservaAtiva, historico } };
+  } catch (error) {
+    console.error('[Action] Erro ao obter estado do agendamento:', error);
+    return { sucesso: false, erro: 'Erro ao carregar estado do agendamento' };
   }
 }
 
