@@ -18,6 +18,8 @@ import { receituarioTemplates } from './receituario-templates';
 import { teleconsultas, transcricoes } from './teleconsultas';
 import { autorizacoesAnvisa } from './autorizacoes-anvisa';
 import { procuracoesEspecificas } from './procuracoes-especificas';
+import { pagamentos } from './pagamentos';
+import { medicosPagamentoConfig } from './medicos-pagamento-config';
 
 /**
  * Declaração centralizada de todas as relations do Drizzle ORM.
@@ -52,6 +54,10 @@ export const medicosRelations = relations(medicos, ({ one, many }) => ({
   evolucoes: many(evolucoes),
   prescricoes: many(prescricoes),
   receituarioTemplates: many(receituarioTemplates),
+  configPagamento: one(medicosPagamentoConfig, {
+    fields: [medicos.id],
+    references: [medicosPagamentoConfig.medicoId],
+  }),
 }));
 
 // ── Pacientes ─────────────────────────────────────────────────
@@ -93,6 +99,34 @@ export const consultasRelations = relations(consultas, ({ one, many }) => ({
     references: [medicos.id],
   }),
   prescricoes: many(prescricoes),
+  pagamento: one(pagamentos, {
+    fields: [consultas.id],
+    references: [pagamentos.consultaId],
+  }),
+}));
+
+// ── Pagamentos ────────────────────────────────────────────────
+export const pagamentosRelations = relations(pagamentos, ({ one }) => ({
+  consulta: one(consultas, {
+    fields: [pagamentos.consultaId],
+    references: [consultas.id],
+  }),
+  paciente: one(pacientes, {
+    fields: [pagamentos.pacienteId],
+    references: [pacientes.id],
+  }),
+  medico: one(medicos, {
+    fields: [pagamentos.medicoId],
+    references: [medicos.id],
+  }),
+}));
+
+// ── Meios de pagamento por médico ────────────────────────────
+export const medicosPagamentoConfigRelations = relations(medicosPagamentoConfig, ({ one }) => ({
+  medico: one(medicos, {
+    fields: [medicosPagamentoConfig.medicoId],
+    references: [medicos.id],
+  }),
 }));
 
 // ── Anamneses ─────────────────────────────────────────────────

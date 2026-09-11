@@ -17,6 +17,7 @@ import {
   Calculator,
   ShieldCheck,
   FileText,
+  CalendarDays,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -31,7 +32,10 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Geral',
-    items: [{ label: 'Dashboard', href: '/paciente', icon: LayoutDashboard }],
+    items: [
+      { label: 'Dashboard', href: '/paciente', icon: LayoutDashboard },
+      { label: 'Agendar Consulta', href: '/paciente/agendamento', icon: CalendarDays },
+    ],
   },
   {
     title: 'Minha Saúde',

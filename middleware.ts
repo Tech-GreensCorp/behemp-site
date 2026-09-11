@@ -19,7 +19,6 @@ const isPublicRoute = createRouteMatcher([
   '/registrar-se(.*)',
   '/historias',
   '/ebooks(.*)',
-  '/agendamento',
   '/parceiros',
   '/programa-acesso-solidario',
   '/contato',

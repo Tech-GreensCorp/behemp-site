@@ -16,6 +16,7 @@ import {
   UserPlus,
   Receipt,
   ShoppingCart,
+  Wallet,
   User,
 
   Stethoscope,
@@ -62,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Financeiro',
     items: [
+      { label: 'Pagamentos', href: '/admin/pagamentos', icon: Wallet },
       { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
       { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
     ],

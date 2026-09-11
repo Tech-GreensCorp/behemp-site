@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { consultas, pacientes, medicos, notificacoes, users } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, ne } from 'drizzle-orm';
 import { verificarMedico } from '@/lib/auth';
 import {
   criarConsultaGoogleCalendar,
@@ -58,7 +58,9 @@ export async function listarConsultasMedico(): Promise<ActionResult<Array<{
       .from(consultas)
       .innerJoin(pacientes, eq(consultas.pacienteId, pacientes.id))
       .innerJoin(users, eq(pacientes.userId, users.id))
-      .where(eq(consultas.medicoId, medicoId))
+      // 'reservada' é reserva sem pagamento confirmado ainda — o médico não deve vê-la
+      // na agenda como se fosse compromisso certo (pode expirar em minutos).
+      .where(and(eq(consultas.medicoId, medicoId), ne(consultas.status, 'reservada')))
       .orderBy(desc(consultas.dataHora))
       .limit(100);
 

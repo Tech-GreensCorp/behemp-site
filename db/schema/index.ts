@@ -36,6 +36,9 @@ export * from './teleconsultas';
 export * from './autorizacoes-anvisa';
 export * from './alertas-config';
 export * from './alertas-enviados';
+export * from './pagamentos';
+export * from './pagamentos-config';
+export * from './medicos-pagamento-config';
 
 // Relations
 export * from './relations';
