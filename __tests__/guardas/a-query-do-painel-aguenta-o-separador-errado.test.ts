@@ -108,6 +108,74 @@ describe('a leitura tolera o separador errado', () => {
     expect(new URL(crua).searchParams.get('tem')).toBe('receita_medica?sessionId=abc');
   });
 
+  /**
+   * 🔴 O CASO QUE A ROTA DE ECO REVELOU, e que duas tentativas anteriores não cobriam.
+   *
+   * Em produção o segundo `?` **não chega como `?`**: o proxy reverso o percent-encoda para
+   * `%3F`, e codifica o `=` seguinte como `%3D`. Medido pelo `/api/chatpro/eco`:
+   *
+   *     "crua": ".../eco?tem=autorizacao_anvisa%3FsessionId%3Dabc&name=X"
+   *     "temSeparadorErrado": false      ← não havia `?` literal para trocar
+   *
+   * As duas versões anteriores procuravam um `?` que já não existia ali. Este caso usa a
+   * string **exata** que o servidor reportou.
+   */
+  it('🔴 trata o `%3F` que o proxy produz — a forma real em produção', () => {
+    const producao =
+      'https://0.0.0.0:3000/api/chatpro/bot-link?tem=autorizacao_anvisa%3FsessionId%3Dabc&name=X';
+    const p = parametrosDoPainel(producao);
+    expect(p.get('tem')).toBe('autorizacao_anvisa');
+    expect(p.get('sessionId')).toBe('abc');
+    expect(p.get('name')).toBe('X');
+  });
+
+  it('e o manifesto sobrevive à forma codificada', () => {
+    const m = lerManifestoDaUrl(
+      parametrosDoPainel(`${BASE}?tem=receita_medica,documento_identidade%3FsessionId%3Dabc`),
+    );
+    expect(m.documentos).toEqual(['receita_medica', 'documento_identidade']);
+    expect(m.declarado).toBe(true);
+  });
+
+  it('o `%3f` minúsculo também — percent-encoding não é sensível a caixa', () => {
+    expect(parametrosDoPainel(`${BASE}?tem=receita_medica%3fsessionId%3dabc`).get('tem')).toBe(
+      'receita_medica',
+    );
+  });
+
+  /**
+   * 🔴 O CASO QUE UMA SABOTAGEM MINHA REVELOU FALTANDO — e que quase foi commitado.
+   *
+   * A sabotagem era trocar o `map` seletivo por uma decodificação da query INTEIRA. Ela
+   * **passou**, porque o controle que eu tinha escrito usava `%253D` — que a sabotagem não
+   * toca, já que `%3D` não ocorre em `a%253Db`. Controle que não distingue não é controle.
+   *
+   * O que distingue é o `%26`, e **antes** do `%3F`: decodificado fora de hora, ele vira um
+   * `&` de verdade e **parte o valor em dois parâmetros**. Com `%3D` os dois caminhos dão o
+   * mesmo resultado, porque o `URLSearchParams` já trata o primeiro `=` como separador — foi
+   * por isso que a asserção anterior não podia acusar nada.
+   */
+  it('🔴 a decodificação NÃO vaza para o que vem ANTES do `%3F`', () => {
+    const p = parametrosDoPainel(`${BASE}?obs=a%26b&tem=receita_medica%3FsessionId%3Dabc`);
+    // Decodificada cedo demais, esta linha viraria `obs=a` + um parâmetro `b` vazio.
+    expect(p.get('obs')).toBe('a&b');
+    expect(p.has('b')).toBe(false);
+    // E o conserto do lado de lá do `%3F` continua acontecendo.
+    expect(p.get('tem')).toBe('receita_medica');
+    expect(p.get('sessionId')).toBe('abc');
+  });
+
+  it('sem `%3F` na query, nada é decodificado', () => {
+    const p = parametrosDoPainel(`${BASE}?tem=receita_medica&obs=a%253Db`);
+    expect(p.get('tem')).toBe('receita_medica');
+    expect(p.get('obs')).toBe('a%3Db');
+  });
+
+  it('a correção é detectável nas DUAS formas, para o log poder avisar', () => {
+    expect(separadorFoiCorrigido(`${BASE}?a=1%3Fb=2`)).toBe(true);
+    expect(separadorFoiCorrigido(`${BASE}?a=1%3fb=2`)).toBe(true);
+  });
+
   it('a correção é detectável, para o log poder avisar', () => {
     expect(separadorFoiCorrigido(`${BASE}?a=1?b=2`)).toBe(true);
     expect(separadorFoiCorrigido(`${BASE}?a=1&b=2`)).toBe(false);
