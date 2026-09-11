@@ -245,15 +245,93 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
    * ⚠️ E `parceiro` NÃO serve para decidir isso: o bot da Greens também grava
    * `parceiro: 'greens'` e não perguntou nada. Quem responde é a ORIGEM.
    */
-  it('não pergunta a quem já respondeu no formulário do parceiro', () => {
-    expect(codigo).toContain('jaDeclarouSobreAnvisa');
+  /**
+   * 🔴 AMPLIADO EM 11/09/2026 (Item 33) — a declaração passou a ser PERSISTIDA.
+   *
+   * Até aqui a única forma de saber "ele já respondeu?" era a ORIGEM: quem veio do formulário
+   * da Greens tinha respondido lá. Isso deixava de fora quem já respondeu **numa passagem
+   * anterior por esta mesma tela** — caso real quando o bot reemite o link para a mesma
+   * pessoa.
+   *
+   * E havia um defeito de acoplamento que só apareceu ao separar: uma flag só decidia AS DUAS
+   * perguntas. Quem vinha do formulário da Greens não era perguntado sobre a receita — e lá
+   * ninguém pergunta sobre receita. O destino saía errado por isso.
+   */
+  it('não pergunta a quem já respondeu — pela origem OU pela declaração gravada', () => {
     expect(codigo).toMatch(/!jaDeclarouSobreAnvisa &&/);
     const pagina = readFileSync(
       path.join(process.cwd(), 'app/(auth)/cadastro/[token]/page.tsx'),
       'utf8',
     );
-    // pela ORIGEM, não pelo parceiro
-    expect(pagina).toContain("jaDeclarouSobreAnvisa={resultado.origem === 'greens_handoff'}");
+    // pela ORIGEM, nunca pelo `parceiro` — o bot da Greens também grava `parceiro: 'greens'`
+    expect(pagina).toContain("resultado.origem === 'greens_handoff'");
+    expect(pagina).not.toMatch(/jaDeclarouSobreAnvisa=\{resultado\.parceiro/);
+    // e pela declaração já gravada
+    expect(pagina).toContain('resultado.declarouTerAutorizacaoAnvisa !== null');
+  });
+
+  it('🔴 a pergunta da RECEITA tem a própria flag — não a da ANVISA', () => {
+    expect(codigo).toMatch(/!jaDeclarouSobreReceita &&[\s\S]{0,120}'receita_medica'/);
+    // O acoplamento antigo: a flag da ANVISA decidindo a pergunta da receita.
+    expect(codigo).not.toMatch(/!jaDeclarouSobreAnvisa &&[\s\S]{0,120}'receita_medica'/);
+  });
+
+  /**
+   * ⚠️ MEDE A GRAVAÇÃO NO `.set()`, não a presença da palavra no arquivo.
+   *
+   * A primeira versão passava verde com a gravação removida: `declarouTerAutorizacaoAnvisa`
+   * também aparece no `dadosDepois` da auditoria, e o `toContain` se satisfazia com isso.
+   * Auditoria não é persistência — foi exatamente o defeito que o Item 33 existe para
+   * corrigir.
+   */
+  it('🔴 o cadastro GRAVA a declaração na coluna, não só no log de auditoria', () => {
+    const acao = readFileSync(
+      path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
+      'utf8',
+    );
+    const update = acao.slice(
+      acao.indexOf('.update(solicitacoesCadastro)'),
+      acao.indexOf('.where(eq(solicitacoesCadastro.id, solicitacao.id))'),
+    );
+    expect(update.length).toBeGreaterThan(100);
+    expect(update).toContain('declarouTerAutorizacaoAnvisa:');
+    expect(update).toContain('declarouTerReceitaMedica:');
+  });
+
+  it('🔴 e grava com `?? null` — `Boolean()` apagaria o "nunca respondeu"', () => {
+    const acao = readFileSync(
+      path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
+      'utf8',
+    );
+    const update = acao.slice(
+      acao.indexOf('.update(solicitacoesCadastro)'),
+      acao.indexOf('.where(eq(solicitacoesCadastro.id, solicitacao.id))'),
+    );
+    expect(update).toMatch(/declarouTerAutorizacaoAnvisa: dados\.temAutorizacaoAnvisa \?\? null/);
+    expect(update).toMatch(/declarouTerReceitaMedica: dados\.temReceitaMedica \?\? null/);
+    expect(update).not.toMatch(/Boolean\(dados\.tem/);
+  });
+
+  it('a coluna é anulável — NOT NULL destruiria o terceiro estado', () => {
+    const schema = readFileSync(
+      path.join(process.cwd(), 'db/schema/solicitacoes-cadastro.ts'),
+      'utf8',
+    );
+    for (const col of ['declarou_ter_autorizacao_anvisa', 'declarou_ter_receita_medica']) {
+      const linha = schema.split('\n').find((l) => l.includes(col));
+      expect(linha, col).toBeDefined();
+      expect(linha, col).not.toContain('notNull()');
+    }
+  });
+
+  it('e "declarou que NÃO tem" também conta como já respondido', () => {
+    const pagina = readFileSync(
+      path.join(process.cwd(), 'app/(auth)/cadastro/[token]/page.tsx'),
+      'utf8',
+    );
+    // `!== null` e não `=== true`: quem respondeu "não" já respondeu.
+    expect(pagina).not.toMatch(/declarouTerAutorizacaoAnvisa === true/);
+    expect(pagina).not.toMatch(/declarouTerReceitaMedica === true/);
   });
 
   it('o campo de arquivo só nasce depois do "sim"', () => {

@@ -16,8 +16,15 @@ import { headers } from 'next/headers';
 export type AcaoAuditoria = 'criar' | 'atualizar' | 'visualizar' | 'deletar';
 
 export interface RegistrarAuditoriaParams {
-  /** ID interno do usuário que realizou a ação */
-  userId: string;
+  /**
+   * ID interno do usuário que realizou a ação.
+   *
+   * 🔴 `null` quando NÃO HÁ usuário — sistema falando com sistema, como o parceiro baixando
+   * um documento por link assinado. A coluna sempre aceitou nulo; o tipo é que não aceitava,
+   * e a saída seria inventar um id, o que faria o registro mentir sobre quem leu. Nesses
+   * casos, quem agiu vai em `dadosDepois`.
+   */
+  userId: string | null;
   /** Tipo de ação realizada */
   acao: AcaoAuditoria;
   /** Nome da tabela/entidade afetada */

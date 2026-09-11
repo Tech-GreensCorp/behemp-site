@@ -257,6 +257,16 @@ export async function concluirCadastroPorLink(
         pacienteId,
         jaFazTratamento: dados.jaFazTratamento,
         tratamentoAtual: dados.jaFazTratamento ? dados.tratamentoAtual?.trim() || null : null,
+        /**
+         * 🔴 A DECLARAÇÃO VIRA COLUNA (Item 33). Até 11/09 ela só existia no log de
+         * auditoria, e log não é fonte de leitura de produto.
+         *
+         * ⚠️ `?? null` preserva os TRÊS estados. `Boolean(undefined)` seria `false`, e aí
+         * quem nunca foi perguntado ficaria gravado como "declarou que não tem" — a
+         * distinção que faz a próxima tela não repetir a pergunta.
+         */
+        declarouTerAutorizacaoAnvisa: dados.temAutorizacaoAnvisa ?? null,
+        declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
       })
       .where(eq(solicitacoesCadastro.id, solicitacao.id));
 

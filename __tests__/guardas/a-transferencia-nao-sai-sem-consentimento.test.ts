@@ -137,14 +137,28 @@ describe('o que o corpo leva, e o que ele não leva', () => {
   });
 
   /**
-   * 🔴 E A LISTA NASCE VAZIA, enquanto o store daqui for público.
+   * 🔴 RETIFICADO EM 11/09/2026 — a lista deixou de nascer vazia, e o caso passou a acusar a
+   * própria entrega.
    *
-   * Mandar URL assinada de um bucket público é enfeite: o objeto já é legível por quem tiver o
-   * endereço. Ela passa a ser preenchida junto com a correção do Item 6 — não antes.
+   * O caso antigo exigia `documentos: []` "enquanto o store for público". Era a leitura certa
+   * em 10/09: mandar URL assinada de um bucket aberto seria enfeite. O que mudou é COMO a
+   * Greens acessa — não a URL do store, mas uma **rota nossa** com token HMAC de vida curta,
+   * auditando cada download. O objeto do blob nunca é entregue, então o Item 6 deixa de ser
+   * pré-requisito desta peça (segue sendo problema próprio).
+   *
+   * O que este caso garante agora é o que realmente não pode regredir: **a URL crua do blob
+   * jamais sai daqui**.
    */
-  it('a lista de documentos está vazia até o store virar privado', () => {
-    expect(codigo).toMatch(/documentos: \[\],/);
-    expect(codigo).toMatch(/store for público|store PÚBLICO|Item 6/);
+  it('🔴 a URL que viaja é a NOSSA rota assinada, nunca o endereço do blob', () => {
+    const corpo = semComentarios(codigo);
+    expect(corpo).toContain('/api/parceiros/documento/');
+    // `urlBlob` é a coluna do endereço direto do arquivo. Ela não pode ser selecionada aqui.
+    expect(corpo).not.toMatch(/urlBlob/);
+    expect(corpo).not.toMatch(/blob\.vercel-storage/);
+  });
+
+  it('e o link é assinado, com validade — não é a rota crua com o id', () => {
+    expect(semComentarios(codigo)).toContain('assinarLinkDoDocumento(');
   });
 
   it('não leva dado clínico — nem dosagem, nem CID, nem diagnóstico', () => {

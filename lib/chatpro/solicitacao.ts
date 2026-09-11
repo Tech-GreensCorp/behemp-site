@@ -174,6 +174,17 @@ export class ServicoDeSolicitacao {
      * veio de um handoff assinado ou da configuração de uma conta de bot.
      */
     urlDeRetorno?: string | null;
+    /**
+     * O que o parceiro diz que o paciente JÁ TEM.
+     *
+     * 🔴 Sem isto, `pendenciasDe(null)` devolve os cinco documentos como pendentes e todo
+     * paciente do bot vira "não tem nada" — o que apagava a diferença entre os oito fluxos.
+     *
+     * ⚠️ `null`/vazio significa "não declarou", NUNCA "não tem". Por isso ele não sobrescreve
+     * um manifesto que já existe: é a mesma regra do deploy — valor vazio não apaga o que está
+     * lá, senão a segunda passagem pelo funil destrói o que a primeira apurou.
+     */
+    documentosDeclarados?: string[] | null;
   }): Promise<ResultadoDoLink> {
     const existente = await this.buscarAtiva({
       leadId: params.leadId,
@@ -199,6 +210,10 @@ export class ServicoDeSolicitacao {
           telefone: params.telefone ?? existente.telefone,
           chatproLeadId: params.leadId ?? existente.chatproLeadId,
           chatproSessionId: params.sessionId ?? existente.chatproSessionId,
+          // Só sobrescreve quando veio alguma coisa. Ver o comentário do parâmetro.
+          ...(params.documentosDeclarados?.length
+            ? { documentosDoParceiro: params.documentosDeclarados }
+            : {}),
           ...entrega,
         })
         .where(eq(solicitacoesCadastro.id, existente.id));
@@ -241,6 +256,9 @@ export class ServicoDeSolicitacao {
         chatproLeadId: params.leadId ?? null,
         chatproSessionId: params.sessionId ?? null,
         parceiro: params.parceiro ?? null,
+        documentosDoParceiro: params.documentosDeclarados?.length
+          ? params.documentosDeclarados
+          : null,
         // 🔴 A MESMA validação do handoff: destino fora da lista de origens permitidas é
         // redirecionamento aberto, e não importa se veio de chamada assinada ou da
         // configuração de uma conta de bot.
@@ -296,6 +314,8 @@ export class ServicoDeSolicitacao {
      * parâmetro de URL. Ausente = a conta da BeHemp, que é o caso histórico.
      */
     conta?: { id: string; urlDeRetorno: string | null } | null;
+    /** O que o bot declarou que o paciente já tem. Ver `manifesto-da-url.ts`. */
+    documentosDeclarados?: string[] | null;
   }): Promise<{ mensagem: string; resultado: ResultadoDoLink }> {
     let leadId = entrada.leadId?.trim() || null;
     let nome = entrada.nome?.trim() || null;
@@ -334,6 +354,7 @@ export class ServicoDeSolicitacao {
       canalDeEntrega: 'bot_reply',
       parceiro: entrada.conta?.id ?? null,
       urlDeRetorno: entrada.conta?.urlDeRetorno ?? null,
+      documentosDeclarados: entrada.documentosDeclarados ?? null,
     });
 
     return { mensagem: this.textoDoLink(resultado), resultado };

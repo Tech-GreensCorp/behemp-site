@@ -57,6 +57,18 @@ export interface SolicitacaoValidada {
   > | null;
   /** Destino de volta, JÁ conferido contra a lista de origens quando foi gravado. */
   urlDeRetorno: string | null;
+  /**
+   * 🔴 O QUE ELE JÁ RESPONDEU, em passagem anterior (Item 33).
+   *
+   * `null` = nunca respondeu; `false` = declarou que NÃO tem. A distinção é o motivo de
+   * estes campos existirem: sem ela, a tela repete a pergunta a quem já respondeu — que foi
+   * exatamente a correção que o dono pediu em 10/09 sobre a pergunta da ANVISA.
+   *
+   * ⚠️ Importa quando a solicitação é REAPROVEITADA: o bot gera link novo para a mesma
+   * pessoa, e o que ela respondeu antes continua valendo.
+   */
+  declarouTerAutorizacaoAnvisa: boolean | null;
+  declarouTerReceitaMedica: boolean | null;
 }
 
 export interface SolicitacaoRecusada {
@@ -116,6 +128,8 @@ export async function validarTokenDeCadastro(
     expiraEm: linha.expiraEm,
     documentosDoParceiro: linha.documentosDoParceiro ?? null,
     urlDeRetorno: linha.urlDeRetorno ?? null,
+    declarouTerAutorizacaoAnvisa: linha.declarouTerAutorizacaoAnvisa ?? null,
+    declarouTerReceitaMedica: linha.declarouTerReceitaMedica ?? null,
   };
 }
 
