@@ -30,8 +30,8 @@ import { format } from 'date-fns';
  * `liberarReservasExpiradas` em lib/integrations/inngest/functions.ts).
  */
 
-/** Placeholder ajustável — quanto tempo o paciente tem para confirmar após reservar. */
-const RESERVA_TTL_MINUTOS = 15;
+/** Placeholder ajustável — quanto tempo o paciente tem para pagar após reservar. */
+const RESERVA_TTL_MINUTOS = 30;
 
 // ── Schemas de validação ──────────────────────────────────────
 

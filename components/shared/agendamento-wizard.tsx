@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
 import {
   listarMedicosDisponiveis,
   listarHorariosLivres,
@@ -26,12 +25,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CloudSun,
   CreditCard,
   Info,
   Loader2,
+  Moon,
   ShieldCheck,
   Stethoscope,
+  Sunrise,
+  Video,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * Wizard multi-step para agendamento de consultas — vive dentro da área logada
@@ -78,6 +82,31 @@ function iniciaisDoNome(nome: string): string {
     .map((w) => w[0].toUpperCase())
     .slice(0, 2)
     .join('');
+}
+
+interface GrupoHorarios {
+  label: string;
+  icon: LucideIcon;
+  horarios: string[];
+}
+
+/** Agrupa horários "HH:mm" por período do dia — deixa a lista organizada mesmo quando
+ *  há poucos horários, em vez de uma grade solta sem contexto. */
+function agruparHorariosPorPeriodo(horarios: string[]): GrupoHorarios[] {
+  const periodos: GrupoHorarios[] = [
+    { label: 'Manhã', icon: Sunrise, horarios: [] },
+    { label: 'Tarde', icon: CloudSun, horarios: [] },
+    { label: 'Noite', icon: Moon, horarios: [] },
+  ];
+
+  for (const h of horarios) {
+    const hora = parseInt(h.split(':')[0], 10);
+    if (hora < 12) periodos[0].horarios.push(h);
+    else if (hora < 18) periodos[1].horarios.push(h);
+    else periodos[2].horarios.push(h);
+  }
+
+  return periodos.filter((p) => p.horarios.length > 0);
 }
 
 const STEPS = [
@@ -324,14 +353,14 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 {medicos.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="group flex flex-col gap-3 rounded-xl border border-border/60 p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+                    className="group flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 items-start gap-4">
                       {m.avatarUrl ? (
                         <img
                           src={m.avatarUrl}
@@ -345,21 +374,20 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                       )}
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold leading-tight">{m.nome}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary" className="text-[11px] font-normal">
-                            {m.especialidade}
-                          </Badge>
-                          {m.crm && (
-                            <span className="text-[11px] text-muted-foreground">{m.crm}</span>
-                          )}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="truncate font-semibold leading-tight">{m.nome}</p>
+                          <ChevronRight
+                            size={16}
+                            className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+                          />
                         </div>
+                        <p className="mt-1 text-xs leading-snug font-medium text-primary/80">
+                          {m.especialidade}
+                        </p>
+                        {m.crm && (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{m.crm}</p>
+                        )}
                       </div>
-
-                      <ChevronRight
-                        size={16}
-                        className="shrink-0 self-start text-muted-foreground transition-colors group-hover:text-primary"
-                      />
                     </div>
 
                     {m.bio && (
@@ -419,7 +447,7 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                 </div>
               </div>
 
-              <div className="grid gap-8 sm:grid-cols-2">
+              <div className="grid gap-8 sm:grid-cols-2 sm:items-start">
                 {/* Calendário */}
                 <div>
                   <Calendar
@@ -443,19 +471,39 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                 {/* Horários */}
                 <div>
                   {!dataSelecionada ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <Clock size={28} className="mb-2 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground">
-                        Selecione uma data para ver os horários disponíveis
-                      </p>
+                    <div className="space-y-5">
+                      <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
+                          <CalendarDays size={20} className="text-primary" />
+                        </div>
+                        <p className="text-sm font-medium">Selecione uma data no calendário</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Os horários disponíveis daquele dia aparecem aqui.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {[
+                          { n: 1, texto: 'Escolha uma data disponível no calendário' },
+                          { n: 2, texto: 'Selecione um dos horários livres' },
+                          { n: 3, texto: 'Revise e reserve — o pagamento vem na próxima etapa' },
+                        ].map((passo) => (
+                          <div key={passo.n} className="flex items-center gap-3">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                              {passo.n}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{passo.texto}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : carregandoHorarios ? (
-                    <div className="flex justify-center py-12">
+                    <div className="flex items-center justify-center rounded-xl border border-dashed border-border/60 py-16">
                       <Loader2 size={22} className="animate-spin text-primary" />
                     </div>
                   ) : horariosLivres.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <CalendarDays size={28} className="mb-2 text-muted-foreground/40" />
+                    <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                      <CalendarDays size={24} className="mx-auto mb-2 text-muted-foreground/40" />
                       <p className="text-sm font-medium">Nenhum horário disponível nesta data</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Tente escolher outro dia no calendário
@@ -463,31 +511,42 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                     </div>
                   ) : (
                     <div>
-                      <p className="mb-3 text-sm font-medium">
+                      <p className="mb-4 text-sm font-medium">
                         {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
                         <span className="ml-1.5 font-normal text-muted-foreground">
-                          — {horariosLivres.length} horário{horariosLivres.length !== 1 ? 's' : ''} disponível
-                          {horariosLivres.length !== 1 ? 'is' : ''}
+                          — {horariosLivres.length}{' '}
+                          {horariosLivres.length === 1
+                            ? 'horário disponível'
+                            : 'horários disponíveis'}
                         </span>
                       </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {horariosLivres.map((h) => (
-                          <button
-                            key={h}
-                            onClick={() => setHorarioSelecionado(h)}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                              horarioSelecionado === h
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border hover:border-primary/40'
-                            }`}
-                          >
-                            {h}
-                          </button>
-                        ))}
-                      </div>
+
+                      {agruparHorariosPorPeriodo(horariosLivres).map((grupo) => (
+                        <div key={grupo.label} className="mb-5">
+                          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                            <grupo.icon size={13} />
+                            {grupo.label}
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {grupo.horarios.map((h) => (
+                              <button
+                                key={h}
+                                onClick={() => setHorarioSelecionado(h)}
+                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                  horarioSelecionado === h
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'border-border hover:border-primary/40'
+                                }`}
+                              >
+                                {h}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
 
                       {horarioSelecionado && (
-                        <div className="mt-6">
+                        <div className="mb-5">
                           <Textarea
                             value={observacoes}
                             onChange={(e) => setObservacoes(e.target.value)}
@@ -510,6 +569,14 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                       )}
                     </div>
                   )}
+
+                  <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
+                    <Video size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Consulta por videochamada, com duração aproximada de 1 hora. Você pode
+                      trocar de médico ou data a qualquer momento antes de reservar o horário.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
