@@ -36,7 +36,7 @@ export async function GET(request: Request) {
    * 🔴 Tolera `?` usado como separador — a mesma armadilha do `bot-link`, e esta rota é
    * chamada pelo mesmo painel. Ver `query-do-painel.ts`.
    */
-  const parametros = parametrosDoPainel(new URL(request.url));
+  const parametros = parametrosDoPainel(request.url);
   const p = (n: string[]) => n.map((k) => parametros.get(k)).find((v) => v?.trim()) ?? null;
 
   const telefone = removerSufixoWhatsapp(p(['phone', 'telefone', 'number']) ?? '');

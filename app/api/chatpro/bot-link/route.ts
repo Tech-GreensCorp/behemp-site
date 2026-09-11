@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
    * A URL configurada no painel já leva `?tem=…`; quando o painel emenda o `sessionId` com
    * outro `?`, o manifesto e a sessão se perdem **em silêncio** (medido em produção).
    */
-  const q = parametrosDoPainel(request.nextUrl);
-  if (separadorFoiCorrigido(request.nextUrl)) {
+  const q = parametrosDoPainel(request.url);
+  if (separadorFoiCorrigido(request.url)) {
     // Nomes de parâmetro não são dado pessoal — e sem este aviso ninguém descobre que o
     // painel está montando a URL errada.
     console.warn('[chatpro] query com `?` no lugar de `&` — corrigido na leitura', {
