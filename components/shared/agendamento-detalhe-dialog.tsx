@@ -65,6 +65,13 @@ export function AgendamentoDetalheDialog({
   const podeCancelar = item.status === 'reservada';
   const podeRemarcar = STATUS_ATIVOS.includes(item.status) && !item.remarcadaPeloPacienteEm;
 
+  const mensagemEncerrada =
+    item.status === 'cancelada'
+      ? 'Esta reserva foi cancelada — o horário já foi liberado para outros pacientes.'
+      : item.status === 'realizada'
+        ? 'Esta consulta já foi realizada.'
+        : null;
+
   async function carregarHorarios(data: Date) {
     setDataSelecionada(data);
     setCarregandoHorarios(true);
@@ -121,8 +128,8 @@ export function AgendamentoDetalheDialog({
               <DialogTitle>Detalhes da consulta</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
+            <div className="min-w-0 space-y-4">
+              <div className="flex min-w-0 items-center gap-3">
                 {item.medicoAvatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -199,24 +206,39 @@ export function AgendamentoDetalheDialog({
                   </p>
                 </div>
               )}
+
+              {mensagemEncerrada && (
+                <div className="flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
+                  <MessageCircle size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {mensagemEncerrada}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {(podeCancelar || podeRemarcar) && (
-              <DialogFooter>
-                {podeCancelar && (
-                  <Button
-                    variant="outline"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setModo('confirmar-cancelamento')}
-                  >
-                    Cancelar reserva
-                  </Button>
-                )}
-                {podeRemarcar && (
-                  <Button onClick={() => setModo('remarcar')}>Remarcar horário</Button>
-                )}
-              </DialogFooter>
-            )}
+            {/* O rodapé sempre aparece — sem ele (ex.: consulta cancelada/realizada, sem
+                nenhuma ação disponível), o card terminava sem a faixa inferior que fecha
+                visualmente o modal, deixando o conteúdo "solto" antes da borda. */}
+            <DialogFooter>
+              {podeCancelar && (
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setModo('confirmar-cancelamento')}
+                >
+                  Cancelar reserva
+                </Button>
+              )}
+              {podeRemarcar && (
+                <Button onClick={() => setModo('remarcar')}>Remarcar horário</Button>
+              )}
+              {!podeCancelar && !podeRemarcar && (
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Fechar
+                </Button>
+              )}
+            </DialogFooter>
           </>
         )}
 
