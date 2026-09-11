@@ -32,6 +32,7 @@ import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
 import { FINALIDADES } from '@/lib/parceiros/consentimento';
 import { conceder } from '@/lib/parceiros/consentimento-registrado';
+import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
@@ -319,6 +320,27 @@ export async function concluirCadastroPorLink(
         console.error('[cadastro] consentimento não gravado', {
           protocolo: solicitacao.protocolo,
           erro: erroDoConsentimento instanceof Error ? erroDoConsentimento.name : 'desconhecida',
+        });
+      }
+
+      /**
+       * 🔴 O GATILHO DO S2 (§7 do contrato-ponte, 11/09/2026).
+       *
+       * `prepararTransferencia` existia e **ninguém a chamava** — a Greens achou isso com
+       * `grep` antes de nós. Este é o primeiro dos dois gatilhos: o paciente acabou de
+       * consentir durante o cadastro.
+       *
+       * ⚠️ DEPOIS de `conceder`, nunca antes: a transferência LÊ o consentimento do banco, e
+       * antes da gravação ela recusaria por `sem_consentimento` — recusa que é definitiva
+       * dentro desta passagem.
+       *
+       * ⚠️ Nunca lança, e a trava de ambiente continua valendo: sem
+       * `PARCEIRO_TRANSFERENCIA_ATIVA=1` nada é enfileirado.
+       */
+      if (solicitacao.parceiro) {
+        await enfileirarTransferencia({
+          solicitacaoId: solicitacao.id,
+          parceiro: solicitacao.parceiro,
         });
       }
     }

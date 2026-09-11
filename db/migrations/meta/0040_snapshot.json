@@ -1,6 +1,6 @@
 {
-  "id": "534bf224-e174-4b9b-8ea0-11d9c143a467",
-  "prevId": "68b0e3da-8c5c-47ec-8dc7-46c92c1e9813",
+  "id": "e98cd8cb-3b46-4496-b0dc-c7e6a1907ea0",
+  "prevId": "534bf224-e174-4b9b-8ea0-11d9c143a467",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5452,53 +5452,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.pagamentos_config": {
-      "name": "pagamentos_config",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "valor_consulta_padrao": {
-          "name": "valor_consulta_padrao",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'150.00'"
-        },
-        "moeda_padrao": {
-          "name": "moeda_padrao",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'BRL'"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { parceiroEventosSaida } from '@/db/schema';
 
 import { assinar } from './assinatura';
+import { destinoDoEvento, type TipoDeEvento } from './destinos-do-envio';
 
 /**
  * ENTREGA OS AVISOS PENDENTES AO PARCEIRO (ADR-0016 D-09).
@@ -77,8 +78,16 @@ export class EnviadorDeAvisos {
       '/api/v1/parceiros/behemp/atualizacao',
   ) {}
 
+  /**
+   * ⚠️ AGORA HÁ DOIS PARES (§7 do contrato-ponte, 11/09/2026): o aviso e o cadastro. A fila é
+   * uma só, então basta **um** deles estar configurado para valer a pena reivindicar — o
+   * evento cujo par falta espera, em vez de gastar tentativa contra um destino inexistente.
+   */
   estaConfigurado(): boolean {
-    return Boolean(this.baseUrl?.trim() && this.segredo?.trim());
+    return Boolean(
+      this.baseUrl?.trim() &&
+        (this.segredo?.trim() || process.env.PARCEIRO_GREENS_SEGREDO_CADASTRO?.trim()),
+    );
   }
 
   async enviarLote(limite = TAMANHO_DO_LOTE): Promise<ResultadoDoEnvio> {
@@ -138,7 +147,7 @@ export class EnviadorDeAvisos {
       : ((linhas as { rows?: unknown[] }).rows ?? []);
     return (registros as Record<string, unknown>[]).map((l) => ({
       id: String(l.id),
-      tipo: String(l.tipo),
+      tipo: l.tipo as TipoDeEvento,
       payload: l.payload as Record<string, unknown>,
       tentativas: Number(l.tentativas ?? 1),
     }));
@@ -146,12 +155,25 @@ export class EnviadorDeAvisos {
 
   private async entregar(evento: {
     id: string;
-    tipo: string;
+    tipo: TipoDeEvento;
     payload: Record<string, unknown>;
     tentativas: number;
   }): Promise<'entregue' | 'reagendado' | 'falhou'> {
     const corpo = JSON.stringify(evento.payload);
     const timestamp = String(Math.floor(Date.now() / 1000));
+
+    /**
+     * 🔴 CADA TIPO TEM O SEU DESTINO E O SEU SEGREDO. O aviso vai para a rota de atualização;
+     * o cadastro (S2) vai para outra rota, com outra chave. Ver `destinos-do-envio.ts`.
+     */
+    const destino = destinoDoEvento(evento.tipo);
+    if (!destino.segredo?.trim()) {
+      /**
+       * ⚠️ REAGENDA, NÃO FALHA. Falta de configuração é estado nosso e temporário — marcar
+       * `falhou` perderia o evento por uma variável que alguém ainda vai preencher.
+       */
+      return this.reagendar(evento.id, evento.tentativas, `sem ${destino.nomeDaVariavelDoSegredo}`);
+    }
 
     /**
      * 🔴 O ID DO EVENTO É O ID DA LINHA — e portanto ESTÁVEL entre tentativas.
@@ -160,10 +182,10 @@ export class EnviadorDeAvisos {
      * deduplicação deles não teria por onde pegar. Um evento reenviado cinco vezes viraria
      * cinco avisos.
      */
-    const assinatura = assinar(evento.id, timestamp, corpo, this.segredo!);
+    const assinatura = assinar(evento.id, timestamp, corpo, destino.segredo);
 
     try {
-      const resposta = await fetch(`${this.baseUrl!.replace(/\/+$/, '')}${this.caminho}`, {
+      const resposta = await fetch(`${this.baseUrl!.replace(/\/+$/, '')}${destino.caminho}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -95,13 +95,17 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
             <QrCode size={16} />
             PIX
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Chave PIX que o paciente verá na tela de pagamento.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
-            <Switch checked={pixHabilitado} onCheckedChange={setPixHabilitado} id="pix-habilitado" />
+            <Switch
+              checked={pixHabilitado}
+              onCheckedChange={setPixHabilitado}
+              id="pix-habilitado"
+            />
             <Label htmlFor="pix-habilitado">Habilitar PIX para este médico</Label>
           </div>
 
@@ -109,7 +113,10 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Tipo de chave</Label>
-                <Select value={pixTipoChave} onValueChange={(v) => setPixTipoChave(v as PixTipoChave)}>
+                <Select
+                  value={pixTipoChave}
+                  onValueChange={(v) => setPixTipoChave(v as PixTipoChave)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -142,7 +149,7 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
             <Barcode size={16} />
             Boleto / dados bancários
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Conta que recebe o valor da consulta — usada para gerar o boleto/transferência.
           </p>
         </CardHeader>
@@ -160,11 +167,18 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="banco-nome">Banco</Label>
-                <Input id="banco-nome" value={bancoNome} onChange={(e) => setBancoNome(e.target.value)} />
+                <Input
+                  id="banco-nome"
+                  value={bancoNome}
+                  onChange={(e) => setBancoNome(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Tipo de conta</Label>
-                <Select value={bancoContaTipo} onValueChange={(v) => setBancoContaTipo(v as ContaTipo)}>
+                <Select
+                  value={bancoContaTipo}
+                  onValueChange={(v) => setBancoContaTipo(v as ContaTipo)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -184,7 +198,11 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="banco-conta">Conta</Label>
-                <Input id="banco-conta" value={bancoConta} onChange={(e) => setBancoConta(e.target.value)} />
+                <Input
+                  id="banco-conta"
+                  value={bancoConta}
+                  onChange={(e) => setBancoConta(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="banco-titular-nome">Nome do titular</Label>
@@ -213,7 +231,7 @@ export function FormConfigPagamentoMedico({ configInicial }: FormConfigPagamento
             <CreditCard size={16} />
             Cartão
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Sem integração de gateway ainda — só habilita/desabilita a opção na tela do paciente.
           </p>
         </CardHeader>

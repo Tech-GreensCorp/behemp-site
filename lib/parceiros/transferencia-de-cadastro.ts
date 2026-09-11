@@ -76,6 +76,13 @@ export interface CorpoDaTransferencia {
     /** O texto que o paciente LEU. Eles precisam poder provar a que ele disse sim. */
     texto: string;
     concedidoEm: string;
+    /**
+     * 🔴 A LÍNGUA EM QUE ELE LEU — acréscimo 1 do §2 do contrato-ponte, 11/09/2026.
+     *
+     * Opcional no schema deles, mas pediram que mandássemos: sem o campo, a Greens grava
+     * `"pt"` por omissão, e passa a afirmar algo que ninguém verificou.
+     */
+    idioma: string;
   };
 }
 
@@ -153,6 +160,8 @@ export async function prepararTransferencia(params: {
         finalidades: vigentes.map((c) => c.finalidade),
         texto: autorizadora.textoApresentado,
         concedidoEm: autorizadora.concedidoEm.toISOString(),
+        // Do REGISTRO, como a versão e o texto — não da constante de hoje.
+        idioma: autorizadora.idioma,
       },
     },
   };

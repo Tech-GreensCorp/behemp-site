@@ -18,7 +18,12 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { consentimentos } from '@/db/schema';
 
-import { TEXTO_DO_CONSENTIMENTO, VERSAO_DO_CONSENTIMENTO, type Finalidade } from './consentimento';
+import {
+  IDIOMA_DO_CONSENTIMENTO,
+  TEXTO_DO_CONSENTIMENTO,
+  VERSAO_DO_CONSENTIMENTO,
+  type Finalidade,
+} from './consentimento';
 
 export interface ConsentimentoVigente {
   finalidade: Finalidade;
@@ -28,6 +33,8 @@ export interface ConsentimentoVigente {
    * texto da constante afirmaria que a pessoa leu uma redação que ela nunca viu.
    */
   textoApresentado: string;
+  /** Em que língua ele leu — o §2 do contrato com a Greens pede, e com razão. */
+  idioma: string;
   concedidoEm: Date;
 }
 
@@ -43,6 +50,7 @@ export async function consentimentosVigentes(pacienteId: string): Promise<Consen
       finalidade: consentimentos.finalidade,
       versao: consentimentos.versao,
       textoApresentado: consentimentos.textoApresentado,
+      idioma: consentimentos.idioma,
       concedidoEm: consentimentos.concedidoEm,
     })
     .from(consentimentos)
@@ -60,6 +68,7 @@ export async function consentimentosVigentes(pacienteId: string): Promise<Consen
         finalidade: l.finalidade as Finalidade,
         versao: l.versao,
         textoApresentado: l.textoApresentado,
+        idioma: l.idioma,
         concedidoEm: l.concedidoEm,
       });
     }
@@ -92,6 +101,7 @@ export async function conceder(params: {
       finalidade,
       versao: VERSAO_DO_CONSENTIMENTO,
       textoApresentado: TEXTO_DO_CONSENTIMENTO,
+      idioma: IDIOMA_DO_CONSENTIMENTO,
       origem: params.origem.slice(0, 120),
     })),
   );

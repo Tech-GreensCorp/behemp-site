@@ -182,71 +182,106 @@ export async function materializarArquivos(
   arquivos: ArquivoMaterializado[];
   recusados: Array<{ tipo: string; motivo: string }>;
 }> {
+  /**
+   * 🔴 EM PARALELO, NÃO EM FILA — corrigido em 11/09/2026, apontado pela Greens no §12 do
+   * contrato-ponte com uma medição do lado deles:
+   *
+   *   hoje:     cria conta → baixa 3 arquivos (sequencial) → responde   ← 15-45 s
+   *
+   * O handoff deles ESPERA esta função. Cada documento custa uma resolução de DNS, um
+   * download e um upload ao blob; em fila, três viram quase um minuto — e o timeout de 30 s
+   * que eles puseram do lado de lá é curativo, não desenho. O pior caso cai para o do
+   * documento mais lento.
+   *
+   * ⚠️ SEM LIMITE DE CONCORRÊNCIA DE PROPÓSITO, e isso só é seguro porque a lista é curta:
+   * `DOCUMENTOS_DO_FLUXO` tem **cinco** chaves, o manifesto é deduplicado por tipo antes de
+   * chegar aqui, e a Greens impõe teto de 20 do lado dela. Se um dia a lista crescer, isto
+   * precisa de um pool — e este comentário é o aviso.
+   *
+   * ⚠️ A ORDEM DO RESULTADO CONTINUA A DA ENTRADA. `Promise.all` preserva a ordem do array,
+   * e o `for` de antes também preservava: quem lê o manifesto não percebe a mudança.
+   */
+  const resultados = await Promise.all(
+    entradas.map(
+      async (
+        entrada,
+      ): Promise<
+        { ok: true; arquivo: ArquivoMaterializado } | { ok: false; tipo: string; motivo: string }
+      > => {
+        try {
+          const autorizacao = await origemAutorizada(entrada.url);
+          if (!autorizacao.ok) {
+            return {
+              ok: false,
+              tipo: entrada.tipo,
+              motivo: autorizacao.motivo ?? 'nao_autorizada',
+            };
+          }
+
+          const resposta = await fetch(entrada.url, {
+            signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+            redirect: 'error', // redirect é como se escapa de uma allowlist
+          });
+          if (!resposta.ok) {
+            return { ok: false, tipo: entrada.tipo, motivo: `http_${resposta.status}` };
+          }
+
+          const mime = (resposta.headers.get('content-type') ?? '').split(';')[0].trim();
+          if (!TIPOS_ACEITOS.has(mime)) {
+            return { ok: false, tipo: entrada.tipo, motivo: 'tipo_de_arquivo_recusado' };
+          }
+
+          const bytes = Buffer.from(await resposta.arrayBuffer());
+          if (bytes.byteLength === 0 || bytes.byteLength > TAMANHO_MAXIMO) {
+            return { ok: false, tipo: entrada.tipo, motivo: 'tamanho_fora_do_limite' };
+          }
+
+          /**
+           * 🔴 PRIVADO — e aqui pesa mais que em qualquer outro lugar: são documentos de
+           * pacientes de OUTRA empresa, que a Greens nos confiou. Ela mediu o bucket dela e
+           * provou que é privado (403, e não 404); receber e guardar em público seria devolver
+           * um cuidado com descuido.
+           *
+           * A entrega é por `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
+           */
+          const ACESSO_DO_BLOB = 'private' as const;
+
+          const nome = entrada.nomeArquivo?.replace(/[^\w.-]/g, '_') ?? `${entrada.tipo}`;
+          const blob = await put(
+            `documentos/parceiro/${referencia}/${entrada.tipo}_${Date.now()}_${nome}`,
+            bytes,
+            {
+              access: ACESSO_DO_BLOB,
+              contentType: mime,
+            },
+          );
+
+          return {
+            ok: true,
+            arquivo: {
+              tipo: entrada.tipo,
+              urlBlob: blob.url,
+              nomeArquivo: entrada.nomeArquivo ?? null,
+              dataEmissao: entrada.dataEmissao ?? null,
+            },
+          };
+        } catch (erro) {
+          // Documento é conveniência; o cadastro é o que importa. Nunca derruba o handoff.
+          return {
+            ok: false,
+            tipo: entrada.tipo,
+            motivo: erro instanceof Error ? erro.name : 'erro_desconhecido',
+          };
+        }
+      },
+    ),
+  );
+
   const arquivos: ArquivoMaterializado[] = [];
   const recusados: Array<{ tipo: string; motivo: string }> = [];
-
-  for (const entrada of entradas) {
-    try {
-      const autorizacao = await origemAutorizada(entrada.url);
-      if (!autorizacao.ok) {
-        recusados.push({ tipo: entrada.tipo, motivo: autorizacao.motivo ?? 'nao_autorizada' });
-        continue;
-      }
-
-      const resposta = await fetch(entrada.url, {
-        signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
-        redirect: 'error', // redirect é como se escapa de uma allowlist
-      });
-      if (!resposta.ok) {
-        recusados.push({ tipo: entrada.tipo, motivo: `http_${resposta.status}` });
-        continue;
-      }
-
-      const mime = (resposta.headers.get('content-type') ?? '').split(';')[0].trim();
-      if (!TIPOS_ACEITOS.has(mime)) {
-        recusados.push({ tipo: entrada.tipo, motivo: 'tipo_de_arquivo_recusado' });
-        continue;
-      }
-
-      const bytes = Buffer.from(await resposta.arrayBuffer());
-      if (bytes.byteLength === 0 || bytes.byteLength > TAMANHO_MAXIMO) {
-        recusados.push({ tipo: entrada.tipo, motivo: 'tamanho_fora_do_limite' });
-        continue;
-      }
-
-      /**
-       * 🔴 PRIVADO — e aqui pesa mais que em qualquer outro lugar: são documentos de
-       * pacientes de OUTRA empresa, que a Greens nos confiou. Ela mediu o bucket dela e
-       * provou que é privado (403, e não 404); receber e guardar em público seria devolver
-       * um cuidado com descuido.
-       *
-       * A entrega é por `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
-       */
-      const ACESSO_DO_BLOB = 'private' as const;
-
-      const nome = entrada.nomeArquivo?.replace(/[^\w.-]/g, '_') ?? `${entrada.tipo}`;
-      const blob = await put(
-        `documentos/parceiro/${referencia}/${entrada.tipo}_${Date.now()}_${nome}`,
-        bytes,
-        {
-          access: ACESSO_DO_BLOB,
-          contentType: mime,
-        },
-      );
-
-      arquivos.push({
-        tipo: entrada.tipo,
-        urlBlob: blob.url,
-        nomeArquivo: entrada.nomeArquivo ?? null,
-        dataEmissao: entrada.dataEmissao ?? null,
-      });
-    } catch (erro) {
-      // Documento é conveniência; o cadastro é o que importa. Nunca derruba o handoff.
-      recusados.push({
-        tipo: entrada.tipo,
-        motivo: erro instanceof Error ? erro.name : 'erro_desconhecido',
-      });
-    }
+  for (const r of resultados) {
+    if (r.ok) arquivos.push(r.arquivo);
+    else recusados.push({ tipo: r.tipo, motivo: r.motivo });
   }
 
   return { arquivos, recusados };
