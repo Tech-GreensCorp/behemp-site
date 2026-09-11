@@ -429,13 +429,12 @@ export const liberarReservasExpiradas = inngest.createFunction(
           .where(eq(pagamentos.consultaId, reserva.consultaId));
 
         try {
-          const { enviarEmailConsultaCancelada } = await import('@/lib/email/consultas');
-          await enviarEmailConsultaCancelada({
+          const { enviarEmailReservaExpirada } = await import('@/lib/email/consultas');
+          await enviarEmailReservaExpirada({
             pacienteNome: reserva.pacienteNome,
             pacienteEmail: reserva.pacienteEmail,
             medicoNome: reserva.medicoNome,
             dataHora: new Date(reserva.dataHora),
-            motivo: 'O horário reservado expirou antes da confirmação.',
           });
           console.log(`[Job] Reserva ${reserva.consultaId} liberada e paciente avisado`);
         } catch (error) {
