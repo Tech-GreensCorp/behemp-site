@@ -28,6 +28,18 @@
 export const VERSAO_DO_CONSENTIMENTO = '2026-09-10.v1';
 
 /**
+ * O IDIOMA EM QUE O TEXTO É APRESENTADO.
+ *
+ * 🔴 Pedido pela Greens no §2 do contrato-ponte, em 11/09/2026, com o argumento certo: _"a
+ * mesma frase em `pt` e em `en` são consentimentos diferentes de provar"_. Sem o campo, quem
+ * recebe grava `"pt"` por omissão — uma afirmação que ninguém verificou.
+ *
+ * ⚠️ Hoje só há uma língua, e por isso é constante. Ela existe para que a segunda não
+ * precise reescrever o histórico: o registro antigo já dirá em que língua foi lido.
+ */
+export const IDIOMA_DO_CONSENTIMENTO = 'pt';
+
+/**
  * O texto exato apresentado ao paciente.
  *
  * ⚠️ Vive aqui, e não na tela, porque é ele que se grava junto ao aceite: o que vale é o que a

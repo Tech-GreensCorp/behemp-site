@@ -47,6 +47,16 @@ export const consentimentos = pgTable(
     /** `avaliacao_medica` · `apoio_anvisa` · `retorno_ao_parceiro`. */
     finalidade: text('finalidade').notNull(),
     versao: text('versao').notNull(),
+    /**
+     * 🔴 O IDIOMA EM QUE O TEXTO FOI APRESENTADO — pedido pela Greens no §2 do contrato-ponte.
+     *
+     * _"A mesma frase em `pt` e em `en` são consentimentos diferentes de provar."_ Está certo:
+     * sem o campo, quem recebe grava `"pt"` por omissão — uma afirmação que ninguém verificou.
+     *
+     * ⚠️ Hoje só apresentamos em português, e o valor é sempre `pt`. Guardá-lo mesmo assim é
+     * o que permite que a segunda língua não precise reescrever o histórico.
+     */
+    idioma: text('idioma').notNull().default('pt'),
     textoApresentado: text('texto_apresentado').notNull(),
     concedidoEm: timestamp('concedido_em', { withTimezone: true }).notNull().defaultNow(),
     revogadoEm: timestamp('revogado_em', { withTimezone: true }),

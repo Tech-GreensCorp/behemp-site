@@ -460,3 +460,32 @@ path:db/schema/consultas.ts
 # indistinguível de quem disse não.
 path:db/migrations/0035_huge_sugar_man.sql
 path:db/migrations/meta/0035_snapshot.json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11/09/2026 — §7 do contrato-ponte com a Greens: o S2 ganha caminho, segredo e gatilho
+#
+# QUEM AUTORIZOU: o dono, em 11/09/2026: "vamos resolver toda pendencia de código e webhook
+# para que os 2 fluxos tanto da behemp quanto da greens estejam conectados pronto para
+# testar" e, ao ler o §7 deles, "sim siga nessa ordem".
+#
+# POR QUÊ: o documento-ponte `greens-corp/docs/CONTRATO-S2-BEHEMP-PARA-GREENS.md` §7 lista
+# três pendências do nosso lado. Duas exigem esta migration:
+#   · o enum `parceiro_evento_tipo` não tem valor para o cadastro
+#   · o consentimento não carrega o idioma, que o §2 deles pede
+#
+# O QUE A MIGRATION FAZ (`db/migrations/0039_secret_randall.sql`):
+#   ALTER TYPE "parceiro_evento_tipo" ADD VALUE 'cadastro_transferido';
+#   ALTER TABLE "consentimentos" ADD COLUMN "idioma" text DEFAULT 'pt' NOT NULL;
+#
+# PERIGO MEDIDO: aditiva nas duas. `ADD VALUE` não reescreve tabela e não invalida linha
+# existente. A coluna nasce com DEFAULT, então o NOT NULL é satisfeito para todas as linhas
+# já gravadas — no Postgres 11+ isso não reescreve a tabela (o default vai no catálogo).
+#
+# ⚠️ O alerta da Greens procede: o valor novo do enum NÃO pode ser USADO na mesma transação
+# em que é criado. Aqui ele é apenas criado; o primeiro uso é em runtime, depois do deploy.
+#
+# COMO SE DESFAZ: a coluna, com DROP COLUMN. O valor do enum NÃO se remove no Postgres —
+# ficaria órfão e inofensivo. É o custo aceito de `ADD VALUE`, e é o motivo de o nome ter
+# sido escolhido com cuidado.
+path:db/migrations/0039_secret_randall.sql
+path:db/migrations/meta/0039_snapshot.json
