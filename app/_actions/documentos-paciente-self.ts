@@ -125,15 +125,6 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     const blobPath = `documentos/${pacienteId}/${nomeSeguro}`;
 
     const blob = await put(blobPath, file, {
-      /**
-       * 🔴 PRIVADO desde 11/09/2026 — o Item 6 fechando ponto a ponto.
-       *
-       * Store público significa: quem tem a URL lê, sem autenticação. O que está aqui é RG,
-       * laudo, receita e comprovante. Obscuridade de URL não é controle de acesso.
-       *
-       * A entrega é por `/api/documentos/<id>/arquivo`, que autentica, confere escopo de
-       * objeto e audita. As telas deste projeto já apontam para lá.
-       */
       access: 'private',
       token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
     });
@@ -232,11 +223,7 @@ export async function obterPerfilPaciente(): Promise<{
       return { sucesso: false, erro: 'Usuário não encontrado' };
     }
 
-    const row = resultado.rows[0] as {
-      nome: string | null;
-      email: string | null;
-      telefone: string | null;
-    };
+    const row = resultado.rows[0] as { nome: string | null; email: string | null; telefone: string | null };
     return { sucesso: true, dados: row };
   } catch (error) {
     console.error('[Action] Erro ao obter perfil do paciente:', error);

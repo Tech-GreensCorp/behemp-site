@@ -68,15 +68,6 @@ export async function uploadDocumento(formData: FormData) {
     const blobPath = `documentos/${parsed.data.pacienteId}/${nomeSeguro}`;
 
     const blob = await put(blobPath, file, {
-      /**
-       * 🔴 PRIVADO desde 11/09/2026 — o Item 6 fechando ponto a ponto.
-       *
-       * Store público significa: quem tem a URL lê, sem autenticação. O que está aqui é RG,
-       * laudo, receita e comprovante. Obscuridade de URL não é controle de acesso.
-       *
-       * A entrega é por `/api/documentos/<id>/arquivo`, que autentica, confere escopo de
-       * objeto e audita. As telas deste projeto já apontam para lá.
-       */
       access: 'private',
       token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
     });
@@ -84,7 +75,10 @@ export async function uploadDocumento(formData: FormData) {
     // Calcular data de validade baseada no tipo
     const emissao = new Date(parsed.data.dataEmissao);
     const validade = new Date(emissao);
-    if (parsed.data.tipo === 'autorizacao_anvisa' || parsed.data.tipo === 'oficio_anvisa') {
+    if (
+      parsed.data.tipo === 'autorizacao_anvisa' ||
+      parsed.data.tipo === 'oficio_anvisa'
+    ) {
       validade.setMonth(validade.getMonth() + 24);
     } else if (parsed.data.tipo === 'receita_medica') {
       validade.setMonth(validade.getMonth() + 6);
