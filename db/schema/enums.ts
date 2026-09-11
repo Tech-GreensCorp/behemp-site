@@ -206,6 +206,18 @@ export const pagamentoStatusEnum = pgEnum('pagamento_status', [
   'estornado',
 ]);
 
+/** Tipo da chave PIX cadastrada pelo médico em `medicosPagamentoConfig`. */
+export const pixTipoChaveEnum = pgEnum('pix_tipo_chave', [
+  'cpf',
+  'cnpj',
+  'email',
+  'telefone',
+  'aleatoria',
+]);
+
+/** Tipo de conta bancária cadastrada pelo médico em `medicosPagamentoConfig`. */
+export const contaBancariaTipoEnum = pgEnum('conta_bancaria_tipo', ['corrente', 'poupanca']);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // IA CLÍNICA — acrescentados na Sprint 2 (20/08/2026)
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -36,6 +36,9 @@ export const consultas = pgTable(
      *  (null) é o sinal de falha de envio, sem precisar de coluna de erro à parte. */
     emailPacienteEnviadoEm: timestamp('email_paciente_enviado_em', { withTimezone: true }),
     emailMedicoEnviadoEm: timestamp('email_medico_enviado_em', { withTimezone: true }),
+    /** E-mail avisando que o horário foi reservado e aguarda pagamento (etapa 3→4 do
+     *  wizard) — mesmo padrão de "ausência é o sinal de falha" dos dois campos acima. */
+    emailReservaEnviadoEm: timestamp('email_reserva_enviado_em', { withTimezone: true }),
     /** Falha ao criar o evento no Calendar (ex.: token do médico expirado/revogado,
      *  "invalid_grant") não bloqueia mais o agendamento — a consulta nasce sem Meet
      *  e o motivo fica aqui, visível para o médico/admin reconectarem o Google. */

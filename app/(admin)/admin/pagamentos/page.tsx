@@ -5,7 +5,7 @@ import { listarPagamentos } from '@/app/(admin)/_actions/pagamentos';
 import { PagamentoStatusBadge } from '@/components/admin/pagamentos/pagamento-status-badge';
 import { PagamentoFunilBadge } from '@/components/admin/pagamentos/pagamento-funil-badge';
 import { PagamentoFilters } from '@/components/admin/pagamentos/pagamento-filters';
-import { Settings, Wallet, Pencil } from 'lucide-react';
+import { Settings, Wallet, Pencil, Landmark } from 'lucide-react';
 
 function formatarValor(v: string): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -54,12 +54,20 @@ export default async function PagamentosPage({
             acompanhamento, a Be4Hope não retém nem intermedeia o valor.
           </p>
         </div>
-        <Link href="/admin/pagamentos/configuracoes">
-          <Button variant="outline" className="gap-2">
-            <Settings size={16} />
-            Configurar valor da consulta
-          </Button>
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/admin/pagamentos/medicos">
+            <Button variant="outline" className="w-full gap-2 sm:w-auto">
+              <Landmark size={16} />
+              Meios de pagamento por médico
+            </Button>
+          </Link>
+          <Link href="/admin/pagamentos/configuracoes">
+            <Button variant="outline" className="w-full gap-2 sm:w-auto">
+              <Settings size={16} />
+              Configurar valor da consulta
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <PagamentoFilters statusAtual={status} buscaAtual={busca} atencaoAtual={atencao} />
