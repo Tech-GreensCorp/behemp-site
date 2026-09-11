@@ -19,6 +19,42 @@
 
 ---
 
+## ✅ Item 35 — RESOLVIDO em 11/09/2026: a confirmação do e-mail tinha dois becos
+
+**Achado pelo dono testando em produção**, horas antes da apresentação: _"a validação do código
+de e-mail não está funcionando… o código chega mas não é válido"_.
+
+**O sintoma era um; as causas, duas** — e nenhuma no código de verificação.
+
+### 1. "Reenviar código" não dava retorno nenhum
+
+`formulario-de-cadastro.tsx`, `reenviarCodigo()`: chamava
+`prepareEmailAddressVerification` e **não mudava nada na tela**. Quem clica e não vê resposta
+clica de novo — e **cada reenvio invalida o código anterior** (comportamento do Clerk). O
+paciente então digita o código do primeiro e-mail e recebe _"código incorreto"_.
+
+A mensagem aponta para o lugar errado: o código estava certo, só era de um e-mail que deixou
+de valer.
+
+**Corrigido:** o reenvio **limpa o campo** (o que estava digitado é o código morto), mostra
+_"Enviamos um código novo. O anterior deixou de valer"_, desabilita o botão enquanto envia e
+recusa reentrada.
+
+### 2. "Corrigir meus dados" virava saída
+
+O botão volta para a etapa de dados — e enviar de novo chamava `signUp.create` com um cadastro
+**já pendente**. O Clerk responde `form_identifier_exists`, e a tela dizia **"Já existe uma
+conta com este e-mail. Use a opção de entrar."** para alguém que estava no meio do próprio
+cadastro e **não tem conta**. O caminho de correção mandava a pessoa embora.
+
+**Corrigido:** quando o cadastro pendente é do mesmo e-mail, a tela **reenvia o código e
+segue** em vez de recriar. A mensagem de "já existe conta" continua — ela é verdadeira para
+quem realmente tem.
+
+🔴 **O que as duas têm em comum:** a tela responsabilizava o paciente por um estado que ela
+própria criou. É a classe de erro que mais custa num funil, porque a pessoa acredita que errou
+e desiste.
+
 ## 🔴 Item 34 — o aviso `consentimento_revogado` depende do lado da Greens, não só do nosso
 
 **Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado**. O
