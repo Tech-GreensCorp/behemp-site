@@ -19,6 +19,31 @@
 
 ---
 
+## 🟠 Item 33 — a declaração "não tenho ANVISA" NÃO é persistida
+
+**Achado em 11/09/2026, ao plugar a P2.** `app/_actions/cadastro-por-link.ts:298-299` grava
+`declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` **apenas dentro de
+`registrarAuditoria`**. Não existe coluna para nenhuma das duas — nem em
+`solicitacoes_cadastro`, nem em `pacientes`. Log de auditoria não é fonte de leitura de
+produto.
+
+**O que isso custou:** o comentário de `components/paciente/AvisoDaProcuracao.tsx` afirmava que
+o cadastro gravava a declaração. Afirmação falsa, que sobreviveu porque **o componente não era
+renderizado por tela nenhuma** — ninguém a exercitou. Retratado no próprio arquivo em 11/09.
+
+**Como ficou funcionando sem isso:** o aviso passou a sair do **estado real** —
+`autorizacoes_anvisa` sem linha `aprovado` dentro da validade. É informação melhor: descreve o
+que existe, em vez do que o paciente lembrou de responder.
+
+**O que ainda se perde sem a coluna:** não conseguimos deixar de repetir a pergunta em outras
+telas, que era o propósito original da declaração. E o fluxo BeHemp 1 continua sem saber
+distinguir _"declarou que não tem"_ de _"nunca respondeu"_.
+
+**Perigo de corrigir (medido):** migration **aditiva**, duas colunas `boolean` nullable em
+`solicitacoes_cadastro`. Nenhum ponto de chamada quebra — nada lê hoje. O risco real é o de
+sempre: `main` é produção e push aplica migration sem rollback. **Não corrigir de passagem:**
+é trabalho próprio, em commit próprio, com autorização.
+
 ## 🔴 Item 32 — CONCLUÍDO em 11/09/2026: a tela do consentimento
 
 **O diagnóstico, que só apareceu ao ligar a P5:** `lib/parceiros/transferencia-de-cadastro.ts`
