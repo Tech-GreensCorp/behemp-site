@@ -119,11 +119,21 @@ export async function prepararTransferencia(params: {
         cpf: solicitacao.cpf,
       },
       /**
-       * ⚠️ VAZIO ENQUANTO O STORE FOR PÚBLICO.
+       * ⚠️ AINDA VAZIO, e o motivo mudou — vale registrar a diferença.
        *
-       * A lista existe no contrato para que a Greens implemente o receptor; preenchê-la hoje
-       * mandaria URLs de um bucket público, e a assinatura seria enfeite. Ela passa a ser
-       * preenchida junto com a correção do Item 6, não antes.
+       * Até 10/09 o motivo era o store público: mandar URL assinada de um bucket aberto seria
+       * enfeite. Isso foi corrigido — os caminhos novos gravam privado, e a entrega passa por
+       * `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
+       *
+       * O que falta agora é outra coisa: **decidir COMO a Greens acessa**. Duas opções, e a
+       * escolha é do lado que recebe:
+       *
+       *   a) URL assinada de vida curta, como eles fazem conosco — exige gerar a assinatura
+       *      aqui e aceitar que quem tiver o link lê, pela validade
+       *   b) a nossa rota autenticada, com credencial de máquina para eles — mais controle,
+       *      mas exige um caminho de autenticação que não existe entre as empresas hoje
+       *
+       * Preencher antes dessa decisão seria escolher por eles. Está no §6 da ADR-0021.
        */
       documentos: [],
       consentimento: {

@@ -1735,3 +1735,49 @@ o guarda `o-aviso-ao-parceiro-nao-se-perde` já aplica ao aviso que vai para a G
 Quando for implementado: o aviso ao paciente não pode carregar dado clínico, e a falha de um
 canal não pode impedir os outros — nem derrubar a atualização de status, que é o fato que
 importa.
+
+## Item 30 — 🟡 O store privado começou pelos caminhos novos (Item 6 segue aberto)
+
+**Decisão do dono em 10/09/2026:** _"então vamos colocar no nosso store privado"_.
+
+### O que mudou
+
+Os **dois caminhos criados nesta sessão** passaram a gravar `access: 'private'`:
+
+| caminho                                  | arquivo                                   |
+| ---------------------------------------- | ----------------------------------------- |
+| anexo enviado pelo paciente no cadastro  | `lib/documentos/anexo-do-cadastro.ts`     |
+| documento que vem do parceiro no handoff | `lib/parceiros/documentos-do-parceiro.ts` |
+
+E nasceu a porta de entrega: **`/api/documentos/<id>/arquivo`** — autentica, confere **escopo
+de objeto** (o paciente, o médico DELE, ou admin), audita a leitura, e nunca entra em cache
+compartilhado.
+
+⚠️ **Ela serve os dois mundos de propósito:** blob antigo (público) é redirecionado; blob novo
+é entregue por streaming autenticado. Assim a tela usa **um endereço** para qualquer documento,
+e terminar o Item 6 não vai exigir tocar em tela nenhuma.
+
+### 🔴 O que ainda falta — e é o Item 6
+
+**12 pontos de upload continuam gravando público.** Eles não foram tocados: mexer em 14 lugares
+no meio de outra tarefa é exatamente o que o `CLAUDE.md` proíbe, e cada um tem uma tela que lê
+`urlBlob` direto.
+
+```
+app/_actions/documentos.ts · documentos-paciente.ts · documentos-paciente-self.ts
+app/_actions/exames.ts · chat.ts
+app/api/upload-documento · upload-exame · upload-avatar · upload-relatorio
+app/api/anvisa/upload-documento · anvisa/procuracao
+lib/integrations/blob/index.ts
+```
+
+**O perigo de mexer, medido:** cada ponto tem uma tela que usa `urlBlob` como `href`. Trocar o
+upload sem trocar a tela deixa o documento invisível — e invisível é pior que público, porque
+some sem avisar.
+
+**A ordem que funciona**, e é a mesma que esta sessão usou: a rota de entrega primeiro (feita),
+depois cada tela passando a apontar para ela, e **só então** o upload virando privado. Um ponto
+por vez, com a tela junto.
+
+⚠️ E os arquivos **já gravados** continuam públicos. Torná-los privados exige copiá-los, o que
+é migração de dado — trabalho próprio, com o histórico preservado (proibição 4).
