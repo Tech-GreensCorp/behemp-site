@@ -1,12 +1,17 @@
-'use client';
-
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
+import { obterEstadoAgendamentoPaciente } from '@/app/(public)/_actions/agendamento';
 
 /**
  * Agendamento — única rota do fluxo (não existe versão pública). Protegida pelo
  * layout de `(paciente)`, que redireciona quem não é paciente/admin.
+ *
+ * Server Component: a etapa do wizard e a reserva ativa vêm do banco a cada carregamento
+ * (`obterEstadoAgendamentoPaciente`), não só do estado local do componente — reload ou
+ * saída da tela não faz o paciente perder uma reserva em andamento.
  */
-export default function PacienteAgendamentoPage() {
+export default async function PacienteAgendamentoPage() {
+  const estado = await obterEstadoAgendamentoPaciente();
+
   return (
     <div className="space-y-8">
       <div>
@@ -21,7 +26,10 @@ export default function PacienteAgendamentoPage() {
         </p>
       </div>
 
-      <AgendamentoWizard />
+      <AgendamentoWizard
+        reservaAtivaInicial={estado.dados?.reservaAtiva ?? null}
+        historicoInicial={estado.dados?.historico ?? []}
+      />
     </div>
   );
 }
