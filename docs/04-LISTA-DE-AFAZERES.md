@@ -19,6 +19,43 @@
 
 ---
 
+## 🔴 Item 34 — o aviso `consentimento_revogado` NÃO cabe no S1 como ele é hoje
+
+**Prometido à Greens em 10/09** (proposta deles, aceita por mim) e **não implementado em
+11/09**, por um motivo que só apareceu ao tentar: o S1 não consegue avisar a mesma coisa duas
+vezes.
+
+**A medição.** `db/schema/parceiro-eventos-saida.ts:70`:
+
+```
+uniqueIndex('parceiro_eventos_saida_fato_idx').on(t.parceiro, t.tipo, t.solicitacaoId)
+```
+
+E `lib/parceiros/notificar.ts` usa `onConflictDoNothing` nesse alvo — de propósito, para que o
+mesmo fato chamado duas vezes não vire dois avisos. O guarda `o-aviso-ao-parceiro-nao-se-perde`
+**quebra o build** se esse índice virar comum (caso _"🔴 o índice do fato é ÚNICO"_).
+
+**A consequência, se eu simplesmente acrescentasse o tipo:** o paciente que **revoga,
+reconsente e revoga de novo** geraria UM aviso. O segundo seria engolido em silêncio, e a
+Greens seguiria usando dado de saúde de alguém que retirou o consentimento. Um aviso que às
+vezes não sai é pior que aviso nenhum: cria a crença de que o outro lado foi avisado.
+
+**As opções, com o custo de cada uma** — a escolha é do dono:
+
+| #   | opção                                                               | custo                                                               | risco                                                              |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| a   | acrescentar `ocorrenciaId` (cuid2) ao índice único                  | migration + ajustar o guarda do S1 + rever os dois tipos existentes | mexe no índice que protege a idempotência de `receita_emitida`     |
+| b   | tabela própria de avisos de consentimento, com o seu próprio índice | migration aditiva; não toca no S1 nem no guarda dele                | dois caminhos de saída para o parceiro, que podem divergir         |
+| c   | um aviso por revogação, aceitando um por solicitação                | trivial                                                             | 🔴 **o caso "revoga de novo" fica silencioso** — recusado por isso |
+
+**Recomendação: (b).** Ela não toca na idempotência de `receita_emitida`, que decide **gateway
+e desconto** do lado da Greens — e essa é exatamente a peça que não se mexe por causa de outra.
+
+⚠️ **O que vale ENQUANTO isso não existe, e precisa ser dito ao paciente:** revogar impede
+envios **futuros** (a P5 lê o consentimento vigente a cada envio), e o que já foi enviado
+continua com quem recebeu. A tela `/paciente/privacidade` diz isso, em vez de prometer o que o
+sistema não cumpre.
+
 ## 🟠 Item 33 — a declaração "não tenho ANVISA" NÃO é persistida
 
 **Achado em 11/09/2026, ao plugar a P2.** `app/_actions/cadastro-por-link.ts:298-299` grava
