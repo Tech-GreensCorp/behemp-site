@@ -23,6 +23,7 @@
  *    inválido", para não revelar se aquele número existe na base.
  */
 
+import { parametrosDoPainel } from '@/lib/chatpro/query-do-painel';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { ServicoDeSolicitacao } from '@/lib/chatpro/solicitacao';
@@ -34,7 +35,7 @@ function urlBase(): string {
 }
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams;
+  const q = parametrosDoPainel(request.nextUrl);
 
   try {
     const resultado = await new ServicoDeSolicitacao().start({

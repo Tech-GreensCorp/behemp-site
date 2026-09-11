@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
 import { lerManifestoDaUrl } from '@/lib/chatpro/manifesto-da-url';
+import { parametrosDoPainel, separadorFoiCorrigido } from '@/lib/chatpro/query-do-painel';
 import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
 import { ErroDeContatoNaoConfirmado, ServicoDeSolicitacao } from '@/lib/chatpro/solicitacao';
 import {
@@ -87,7 +88,20 @@ export async function GET(request: NextRequest) {
     return textoPuro('Não autorizado.', 401);
   }
 
-  const q = request.nextUrl.searchParams;
+  /**
+   * 🔴 TOLERA `?` USADO COMO SEPARADOR — ver `query-do-painel.ts`.
+   *
+   * A URL configurada no painel já leva `?tem=…`; quando o painel emenda o `sessionId` com
+   * outro `?`, o manifesto e a sessão se perdem **em silêncio** (medido em produção).
+   */
+  const q = parametrosDoPainel(request.nextUrl);
+  if (separadorFoiCorrigido(request.nextUrl)) {
+    // Nomes de parâmetro não são dado pessoal — e sem este aviso ninguém descobre que o
+    // painel está montando a URL errada.
+    console.warn('[chatpro] query com `?` no lugar de `&` — corrigido na leitura', {
+      caminho: request.nextUrl.pathname,
+    });
+  }
 
   /**
    * 🔴 O QUE O PACIENTE JÁ TEM, declarado pelo bot.
