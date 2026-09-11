@@ -158,6 +158,16 @@ export default async function CadastroPorLinkPage({
          * fazer o trabalho duas vezes, e é onde se perde gente no meio do cadastro.
          */
         veioDeParceiro={!!resultado.parceiro}
+        /**
+         * 🔴 QUEM VEIO DO FORMULÁRIO DO PARCEIRO JÁ RESPONDEU SOBRE A ANVISA.
+         *
+         * No formulário da Greens ele marcou se tem ou não a autorização, e anexou o que
+         * tinha. Repetir a pergunta aqui é pedir a mesma resposta duas vezes.
+         *
+         * ⚠️ `parceiro` não serve para isso: o BOT da Greens também grava `parceiro:
+         * 'greens'`, e ele não perguntou nada. Quem responde é a ORIGEM.
+         */
+        jaDeclarouSobreAnvisa={resultado.origem === 'greens_handoff'}
       />
     </div>
   );

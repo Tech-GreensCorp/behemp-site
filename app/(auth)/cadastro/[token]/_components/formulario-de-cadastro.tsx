@@ -88,6 +88,15 @@ interface Props {
    * definitivo justamente no cadastro que deveria simplificar a vida dele.
    */
   veioDeParceiro?: boolean;
+  /**
+   * 🔴 ELE JÁ RESPONDEU SOBRE A ANVISA NO FORMULÁRIO DO PARCEIRO.
+   *
+   * Quando verdadeiro, a pergunta não aparece — a resposta já existe, e pedi-la de novo é
+   * fazer o paciente responder duas vezes a mesma coisa. Apontado pelo dono em 10/09/2026:
+   * "lá ele já marcou a opção que não tem anvisa, então já vem, não precisa perguntá-lo
+   * novamente".
+   */
+  jaDeclarouSobreAnvisa?: boolean;
 }
 
 /**
@@ -171,6 +180,7 @@ export function FormularioDeCadastro({
   telefoneInicial,
   cpfInicial = null,
   veioDeParceiro = false,
+  jaDeclarouSobreAnvisa = false,
 }: Props) {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -220,7 +230,14 @@ export function FormularioDeCadastro({
   const [temAnvisa, setTemAnvisa] = useState<boolean | null>(null);
   const [arquivoAnvisa, setArquivoAnvisa] = useState<File | null>(null);
   const [erroDoAnexo, setErroDoAnexo] = useState('');
-  const anvisaPendente = pendencias.some((p) => p.chave === 'autorizacao_anvisa');
+  /**
+   * A pergunta só faz sentido quando a autorização falta **e** ninguém já perguntou.
+   *
+   * Quem veio do formulário do parceiro já declarou lá — e a pendência aqui é justamente a
+   * consequência daquela resposta, não uma dúvida nova.
+   */
+  const perguntarSobreAnvisa =
+    !jaDeclarouSobreAnvisa && pendencias.some((p) => p.chave === 'autorizacao_anvisa');
   const [tratamentoAtual, setTratamentoAtual] = useState('');
   const [codigo, setCodigo] = useState('');
   /**
@@ -334,7 +351,7 @@ export function FormularioDeCadastro({
          * A declaração vai mesmo sem arquivo: "não tenho" é informação, não ausência dela.
          * `null` quando a pergunta nem apareceu — o parceiro já tinha mandado a autorização.
          */
-        temAutorizacaoAnvisa: anvisaPendente ? temAnvisa : null,
+        temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null,
         anexoAnvisa: await lerAnexo(arquivoAnvisa),
         tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       });
@@ -668,7 +685,7 @@ export function FormularioDeCadastro({
 
             <Separador />
 
-            {anvisaPendente && (
+            {perguntarSobreAnvisa && (
               <>
                 <Secao titulo="Autorização da ANVISA" icone={FileText}>
                   <fieldset className="space-y-3">
