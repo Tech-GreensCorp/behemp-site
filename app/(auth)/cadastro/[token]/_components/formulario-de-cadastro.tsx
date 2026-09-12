@@ -24,6 +24,9 @@ import { useRouter } from 'next/navigation';
 
 import { destinoDepoisDoCadastro, textosDoDestino } from '@/lib/parceiros/destino-do-paciente';
 import { useSignUp } from '@clerk/nextjs/legacy';
+// `useAuth` não existe no entrypoint `/legacy` — vem do pacote principal, como em
+// `entrar/page.tsx` e `navbar.tsx`. Medido: o type-check acusa TS2305 se importado de lá.
+import { useAuth } from '@clerk/nextjs';
 import {
   ArrowLeft,
   ArrowRight,
@@ -174,6 +177,20 @@ function traduzirErro(err: unknown): string {
 
   const mapa: Record<string, string> = {
     form_identifier_exists: 'Já existe uma conta com este e-mail. Use a opção de entrar.',
+    /**
+     * 🔴 SESSÃO JÁ ABERTA. Medido em 12/09/2026, com o dono testando o fluxo 1 logado: o
+     * `signUp.create` foi recusado, o código não estava neste mapa, e a tela caiu na frase
+     * genérica "Confira os dados e tente novamente" — mandando conferir dados que estavam
+     * todos certos.
+     *
+     * ⚠️ Com a retomada, este caminho não deveria mais ser alcançado: quem tem sessão pula o
+     * Clerk e grava só a ficha. A entrada fica como rede — se a sessão aparecer NO MEIO do
+     * preenchimento (outra aba, login em paralelo), a mensagem diz o que fazer em vez de
+     * culpar os dados.
+     */
+    session_exists: 'Você já está com a sessão aberta. Recarregue a página para continuar.',
+    identifier_already_signed_in:
+      'Você já está com a sessão aberta. Recarregue a página para continuar.',
     form_password_pwned:
       'Esta senha apareceu em vazamentos públicos. Escolha outra, por segurança.',
     form_password_length_too_short: 'A senha precisa ter pelo menos 8 caracteres.',
@@ -204,6 +221,20 @@ export function FormularioDeCadastro({
 }: Props) {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
+
+  /**
+   * 🔴 QUEM JÁ TEM SESSÃO NÃO PRECISA CRIAR CONTA DE NOVO — e não conseguia.
+   *
+   * O estado em que o dono ficou em 11/09/2026, no protocolo SOL-000046: a conta foi criada,
+   * o e-mail foi confirmado, a sessão abriu — e a gravação da ficha falhou. Ele ficou logado,
+   * com o painel vazio, e o link não servia para mais nada: ao voltar, a tela pedia para criar
+   * uma conta que já existia, e o Clerk respondia `form_identifier_exists`.
+   *
+   * ⚠️ Com sessão viva, a conta é fato consumado. O que falta é só a FICHA — e
+   * `concluirCadastroPorLink` já exige `auth()`, então ela funciona sozinha, sem passar pelo
+   * Clerk outra vez.
+   */
+  const { isSignedIn, isLoaded: authCarregou } = useAuth();
 
   /**
    * Os quatro campos que o formulário do parceiro já coletou. Se os quatro vieram, a tela
@@ -357,6 +388,49 @@ export function FormularioDeCadastro({
     return () => clearTimeout(t);
   }, [isLoaded]);
 
+  /**
+   * 🔴 RETOMAR DE ONDE PAROU — e não recomeçar do zero.
+   *
+   * Pedido do dono em 12/09/2026, testando o fluxo 1: _"não teria como eu continuar o meu
+   * cadastro? deveria ter essa opção de continuar um cadastro; se eu parei na etapa de
+   * verificar o código do e-mail, quando eu entrasse na minha conta era para aparecer
+   * justamente essa tela"_. E a razão que ele deu é a que importa: _"isso pode ser um caso
+   * real do paciente BeHemp, nós temos que prevenir esse tipo de coisa"_.
+   *
+   * ⚠️ QUEM PARA NO MEIO NÃO PARA POR DISTRAÇÃO. Para porque o código demorou, porque trocou
+   * de aparelho para abrir o e-mail, porque a bateria acabou, porque um deploy subiu. Ao
+   * voltar, encontrava o formulário em branco — e, ao preencher de novo, o Clerk respondia
+   * `form_identifier_exists`, porque a conta pendente já existia. O caminho de volta virava
+   * beco, que é a mesma família dos dois defeitos do Item 35.
+   *
+   * 🔴 O ESTADO JÁ EXISTIA E NINGUÉM LIA. O Clerk mantém o `signUp` pendente no navegador: a
+   * `etapa` nascia `'dados'` sempre, ignorando que `signUp.status` dizia
+   * `'missing_requirements'` e que o e-mail já tinha um código a caminho.
+   *
+   * ⚠️ SÓ RETOMA SE FOR O MESMO E-MAIL. Um `signUp` pendente de OUTRO endereço — o paciente
+   * digitou errado e voltou, ou é outra pessoa no mesmo navegador — não pode sequestrar este
+   * cadastro: nesse caso a tela começa do início, como antes.
+   */
+  const [retomado, setRetomado] = useState(false);
+
+  useEffect(() => {
+    if (!isLoaded || !signUp || etapa !== 'dados' || retomado) return;
+
+    const pendente = signUp.status === 'missing_requirements';
+    const emailPendente = signUp.emailAddress?.toLowerCase() ?? '';
+    const aguardandoCodigo = signUp.verifications?.emailAddress?.status === 'unverified';
+
+    if (!pendente || !emailPendente || !aguardandoCodigo) return;
+
+    /**
+     * O e-mail alvo é o que o parceiro mandou; se o paciente já tinha corrigido, o pendente
+     * é a fonte — é nele que o código foi entregue.
+     */
+    setEmail(emailPendente);
+    setEtapa('codigo');
+    setRetomado(true);
+  }, [isLoaded, signUp, etapa, retomado]);
+
   const campoCodigo = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (etapa === 'codigo') campoCodigo.current?.focus();
@@ -392,6 +466,60 @@ export function FormularioDeCadastro({
     return Math.min(pontos, 4);
   }, [senha]);
 
+  /**
+   * GRAVA A FICHA — o único caminho, usado pelos DOIS pontos de entrada.
+   *
+   * 🔴 Extraída em 12/09/2026 porque passou a haver dois caminhos até aqui:
+   *   1. o normal — confirmou o código, a sessão abriu, grava;
+   *   2. a RETOMADA — a sessão já estava viva e só a ficha faltava.
+   *
+   * ⚠️ Uma cópia em cada caminho é como nasce a divergência silenciosa: um ganha um campo
+   * novo, o outro não, e o paciente que veio pelo segundo caminho fica sem ele. Por isso é
+   * uma função só.
+   */
+  async function gravarFicha() {
+    const gravado = await concluirCadastroPorLink({
+      token,
+      nomeCompleto: nome.trim(),
+      cpf: somenteDigitosDoCpf(cpf),
+      telefone: telefone.trim(),
+      email: email.trim().toLowerCase(),
+      jaFazTratamento: jaFazTratamento === true,
+      /**
+       * A declaração vai mesmo sem arquivo: "não tenho" é informação, não ausência dela.
+       * `null` quando a pergunta nem apareceu — o parceiro já tinha mandado a autorização.
+       */
+      temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null,
+      temReceitaMedica: perguntarSobreReceita ? temReceita : null,
+      anexos: await lerAnexos(anexos),
+      tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
+      // Pode ser lista vazia, e vazia é uma resposta: ele leu e não autorizou nada.
+      finalidadesConsentidas,
+    });
+
+    if (!gravado.sucesso) {
+      // A conta EXISTE e ele está logado. Mandá-lo de volta ao formulário seria pedir
+      // que criasse a conta outra vez — o que falharia com "e-mail já cadastrado".
+      setErro(
+        `${gravado.erro} Sua conta já foi criada: entre com seu e-mail e complete o cadastro pelo painel.`,
+      );
+      return;
+    }
+
+    setEtapa('pronto');
+    /**
+     * 🔴 O DESTINO DEPENDE DO QUE FALTA, e é o que separa os dois fluxos da Greens.
+     *
+     * Sem receita → agendamento: a receita só existe depois de um médico avaliar.
+     * Com receita e sem ANVISA → procuração: mandá-lo agendar seria pedir que repetisse um
+     * ato médico que já aconteceu.
+     *
+     * A regra e o porquê da ordem moram em `lib/parceiros/destino-do-paciente.ts`.
+     */
+    const destino = destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave));
+    setTimeout(() => router.push(destino), 1400);
+  }
+
   async function criarConta(evento: React.FormEvent) {
     evento.preventDefault();
     if (!isLoaded || !podeEnviar) return;
@@ -411,6 +539,17 @@ export function FormularioDeCadastro({
        *
        * Quando o cadastro pendente é do MESMO e-mail, só reenviamos o código e seguimos.
        */
+      /**
+       * 🔴 SESSÃO VIVA: a conta existe, falta a ficha. Pula o Clerk inteiro.
+       *
+       * Sem isto, quem voltou ao link com sessão aberta batia em `form_identifier_exists` e
+       * lia "já existe uma conta" — sendo que a conta é DELE, e o que faltava era só gravar.
+       */
+      if (authCarregou && isSignedIn) {
+        await gravarFicha();
+        return;
+      }
+
       const emailAlvo = email.trim().toLowerCase();
       const pendenteDoMesmoEmail =
         Boolean(signUp.status) && signUp.emailAddress?.toLowerCase() === emailAlvo;
@@ -456,47 +595,7 @@ export function FormularioDeCadastro({
 
       await setActive({ session: conclusao.createdSessionId });
 
-      // Só agora a ficha existe — ver o bloco no topo do arquivo.
-      const gravado = await concluirCadastroPorLink({
-        token,
-        nomeCompleto: nome.trim(),
-        cpf: somenteDigitosDoCpf(cpf),
-        telefone: telefone.trim(),
-        email: email.trim().toLowerCase(),
-        jaFazTratamento: jaFazTratamento === true,
-        /**
-         * A declaração vai mesmo sem arquivo: "não tenho" é informação, não ausência dela.
-         * `null` quando a pergunta nem apareceu — o parceiro já tinha mandado a autorização.
-         */
-        temAutorizacaoAnvisa: perguntarSobreAnvisa ? temAnvisa : null,
-        temReceitaMedica: perguntarSobreReceita ? temReceita : null,
-        anexos: await lerAnexos(anexos),
-        tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
-        // Pode ser lista vazia, e vazia é uma resposta: ele leu e não autorizou nada.
-        finalidadesConsentidas,
-      });
-
-      if (!gravado.sucesso) {
-        // A conta EXISTE e ele está logado. Mandá-lo de volta ao formulário seria pedir
-        // que criasse a conta outra vez — o que falharia com "e-mail já cadastrado".
-        setErro(
-          `${gravado.erro} Sua conta já foi criada: entre com seu e-mail e complete o cadastro pelo painel.`,
-        );
-        return;
-      }
-
-      setEtapa('pronto');
-      /**
-       * 🔴 O DESTINO DEPENDE DO QUE FALTA, e é o que separa os dois fluxos da Greens.
-       *
-       * Sem receita → agendamento: a receita só existe depois de um médico avaliar.
-       * Com receita e sem ANVISA → procuração: mandá-lo agendar seria pedir que repetisse um
-       * ato médico que já aconteceu.
-       *
-       * A regra e o porquê da ordem moram em `lib/parceiros/destino-do-paciente.ts`.
-       */
-      const destino = destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave));
-      setTimeout(() => router.push(destino), 1400);
+      await gravarFicha();
     } catch (err) {
       setErro(traduzirErro(err));
     } finally {
@@ -1129,6 +1228,22 @@ export function FormularioDeCadastro({
             */}
             <div id="clerk-captcha" className="empty:hidden" />
 
+            {/*
+              🔴 QUEM VOLTA COM SESSÃO ABERTA PRECISA SABER QUE NÃO VAI CRIAR CONTA DE NOVO.
+              Sem este aviso, o botão continua dizendo "Criar conta e continuar" para quem já
+              tem conta — e o paciente hesita, ou clica achando que vai duplicar alguma coisa.
+              É o estado em que o dono ficou em 11/09/2026 (SOL-000046): conta criada, ficha
+              não gravada, e o link parecendo inútil.
+            */}
+            {authCarregou && isSignedIn && !jaTemConta && (
+              <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você já está com a sessão aberta. Vamos apenas{' '}
+                  <strong>concluir o seu cadastro</strong> — sua conta não será criada de novo.
+                </p>
+              </div>
+            )}
+
             {jaTemConta ? (
               <div className="animate-fade-in border-secondary/25 bg-secondary/5 space-y-3 rounded-xl border px-4 py-4">
                 <p className="text-foreground text-sm leading-relaxed">
@@ -1185,11 +1300,20 @@ export function FormularioDeCadastro({
                 ) : carregando ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Criando sua conta…
+                    {/*
+                      Com sessão aberta não se cria conta nenhuma — dizer "criando sua conta"
+                      seria descrever um passo que não está acontecendo.
+                    */}
+                    {authCarregou && isSignedIn ? 'Concluindo seu cadastro…' : 'Criando sua conta…'}
                   </>
                 ) : (
                   <>
-                    {textos.botao}
+                    {/*
+                      🔴 O BOTÃO NÃO PROMETE O QUE NÃO VAI FAZER. `textos.botao` diz "Criar
+                      conta e …" — certo para quem chega sem conta, e mentira para quem volta
+                      com a sessão viva e só precisa da ficha.
+                    */}
+                    {authCarregou && isSignedIn ? 'Concluir meu cadastro' : textos.botao}
                     <ArrowRight size={18} />
                   </>
                 )}

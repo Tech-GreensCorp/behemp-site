@@ -137,13 +137,47 @@ describe('a action revalida tudo, mesmo o que a página já tinha validado', () 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('a ficha clínica só nasce depois da sessão existir', () => {
-  it('🔴 a action de gravar é chamada DEPOIS do setActive', () => {
+  /**
+   * 🔴 RETIFICADO em 12/09/2026, e o caso anterior fica escrito porque ensina.
+   *
+   * Ele exigia a adjacência TEXTUAL `await setActive(… concluirCadastroPorLink(` — os dois
+   * na mesma sequência de caracteres. Media a FORMA do código, não a garantia.
+   *
+   * Quando a gravação foi extraída para `gravarFicha()` (para ser chamada também pela
+   * retomada de cadastro), o guarda ficou vermelho **sem que a garantia tivesse mudado**:
+   * a ficha continua nascendo só depois de existir sessão. É a mesma família do guarda dos
+   * destinos que congelava o defeito — asserção presa à escrita envelhece com ela.
+   *
+   * A GARANTIA, dita como garantia: **toda chamada que grava a ficha acontece com sessão
+   * viva.** Hoje há exatamente dois caminhos até ela, e cada um prova a sessão do seu jeito:
+   *   1. `confirmarCodigo` — chama depois de `await setActive(…)`;
+   *   2. `criarConta` — chama dentro do ramo `if (authCarregou && isSignedIn)`.
+   *
+   * O caso confere os dois, e o de cobertura abaixo fica vermelho se aparecer um terceiro.
+   */
+  it('🔴 a ficha só é gravada com SESSÃO VIVA — pelos dois caminhos', () => {
     // Invertido, uma falha na verificação do e-mail deixaria no banco um paciente sem
     // dono: invisível para ele e para o médico.
     const t = codigo(FORM).replace(/\s+/g, ' ');
+
+    // 1 — o caminho normal: confirma o código, ativa a sessão, grava.
     expect(t, 'a ficha passou a ser gravada antes da conta existir').toMatch(
-      /await setActive\([\s\S]*?concluirCadastroPorLink\(/,
+      /await setActive\([\s\S]*?await gravarFicha\(/,
     );
+
+    // 2 — a retomada: só entra com o Clerk carregado E sessão confirmada.
+    expect(t, 'a retomada grava sem provar que há sessão').toMatch(
+      /if \(authCarregou && isSignedIn\) \{ await gravarFicha\(/,
+    );
+  });
+
+  it('⚠️ COBERTURA: não existe um TERCEIRO caminho até a gravação', () => {
+    // Um caminho novo que não prove sessão deixaria ficha órfã no banco. Se este caso
+    // ficar vermelho, é porque alguém acrescentou um — e ele precisa entrar no caso acima.
+    const t = codigo(FORM);
+    expect((t.match(/await gravarFicha\(\)/g) ?? []).length).toBe(2);
+    // E a action continua sendo chamada de um lugar só.
+    expect((t.match(/concluirCadastroPorLink\(\{/g) ?? []).length).toBe(1);
   });
 
   it('🔴 o link só é consumido DEPOIS da ficha gravada', () => {

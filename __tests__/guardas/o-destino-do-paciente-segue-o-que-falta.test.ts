@@ -200,7 +200,15 @@ describe('a tela promete o que vai entregar', () => {
 
   it('e a tela usa a função — não texto fixo', () => {
     expect(codigo).toContain('textosDoDestino(');
-    expect(codigo).toContain('{textos.botao}');
+    /**
+     * 🔴 RETIFICADO em 12/09/2026: era `toContain('{textos.botao}')`, a forma EXATA.
+     *
+     * O rótulo do botão passou a ser uma ternária — quem volta com sessão viva lê "Concluir
+     * meu cadastro", porque para ele não há conta a criar e `textos.botao` prometeria o que
+     * não vai acontecer. A garantia não mudou: o texto do fluxo continua vindo da função.
+     * Exigir a forma literal media a escrita, não a regra.
+     */
+    expect(codigo).toMatch(/\btextos\.botao\b/);
     expect(codigo).toContain('{textos.destaque}');
     /**
      * ⚠️ E o texto antigo não pode ter sobrado NO JSX.
