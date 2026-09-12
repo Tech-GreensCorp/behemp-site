@@ -165,9 +165,15 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
       /await setActive\([\s\S]*?await gravarFicha\(/,
     );
 
-    // 2 — a retomada: só entra com o Clerk carregado E sessão confirmada.
-    expect(t, 'a retomada grava sem provar que há sessão').toMatch(
-      /if \(authCarregou && isSignedIn\) \{ await gravarFicha\(/,
+    /**
+     * 2 — a retomada: entra só com o Clerk carregado, sessão confirmada, E a sessão sendo
+     * de quem o link chama. A terceira condição entrou em 12/09/2026: sem ela, quem abrisse
+     * um link alheio estando logado gravaria a ficha do outro na própria conta. Quem
+     * garante esse pedaço é `a-sessao-precisa-ser-do-dono-do-link`; aqui basta que a
+     * gravação não aconteça sem ele.
+     */
+    expect(t, 'a retomada grava sem provar de quem é a sessão').toMatch(
+      /if \(authCarregou && isSignedIn && !sessaoEDeOutraPessoa\) \{ await gravarFicha\(/,
     );
   });
 

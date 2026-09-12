@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 
 import { destinoDepoisDoCadastro, textosDoDestino } from '@/lib/parceiros/destino-do-paciente';
 import { useSignUp } from '@clerk/nextjs/legacy';
+import { useClerk, useUser } from '@clerk/nextjs';
 // `useAuth` não existe no entrypoint `/legacy` — vem do pacote principal, como em
 // `entrar/page.tsx` e `navbar.tsx`. Medido: o type-check acusa TS2305 se importado de lá.
 import { useAuth } from '@clerk/nextjs';
@@ -235,6 +236,35 @@ export function FormularioDeCadastro({
    * Clerk outra vez.
    */
   const { isSignedIn, isLoaded: authCarregou } = useAuth();
+
+  /**
+   * 🔴 DE QUEM É A SESSÃO ABERTA — e ela precisa ser de quem o link chama.
+   *
+   * Achado pelo dono em 12/09/2026, com três contas de teste no mesmo navegador: abriu um
+   * link emitido para um e-mail estando logado com outro. Sem esta conferência, "pular o
+   * Clerk porque já há sessão" gravaria a ficha do paciente do link — CPF, telefone,
+   * documentos do parceiro — na conta de quem estivesse logado.
+   *
+   * ⚠️ O servidor RECUSA esse caso (`cadastro-por-link.ts`), e é ele que garante. Aqui o
+   * trabalho é outro: dizer ANTES do clique, para o paciente não bater numa recusa sem
+   * entender o motivo — e para não parecer que os dados dele estão errados.
+   */
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const emailDaSessao = user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? '';
+  /**
+   * ⚠️ A COMPARAÇÃO É COM `emailInicial` — o e-mail que o PARCEIRO mandou —, nunca com o
+   * campo `email` da tela. O campo é editável: quem estivesse logado em outra conta poderia
+   * digitar o próprio endereço e fazer a checagem passar, que é exatamente o que ela existe
+   * para impedir. A mesma razão pela qual o servidor compara com `solicitacao.email`.
+   */
+  const emailDoLink = (emailInicial ?? '').trim().toLowerCase();
+  const sessaoEDeOutraPessoa =
+    authCarregou &&
+    Boolean(isSignedIn) &&
+    Boolean(emailDaSessao) &&
+    Boolean(emailDoLink) &&
+    emailDaSessao !== emailDoLink;
 
   /**
    * Os quatro campos que o formulário do parceiro já coletou. Se os quatro vieram, a tela
@@ -545,9 +575,33 @@ export function FormularioDeCadastro({
        * Sem isto, quem voltou ao link com sessão aberta batia em `form_identifier_exists` e
        * lia "já existe uma conta" — sendo que a conta é DELE, e o que faltava era só gravar.
        */
-      if (authCarregou && isSignedIn) {
+      if (authCarregou && isSignedIn && !sessaoEDeOutraPessoa) {
         await gravarFicha();
         return;
+      }
+
+      /**
+       * 🔴 SAIR DA SESSÃO ALHEIA ANTES DE CRIAR O CADASTRO — e não depois.
+       *
+       * Medido com o dono em 12/09/2026, e o relato dele diz o essencial: _"o sistema loga
+       * assim que clico em criar a conta, sendo que era pra logar após eu inserir o código
+       * do e-mail… tentei inserir o código e deu erro que eu já estava logado; saí da conta
+       * e tentei entrar com minha senha, e não foi"_.
+       *
+       * ⚠️ O CLERK NÃO COMPLETA UM `signUp` ENQUANTO HÁ SESSÃO ATIVA. O `create` passa — e
+       * por isso parece que deu certo —, mas o `attemptEmailAddressVerification` seguinte
+       * responde `session_exists`. O cadastro morre no meio: o `signUp` fica pendente, a
+       * conta **nunca chega a existir** (sem e-mail verificado não há conta), e a senha que
+       * o paciente acabou de escolher não serve para entrar. Limbo completo, e sem saída
+       * visível.
+       *
+       * ⚠️ POR QUE AUTOMÁTICO, e não mais um aviso. O aviso com botão "Sair desta conta"
+       * existe e cobre quem CHEGA logado. Este caso é outro: a sessão pode estar viva por
+       * um login em paralelo, por uma aba antiga, ou porque o `signOut` do aviso ainda não
+       * propagou. Pedir de novo o que o paciente já fez é o que transforma correção em beco.
+       */
+      if (authCarregou && isSignedIn) {
+        await signOut();
       }
 
       const emailAlvo = email.trim().toLowerCase();
@@ -587,6 +641,18 @@ export function FormularioDeCadastro({
     setErro('');
 
     try {
+      /**
+       * 🔴 REDE DE SEGURANÇA: sessão que apareceu ENTRE as duas etapas.
+       *
+       * O `criarConta` já sai de qualquer sessão antes de criar o cadastro. Mas entre uma
+       * etapa e outra o paciente vai ao e-mail, volta, às vezes por outra aba — e pode
+       * chegar aqui com sessão nova. Sem isto, o `attempt` responde `session_exists` e o
+       * cadastro morre no meio, com a conta ainda inexistente.
+       */
+      if (authCarregou && isSignedIn) {
+        await signOut();
+      }
+
       const conclusao = await signUp.attemptEmailAddressVerification({ code: codigo.trim() });
       if (conclusao.status !== 'complete') {
         setErro('A verificação não pôde ser concluída. Tente novamente.');
@@ -712,6 +778,21 @@ export function FormularioDeCadastro({
               <button
                 type="button"
                 onClick={() => {
+                  /**
+                   * 🔴 `setRetomado(true)` AQUI, e sem isso o botão não funcionava.
+                   *
+                   * Defeito da própria retomada, achado em 12/09/2026 ao revisar o caminho
+                   * de volta que o dono pediu: o efeito que retoma dispara quando
+                   * `etapa === 'dados'` e ainda não retomou. Quem clicasse em "Corrigir meus
+                   * dados" voltaria para a etapa 1 e seria **jogado de volta** para a do
+                   * código no render seguinte — preso, sem nunca conseguir corrigir o que
+                   * estava errado.
+                   *
+                   * ⚠️ A marca diz "a retomada já cumpriu seu papel nesta visita". Voltar
+                   * passa a ser uma escolha do paciente, e escolha do paciente não se
+                   * desfaz sozinha.
+                   */
+                  setRetomado(true);
                   setEtapa('dados');
                   setErro('');
                 }}
@@ -1235,7 +1316,32 @@ export function FormularioDeCadastro({
               É o estado em que o dono ficou em 11/09/2026 (SOL-000046): conta criada, ficha
               não gravada, e o link parecendo inútil.
             */}
-            {authCarregou && isSignedIn && !jaTemConta && (
+            {/*
+              🔴 SESSÃO DE OUTRA PESSOA — e com SAÍDA, não só com o aviso.
+              Dizer "este link é de outro e-mail" e parar aí deixa o paciente preso: ele não
+              sabe que precisa sair da conta, e muito menos onde. O botão faz o trabalho.
+              ⚠️ Vem ANTES do aviso de sessão aberta: os dois são sobre sessão, e este é o
+              que impede de continuar.
+            */}
+            {sessaoEDeOutraPessoa && (
+              <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, mas este link
+                  foi enviado para <strong>{emailDoLink}</strong>. Saia da conta atual para
+                  continuar o cadastro certo.
+                </p>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-xl"
+                  onClick={() => signOut()}
+                  type="button"
+                >
+                  Sair desta conta e continuar
+                </Button>
+              </div>
+            )}
+
+            {authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta && (
               <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
                 <p className="text-foreground text-sm leading-relaxed">
                   Você já está com a sessão aberta. Vamos apenas{' '}

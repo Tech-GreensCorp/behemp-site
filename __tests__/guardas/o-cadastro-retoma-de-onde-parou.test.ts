@@ -70,10 +70,36 @@ describe('o cadastro retoma de onde parou', () => {
     expect(CODIGO).toMatch(/etapa !== 'dados' \|\| retomado/);
   });
 
+  it('🔴 "Corrigir meus dados" NÃO é desfeito pela retomada', () => {
+    /**
+     * ⚠️ DEFEITO DA PRÓPRIA RETOMADA, achado ao revisar o caminho de volta que o dono pediu:
+     * _"também poder voltar para a primeira etapa"_.
+     *
+     * O efeito dispara quando `etapa === 'dados'` e ainda não retomou. Quem clicasse em
+     * "Corrigir meus dados" voltava para a etapa 1 e era **jogado de volta** para a do
+     * código no render seguinte — preso, sem nunca conseguir corrigir o que estava errado.
+     * Conserto que cria beco novo é o modo de falha mais caro que existe.
+     */
+    const i = CODIGO.indexOf('Corrigir meus dados');
+    expect(i, 'não achei o botão de voltar').toBeGreaterThan(-1);
+    // O handler fica ANTES do rótulo no JSX; a marca precisa estar nele.
+    const bloco = CODIGO.slice(Math.max(0, i - 700), i);
+    expect(bloco).toMatch(/setRetomado\(true\)/);
+    expect(bloco).toMatch(/setEtapa\('dados'\)/);
+  });
+
   it('🔴 com SESSÃO VIVA, pula o Clerk e grava só a ficha', () => {
+    /**
+     * ⚠️ A CONDIÇÃO GANHOU UMA TERCEIRA PARTE em 12/09/2026, e este caso acompanhou.
+     *
+     * Era `if (authCarregou && isSignedIn)`. Com três contas no mesmo navegador, o dono
+     * abriu um link de um e-mail estando logado com outro — e o atalho gravaria a ficha
+     * dele na conta errada. Agora exige também `!sessaoEDeOutraPessoa`, e quem garante isso
+     * é `a-sessao-precisa-ser-do-dono-do-link`.
+     */
     const corpo = corpoDe('criarConta');
-    expect(corpo).toMatch(/if \(authCarregou && isSignedIn\)/);
-    const i = corpo.indexOf('if (authCarregou && isSignedIn)');
+    expect(corpo).toMatch(/if \(authCarregou && isSignedIn && !sessaoEDeOutraPessoa\)/);
+    const i = corpo.indexOf('if (authCarregou && isSignedIn && !sessaoEDeOutraPessoa)');
     expect(corpo.slice(i, i + 200)).toMatch(/gravarFicha\(\)/);
   });
 
@@ -81,6 +107,39 @@ describe('o cadastro retoma de onde parou', () => {
     // `isSignedIn` é `undefined` enquanto carrega. Agir antes trataria todo mundo como
     // deslogado, e a retomada nunca aconteceria.
     expect(CODIGO).not.toMatch(/if \(isSignedIn\)\s*\{\s*await gravarFicha/);
+  });
+
+  /**
+   * 🔴 O CLERK NÃO COMPLETA UM `signUp` COM SESSÃO ATIVA — e o cadastro morria no meio.
+   *
+   * Medido com o dono em 12/09/2026: _"o sistema loga assim que clico em criar a conta,
+   * sendo que era pra logar após eu inserir o código do e-mail… tentei inserir o código e
+   * deu erro que eu já estava logado; saí da conta e tentei entrar com minha senha, e não
+   * foi"_.
+   *
+   * ⚠️ O `create` PASSA — e por isso parece que deu certo. É o
+   * `attemptEmailAddressVerification` seguinte que responde `session_exists`. O `signUp`
+   * fica pendente, a conta NUNCA chega a existir (sem e-mail verificado não há conta), e a
+   * senha recém-escolhida não serve para entrar. Limbo, sem saída visível.
+   *
+   * A saída é sair da sessão ANTES, nos dois pontos — e automaticamente. Pedir de novo o
+   * que o paciente já fez é o que transforma correção em beco.
+   */
+  it('🔴 sai da sessão ANTES de criar o cadastro', () => {
+    const corpo = corpoDe('criarConta');
+    const i = corpo.indexOf('if (authCarregou && isSignedIn) {');
+    expect(i, 'criarConta não sai da sessão').toBeGreaterThan(-1);
+    expect(corpo.slice(i, i + 120)).toMatch(/await signOut\(\)/);
+    // E isso acontece ANTES do `signUp.create`, senão não adianta.
+    expect(i).toBeLessThan(corpo.indexOf('signUp.create('));
+  });
+
+  it('🔴 e sai de novo ANTES de confirmar o código — a sessão pode nascer entre as etapas', () => {
+    const corpo = corpoDe('confirmarCodigo');
+    const saida = corpo.indexOf('await signOut()');
+    const tentativa = corpo.indexOf('attemptEmailAddressVerification');
+    expect(saida, 'confirmarCodigo não sai da sessão').toBeGreaterThan(-1);
+    expect(tentativa).toBeGreaterThan(saida);
   });
 
   it('🔴 a gravação da ficha é UM caminho só, usado pelos dois pontos de entrada', () => {
@@ -102,7 +161,7 @@ describe('o cadastro retoma de onde parou', () => {
   });
 
   it('🔴 e a tela avisa ANTES do clique, para o paciente não hesitar', () => {
-    expect(CODIGO).toMatch(/authCarregou && isSignedIn && !jaTemConta/);
+    expect(CODIGO).toMatch(/authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta/);
     expect(FONTE).toMatch(/sua conta não será criada de novo/i);
   });
 });
