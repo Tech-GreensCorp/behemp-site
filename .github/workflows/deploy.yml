@@ -66,6 +66,19 @@ jobs:
         # Valor de `NEXT_PUBLIC_*` NÃO é segredo — ele é servido a qualquer visitante dentro
         # do bundle. Está em `secrets` por conveniência de gestão, não por sigilo.
         env:
+          # 🔴 O ID DESTE DEPLOY — sem ele, uma aba aberta durante o deploy QUEBRA.
+          #
+          # Os ids de Server Action são hashes gerados no build. Quando o build troca, a aba
+          # que o paciente deixou aberta continua chamando o hash antigo, e o servidor
+          # responde `Failed to find Server Action "…"`. Medido em produção em 11/09/2026:
+          # o dono perdeu um cadastro no meio, com uploads já feitos, e a mensagem na tela
+          # mandava "tentar novamente" — que não resolve, porque a aba continua velha.
+          #
+          # Com o `deploymentId`, o Next compara o id do cliente com o do servidor e, na
+          # divergência, força RECARGA COMPLETA em vez de navegação — doc oficial:
+          # "triggers a hard navigation (full page reload) instead of a client-side
+          # navigation". O `github.sha` é único por deploy e igual em todas as instâncias.
+          NEXT_DEPLOYMENT_ID: ${{ github.sha }}
           NEXT_PUBLIC_APP_URL: 'https://be4hope.org'
           DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
           NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
@@ -200,6 +213,9 @@ jobs:
             gravar CHATPRO_GREENS_URL_DE_RETORNO   "${{ secrets.CHATPRO_GREENS_URL_DE_RETORNO }}"
             gravar CRON_SECRET                     "${{ secrets.CRON_SECRET }}"
             gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
+            # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor
+            # nunca bate com o do cliente e TODA navegação vira recarga completa.
+            gravar NEXT_DEPLOYMENT_ID              "${{ github.sha }}"
 
             chmod 600 "$ENVFILE"
 

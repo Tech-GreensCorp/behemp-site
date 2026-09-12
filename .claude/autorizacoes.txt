@@ -530,3 +530,34 @@ path:db/migrations/meta/0039_snapshot.json
 # estiver mais deployado. Lição para a próxima vez: antes de um DROP, conferir se
 # `main` (produção) ainda depende do que está sendo removido — não basta a branch
 # atual não depender mais.
+
+# ── 12/09/2026 — .github/workflows/deploy.yml: NEXT_DEPLOYMENT_ID ──
+#
+# ESCOPO: o hook `escopo-autorizado` protege `.github/workflows/` como "pipeline de
+# deploy em produção (DT-008)". A mudança aqui é a variável `NEXT_DEPLOYMENT_ID`, no
+# `env:` do passo de build e na lista `gravar` do script remoto.
+#
+# PEDIDO DO DONO (12/09/2026, verbatim): "continue até finalizarmos todas essas
+# pendencias pra eu testar limpo" — e, antes: "isso não pode acontecer em nenhum dos 8
+# fluxos cara".
+#
+# O QUE MOTIVOU: em 11/09/2026 o dono estava preenchendo o cadastro, com uploads já
+# feitos, quando um deploy subiu. O log do servidor encheu de `Failed to find Server
+# Action "008065c0…"`. Os ids de Server Action são hashes gerados NO BUILD; a aba
+# aberta continua chamando o hash antigo. A tela dizia "tente novamente", e tentar de
+# novo não resolve — só recarregar resolve, e ninguém sabe disso.
+#
+# O QUE QUEBRA SE ESTIVER ERRADO, medido: se o id chegar em só UM dos dois lados
+# (build ou runtime), o header do servidor nunca bate com o do cliente e TODA navegação
+# vira recarga completa — o site fica lento sem ninguém entender por quê. É por isso
+# que o guarda exige as duas pontas E que usem a mesma fonte (`github.sha`).
+#
+# QUANTOS ARQUIVOS TOCA: 2 (`deploy.yml`, `next.config.ts`).
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: `a-aba-aberta-sobrevive-ao-deploy`, 8 casos,
+# provado por 6 sabotagens — todas acusadas, inclusive "as duas pontas usam fontes
+# diferentes" e "a fonte não muda a cada deploy".
+#
+# FONTE: doc oficial do Next.js, `deploymentId` — "When the client detects a mismatch
+# between its deployment ID and the server's (via the response header), it triggers a
+# hard navigation (full page reload) instead of a client-side navigation."
