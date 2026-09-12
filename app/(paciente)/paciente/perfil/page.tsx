@@ -46,6 +46,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
+import { checklistDosDocumentos } from '@/lib/documentos/o-que-falta-no-painel';
 import { 
   obterPerfilCompletoPaciente, 
   atualizarPerfilCompletoPaciente,
@@ -114,6 +115,19 @@ export default function PerfilPacientePage() {
   /* ── Documentos ──────────────────────────────────────────── */
   const [docs, setDocs] = useState<any[]>([]);
   const [carregandoDocs, setCarregandoDocs] = useState(true);
+
+  /**
+   * 🔴 O QUE A BeHemp ESPERA, e o que ele já tem — derivado do estado REAL do banco.
+   *
+   * Achado do dono em 11/09/2026: _"o local dos meus documentos não está diferenciado por
+   * todos que a BeHemp tem"_. A tela dizia "Nenhum documento enviado ainda" e parava aí —
+   * informava a ausência sem informar a expectativa.
+   *
+   * ⚠️ Do que ESTÁ no banco, não do manifesto do parceiro: quando a materialização falha
+   * (e ela nunca lança, por decisão), o manifesto continua afirmando que o documento veio.
+   */
+  const checklist = checklistDosDocumentos(docs.map((d) => String(d.tipo)));
+  const faltam = checklist.filter((i) => !i.temNoBanco && !i.opcional);
 
   const carregarDocs = useCallback(async () => {
     setCarregandoDocs(true);
@@ -610,6 +624,66 @@ export default function PerfilPacientePage() {
             </Link>
           </div>
         </div>
+
+        {/*
+          🔴 O CHECKLIST DO CADASTRO COMPLETO — o que a BeHemp espera, com o estado de cada um.
+          Fica ANTES da lista de arquivos: quem abre esta tela quer saber o que falta, e a
+          lista dos que já subiram não responde isso.
+          ⚠️ AVISA, NÃO BLOQUEIA (ADR-0016 D-06): pendência é informação, não trava.
+        */}
+        {!carregandoDocs && (
+          <div className="mb-5 rounded-3xl border border-border/60 bg-card p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Documentos do seu cadastro</p>
+                <p className="text-xs text-muted-foreground">
+                  {faltam.length === 0
+                    ? 'Recebemos tudo o que precisávamos.'
+                    : `Faltam ${faltam.length} de ${checklist.length}. Você pode enviar quando quiser — nada aqui trava o seu atendimento.`}
+                </p>
+              </div>
+            </div>
+
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {checklist.map((item) => (
+                <li
+                  key={item.chave}
+                  className={cn(
+                    'flex items-start gap-3 rounded-2xl border px-4 py-3',
+                    item.temNoBanco
+                      ? 'border-secondary/30 bg-secondary/5'
+                      : 'border-border/60 bg-background',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                      item.temNoBanco
+                        ? 'bg-secondary/15 text-secondary'
+                        : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    {item.temNoBanco ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Clock className="h-3.5 w-3.5" />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{item.rotulo}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.temNoBanco
+                        ? 'Recebido'
+                        : item.resolvemosAqui
+                          ? 'A gente resolve com você — pela consulta ou pela procuração'
+                          : 'Ainda não recebemos'}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Lista de documentos reais */}
         {carregandoDocs ? (
