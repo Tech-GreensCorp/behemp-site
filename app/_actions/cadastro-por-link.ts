@@ -190,6 +190,42 @@ export async function concluirCadastroPorLink(
     const emailConfirmado =
       usuarioClerk?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? dados.email;
 
+    /**
+     * 🔴 A SESSÃO PRECISA SER DE QUEM O LINK CHAMA. Achado em 12/09/2026, pelo dono, com
+     * três contas de teste no mesmo navegador: ele abriu um link emitido para
+     * `…1110@` estando logado como `…1100@`.
+     *
+     * ⚠️ O QUE ACONTECERIA SEM ESTA TRAVA: logo abaixo, `users` é resolvido pelo `clerkId`
+     * DA SESSÃO. A ficha do paciente do link — CPF, telefone, documentos que o parceiro
+     * mandou — seria gravada na conta de quem está logado. Numa plataforma de saúde isso é
+     * o pior tipo de erro: dado clínico na pessoa errada, e sem nenhum sinal de que houve
+     * troca.
+     *
+     * 🔴 E É EXPLORÁVEL, não só acidental. O link chega por WhatsApp e vale 7 dias. Quem
+     * receber um link alheio e abrir logado passa a ter, na própria conta, a ficha e os
+     * documentos de outra pessoa — OWASP API1 (BOLA) por um caminho novo.
+     *
+     * A comparação é entre o e-mail da SESSÃO e o e-mail da SOLICITAÇÃO (o que o parceiro
+     * mandou e o paciente confirmou na tela), não o do formulário: o campo é editável, e
+     * deixar o cliente escolher o alvo é justamente o que se quer impedir.
+     *
+     * ⚠️ FALHA FECHADA. Sem e-mail na sessão, não dá para provar que é a pessoa certa —
+     * então recusa. É mais seguro pedir que entre de novo do que gravar na conta errada.
+     */
+    const emailDaSolicitacao = (solicitacao.email ?? dados.email).trim().toLowerCase();
+    const emailDaSessao = usuarioClerk?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? '';
+
+    if (!emailDaSessao || emailDaSessao !== emailDaSolicitacao) {
+      console.warn('[cadastro-por-link] sessão de outro e-mail', {
+        // Nunca os endereços — só o FATO. O e-mail é dado pessoal, e log não é lugar dele.
+        temSessao: Boolean(emailDaSessao),
+        confere: false,
+      });
+      return falha(
+        'Este link foi enviado para outro e-mail. Saia da conta atual e entre com o e-mail que recebeu o link.',
+      );
+    }
+
     const pacienteId = await db.transaction(async (tx) => {
       /**
        * 4 ── Garantir o `users`.
