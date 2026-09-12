@@ -1135,7 +1135,25 @@ export function FormularioDeCadastro({
                   Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
                   continuar de onde parou.
                 </p>
-                <Button className="h-11 w-full rounded-xl" render={<Link href="/entrar" />}>
+                {/*
+                  🔴 O LINK DO CADASTRO VIAJA JUNTO, e sem isso este botão era um beco.
+                  Medido em 12/09/2026: ele mandava para `/entrar` sem `redirect_url`. A tela
+                  de login **aceita** esse parâmetro (`entrar/page.tsx:104`) e, sem ele, cai no
+                  padrão `/redirect` — fora do cadastro, com o token perdido e as caixas de
+                  consentimento desmarcadas.
+                  ⚠️ O paciente da RECOMPRA (fluxo 3 da Greens) é justamente quem cai aqui: ele
+                  já tem conta, é esse o motivo de ele voltar. Mandá-lo para o painel em vez de
+                  para o cadastro que ele estava preenchendo é perder o fluxo inteiro.
+                  Mesma família dos dois becos do Item 35.
+                */}
+                <Button
+                  className="h-11 w-full rounded-xl"
+                  render={
+                    <Link
+                      href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
+                    />
+                  }
+                >
                   Entrar na minha conta
                 </Button>
               </div>

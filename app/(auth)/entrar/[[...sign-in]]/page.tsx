@@ -3,6 +3,7 @@
 import { SignIn, useAuth } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { destinoInternoSeguro } from '@/lib/auth/destino-interno';
 import {
   CalendarDays,
   HeartPulse,
@@ -102,14 +103,30 @@ export default function SignInPage() {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect_url') || '/redirect';
+  /**
+   * 🔴 O DESTINO VEM DA URL, LOGO É ENTRADA DO USUÁRIO. Sem filtrar, um
+   * `/entrar?redirect_url=https://site-falso.com` leva o paciente para fora depois de ele
+   * digitar a senha — redirecionamento aberto (OWASP A01). Só caminho interno passa.
+   */
+  const redirectUrl = destinoInternoSeguro(searchParams.get('redirect_url'));
 
-  // Se o usuário já está logado, redireciona para /redirect
+  /**
+   * Já logado: vai para onde pediram — e só depois para o padrão.
+   *
+   * 🔴 Medido em 12/09/2026: este efeito mandava sempre para `/redirect`, ignorando o
+   * `redirect_url` que a linha acima calcula e que o `forceRedirectUrl` do `<SignIn/>`
+   * respeita. Quem chegava aqui com sessão viva era levado ao painel, e o destino pedido
+   * era descartado em silêncio.
+   *
+   * ⚠️ É exatamente o caminho do paciente da RECOMPRA: ele abre o link do cadastro, a tela
+   * diz "você já tem conta", ele clica em entrar — e, com a sessão ainda válida, voltava ao
+   * painel em vez de ao cadastro que estava preenchendo.
+   */
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      router.replace('/redirect');
+      router.replace(redirectUrl);
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router, redirectUrl]);
 
   useEffect(() => {
     setMounted(true);
