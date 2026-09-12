@@ -2,6 +2,27 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  /**
+   * 🔴 O ID DESTE DEPLOY — o que impede uma aba aberta de quebrar quando o build troca.
+   *
+   * Os ids de Server Action são hashes gerados NO BUILD. Quando o build muda, a aba que o
+   * paciente deixou aberta continua chamando o hash antigo e o servidor responde
+   * `Failed to find Server Action "…"`. Medido em produção em 11/09/2026: o dono perdeu um
+   * cadastro no meio, com uploads já feitos, e a tela mandava "tentar novamente" — que não
+   * resolve, porque a aba continua velha. Só recarregar resolve, e ninguém sabe disso.
+   *
+   * Com o id declarado, o Next compara o do cliente com o do servidor e, na divergência,
+   * força RECARGA COMPLETA em vez de navegação. Doc oficial: _"triggers a hard navigation
+   * (full page reload) instead of a client-side navigation"_.
+   *
+   * ⚠️ PRECISA SER O MESMO NO BUILD E EM RUNTIME. O `deploy.yml` passa `github.sha` ao passo
+   * de build E grava a variável no `.env` do servidor — se só um lado tiver, o header nunca
+   * bate e toda navegação vira recarga.
+   *
+   * Vazio em desenvolvimento: sem valor, o Next se comporta como antes.
+   */
+  deploymentId: process.env.NEXT_DEPLOYMENT_ID || undefined,
+
   reactStrictMode: true,
   output: 'standalone',
 
@@ -105,13 +126,13 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy-Report-Only',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://img.clerk.com https://images.clerk.dev https://*.public.blob.vercel-storage.com",
-              "connect-src 'self' https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com",
+              "connect-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com",
               "media-src 'self' blob: https://*.public.blob.vercel-storage.com",
-              "frame-src 'self' https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com",
+              "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com",
               "worker-src 'self' blob:",
             ].join('; '),
           },

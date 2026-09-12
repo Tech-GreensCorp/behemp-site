@@ -19,6 +19,104 @@
 
 ---
 
+## ✅ Item 37 — RESOLVIDO em 12/09/2026: seis defeitos que quebravam o fluxo da Greens de ponta a ponta
+
+**Achados pelo dono testando em produção**, mais três que apareceram ao medir os 4 fluxos
+contra o código. Nenhum tinha erro visível: todos falhavam em silêncio ou com mensagem que
+apontava para o lugar errado.
+
+### 1. 🔴 O Firefox não conseguia se cadastrar
+
+`captcha_missing_token` (400) depois de o Turnstile receber `401` do Cloudflare. **Causa:** o
+Total Cookie Protection do Firefox particiona o armazenamento de um iframe de terceiro, e o
+widget sem armazenamento não emite token.
+
+⚠️ **A cura é a instância de produção do Clerk, e a doc deles prova:** em desenvolvimento o
+FAPI fica em `accounts.dev`, que é **cross-site** com `be4hope.org`; em produção fica num
+**subdomínio** (`clerk.be4hope.org`) via CNAME, e aí o cookie é primeira-parte. Fica no
+[Item 36](#) — os dois trabalhos são um só.
+
+### 2. 🔴 O cadastro virava falha DEPOIS de gravar tudo
+
+Protocolo SOL-000046. Conta criada, sessão ativa, ficha gravada, link de uso único consumido —
+e a tela dizendo _"Não conseguimos concluir seu cadastro"_. Sem volta possível, porque o token
+é de uso único (ADR-0016 D-04) e a ADR não previu a gravação falhar depois dele.
+
+**E o log não ajudava:** `app/_actions/cadastro-por-link.ts` registrava só `erro.name`, que num
+`new Error(…)` é sempre a string `'Error'`. Produção escreveu, literalmente,
+`{ erro: 'Error' }`.
+
+**Corrigido:** `cadastroGravado` vira `true` quando a transação commita, e o catch devolve `ok`
+a partir daí. O log ganhou `etapa` (rótulo nosso, nunca entrada do usuário) e `em:` com a
+primeira linha do **stack** — nunca `erro.message`, que cita o valor que violou a restrição, e
+as colunas aqui são CPF e telefone.
+
+### 3. 🔴 Os DOIS destinos pós-cadastro levavam a 404
+
+```
+DESTINOS.agendamento  = '/agendamento'            → o disco só tem /paciente/agendamento
+DESTINOS.teleconsulta = '/paciente/teleconsulta'  → só existe /paciente/teleconsulta/[roomId]
+```
+
+Entre os dois, **quase todo paciente da Greens**: `agendamento` é o passo 4 do fluxo 2 e o
+passo 3 do fluxo 4; `teleconsulta` é o paciente sem pendência, a recompra do fluxo 3.
+
+⚠️ **E o guarda existente CONGELAVA o defeito.** `o-destino-do-paciente-segue-o-que-falta`
+comparava os destinos com uma **lista fixa que continha os dois 404** — ficava verde enquanto o
+paciente caía em 404, e ficou vermelho quando o defeito foi corrigido. Causa de classe: lista
+paralela. Retificado, e o caso anterior fica escrito no arquivo.
+
+### 4. 🔴 A tela da ANVISA pedia documento que o parceiro já mandou
+
+`app/(paciente)/_actions/anvisa.ts` criava o checklist com `enviado: false` **fixo** e nunca
+consultava a tabela `documentos`. A tela anterior tinha prometido o contrário: _"Os documentos
+que você já enviou vêm junto"_.
+
+**Causa de fundo: três vocabulários para o mesmo documento.** `documento_identidade` (fluxo),
+`rg` (enum da coluna) e `rg_paciente` (inventado no checklist, e que **não existe** no enum).
+Nenhum erro em runtime — a coluna é JSON e aceita qualquer string.
+
+### 5. 🔴 O login não voltava ao cadastro — e podia levar para fora
+
+O botão _"Entrar na minha conta"_ apontava para `/entrar` sem `redirect_url`; o efeito de sessão
+viva fazia `router.replace('/redirect')` fixo. O paciente da recompra ia parar no painel, com o
+token perdido.
+
+⚠️ **E corrigir isso abriu um terceiro, que já existia:** `redirect_url` vem da URL, logo é
+entrada do usuário — `?redirect_url=https://site-falso.com` leva o paciente para fora **depois**
+de ele digitar a senha (OWASP A01). `lib/auth/destino-interno.ts` filtra por **origem**, nunca
+por prefixo.
+
+### 6. 🔴 Uma aba aberta durante o deploy quebrava
+
+`Failed to find Server Action "008065c0…"` — os ids são hashes gerados no build. A tela mandava
+_"tentar novamente"_, e tentar não resolve: só recarregar. Corrigido com `deploymentId` =
+`github.sha`, **nas duas pontas** (build e runtime).
+
+### E duas telas órfãs foram ligadas
+
+- **`/paciente/privacidade`** entrou no menu. Existia desde 11/09 e nenhuma navegação levava a
+  ela. A LGPD art. 8º §5º exige que revogar seja _"por procedimento gratuito e FACILITADO"_.
+- **O perfil** passou a mostrar o checklist de documentos por tipo, em vez de só _"nenhum
+  documento enviado ainda"_.
+
+### O que ficou de fora, e por quê
+
+| item                                       | por quê                                                                                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/acesso` continua órfã                    | é a P4 do fluxo 3, e o `/cadastro/[token]` já detecta conta existente **dinamicamente**, o que é melhor que dois botões cegos. Ligar ou aposentar é **decisão do dono** |
+| consentimento pós-fluxo (fluxo 4, passo 5) | o consentimento é colhido no cadastro. Pedir de novo depois da ANVISA é desenho de produto, não correção                                                                |
+| `laudo_medico` sem tipo no enum            | exige migration, e migration não entra de passagem                                                                                                                      |
+| notificação de ANVISA **rejeitada**        | só `aprovado` notifica hoje; rejeitado tem só Pusher efêmero                                                                                                            |
+| WhatsApp na aprovação                      | Item 29 — sem doc do endpoint                                                                                                                                           |
+
+**Guardas novos:** `o-cadastro-feito-nao-vira-falha` (10), `o-painel-diz-o-que-falta` (10),
+`todo-destino-e-uma-rota-que-existe` (8), `a-anvisa-aproveita-o-que-ja-chegou` (8),
+`o-login-nao-leva-para-fora` (18), `a-aba-aberta-sobrevive-ao-deploy` (8),
+`o-csp-conhece-o-captcha-do-clerk` (7). Medido: **1104 casos em 42 guardas**.
+
+---
+
 ## 🔴 Item 36 — CATALOGADO em 11/09/2026: produção autentica por uma instância de DESENVOLVIMENTO do Clerk
 
 **Achado pela Greens**, testando o handoff em produção. Ao clicar em "Criar conta e continuar",

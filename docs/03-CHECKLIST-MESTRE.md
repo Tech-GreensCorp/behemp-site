@@ -59,6 +59,17 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
 
 ## 🔴 Prioridade 1 — risco agora
 
+- [x] **Item 37 — ✅ RESOLVIDO em 12/09/2026:** seis defeitos que quebravam o fluxo da Greens
+      de ponta a ponta. O cadastro virava falha **depois** de gravar tudo (conta, ficha e link
+      consumido) e a tela negava, sem volta; os **dois** destinos pós-cadastro levavam a 404
+      (`/agendamento` e `/paciente/teleconsulta`), o que atingia quase todo paciente da Greens;
+      a tela da ANVISA pedia documento que o parceiro já mandou; o login não voltava ao cadastro
+      e podia levar **para fora** (OWASP A01); uma aba aberta durante o deploy quebrava; e o
+      Firefox não conseguia se cadastrar. Diagnóstico e o que ficou de fora em
+      [04 — Item 37](04-LISTA-DE-AFAZERES.md). **7 guardas novos, 1104 casos em 42.**
+      ⚠️ **Um guarda existente CONGELAVA um dos defeitos** — comparava os destinos com uma lista
+      fixa que continha os dois 404. Ficava verde com o paciente caindo em 404, e ficou vermelho
+      quando o defeito foi corrigido. Retificado.
 - [ ] **Item 36** — 🔴 **produção autentica por uma instância de DESENVOLVIMENTO do Clerk**
       (`relative-blowfish-96.clerk.accounts.dev`, `pk_test`). Medido na própria instância:
       `instance_environment_type = "development"` e `captcha_enabled = true`. O cadastro falha

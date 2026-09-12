@@ -19,11 +19,39 @@
  * podendo navegar para qualquer área. Pendência informa, não impede (ADR-0016 D-06).
  */
 
-/** Os destinos possíveis, todos rotas que já existem. */
+/**
+ * Os destinos possíveis — e cada um é uma rota que EXISTE no disco.
+ *
+ * 🔴 RETRATAÇÃO, 12/09/2026. Este comentário dizia "todos rotas que já existem", e uma não
+ * existia: `agendamento` apontava para `/agendamento`, e o único diretório é
+ * `app/(paciente)/paciente/agendamento`. Medido no manifesto do build: a única rota com esse
+ * nome é `/paciente/agendamento`, e não há rewrite no `next.config.ts`.
+ *
+ * ⚠️ QUEM CAÍA NISSO ERA A MAIORIA. `destinoDepoisDoCadastro` devolve `agendamento` sempre que
+ * falta a receita — o passo 4 do fluxo 2 e o passo 3 do fluxo 4 da Greens. O paciente
+ * terminava o cadastro, via "pronto", e a tela seguinte era 404.
+ *
+ * 🔴 A LIÇÃO: comentário que afirma um fato sobre o disco não é verificação. Agora há um
+ * guarda que confere cada destino contra as pastas de `app/` — se alguém acrescentar um
+ * destino sem rota, o build fica vermelho nomeando qual.
+ */
 export const DESTINOS = {
-  agendamento: '/agendamento',
+  agendamento: '/paciente/agendamento',
   anvisa: '/paciente/anvisa',
-  teleconsulta: '/paciente/teleconsulta',
+  /**
+   * 🔴 SEGUNDO DESTINO QUEBRADO, achado pelo guarda ao nascer vermelho, 12/09/2026.
+   *
+   * Valia `'/paciente/teleconsulta'`, e essa rota **não existe**: o disco só tem
+   * `app/(paciente)/paciente/teleconsulta/[roomId]` — uma sala precisa de um id, e quem
+   * acabou de se cadastrar não tem sala nenhuma. Quem caía aqui era o paciente **sem
+   * pendência alguma**: a recompra do fluxo 3, que é justamente quem já trouxe tudo.
+   *
+   * ⚠️ O destino certo é o agendamento, e a própria tela já dizia isso: o texto deste ramo
+   * promete _"agendar a teleconsulta com um médico prescritor"_ e o botão diz _"Criar conta e
+   * agendar consulta"_ (`textosDoDestino`, abaixo). A promessa estava certa; o destino é que
+   * mandava para uma sala inexistente.
+   */
+  teleconsulta: '/paciente/agendamento',
 } as const;
 
 export type Destino = (typeof DESTINOS)[keyof typeof DESTINOS];

@@ -111,6 +111,19 @@ const esquema = z.object({
 
 export type EntradaDoCadastro = z.input<typeof esquema>;
 
+/**
+ * A primeira linha do stack — `arquivo:linha`, sem a mensagem.
+ *
+ * A mensagem de um erro do Postgres cita o valor que violou a restrição, e aqui os valores
+ * são CPF e telefone. O stack diz ONDE sem dizer O QUÊ, que é o que um log pode carregar.
+ */
+function primeiraLinhaDoStack(erro: unknown): string | null {
+  if (!(erro instanceof Error) || !erro.stack) return null;
+  const linhas = erro.stack.split('\n');
+  // Índice 0 é `Error: <mensagem>` — justamente a parte que não pode entrar no log.
+  return linhas[1]?.trim() ?? null;
+}
+
 export async function concluirCadastroPorLink(
   entrada: EntradaDoCadastro,
 ): Promise<ResultadoAction<{ protocolo: string }>> {
@@ -141,6 +154,35 @@ export async function concluirCadastroPorLink(
   // Se a normalização recusar (número de país impossível, por exemplo), guarda o que ele
   // digitou em vez de perder o dado — o atendimento consegue ligar mesmo assim.
   const telefone = normalizarTelefoneWhatsapp(dados.telefone) ?? dados.telefone.trim();
+
+  /**
+   * 🔴 ONDE FALHOU, e se o cadastro já estava feito quando falhou.
+   *
+   * O log deste bloco registrava `erro.name` e nada mais — e `erro.name` de um `new Error(…)`
+   * é a string `'Error'`. Medido em produção em 11/09/2026: o paciente viu "não conseguimos
+   * concluir", e o servidor escreveu `{ erro: 'Error' }`. Não dava para saber nem em que
+   * etapa. O cuidado de não vazar CPF no log tinha, sem querer, jogado fora a informação
+   * inteira.
+   *
+   * ⚠️ `etapa` é um rótulo NOSSO, escrito por nós — nunca vem de entrada do usuário e nunca
+   * carrega valor de coluna. É o que se pode logar com segurança.
+   */
+  let etapa = 'transacao-usuario-e-ficha';
+
+  /**
+   * 🔴 A PARTIR DA TRANSAÇÃO, O CADASTRO EXISTE — e nada depois pode desfazê-lo.
+   *
+   * Os blocos 8a/8b/8c já dizem isso em prosa ("anexo que falha não desfaz cadastro que deu
+   * certo"), e cada um se protege por dentro. Mas a garantia não valia para o que está ENTRE
+   * eles: uma exceção em qualquer ponto pós-transação caía neste catch e devolvia `falha`.
+   *
+   * O paciente ficava no pior estado possível: conta criada, sessão ativa, link já consumido,
+   * ficha gravada — e a tela dizendo que não deu certo. Sem caminho de volta, porque o token
+   * é de uso único (ADR-0016 D-04), e a ADR não previu a gravação falhar depois dele.
+   *
+   * Aconteceu em produção em 11/09/2026, com o dono testando o protocolo SOL-000046.
+   */
+  let cadastroGravado = false;
 
   try {
     const usuarioClerk = await currentUser();
@@ -240,9 +282,15 @@ export async function concluirCadastroPorLink(
       return ficha.id;
     });
 
+    // Daqui para a frente, falhar é acessório: a conta e a ficha existem.
+    cadastroGravado = true;
+    etapa = 'consumir-o-link';
+
     // 6 ── Consome o link. Depois de gravar: se o envio falhasse antes, o paciente
     // ficaria sem link E sem cadastro.
     const consumiu = await marcarComoUtilizada(solicitacao.id);
+
+    etapa = 'gravar-declaracao-na-solicitacao';
 
     // 7 ── O que ele declarou fica na solicitação também — é o registro do ato, e a
     // ficha do paciente pode ser editada depois por outra pessoa.
@@ -289,6 +337,7 @@ export async function concluirCadastroPorLink(
      * ficha só existe agora. Fora da transação — anexo que falha não desfaz cadastro que deu
      * certo.
      */
+    etapa = 'anexar-documentos-do-formulario';
     const tiposAnexados: string[] = [];
     for (const anexo of dados.anexos ?? []) {
       const gravou = await anexarDocumentoDoCadastro({
@@ -345,12 +394,14 @@ export async function concluirCadastroPorLink(
       }
     }
 
+    etapa = 'materializar-documentos-do-parceiro';
     const copiados = await materializarDocumentosDoParceiro({
       pacienteId,
       documentosDoParceiro: solicitacao.documentosDoParceiro,
       protocolo: solicitacao.protocolo,
     });
 
+    etapa = 'auditoria';
     await registrarAuditoria({
       userId: clerkId,
       acao: 'criar',
@@ -376,15 +427,44 @@ export async function concluirCadastroPorLink(
       },
     });
 
+    etapa = 'revalidar-painel';
     revalidatePath('/paciente');
 
     return ok({ protocolo: solicitacao.protocolo });
   } catch (erro) {
     console.error('[cadastro-por-link] falha ao concluir', {
-      // Nome do erro apenas. A mensagem pode carregar valor de coluna — e as colunas
-      // aqui são CPF, telefone e texto clínico.
+      /** Rótulo escrito por nós. Nunca vem de entrada, nunca carrega valor de coluna. */
+      etapa,
+      cadastroGravado,
+      /**
+       * O nome do erro continua aqui, mas ele sozinho não bastava: `erro.name` de um
+       * `new Error(…)` é sempre `'Error'`, e foi exatamente o que produção registrou.
+       */
       erro: erro instanceof Error ? erro.name : 'desconhecido',
+      /**
+       * ONDE, sem O QUÊ. A primeira linha do stack traz `arquivo:linha`; a MENSAGEM é que
+       * pode trazer valor de coluna — e as colunas aqui são CPF, telefone e texto clínico.
+       * Por isso o stack entra e a mensagem fica de fora.
+       */
+      em: primeiraLinhaDoStack(erro),
     });
+
+    /**
+     * 🔴 CADASTRO FEITO NÃO VIRA FALHA POR CAUSA DE UM PASSO ACESSÓRIO.
+     *
+     * Se a transação commitou, o paciente TEM conta e ficha, e o link já foi consumido.
+     * Devolver `falha` aqui mandaria refazer o que não pode ser refeito — o token é de uso
+     * único — e foi o que aconteceu em produção em 11/09/2026.
+     *
+     * ⚠️ O que se perde ao seguir é acessório e recuperável pelo painel: anexo que não
+     * subiu, documento do parceiro não copiado, revalidação de cache. O consentimento tem
+     * catch próprio e a decisão dele continua valendo: sem consentimento gravado, nada é
+     * enviado à Greens.
+     */
+    if (cadastroGravado) {
+      return ok({ protocolo: solicitacao.protocolo });
+    }
+
     return falha('Não conseguimos concluir seu cadastro. Tente novamente em instantes.');
   }
 }

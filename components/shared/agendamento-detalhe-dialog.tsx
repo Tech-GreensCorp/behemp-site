@@ -138,13 +138,13 @@ export function AgendamentoDetalheDialog({
                     className="h-11 w-11 shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                  <div className="bg-primary/10 text-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
                     {iniciaisDoNome(item.medicoNome)}
                   </div>
                 )}
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{item.medicoNome}</p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="text-muted-foreground truncate text-xs">
                     {item.medicoEspecialidade}
                   </p>
                 </div>
@@ -153,7 +153,7 @@ export function AgendamentoDetalheDialog({
                 </Badge>
               </div>
 
-              <div className="space-y-2 rounded-xl border border-border/60 p-4 text-sm">
+              <div className="border-border/60 space-y-2 rounded-xl border p-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Data e horário</span>
                   <span className="font-medium">
@@ -180,7 +180,7 @@ export function AgendamentoDetalheDialog({
                   </div>
                 )}
                 {item.observacoes && (
-                  <div className="border-t border-border/60 pt-2">
+                  <div className="border-border/60 border-t pt-2">
                     <span className="text-muted-foreground">Observações</span>
                     <p className="mt-1">{item.observacoes}</p>
                   </div>
@@ -188,29 +188,29 @@ export function AgendamentoDetalheDialog({
               </div>
 
               {!podeCancelar && STATUS_ATIVOS.includes(item.status) && (
-                <div className="flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
-                  <MessageCircle size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Esta consulta já está confirmada — para cancelar, entre em contato com o
-                    nosso suporte.
+                <div className="bg-muted/40 flex items-start gap-2.5 rounded-xl p-3.5">
+                  <MessageCircle size={15} className="text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Esta consulta já está confirmada — para cancelar, entre em contato com o nosso
+                    suporte.
                   </p>
                 </div>
               )}
 
               {STATUS_ATIVOS.includes(item.status) && item.remarcadaPeloPacienteEm && (
-                <div className="flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
-                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Você já usou sua remarcação gratuita para esta consulta. Para alterar de
-                    novo, entre em contato com o suporte.
+                <div className="bg-muted/40 flex items-start gap-2.5 rounded-xl p-3.5">
+                  <AlertTriangle size={15} className="text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Você já usou sua remarcação gratuita para esta consulta. Para alterar de novo,
+                    entre em contato com o suporte.
                   </p>
                 </div>
               )}
 
               {mensagemEncerrada && (
-                <div className="flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
-                  <MessageCircle size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                <div className="bg-muted/40 flex items-start gap-2.5 rounded-xl p-3.5">
+                  <MessageCircle size={15} className="text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     {mensagemEncerrada}
                   </p>
                 </div>
@@ -247,7 +247,7 @@ export function AgendamentoDetalheDialog({
             <DialogHeader>
               <DialogTitle>Cancelar esta reserva?</DialogTitle>
             </DialogHeader>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               O horário volta a ficar disponível para outros pacientes. Essa ação não pode ser
               desfeita.
             </p>
@@ -269,9 +269,9 @@ export function AgendamentoDetalheDialog({
             <DialogHeader>
               <DialogTitle>Escolher novo horário</DialogTitle>
             </DialogHeader>
-            <p className="text-xs text-muted-foreground">
-              Esta é sua remarcação gratuita para esta consulta — não é possível remarcar de
-              novo depois sem contatar o suporte.
+            <p className="text-muted-foreground text-xs">
+              Esta é sua remarcação gratuita para esta consulta — não é possível remarcar de novo
+              depois sem contatar o suporte.
             </p>
 
             <Calendar
@@ -291,10 +291,10 @@ export function AgendamentoDetalheDialog({
               <div>
                 {carregandoHorarios ? (
                   <div className="flex justify-center py-6">
-                    <Loader2 size={20} className="animate-spin text-primary" />
+                    <Loader2 size={20} className="text-primary animate-spin" />
                   </div>
                 ) : horariosLivres.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-muted-foreground">
+                  <p className="text-muted-foreground py-4 text-center text-sm">
                     Nenhum horário disponível nesta data.
                   </p>
                 ) : (

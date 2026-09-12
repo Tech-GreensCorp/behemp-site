@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Calculator,
   ShieldCheck,
+  Lock,
   FileText,
   CalendarDays,
 } from 'lucide-react';
@@ -56,7 +57,23 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Configurações',
-    items: [{ label: 'Meu Perfil', href: '/paciente/perfil', icon: User }],
+    items: [
+      { label: 'Meu Perfil', href: '/paciente/perfil', icon: User },
+      /**
+       * 🔴 A REVOGAÇÃO PRECISA SER TÃO FÁCIL QUANTO O CONSENTIMENTO — LGPD art. 8º §5º:
+       * o titular pode revogar _"a qualquer momento, mediante manifestação expressa, por
+       * procedimento gratuito e FACILITADO"_.
+       *
+       * A tela existia e funcionava desde 11/09/2026, e **nenhuma navegação levava a ela**:
+       * só se chegava digitando a URL. Consentimento que se dá em dois cliques e se tira
+       * sabendo o caminho de cor não é facilitado — é decorativo.
+       *
+       * ⚠️ Mesma classe do `AvisoDaProcuracao` importado e nunca renderizado, e da
+       * `prepararTransferencia` que ninguém chamava. A peça existe, o teste passa, o
+       * checklist diz "pronto" — e não acontece para paciente nenhum.
+       */
+      { label: 'Privacidade', href: '/paciente/privacidade', icon: Lock },
+    ],
   },
 ];
 
