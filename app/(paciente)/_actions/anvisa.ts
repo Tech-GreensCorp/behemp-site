@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { autorizacoesAnvisa, logsAuditoria } from '@/db/schema';
+import { autorizacoesAnvisa, documentos, logsAuditoria } from '@/db/schema';
 import { verificarPaciente } from '@/lib/auth/permissions';
 import { redirect } from 'next/navigation';
 import { eq, and, isNull, desc, inArray } from 'drizzle-orm';
@@ -86,12 +86,48 @@ export async function iniciarAutorizacaoAnvisa(prescricaoId?: string) {
     .limit(1);
   if (existente) return { sucesso: true, dados: existente };
 
-  // 5. Checklist inicial
-  const checklistInicial = [
-    { tipo: 'receita_medica', enviado: false, validado: false, urlBlob: null, nomeArquivo: null },
-    { tipo: 'rg_paciente', enviado: false, validado: false, urlBlob: null, nomeArquivo: null },
-    { tipo: 'comprovante_residencia', enviado: false, validado: false, urlBlob: null, nomeArquivo: null },
-  ];
+  /**
+   * 5. Checklist inicial — LIDO DO QUE O PACIENTE JÁ TEM, não zerado.
+   *
+   * 🔴 O DEFEITO, medido em 12/09/2026. Esta lista nascia com `enviado: false` fixo nos três
+   * itens e nunca olhava a tabela `documentos`. Quem veio da Greens pelo fluxo 1 chegava aqui
+   * com RG, comprovante e receita **já materializados**
+   * (`lib/parceiros/materializar-documentos.ts:116`) — e a tela pedia os três de novo.
+   *
+   * ⚠️ E A TELA ANTERIOR TINHA PROMETIDO O CONTRÁRIO: _"Os documentos que você já enviou vêm
+   * junto"_ (`lib/parceiros/destino-do-paciente.ts`, textos do destino da ANVISA) e o mesmo no
+   * `AvisoDaProcuracao`. Prometer e não cumprir na tela seguinte é pior que não prometer: o
+   * paciente conclui que os documentos se perderam.
+   *
+   * 🔴 TERCEIRO VOCABULÁRIO, e ele é a causa de o erro ter passado. O fluxo diz
+   * `documento_identidade`, a coluna `documentos.tipo` guarda `rg`, e este checklist dizia
+   * `rg_paciente` — um valor que **não existe** no enum `documento_tipo`. Três nomes para a
+   * mesma coisa, e nenhum lugar onde eles se encontrassem.
+   */
+  const jaTem = await db
+    .select({ tipo: documentos.tipo, urlBlob: documentos.urlBlob, nome: documentos.nomeArquivo })
+    .from(documentos)
+    .where(and(eq(documentos.pacienteId, paciente.id), isNull(documentos.deletedAt)));
+
+  const porTipo = new Map(jaTem.map((d) => [String(d.tipo), d]));
+
+  /**
+   * Os três que a ANVISA exige, nomeados como a COLUNA os nomeia. `rg` e não `rg_paciente`:
+   * o valor tem de ser o mesmo dos dois lados, senão a busca nunca casa.
+   */
+  const EXIGIDOS = ['receita_medica', 'rg', 'comprovante_residencia'] as const;
+
+  const checklistInicial = EXIGIDOS.map((tipo) => {
+    const doc = porTipo.get(tipo);
+    return {
+      tipo,
+      enviado: doc !== undefined,
+      // Enviado não é validado: quem valida é gente, e continua sendo.
+      validado: false,
+      urlBlob: doc?.urlBlob ?? null,
+      nomeArquivo: doc?.nome ?? null,
+    };
+  });
 
   // 6. Criar autorização com medicoId e prescricaoId da prescrição real
   const [autorizacao] = await db

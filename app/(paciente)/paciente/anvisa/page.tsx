@@ -96,6 +96,19 @@ const DOC_LABELS: Record<string, { label: string; dica: string }> = {
     label: 'Receita Médica',
     dica: 'A receita emitida pelo seu médico na plataforma Be4Hope.',
   },
+  /**
+   * 🔴 DOIS NOMES PARA O MESMO DOCUMENTO, e os dois precisam existir aqui.
+   *
+   * `rg` é como a coluna `documentos.tipo` o chama, e é o que o checklist passa a usar desde
+   * 12/09/2026 — sem isso, um RG já recebido nunca casava e a tela pedia de novo. `rg_paciente`
+   * é o nome que as autorizações **já gravadas** carregam no JSON `documentos`: elas continuam
+   * no banco e continuam abrindo esta tela. Tirar o antigo faria o rótulo sumir para quem já
+   * tem autorização em andamento.
+   */
+  rg: {
+    label: 'RG do Paciente',
+    dica: 'Documento de identidade do paciente (frente e verso).',
+  },
   rg_paciente: {
     label: 'RG do Paciente',
     dica: 'Documento de identidade do paciente (frente e verso).',
