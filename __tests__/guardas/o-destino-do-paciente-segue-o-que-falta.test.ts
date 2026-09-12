@@ -73,13 +73,38 @@ describe('a tela usa a regra, em vez de decidir por conta própria', () => {
     expect(codigo).not.toMatch(/router\.push\('\/paciente\/teleconsulta'\)/);
   });
 
-  it('as três rotas de destino existem no produto', () => {
-    // Um destino que não existe manda o paciente para um 404 no melhor momento dele.
-    expect(Object.values(DESTINOS)).toEqual([
-      '/agendamento',
-      '/paciente/anvisa',
-      '/paciente/teleconsulta',
-    ]);
+  /**
+   * 🔴 RETIFICADO em 12/09/2026, e o caso anterior fica escrito porque ensina mais que o novo.
+   *
+   * Ele dizia, no comentário: _"Um destino que não existe manda o paciente para um 404 no
+   * melhor momento dele"_ — e então comparava `Object.values(DESTINOS)` com uma lista FIXA
+   * que continha **dois destinos inexistentes**:
+   *
+   *     '/agendamento'            → o disco só tem /paciente/agendamento
+   *     '/paciente/teleconsulta'  → o disco só tem /paciente/teleconsulta/[roomId]
+   *
+   * ⚠️ O GUARDA CONGELOU O DEFEITO EM VEZ DE DETECTÁ-LO. Ele ficava verde enquanto quase
+   * todo paciente vindo da Greens caía em 404 depois do cadastro — e ficaria VERMELHO na hora
+   * em que alguém consertasse. É o oposto do que um guarda existe para fazer.
+   *
+   * A causa é de classe e está na técnica: **lista paralela**. Uma lista escrita à mão não
+   * verifica o mundo, afirma o que o autor acreditava sobre ele. Quem confere destino contra
+   * o DISCO é `todo-destino-e-uma-rota-que-existe`, e é lá que este caso mora agora.
+   *
+   * O que fica aqui é a outra metade, que aquele guarda não cobre: os nomes das chaves. Se
+   * alguém acrescentar um destino, este caso fica vermelho e obriga a decidir quando ele vale
+   * — porque `destinoDepoisDoCadastro` precisa de um ramo para ele.
+   */
+  it('🔴 os destinos declarados são exatamente os três que a decisão sabe escolher', () => {
+    expect(Object.keys(DESTINOS).sort()).toEqual(['agendamento', 'anvisa', 'teleconsulta']);
+  });
+
+  it('⚠️ e nenhum deles é uma rota de primeiro nível — todas vivem sob /paciente', () => {
+    // Foi o formato do erro nos dois casos: `/agendamento` em vez de `/paciente/agendamento`.
+    // A existência real é conferida contra o disco em `todo-destino-e-uma-rota-que-existe`.
+    for (const destino of Object.values(DESTINOS)) {
+      expect(destino.startsWith('/paciente/'), `${destino} não está sob /paciente`).toBe(true);
+    }
   });
 });
 
