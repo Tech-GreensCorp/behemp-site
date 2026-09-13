@@ -301,6 +301,88 @@ tratando "o cadastro parou no meio entre as duas empresas" como problema nosso. 
 - **Investigar só o nosso lado** quando o fluxo atravessa duas empresas. O contrato tem duas
   pontas, e a outra está no disco: `/home/DK/Developer/Projects/greens-corp`.
 
+## 🔴 Deploy CUSTA. Prove local antes de gastar um.
+
+**Decisão do dono em 13/09/2026:** _"eu descobri que um deploy custa na AWS, logo utilize o
+chromium, simulações locais e todo tipo de técnica via terminal, via script ou outros tipos para
+provarmos que tudo funciona local simulando a VPS… temos que economizar nisso também, e é até
+melhor pra testarmos tudo"_.
+
+⚠️ **E ele tem razão no "é até melhor".** Um deploy leva minutos, não dá para pausar no meio, e
+quando falha o diagnóstico é por log. Local, o ciclo é de segundos e dá para inspecionar tudo.
+Economia é o motivo; **qualidade de diagnóstico é o ganho**.
+
+### A regra
+
+🔴 **Nenhum deploy sai para provar que algo funciona.** Deploy é para ENTREGAR o que já foi
+provado. Se a pergunta é _"será que funciona?"_, ela se responde aqui.
+
+**E o local precisa ser o MESMO artefato**, não uma aproximação:
+
+| a VPS roda                           | então localmente se roda          |
+| ------------------------------------ | --------------------------------- |
+| `.next/standalone/server.js` via PM2 | `node .next/standalone/server.js` |
+| com `NODE_ENV=production`            | idem — **nunca `pnpm dev`**       |
+| o build gerado pelo CI               | `pnpm build`, o mesmo comando     |
+
+⚠️ **`pnpm dev` NÃO SERVE como prova.** A doc do Next é explícita: o servidor de
+desenvolvimento tem _"hot reloading, debug logs e outros comportamentos que não existem em
+produção, levando a testes instáveis ou enganosos"_. Metade dos defeitos de 12/09 só aparecia no
+build de produção.
+
+### As técnicas, em ordem de custo
+
+| #   | técnica                                                | quando                                                       |
+| --- | ------------------------------------------------------ | ------------------------------------------------------------ |
+| 1   | **guarda estrutural** (`pnpm test`)                    | sempre — mas prova só que o código está ESCRITO certo        |
+| 2   | **`node .next/standalone/server.js`** + `curl`         | rota responde? cabeçalho certo? redirect certo?              |
+| 3   | **Chromium headless** (já em `~/.cache/ms-playwright`) | a TELA faz o que promete: clique, formulário, navegação      |
+| 4   | **Postgres em Docker**                                 | fluxo que escreve — e aí dá para sujar o estado de propósito |
+| 5   | deploy                                                 | **só depois** dos quatro                                     |
+
+🔴 **O nível 3 é o que faltava.** Guarda estrutural lê o código; ele não clica em nada. Foi por
+confundir os dois que eu afirmei "está funcionando" cinco vezes em 12/09, com 1152 guardas
+verdes, enquanto o dono encontrava seis defeitos seguidos no fluxo real.
+
+### O que isto proíbe
+
+- **"Subi, veja se funciona"** — se não foi provado local, não sobe.
+- **Diagnosticar por deploy.** Duas correções do `%3F` falharam assim, e o que resolveu foi um
+  instrumento que respondia sem subir nada.
+- **Chamar de prova um teste que rodou em `dev`.** O artefato tem de ser o `standalone`.
+
+### 🔴 O limite MEDIDO em 13/09/2026, na primeira aplicação da regra
+
+Montei o ambiente e rodei. **O que funcionou, e é bastante:**
+
+| nível                                   | resultado                                                        |
+| --------------------------------------- | ---------------------------------------------------------------- |
+| `node .next/standalone/server.js`       | ✅ sobe, o mesmo artefato do rsync                               |
+| Postgres em Docker + `drizzle-kit push` | ✅ **as duas migrations novas provadas contra um Postgres real** |
+| estáticos, middleware, redirects        | ✅ `200` / `307` / `308` como em produção                        |
+
+🔴 **E o que NÃO funciona local, com a causa isolada:** **renderização de página pendura**.
+Isolado por eliminação — estáticos respondem `200`, rotas respondem `307`, o processo fica
+saudável — então não é o build nem o banco: é o **Clerk**. Sem `CLERK_SECRET_KEY` de verdade,
+resolver auth trava, e toda página que renderiza depende disso.
+
+⚠️ **E a chave secreta não está no `.env` local** (medido: `grep -c CLERK .env` → `0`). Ela
+vive só na memória do processo PM2 da VPS, herdada de um `pm2 start` antigo — é o que o
+`preservar-ambiente-do-pm2.mjs` existe para copiar.
+
+**A consequência prática, e ela é honesta:**
+
+- ✅ **prove local**: migration, rota de API sem auth, middleware, build, estático, guarda
+- 🔴 **não dá para provar local hoje**: qualquer TELA que exija sessão — e isso inclui o
+  fluxo de cadastro inteiro
+- ➜ **para destravar**: uma `CLERK_SECRET_KEY` de desenvolvimento no `.env` local. É decisão do
+  dono, e é o que separa "provo metade" de "provo tudo"
+
+⚠️ **O que continua sem equivalente local, mesmo com a chave:** o proxy reverso (foi ele que
+percent-encodou o `%3F`), o banco de produção com dado real, e o comportamento da instância de
+produção do Clerk. Para esses, o **instrumento** — uma rota que responde o que o servidor viu —
+continua valendo mais que uma tentativa.
+
 ## Fundamentação técnica obrigatória
 
 **Nenhuma decisão, diagnóstico ou implementação entra sem fundamento citado.** Vale
