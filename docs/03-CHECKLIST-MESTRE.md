@@ -313,6 +313,14 @@ de passagem.**
       cinco dos seis pontos engolem o erro. **Perigo de mexer: BAIXO** — acrescentar uma linha
       `gravar` e cadastrar o secret. Espera a decisão do store privado, para gravar os dois
       tokens no mesmo movimento.
+      ⚠️ **MEDIDO em 13/09/2026, e muda o que fazer:** `gh secret list` mostra que
+      `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **estão cadastrados no GitHub
+      desde 22/06** — o que falta é só a linha `gravar`. Mas acrescentá-la agora é aposta: o
+      GitHub não deixa **ler** o valor de um secret, e o `.env` da VPS vem de um `pm2 start`
+      anterior a isso. Se os valores divergirem, o próximo deploy sobrescreve o token que hoje
+      funciona e quebra avatar, exame e procuração. **Fechar isto exige confirmar ou renovar os
+      dois valores primeiro** — o que é seguro fazer é gerar tokens novos no painel, cadastrá-los
+      e só então acrescentar as linhas, num movimento só e com o site observado.
 - [ ] 🔴 **O guarda `o-segredo-cadastrado-chega-ao-servidor` não vê variável lida por DEPENDÊNCIA**
       — achado em 13/09/2026 ao investigar o item acima. Ele deriva de `process.env.X` dentro de
       cinco áreas (`lib/parceiros`, `lib/chatpro`, `app/api/parceiros`, `app/api/chatpro`,

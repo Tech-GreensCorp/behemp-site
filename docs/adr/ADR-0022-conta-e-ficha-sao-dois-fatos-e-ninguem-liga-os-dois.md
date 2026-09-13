@@ -1782,3 +1782,63 @@ CPF, telefone, nome de arquivo ou queixa clínica aparecerem nele.
 ⚠️ **As duas direções no mesmo guarda são de propósito.** Separadas, alguém "resolve" uma
 passando a logar a mensagem crua, e o outro guarda é que fica vermelho — em outro arquivo, em
 outro PR, talvez em outra semana.
+
+## §59 — O store criado, e a prova contra o serviço real
+
+**13/09/2026, 18:32.** `behemp-documentos-privados` · `store_i9Cq0YBERLypCKIm` · `iad1` ·
+**Access: Private** · base URL `i9cq0yberlypckim.private.blob.vercel-storage.com`.
+
+### §59.1 — Por que `iad1` e não `gru1`, que é onde estão os outros dois
+
+Os dois stores que já existiam — `be4hope-public` (88 arquivos) e `medgreens-public` (31) —
+estão em **`gru1`**, São Paulo. A escolha faz sentido para eles e **não** para este:
+
+|                     | store público                       | store privado     |
+| ------------------- | ----------------------------------- | ----------------- |
+| quem busca os bytes | o **navegador do paciente**, direto | a **VPS**, sempre |
+| onde convém estar   | perto do paciente (Brasil)          | perto da VPS      |
+
+Blob privado não abre por link: a entrega passa obrigatoriamente por
+`/api/documentos/[id]/arquivo`, que roda na VPS em **us-east-1** — a mesma região do bucket de
+onde a Greens serve os documentos (`greens-site-bucket.s3.us-east-1`). Com `gru1`, cada arquivo
+faria Virginia→São Paulo ao gravar e São Paulo→Virginia→paciente ao ler. Com `iad1`, a gravação
+é local e a leitura sai de onde o servidor está.
+
+⚠️ **Isto fica escrito porque a inconsistência é aparente.** Quem olhar a lista de stores daqui
+a três meses vai ver dois em `gru1` e um em `iad1`, e a tentação é "padronizar". Região, como
+acesso, é **imutável** — padronizar custaria um store novo e uma migração de arquivos.
+
+### §59.2 — A prova, e ela não é guarda estrutural
+
+Executado contra o store real, com o código deste PR, antes de qualquer deploy:
+
+```
+✅ gravou no store privado
+   host: i9cq0yberlypckim.private.blob.vercel-storage.com
+✅ host é .private.
+✅ ehDoStorePrivado() reconhece a URL real
+✅ fetch sem autenticação é RECUSADO (HTTP 403)
+✅ lerDocumentoPrivado devolveu os bytes certos
+✅ teste apagado do store
+```
+
+🔴 **A quarta linha é a que fecha a decisão inteira.** Um `fetch` sem `Authorization` responde
+**403** — o arquivo não é legível por quem tem a URL. É precisamente o que o store público não
+garantia, e a razão de tudo isto existir. As outras cinco provam que o caminho funciona; essa
+prova que ele **protege**.
+
+E `ehDoStorePrivado`, escrito por dedução a partir da doc antes de o store existir, reconheceu o
+host real na primeira tentativa.
+
+### §59.3 — O que a criação do store revelou de graça
+
+`gh secret list` mostra `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **cadastrados
+desde 22/06/2026** — e nenhum dos dois na lista `gravar` do `deploy.yml`. O achado do §57 ganha
+evidência: os segredos existem, o deploy simplesmente não os escreve, e produção vive da herança
+do `.env` antigo.
+
+⚠️ **E fechar isso não é acrescentar duas linhas.** O GitHub não deixa **ler** o valor de um
+secret, e o `.env` da VPS é anterior ao cadastro — não há como confirmar que batem. Se
+divergirem, a próxima linha `gravar` sobrescreve o token que funciona e derruba avatar, exame e
+procuração. Trocar fragilidade latente por falha real é mau negócio: o caminho seguro é gerar
+tokens novos no painel, cadastrá-los e então acrescentar as linhas, num movimento só.
