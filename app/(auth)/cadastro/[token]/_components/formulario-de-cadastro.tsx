@@ -307,6 +307,19 @@ export function FormularioDeCadastro({
    * **perguntar**, e a resposta dele é um fato, não uma inferência nossa.
    */
   const [continuarComASessao, setContinuarComASessao] = useState(false);
+  /**
+   * 🔴 A CONTA JÁ NASCEU NESTE FLUXO — e a tela precisa DIZER isso.
+   *
+   * Pergunta do dono em 13/09/2026, olhando a própria tela travada: _"o paciente fica travado
+   * nessa tela sem ter confirmação de que foi criado a conta"_. Ele estava certo: o código
+   * fora aceito, a conta existia, ele estava logado — e a tela mostrava só o erro do passo
+   * seguinte, o que faz parecer que **nada** funcionou.
+   *
+   * ⚠️ É a classe do `o-cadastro-feito-nao-vira-falha`, que já mordeu aqui: cadastro feito
+   * virando falha na tela. Aquele guarda cobria a FICHA gravada; este estado cobre a CONTA
+   * criada, que é o passo irreversível — e o que o paciente mais precisa saber que deu certo.
+   */
+  const [contaCriada, setContaCriada] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -605,11 +618,17 @@ export function FormularioDeCadastro({
     });
 
     if (!gravado.sucesso) {
-      // A conta EXISTE e ele está logado. Mandá-lo de volta ao formulário seria pedir
-      // que criasse a conta outra vez — o que falharia com "e-mail já cadastrado".
-      setErro(
-        `${gravado.erro} Sua conta já foi criada: entre com seu e-mail e complete o cadastro pelo painel.`,
-      );
+      /**
+       * ⚠️ SÓ O MOTIVO, sem apêndice. A versão anterior emendava _"Sua conta já foi criada:
+       * entre com seu e-mail e complete o cadastro pelo painel"_ no fim de qualquer erro — e
+       * com a recusa por e-mail divergente o resultado eram DUAS instruções contraditórias na
+       * mesma frase: "saia da conta atual" e "entre com seu e-mail". Nenhuma das duas resolvia,
+       * e uma delas mandava o paciente sair de uma conta que era a certa.
+       *
+       * O que já deu certo agora é dito pelo bloco de `contaCriada`, separado do que falhou —
+       * porque são fatos diferentes e o paciente precisa dos dois.
+       */
+      setErro(gravado.erro ?? 'Não conseguimos concluir o cadastro agora.');
       return;
     }
 
@@ -809,6 +828,8 @@ export function FormularioDeCadastro({
       }
 
       await setActive({ session: conclusao.createdSessionId });
+      // A partir daqui a conta EXISTE. O que vier depois pode falhar; isto não se desfaz.
+      setContaCriada(true);
 
       await gravarFicha();
     } catch (err) {
@@ -903,7 +924,49 @@ export function FormularioDeCadastro({
               </div>
             )}
 
+            {/*
+              🔴 O QUE JÁ DEU CERTO VEM ANTES DO QUE FALHOU — e esta ordem é a correção.
+
+              Pergunta do dono, olhando a tela travada: _"o paciente fica travado nessa tela sem
+              ter confirmação de que foi criado a conta"_. A conta nasce no `setActive`, duas
+              linhas ANTES da gravação da ficha. Quando a ficha falha, o passo irreversível já
+              aconteceu — e a tela mostrava só o erro, o que faz parecer que nada funcionou.
+
+              ⚠️ Sem isto, o paciente lê "não deu certo" sobre um cadastro cuja conta existe, e
+              a próxima coisa que ele tenta é criar a conta de novo — que falha com "e-mail já
+              cadastrado". O beco se fecha por cima do próprio sucesso.
+            */}
+            {contaCriada && erro && (
+              <div className="animate-fade-in border-primary/25 bg-primary/5 space-y-1 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  <strong>Sua conta foi criada e o e-mail está confirmado.</strong> Isso não se
+                  perde — você já pode entrar com {email.trim().toLowerCase()}.
+                </p>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  O que faltou foi guardar os dados do cadastro. O motivo está abaixo.
+                </p>
+              </div>
+            )}
+
             {erro && <Aviso texto={erro} />}
+
+            {/*
+              E uma saída que RESOLVE, em vez de uma instrução que não funciona. "Tentar de
+              novo" repete só a gravação da ficha — a conta não é recriada.
+            */}
+            {contaCriada && erro && (
+              <Button
+                className="h-12 w-full rounded-xl"
+                disabled={carregando}
+                onClick={() => {
+                  setErro('');
+                  void gravarFicha();
+                }}
+                type="button"
+              >
+                {carregando ? 'Tentando…' : 'Tentar guardar meus dados de novo'}
+              </Button>
+            )}
 
             <Button
               type="submit"

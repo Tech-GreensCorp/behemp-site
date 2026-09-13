@@ -256,10 +256,40 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
     expect(t.slice(i, t.indexOf('.where(', i))).toMatch(/\bpacienteId,/);
   });
 
-  it('falha ao gravar NÃO manda o paciente recriar a conta', () => {
-    // A conta já existe: repetir o formulário falharia com "e-mail já cadastrado", e ele
-    // acharia que perdeu tudo.
-    expect(codigo(FORM)).toMatch(/Sua conta já foi criada/);
+  it('🔴 falha ao gravar DIZ que a conta existe — e não manda recriar', () => {
+    /**
+     * ⚠️ A versão anterior exigia o texto literal `"Sua conta já foi criada"`, e por isso
+     * acusou a melhoria do texto em 13/09/2026. **Quarta vez nesta sessão que um guarda meu
+     * congela redação em vez de propriedade** — e o padrão já rendeu uma regra: guarda mede o
+     * que o código GARANTE, nunca como ele está escrito hoje.
+     *
+     * A propriedade, e ela veio de uma pergunta do dono olhando a tela travada — _"o paciente
+     * fica travado nessa tela sem ter confirmação de que foi criado a conta"_:
+     *
+     *   1. existe um estado que registra que a conta nasceu neste fluxo, e
+     *   2. quando há erro, a tela afirma que a conta foi criada.
+     *
+     * Sem isso o paciente lê "não deu certo" sobre um cadastro cuja conta existe, tenta criar
+     * de novo, e recebe "e-mail já cadastrado" — o beco se fechando por cima do próprio sucesso.
+     */
+    const t = codigo(FORM);
+
+    expect(t, 'não há estado que registre que a conta nasceu').toMatch(/setContaCriada\(true\)/);
+
+    /**
+     * E ele é marcado DEPOIS de a conta existir de fato — antes do `setActive` seria mentira,
+     * e é o tipo de mentira que faz a tela prometer o que não aconteceu.
+     */
+    const marca = t.indexOf('setContaCriada(true)');
+    const ativa = t.indexOf('setActive(');
+    expect(ativa, 'não achei o setActive').toBeGreaterThan(-1);
+    expect(marca, 'a conta é dada como criada ANTES de existir').toBeGreaterThan(ativa);
+
+    // E a afirmação chega à tela, junto do erro.
+    const bloco = t.slice(t.indexOf('{contaCriada && erro && ('));
+    expect(bloco.slice(0, 600), 'a tela não afirma que a conta foi criada').toMatch(
+      /conta foi criada|conta já foi criada/i,
+    );
   });
 });
 
