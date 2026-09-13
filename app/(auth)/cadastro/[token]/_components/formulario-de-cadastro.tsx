@@ -279,6 +279,13 @@ export function FormularioDeCadastro({
   const confirmandoDados = dadosVieramDoParceiro && !corrigindo;
 
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
+
+  /**
+   * O paciente clicou em "Corrigir meus dados". É escolha dele, e escolha não se desfaz
+   * sozinha — sem esta marca, a retomada o traria de volta no render seguinte, e ele ficaria
+   * preso sem nunca conseguir corrigir o que estava errado.
+   */
+  const [voltouDeProposito, setVoltouDeProposito] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -419,52 +426,50 @@ export function FormularioDeCadastro({
   }, [isLoaded]);
 
   /**
-   * 🔴 RETOMAR DE ONDE PAROU — e não recomeçar do zero.
+   * 🔴 RETOMAR DE ONDE PAROU — derivado no render, sem `useEffect`.
    *
-   * Pedido do dono em 12/09/2026, testando o fluxo 1: _"não teria como eu continuar o meu
-   * cadastro? deveria ter essa opção de continuar um cadastro; se eu parei na etapa de
-   * verificar o código do e-mail, quando eu entrasse na minha conta era para aparecer
-   * justamente essa tela"_. E a razão que ele deu é a que importa: _"isso pode ser um caso
-   * real do paciente BeHemp, nós temos que prevenir esse tipo de coisa"_.
+   * Pedido do dono em 12/09/2026: _"se eu parei na etapa de verificar o código do e-mail,
+   * quando eu entrasse na minha conta era para aparecer justamente essa tela"_. E a razão:
+   * _"isso pode ser um caso real do paciente BeHemp, nós temos que prevenir esse tipo de
+   * coisa"_.
    *
-   * ⚠️ QUEM PARA NO MEIO NÃO PARA POR DISTRAÇÃO. Para porque o código demorou, porque trocou
-   * de aparelho para abrir o e-mail, porque a bateria acabou, porque um deploy subiu. Ao
-   * voltar, encontrava o formulário em branco — e, ao preencher de novo, o Clerk respondia
-   * `form_identifier_exists`, porque a conta pendente já existia. O caminho de volta virava
-   * beco, que é a mesma família dos dois defeitos do Item 35.
+   * ⚠️ A PRIMEIRA VERSÃO USAVA UM EFEITO com três `setState` no corpo — e o lint acusou, com
+   * razão: _"Calling setState synchronously within an effect can trigger cascading renders"_.
+   * O `AGENTS.md` proíbe isso, e o React documenta o padrão certo: **isto não precisa de
+   * efeito**. A etapa é uma função do que já se sabe, então se calcula.
    *
-   * 🔴 O ESTADO JÁ EXISTIA E NINGUÉM LIA. O Clerk mantém o `signUp` pendente no navegador: a
-   * `etapa` nascia `'dados'` sempre, ignorando que `signUp.status` dizia
-   * `'missing_requirements'` e que o e-mail já tinha um código a caminho.
+   * 🔴 `senha` É CONDIÇÃO, e não por capricho. Desde a inversão da ordem, a senha é entregue
+   * ao Clerk DEPOIS da confirmação — é o que faz a conta nascer só ali. Ela vive no estado do
+   * React, que não sobrevive a fechar a aba. Retomar na etapa do código sem senha em mãos
+   * completaria o cadastro **sem senha**, recriando o buraco que a inversão veio fechar.
    *
-   * ⚠️ SÓ RETOMA SE FOR O MESMO E-MAIL. Um `signUp` pendente de OUTRO endereço — o paciente
-   * digitou errado e voltou, ou é outra pessoa no mesmo navegador — não pode sequestrar este
-   * cadastro: nesse caso a tela começa do início, como antes.
+   * ⚠️ E ter a senha em mãos implica MESMA SESSÃO DE NAVEGADOR — logo o `email` da tela já
+   * está preenchido. Por isso não há `setEmail` aqui: nada a sincronizar.
+   *
+   * Sem senha, fica na etapa 1. Ao enviar de novo, o cadastro pendente do mesmo e-mail é
+   * reconhecido e só o código é reenviado (o caminho que o Item 35 abriu). O paciente
+   * redigita a senha uma vez; não perde o cadastro nenhuma.
    */
-  const [retomado, setRetomado] = useState(false);
+  const cadastroPendenteNoNavegador =
+    isLoaded &&
+    Boolean(signUp) &&
+    signUp.status === 'missing_requirements' &&
+    Boolean(signUp.emailAddress) &&
+    signUp.verifications?.emailAddress?.status === 'unverified';
 
-  useEffect(() => {
-    if (!isLoaded || !signUp || etapa !== 'dados' || retomado) return;
+  const deveRetomar = cadastroPendenteNoNavegador && Boolean(senha) && !voltouDeProposito;
 
-    const pendente = signUp.status === 'missing_requirements';
-    const emailPendente = signUp.emailAddress?.toLowerCase() ?? '';
-    const aguardandoCodigo = signUp.verifications?.emailAddress?.status === 'unverified';
-
-    if (!pendente || !emailPendente || !aguardandoCodigo) return;
-
-    /**
-     * O e-mail alvo é o que o parceiro mandou; se o paciente já tinha corrigido, o pendente
-     * é a fonte — é nele que o código foi entregue.
-     */
-    setEmail(emailPendente);
-    setEtapa('codigo');
-    setRetomado(true);
-  }, [isLoaded, signUp, etapa, retomado]);
+  /**
+   * A etapa que a tela mostra. `etapa` é o que o paciente escolheu; esta é o que ele vê —
+   * e as duas só divergem enquanto há cadastro pendente para retomar.
+   */
+  const etapaVisivel: 'dados' | 'codigo' | 'pronto' =
+    etapa === 'dados' && deveRetomar ? 'codigo' : etapa;
 
   const campoCodigo = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (etapa === 'codigo') campoCodigo.current?.focus();
-  }, [etapa]);
+    if (etapaVisivel === 'codigo') campoCodigo.current?.focus();
+  }, [etapaVisivel]);
 
   const nomeValido = nome.trim().split(/\s+/).filter(Boolean).length >= 2;
   const cpfValido = cpfEhValido(cpf);
@@ -557,7 +562,6 @@ export function FormularioDeCadastro({
     setCarregando(true);
     setErro('');
 
-    const partes = nome.trim().split(/\s+/);
     try {
       /**
        * 🔴 VOLTAR E ENVIAR DE NOVO NÃO PODE VIRAR BECO — achado em 11/09/2026.
@@ -616,12 +620,31 @@ export function FormularioDeCadastro({
         return;
       }
 
-      await signUp.create({
-        emailAddress: email.trim().toLowerCase(),
-        password: senha,
-        firstName: partes[0],
-        lastName: partes.slice(1).join(' '),
-      });
+      /**
+       * 🔴 SÓ O E-MAIL AQUI. A SENHA E O NOME VÃO DEPOIS DA CONFIRMAÇÃO.
+       *
+       * Decisão do dono em 12/09/2026, e a frase dele diz o motivo melhor do que eu
+       * resumiria: _"a conta já existe mas pra entrar nela eu não consigo, porque a senha não
+       * foi gerada… ou seja, na última etapa, por conta do erro do código, eu perdi minha
+       * conta"_.
+       *
+       * ⚠️ O QUE ACONTECIA COM TUDO JUNTO NO `create`. Se o fluxo morresse entre esta linha e
+       * a confirmação do e-mail — e morreu, com `session_exists` —, sobrava um cadastro no
+       * Clerk segurando aquele e-mail. Voltar dava `form_identifier_exists` ("já existe uma
+       * conta"), e entrar não dava, porque a senha nunca tinha sido gravada de verdade.
+       * Preso dos dois lados, com os dados do parceiro parados esperando um cadastro que não
+       * podia mais ser feito.
+       *
+       * 🔴 A DOC DO CLERK DÁ A GARANTIA, e é o que sustenta esta ordem: o status
+       * `'complete'` significa _"The user has been created and the custom flow can proceed to
+       * setActive()"_. Enquanto faltar requisito, o status é `'missing_requirements'` e
+       * **não há conta** — só uma tentativa. Mandando a senha depois da verificação, a conta
+       * nasce num passo só, já com senha, e nunca existe o estado "conta sem senha".
+       *
+       * ⚠️ E o `update()` aceita os mesmos campos do `create()` (doc do objeto `SignUp`), com
+       * `missingFields` listando o que falta. É o fluxo incremental previsto, não um desvio.
+       */
+      await signUp.create({ emailAddress: email.trim().toLowerCase() });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setEtapa('codigo');
     } catch (err) {
@@ -653,9 +676,40 @@ export function FormularioDeCadastro({
         await signOut();
       }
 
-      const conclusao = await signUp.attemptEmailAddressVerification({ code: codigo.trim() });
+      const verificado = await signUp.attemptEmailAddressVerification({ code: codigo.trim() });
+
+      /**
+       * 🔴 AGORA A CONTA NASCE — e é aqui que ela deve nascer.
+       *
+       * O `create` mandou só o e-mail, então depois da verificação o status é
+       * `'missing_requirements'` e `missingFields` lista o que falta (senha, nome). O
+       * `update` entrega tudo de uma vez: o status vira `'complete'`, e é nesse instante que
+       * o Clerk cria o usuário — _"The user has been created"_, na doc do objeto `SignUp`.
+       *
+       * ⚠️ Isto elimina a classe inteira do estado "conta existe, senha não". Se algo falhar
+       * antes desta linha, não há conta — há uma tentativa pendente, que a retomada recupera.
+       */
+      const partesDoNome = nome.trim().split(/\s+/);
+      const conclusao =
+        verificado.status === 'complete'
+          ? verificado
+          : await signUp.update({
+              password: senha,
+              firstName: partesDoNome[0],
+              lastName: partesDoNome.slice(1).join(' '),
+            });
+
       if (conclusao.status !== 'complete') {
-        setErro('A verificação não pôde ser concluída. Tente novamente.');
+        /**
+         * Sobrou requisito que não sabemos preencher. Dizer QUAL evita o "tente novamente"
+         * que não leva a lugar nenhum — foi o que prendeu o dono por duas rodadas.
+         */
+        const faltando = conclusao.missingFields?.join(', ');
+        setErro(
+          faltando
+            ? `Faltou concluir: ${faltando}. Volte e confira os dados.`
+            : 'A verificação não pôde ser concluída. Tente novamente.',
+        );
         return;
       }
 
@@ -692,7 +746,7 @@ export function FormularioDeCadastro({
 
   return (
     <div className="relative mx-auto w-full max-w-xl">
-      <Cabecalho protocolo={protocolo} etapa={etapa} textos={textos} />
+      <Cabecalho protocolo={protocolo} etapa={etapaVisivel} textos={textos} />
 
       <div
         className={cn(
@@ -703,9 +757,9 @@ export function FormularioDeCadastro({
           'p-6 sm:p-9',
         )}
       >
-        {etapa === 'pronto' ? (
+        {etapaVisivel === 'pronto' ? (
           <Concluido urlDeRetorno={urlDeRetorno} />
-        ) : etapa === 'codigo' ? (
+        ) : etapaVisivel === 'codigo' ? (
           <form onSubmit={confirmarCodigo} className="space-y-6">
             <div className="text-center">
               <div className="bg-primary/10 mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
@@ -792,7 +846,7 @@ export function FormularioDeCadastro({
                    * passa a ser uma escolha do paciente, e escolha do paciente não se
                    * desfaz sozinha.
                    */
-                  setRetomado(true);
+                  setVoltouDeProposito(true);
                   setEtapa('dados');
                   setErro('');
                 }}
@@ -1376,6 +1430,24 @@ export function FormularioDeCadastro({
                   }
                 >
                   Entrar na minha conta
+                </Button>
+                {/*
+                  A SAÍDA PARA QUEM NÃO TEM SENHA UTILIZÁVEL. Medido na instância em
+                  12/09/2026: para um e-mail nesse estado o Clerk declara TRÊS caminhos —
+                  `password`, `email_code` e `reset_password_email_code`. A tela oferecia um.
+                  O `redirect_url` leva de volta a ESTE cadastro: sem ele, quem recupera o
+                  acesso cai no painel e o fluxo morre aqui.
+                */}
+                <Button
+                  variant="outline"
+                  className="h-11 w-full rounded-xl"
+                  render={
+                    <Link
+                      href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
+                    />
+                  }
+                >
+                  Esqueci minha senha / entrar por código
                 </Button>
               </div>
             ) : (

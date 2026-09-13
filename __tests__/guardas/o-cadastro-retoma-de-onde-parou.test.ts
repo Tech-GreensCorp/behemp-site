@@ -51,41 +51,64 @@ describe('o cadastro retoma de onde parou', () => {
     expect(CODIGO).toMatch(/verifications\?\.emailAddress\?\.status === 'unverified'/);
   });
 
-  it('🔴 e pula para a etapa do CÓDIGO, que é onde o paciente parou', () => {
-    const i = CODIGO.indexOf("signUp.status === 'missing_requirements'");
-    expect(CODIGO.slice(i, i + 900)).toMatch(/setEtapa\('codigo'\)/);
+  /**
+   * 🔴 RETIFICADO em 12/09/2026: a retomada deixou de ser um `useEffect` e virou valor
+   * DERIVADO no render.
+   *
+   * A primeira versão usava um efeito com três `setState` no corpo, e o lint acusou com
+   * razão — _"Calling setState synchronously within an effect can trigger cascading
+   * renders"_, o que o `AGENTS.md` proíbe. O React documenta que isto **não precisa de
+   * efeito**: a etapa é função do que já se sabe.
+   *
+   * A garantia é a mesma e é o que estes casos medem: **quem tem cadastro pendente vê a
+   * etapa do código, não o formulário em branco.**
+   */
+  it('🔴 a etapa VISÍVEL é derivada — quem tem cadastro pendente vê a do código', () => {
+    expect(CODIGO).toMatch(/const etapaVisivel/);
+    expect(CODIGO).toMatch(/etapa === 'dados' && deveRetomar \? 'codigo' : etapa/);
   });
 
-  it('🔴 a retomada exige o MESMO e-mail — senão vira troca de identidade', () => {
-    const i = CODIGO.indexOf("signUp.status === 'missing_requirements'");
-    const bloco = CODIGO.slice(i, i + 900);
-    // O e-mail pendente é lido e vira a fonte; sem ele, não retoma.
-    expect(bloco).toMatch(/signUp\.emailAddress\?\.toLowerCase\(\)/);
-    expect(bloco).toMatch(/if \(!pendente \|\| !emailPendente \|\| !aguardandoCodigo\) return;/);
+  it('⚠️ e é a etapa VISÍVEL que a tela usa, não a escolhida', () => {
+    // Derivar e não usar seria pior que não derivar: daria a impressão de estar resolvido.
+    expect(CODIGO).toMatch(/etapaVisivel === 'codigo' \?/);
+    expect(CODIGO).toMatch(/etapa=\{etapaVisivel\}/);
   });
 
-  it('⚠️ e não retoma em looping — uma vez só', () => {
-    // Sem a trava, o efeito reescreveria a etapa a cada render e o paciente não sairia dali.
-    expect(CODIGO).toMatch(/setRetomado\(true\)/);
-    expect(CODIGO).toMatch(/etapa !== 'dados' \|\| retomado/);
+  it('🔴 a retomada exige cadastro pendente DO MESMO navegador, com e-mail não verificado', () => {
+    // O `signUp` do Clerk é por navegador; retomar exige que ele exista, que esteja
+    // incompleto, e que o e-mail ainda não tenha sido confirmado.
+    expect(CODIGO).toMatch(/signUp\.status === 'missing_requirements'/);
+    expect(CODIGO).toMatch(/verifications\?\.emailAddress\?\.status === 'unverified'/);
+    expect(CODIGO).toMatch(/Boolean\(signUp\.emailAddress\)/);
   });
 
-  it('🔴 "Corrigir meus dados" NÃO é desfeito pela retomada', () => {
+  it('🔴 e NÃO retoma sem a senha em mãos — senão completaria o cadastro SEM senha', () => {
     /**
-     * ⚠️ DEFEITO DA PRÓPRIA RETOMADA, achado ao revisar o caminho de volta que o dono pediu:
-     * _"também poder voltar para a primeira etapa"_.
-     *
-     * O efeito dispara quando `etapa === 'dados'` e ainda não retomou. Quem clicasse em
-     * "Corrigir meus dados" voltava para a etapa 1 e era **jogado de volta** para a do
-     * código no render seguinte — preso, sem nunca conseguir corrigir o que estava errado.
-     * Conserto que cria beco novo é o modo de falha mais caro que existe.
+     * Desde a inversão da ordem, a senha é entregue ao Clerk depois da confirmação — é o que
+     * faz a conta nascer só ali. Ela vive no estado do React, que não sobrevive a fechar a
+     * aba. Retomar sem senha recriaria, por outro caminho, o buraco que a inversão fechou.
      */
+    expect(CODIGO).toMatch(/deveRetomar =[\s\S]{0,120}Boolean\(senha\)/);
+  });
+
+  it('⚠️ a escolha do paciente vence a retomada', () => {
+    // Sem isto, quem clicasse em "Corrigir meus dados" voltava para a etapa 1 e era jogado
+    // de volta no render seguinte — preso, sem nunca conseguir corrigir.
+    expect(CODIGO).toMatch(/deveRetomar =[\s\S]{0,140}!voltouDeProposito/);
+  });
+
+  it('🔴 "Corrigir meus dados" marca a escolha ANTES de voltar', () => {
     const i = CODIGO.indexOf('Corrigir meus dados');
     expect(i, 'não achei o botão de voltar').toBeGreaterThan(-1);
-    // O handler fica ANTES do rótulo no JSX; a marca precisa estar nele.
     const bloco = CODIGO.slice(Math.max(0, i - 700), i);
-    expect(bloco).toMatch(/setRetomado\(true\)/);
+    expect(bloco).toMatch(/setVoltouDeProposito\(true\)/);
     expect(bloco).toMatch(/setEtapa\('dados'\)/);
+  });
+
+  it('⚠️ e NÃO sobrou `useEffect` com setState no corpo — é o que o lint proibia', () => {
+    // O efeito antigo fazia `setEmail`/`setEtapa`/`setRetomado` sincronamente.
+    expect(CODIGO).not.toMatch(/setRetomado/);
+    expect(CODIGO).not.toMatch(/useEffect\([\s\S]{0,400}setEtapa\('codigo'\)/);
   });
 
   it('🔴 com SESSÃO VIVA, pula o Clerk e grava só a ficha', () => {
