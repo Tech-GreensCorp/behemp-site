@@ -1,6 +1,6 @@
 # ADR-0022 — Conta e ficha são dois fatos, e ninguém liga os dois
 
-> **Status:** aceita · **Data:** 12/09/2026
+> **Status:** aceita · **Data:** 12/09/2026 · **Revisada:** 13/09/2026 (Parte VII)
 > **Contexto:** o dono percorreu o fluxo 1 da Greens de ponta a ponta e ficou com uma conta
 > funcionando, um painel vazio e um cadastro que não podia mais ser concluído. Nenhuma das
 > peças estava quebrada. O que faltava era a ligação entre elas.
@@ -73,6 +73,9 @@ parceiro nunca viram linha em `documentos` ⇒ o painel diz "Faltam 4 de 4".
 `grep solicitacoesCadastro` em `app/(paciente)` e em `app/(auth)/redirect`: **zero
 ocorrências**. O painel não tem como saber que existe um cadastro esperando por aquele
 usuário.
+
+> ✅ **RETIFICADO em 13/09/2026 — fechado.** `app/_actions/dashboard-paciente.ts` chama
+> `situacaoDoFluxo`. A medição acima vale para 12/09; ver §34.
 
 ## §2 — As etapas, e o gap de cada uma
 
@@ -169,6 +172,12 @@ toda entrada no sistema, e falha de rede viraria falha de login.
 Princípio **C** (o sistema informa, não esconde) e **H** (estado parcial é estado, e se declara).
 Fase 7 — integração entre empresas.
 
+> 🔴 **RETIFICADO em 13/09/2026 — as três glosas acima são INVENTADAS.** Medido em
+> `docs/PRINCIPIOS.md`: **C** é _Ambientes e CI/CD_, **H** é _Segurança_, e a **fase 7** é _Erros
+> e resiliência_. O número da fase estava certo; a descrição, não — que é o jeito mais fácil de
+> alguém acreditar. O princípio correto para esta parte é **D** (Tratamento de erros, resiliência
+> e HTTP). A atribuição completa, decisão por decisão, está no §35.1.
+
 ---
 
 # PARTE II — A sentinela e a procedência
@@ -230,6 +239,9 @@ sozinho — e é por isso que nenhuma tela sabe que há documentos esperando.
 
 **G5 — a procedência não sobrevive à criação da ficha.**
 
+> ✅ **RETIFICADO em 13/09/2026 — fechado pelo S8.2.** `db/schema/pacientes.ts:107,117` tem
+> `origem` e `solicitacaoId` (migration `0042`). Ver §34.
+
 ## §11 — O que falta medir, e que eu NÃO vou supor
 
 Registrado como pendência aberta, porque afirmar sem medir foi o erro do dia:
@@ -246,6 +258,9 @@ verificada:
 ⚠️ **Exige acesso ao banco de produção, que não tenho daqui.** Fica como primeiro item da
 sprint — e a lição: um aviso que depende de três condições precisa de um jeito de saber **qual**
 delas o barrou. Hoje ele só some.
+
+> ✅ **RETIFICADO no mesmo dia — contornado pelo D-16.** O acesso não veio; o instrumento sim.
+> `GET /api/fluxo/situacao` responde o ponto **e o porquê** sem tocar no banco de produção.
 
 ## §12 — A decisão: a sentinela
 
@@ -303,6 +318,12 @@ O estudo que o R1 e o R5 pedem. Cada linha é um estado que **acontece**, não u
 | 6   | ficha grava                     | exceção pós-transação                                          | preserva o cadastro (corrigido hoje)           | ponto **ficha_gravada_parcial**                              |
 | 7   | materialização                  | link do parceiro expirou, MIME recusado                        | **silenciosa** — `{inseridos: 0}`              | ponto **documentos_nao_materializados** (R6)                 |
 | 8   | transferência S2                | sem consentimento, trava desligada                             | não enfileira, loga `info`                     | visível ao paciente e ao admin                               |
+
+> ⚠️ **RETIFICADA A LINHA 4 em 13/09/2026.** Ela prometia _"retomável de qualquer lugar"_.
+> Medido: retomar com o formulário zerado **gravaria ficha vazia**, porque a confirmação do
+> código chama `gravarFicha()`, que lê anexos, consentimento e respostas clínicas do estado do
+> React. O que se entrega é retomada de qualquer lugar **refazendo a etapa 1**, com a tela
+> dizendo o que aconteceu. Ver §33.3 e o D-17.
 
 🔴 **As linhas 1b e 7 são o R6 inteiro.** As duas falham em silêncio hoje, e as duas produzem
 exatamente o que o dono viu: o sistema afirmando "0 documentos" enquanto quatro tinham sido
@@ -422,6 +443,11 @@ distinguir a ficha do cadastro completo da casca criada no login.
 
 **G7 — não existe o conceito de "ficha completa".** É o que permite ao G2 mentir, e é por isso
 que remover só o criador do `/redirect` (o rejeitado do §5) não resolveria: sobrariam seis.
+
+> ⚠️ **RETIFICADO em 13/09/2026 — parcial, E O PARCIAL É DE PROPÓSITO.** Hoje **1 dos 7** grava
+> procedência (`cadastro-por-link.ts`). Os outros seis continuam sem — e é o que o D-11 quis:
+> `origem IS NULL` **é** a declaração de que a ficha nasceu de lado. O que faltava era o
+> documento dizer que o nulo carrega significado. Ver §34.
 
 **D-11 — A ficha declara se está completa, e quem a completou.** Não um booleano solto: a
 mesma coluna de procedência do D-08 responde as duas perguntas — de onde veio e por qual
@@ -836,3 +862,241 @@ metade da sentinela antes dela.
 **Regras do instrumento**, iguais às da rota de eco: exige o mesmo segredo, tem limite de
 requisição, **não ecoa cabeçalho nem corpo**, e nunca devolve dado pessoal — só o **fato** de
 cada condição ter passado ou não.
+
+---
+
+# PARTE VII — A revisão do documento inteiro
+
+> **Escrita em 13/09/2026**, a pedido do dono: _"eu quero que você revise todo documento da ADR
+> do jeito que o `@CLAUDE.md` orienta, para que nós possamos finalizar esse fluxo"_.
+>
+> Não é releitura: é o documento medido contra o código, item por item, com as seis perguntas.
+> **A precedência nº 1 diz que o código vence a doc** — então onde os dois divergem, quem muda é
+> a doc. Exceto onde o código divergiu de uma decisão já tomada: aí quem muda é o código, e os
+> dois casos abaixo são disso.
+
+## §33 — O que a revisão ACHOU, e que não era releitura
+
+### 33.1 🔴 O D-14 estava escrito e não implementado
+
+O D-14 decidiu, com todas as letras: _"o evento vira `cancelado_por_revogacao`, não `falhou` — a
+diferença importa para quem lê a fila depois"_. A migration `0043` foi autorizada pelo dono
+**para isso**.
+
+Medido em 13/09: `cancelado_por_revogacao` existia em `db/schema/enums.ts` e em **zero** arquivos
+de `lib/` ou `app/`. O enviador chamava `marcarFalha`.
+
+⚠️ **É a mesma classe que esta ADR nomeia no §27** sobre o `chatpro_webhook`: _"existe no enum e
+ninguém grava: valor morto"_. Eu escrevi aquele parágrafo e cometi o mesmo defeito quatro seções
+depois.
+
+**Três consequências, e nenhuma é de rótulo:**
+
+| #   | o que `falhou` causa                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **mente para quem investiga** — quem abre a fila procurando o que não chegou persegue um envio que não devia ter saído, junto de falhas reais |
+| 2   | **convida a reenviar** — o reaper que o G12 pede pegaria este evento e tentaria de novo contra uma decisão do titular                         |
+| 3   | **apaga a prova** — "vocês pararam quando ele revogou?" precisa de resposta no banco, não numa linha de log que some no deploy                |
+
+**Corrigido**: `marcarCancelado` grava o status próprio, e o `enviarLote` conta `cancelados`
+separado de `falharam` — somar repetiria o erro uma camada acima, com o cron dizendo "3 falharam"
+sobre três pacientes que exerceram um direito.
+
+### 33.2 🔴 E o guarda CONGELAVA esse defeito
+
+`a-revogacao-para-a-fila` afirmava `expect(bloco).toMatch(/marcarFalha/)`. Ele ficava **verde
+porque o código contrariava o D-14**, e ficou vermelho quando a correção chegou — o sinal
+invertido.
+
+⚠️ **Mesma classe do `o-destino-do-paciente-segue-o-que-falta`**, que comparava destinos com uma
+lista fixa contendo os dois 404. **A regra que sai, e que vale para todo guarda:** medir a
+**propriedade**, nunca o **nome do método** que a produz.
+
+🔴 **E a sabotagem achou um terceiro defeito meu no mesmo guarda:** `toMatch(/ultimoErro:/)`
+sobrevivia a `ultimoErro: 'cancelado'` — um literal fixo, sem motivo nenhum, com 40 cancelamentos
+indistinguíveis no banco. **Existir não é carregar.** É a mesma classe da segunda retratação do
+`CLAUDE.md`, onde `toBeTruthy()` checava que o campo existisse em vez de o valor ser válido.
+
+### 33.3 🔴 O S8.5 — e por que a correção óbvia produziria o G2
+
+O dono declarou pendência real: _"retomar da mesma aba deve funcionar em todas as instâncias"_. A
+retomada dependia de `Boolean(senha)` no estado do React, o que a prendia à mesma aba. A correção
+óbvia seria pedir a senha na etapa do código e pular para lá.
+
+🔴 **Medido antes de mexer, e é o que inverte a decisão:** confirmar o código **não termina no
+Clerk**. Ele chama `gravarFicha()`, que monta a ficha inteira a partir do estado do React —
+`anexos`, `finalidadesConsentidas`, `jaFazTratamento`, `temAnvisa`, `temReceita`,
+`tratamentoAtual`. Pular para a etapa do código com o estado zerado gravaria ficha **sem
+documento, sem consentimento e sem as respostas clínicas**, e queimaria o link de uso único.
+
+⚠️ **Ou seja: a correção ingênua do S8.5 produziria a FICHA CASCA (G2) pelo caminho principal,
+com o paciente lendo "pronto".** O defeito que esta ADR inteira existe para fechar, entrando pela
+porta da correção dele.
+
+**A senha não era condição por ser senha — era proxy para "o formulário inteiro está em mãos".**
+
+⛔ **Rejeitado: persistir o formulário no navegador.** `File` de documento clínico não é
+serializável, e senha em `localStorage`/`sessionStorage` é o que a regra de segurança proíbe.
+Persistir para conveniência sairia mais caro que o problema.
+
+**D-17 — A retomada exige o formulário em mãos, e quando não o tem, DIZ.**
+
+O comportamento já estava certo: sem formulário, fica na etapa 1, e ao enviar de novo o
+`pendenteDoMesmoEmail` reconhece o cadastro e só reenvia o código. **O defeito era o silêncio** —
+o paciente voltava, via a etapa 1 do zero e concluía que tinha perdido tudo.
+
+Agora a tela diz os dois lados: o que sobreviveu (o cadastro, o código reenviado) e o que não (os
+documentos, que precisam voltar). **Avisar só a boa notícia faria o paciente chegar ao fim sem os
+arquivos** — que é como a ficha casca nasce.
+
+⚠️ **Retifica o §13, linha 4**, que prometia _"ponto `aguardando_codigo`, retomável de qualquer
+lugar"_. Retomável de qualquer lugar **com o formulário zerado** é uma ficha vazia. O que se
+entrega é: retomável de qualquer lugar, **refazendo a etapa 1**, com o sistema dizendo o que
+aconteceu.
+
+### 33.4 A chave do Clerk: a pergunta estava errada
+
+O dono informou que a `CLERK_SECRET_KEY` está nos secrets do GitHub. Duas medições fecham o
+assunto, e a segunda é a que importa:
+
+1. **Secret do GitHub não é legível.** `GET /repos/.../actions/secrets/CLERK_SECRET_KEY` devolve
+   `{"name":"CLERK_SECRET_KEY","created_at":…}` — nome e datas, valor nenhum. É write-only por
+   construção.
+2. 🔴 **E não serviria.** A doc do Clerk: _"Production keys (`pk_live_`and`sk*live*`) only work
+   with your configured production domain. This means localhost won't work with production
+   keys"_, com o erro literal _"Clerk: Production Keys are only allowed for domain
+   'your-domain.com'"\_.
+
+**O que serve é uma chave de DESENVOLVIMENTO** (`sk_test_`/`pk_test_`), que toda aplicação do
+Clerk tem de graça, numa instância separada — _"a Development instance… allowing HTTP connections"_.
+
+⚠️ **Registrado como o que é: um bloqueio de acesso, não um bloqueio técnico.** E o
+`NEXT_PUBLIC_CLERK_API_URL` existe (default `https://api.clerk.com`, _"sets the Clerk API URL for
+debugging"_) — é o caminho para um duplo local, se a instância de desenvolvimento não vier.
+
+**Fontes:** [Using production keys in development — Clerk](https://clerk.com/docs/guides/development/troubleshooting/using-production-keys-in-development) ·
+[Clerk environment variables](https://clerk.com/docs/guides/development/clerk-environment-variables) ·
+[Managing environments](https://clerk.com/docs/guides/development/managing-environments)
+
+## §34 — O que a implementação tornou obsoleto no documento
+
+Medido em 13/09 contra o código. **A doc mentia em quatro pontos** — todos por estar desatualizada,
+não por estar errada quando foi escrita.
+
+| §           | o que a ADR afirma                                                        | o que o código mostra hoje                                        | estado                                     |
+| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------ |
+| **1.5**     | _"`grep solicitacoesCadastro` em `app/(paciente)`: **zero** ocorrências"_ | `app/_actions/dashboard-paciente.ts` chama `situacaoDoFluxo`      | ✅ fechado pelo S8.3/S8.4                  |
+| **10**      | _"`pacientes` **não tem** nenhuma coluna de origem"_                      | `db/schema/pacientes.ts:107,117` — `origem` e `solicitacaoId`     | ✅ fechado pelo S8.2 (migration `0042`)    |
+| **16**      | _"sete criadores, e **NENHUM** marca que a ficha nasceu incompleta"_      | 1 de 7 grava `origem` (`cadastro-por-link.ts`); os outros 6 não   | ⚠️ **parcial — e o `null` é que responde** |
+| **11 (G6)** | _"exige acesso ao banco de produção, que não tenho daqui"_                | `app/api/fluxo/situacao/route.ts` responde o ponto **e o porquê** | ✅ contornado pelo D-16                    |
+
+🔴 **O §16 merece leitura, porque "parcial" aqui é de propósito e a ADR não dizia.** Seis
+criadores continuam sem gravar procedência — e é isso que o D-11 quis: _"uma ficha sem procedência
+é uma ficha que nasceu de lado"_. `origem IS NULL` **é** a declaração de casca. O que faltava era
+o documento dizer que o nulo carrega significado, em vez de parecer campo não preenchido.
+
+### 34.1 O D-15 foi implementado por TIPAGEM, não por gravação
+
+O §27 diz que a porta 3 _"funciona por acidente… cai no `default()` da coluna"_. Continua verdade
+sobre o default — mas a decisão foi cumprida por um caminho mais forte que gravar um literal:
+`lib/chatpro/solicitacao.ts` deriva `type Origem` do **próprio enum** e a torna obrigatória, então
+**a porta 3 não consegue nascer sem declarar de onde veio**. Ela ainda não existe como tela.
+
+⚠️ **Falha fechada por tipo vale mais que gravação correta**: gravação se esquece no código novo,
+tipo não compila.
+
+## §35 — Onde a ADR desobedecia ao próprio `CLAUDE.md`
+
+A revisão virou o documento contra as regras que ele mesmo invoca. Três achados.
+
+### 35.1 🔴 Princípio e fase citados com glosa INVENTADA
+
+A §8 escreve: _"Princípio **C** (o sistema informa, não esconde) e **H** (estado parcial é estado,
+e se declara). Fase 7 — integração entre empresas."_
+
+Medido em `docs/PRINCIPIOS.md`:
+
+| citado | a glosa que escrevi                     | o que **é**             |
+| ------ | --------------------------------------- | ----------------------- |
+| C      | "o sistema informa, não esconde"        | **Ambientes e CI/CD**   |
+| H      | "estado parcial é estado, e se declara" | **Segurança**           |
+| Fase 7 | "integração entre empresas"             | **Erros e resiliência** |
+
+⚠️ **É exatamente o que o `CLAUDE.md` proíbe** na seção de fundamentação: _"não inventar
+fundamento"_ e conferir o **objeto** antes de citar. Eu inventei três glosas que soavam certas —
+e a fase 7 estava certa pelo número e errada pela descrição, que é o jeito mais fácil de alguém
+acreditar.
+
+**Retificado, com os princípios reais:**
+
+| decisões                 | princípio                                       | por quê                                                         |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------- |
+| D-01…D-07, D-12, D-17    | **D** — Tratamento de erros, resiliência e HTTP | é o assunto da ADR: estado parcial, modo de falha, recuperação  |
+| D-08, D-11, D-15         | **F** — Banco de dados e arquitetura de dados   | procedência e completude são modelagem, não tela                |
+| D-09, D-13, D-16         | **D** + **C** — Ambientes e CI/CD               | reconciliação e instrumento são rotina de operação              |
+| **D-14**                 | **H** — Segurança                               | LGPD art. 8º §5º: é dado de saúde saindo sem autorização válida |
+| todos os guardas citados | **I** — Testes automatizados e qualidade        | a classe, não o caso                                            |
+
+**Fase 7 — Erros e resiliência**, cujo grupo no roadmap é justamente **D**. O número estava certo
+desde o começo; só a descrição era inventada.
+
+### 35.2 As perguntas 1 e 3 da regra não tinham dono no documento
+
+A Parte III declara a pergunta 4, a Parte IV a pergunta 2, a Parte V as perguntas 5 e 6. **As
+perguntas 1 (_"examinei todo o escopo do código?"_) e 3 (_"segui a lógica do começo ao fim?"_)
+não tinham seção.**
+
+Não é formalidade: foi por elas que os dois achados do §33 escaparam. O D-14 não implementado é
+pergunta 1 — **o escopo do código incluía conferir se a decisão virou linha**. E o S8.5 é
+pergunta 3: seguir a lógica até o fim mostrou que a confirmação do código **continua** em
+`gravarFicha()`, que é onde a correção óbvia quebraria.
+
+**Esta Parte VII é a resposta às duas.**
+
+### 35.3 A definição de saga veio de blog, não da fonte canônica
+
+O §15.1 abre com a definição do padrão citando **Temporal** e **dev.to**. A ordem de autoridade do
+`CLAUDE.md` põe blog de engenharia **abaixo** de autor canônico — e as fontes canônicas estavam
+citadas quatro parágrafos depois, no §15.2, como "fontes lidas": microservices.io (Chris
+Richardson, que nomeou o padrão) e o Azure Architecture Center.
+
+⚠️ **A decisão não muda** — coreografia entre empresas, orquestração dentro, e o D-12 continua de
+pé. Mas a hierarquia da citação estava invertida, e quem lê a ADR para decidir de novo tem de
+saber qual fonte pesa.
+
+## §36 — O estado real de cada decisão, medido
+
+**A tabela que faltava.** Sem ela, quem lê a ADR não distingue decidido de feito — e foi assim
+que o D-14 passou.
+
+| decisão  | o que decide                                        | estado em 13/09/2026                                                    |
+| -------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| D-01     | conta sem ficha é estado reconhecido                | ✅ na sentinela (`lib/fluxo/sentinela.ts`)                              |
+| D-02     | o painel pergunta se há cadastro pendente           | ✅ `dashboard-paciente.ts`                                              |
+| D-03     | a ficha casca se declara como casca                 | ⚠️ **parcial** — `origem IS NULL` a declara; nenhuma tela lê isso ainda |
+| D-04     | materialização deixa de depender do link            | ⚠️ **pendente** — segue com gatilho único                               |
+| D-05     | uma função responde o ponto do fluxo                | ✅ `situacaoDoFluxo`                                                    |
+| D-06     | responde o ponto **e o porquê**                     | ✅ campo `porque`, com guarda por ramo                                  |
+| D-07     | conta antiga sai por ramo próprio                   | ✅ `completo_legado`, antes de cobrar documento                         |
+| D-08     | a procedência vive no paciente                      | ✅ migration `0042`                                                     |
+| D-09     | reconciliação é ato explícito                       | ❌ **S8.6, não começou**                                                |
+| D-10     | híbrido, fronteira na empresa                       | ✅ é o desenho vigente                                                  |
+| D-11     | a ficha declara se está completa                    | ⚠️ **parcial** — ver §34, o nulo é a declaração                         |
+| D-12     | transação dentro, saga só na fronteira              | ✅ sentinela é máquina de estados                                       |
+| D-13     | a compensação sai daqui para a Greens               | ❌ **pendente — exige acordo** (tipo novo no validador deles)           |
+| D-14     | revogação vira status próprio                       | ✅ **corrigido nesta revisão** (§33.1)                                  |
+| D-15     | a porta do admin declara a origem                   | ✅ por tipagem (§34.1)                                                  |
+| D-16     | constrói-se o instrumento                           | ✅ `GET /api/fluxo/situacao`                                            |
+| **D-17** | **retomada exige formulário, e diz quando não tem** | ✅ **desta revisão** (§33.3)                                            |
+
+🔴 **O que sobra, em ordem:** D-09 (reconciliação, S8.6) · D-04 (materialização) · D-13 (acordo
+com a Greens). Os dois primeiros são nossos e cabem na sprint; o terceiro depende de conversa.
+
+## §37 — O que esta revisão NÃO fez
+
+- **não rodou o fluxo de ponta a ponta** — falta a chave de desenvolvimento do Clerk (§33.4), e
+  sem ela nenhuma tela com sessão renderiza localmente. O que se provou aqui foi por leitura de
+  código, medição e guarda; **não por execução do caminho do paciente**
+- **não mexeu nos seis criadores de ficha** que não gravam procedência — é escopo próprio, e o
+  nulo já significa o que precisa significar
+- **não corrigiu os achados do lado da Greens** (Y1…Y6) — continuam para comunicar, não corrigir

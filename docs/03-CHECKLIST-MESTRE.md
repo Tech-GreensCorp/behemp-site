@@ -378,6 +378,52 @@ de passagem.**
 
 ---
 
+### 🔴 Achado de 13/09/2026 — as migrations NÃO RODAM DO ZERO
+
+**Medido** ao subir um Postgres em Docker para provar as migrations da Sprint 8 sem gastar
+deploy. Contra banco **vazio**, o histórico quebra numa migration antiga:
+
+```
+ALTER TABLE consultas ALTER COLUMN status SET DEFAULT 'reservada'
+```
+
+⚠️ **O que isso significa, e é maior que parece:** um banco novo **não pode ser criado a partir
+do histórico de migrations**. Hoje produção está de pé porque o banco dela foi evoluindo junto;
+mas um ambiente de homologação, um restore limpo, ou a máquina de um dev novo não têm como
+chegar ao schema atual pelo caminho oficial.
+
+**O perigo de mexer:** as migrations já aplicadas em produção **não podem ser reescritas** — o
+`drizzle` guarda o hash no journal, e alterar uma aplicada faz o próximo deploy divergir. A
+correção é uma migration nova que torne o estado alcançável, ou um dump de baseline versionado.
+
+**Custo de deixar:** nenhum ambiente novo nasce. Custo de mexer: uma sessão, sem tocar em nada
+que já rodou. **Não é escopo da Sprint 8** — catalogado, não corrigido.
+
+### 🔴 Achado de 13/09/2026 — um guarda CONGELAVA o defeito que devia impedir (corrigido)
+
+`a-revogacao-para-a-fila` afirmava `expect(bloco).toMatch(/marcarFalha/)` — exigia a
+implementação de então. O D-14 da ADR-0022 decidira o contrário (`cancelado_por_revogacao`), a
+migration `0043` fora autorizada para isso, e o valor ficou no enum com **zero** usos.
+
+O guarda ficava **verde com o defeito** e vermelho quando a correção chegou.
+
+⚠️ **Segunda ocorrência desta classe** — a primeira foi
+`o-destino-do-paciente-segue-o-que-falta`, que comparava destinos com uma lista fixa contendo os
+dois 404. **A regra que sai:** guarda mede a PROPRIEDADE, nunca o nome do método que a produz.
+Corrigido em 13/09; ver ADR-0022 §33.2.
+
+### ⚪ Achado de 13/09/2026 — a chave do Clerk não destrava o teste local
+
+O `.env` local tem **zero** variáveis do Clerk, e por isso nenhuma tela com sessão renderiza
+localmente. O secret existe no GitHub — mas **não é legível** (a API devolve nome e datas, valor
+nenhum) e, mais decisivo, **não serviria**: a doc do Clerk diz que chave de produção só funciona
+no domínio de produção, com erro literal _"Production Keys are only allowed for domain
+'…'"_.
+
+**O que destrava** é uma chave de **desenvolvimento** (`sk_test_`/`pk_test_`), grátis, de uma
+instância separada — só o dono pega no dashboard. Sem ela, o Nível 3 (Chromium) da regra de
+provar local alcança só tela sem sessão. Ver ADR-0022 §33.4.
+
 ### ⚪ Achado de 09/09/2026 — sem data
 
 **`users.telefone` é texto livre** (`04` Item 26). Quatro caminhos gravam, nenhum normaliza — e
