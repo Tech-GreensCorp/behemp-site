@@ -288,6 +288,20 @@ export async function concluirCadastroPorLink(
       });
     }
 
+    /**
+     * 🔴 O `users.id`, capturado de dentro da transação — e isto nasceu de um DEFEITO REAL.
+     *
+     * Achado em 13/09/2026 rodando o fluxo contra um Postgres de verdade: a auditoria do cadastro
+     * passava `userId: clerkId`, mas a FK `logs_auditoria.user_id` aponta para `users.id`. O
+     * insert violava a constraint **toda vez** — e `registrarAuditoria` engole o erro, então
+     * ninguém soube.
+     *
+     * ⚠️ Consequência: o cadastro por link **nunca foi auditado**. Era 1 das 62 chamadas de
+     * auditoria do repositório com o id errado, e a única que a tabela recusava em silêncio.
+     * Nenhum guarda estrutural pegaria isto — só executar contra o banco revela.
+     */
+    let usuarioId: string | null = null;
+
     const pacienteId = await db.transaction(async (tx) => {
       /**
        * 4 ── Garantir o `users`.
@@ -338,6 +352,9 @@ export async function concluirCadastroPorLink(
           .set({ nome: dados.nomeCompleto, telefone })
           .where(eq(users.id, usuario.id));
       }
+
+      // Fora da transação a auditoria precisa deste id — a FK aponta para `users.id`.
+      usuarioId = usuario.id;
 
       /**
        * 5 ── A ficha do paciente. `pacientes.userId` é único, então o caminho de
@@ -588,7 +605,8 @@ export async function concluirCadastroPorLink(
 
     etapa = 'auditoria';
     await registrarAuditoria({
-      userId: clerkId,
+      // O `users.id`, nunca o `clerkId`: a FK desta tabela aponta para `users.id`.
+      userId: usuarioId ?? clerkId,
       acao: 'criar',
       entidade: 'pacientes',
       entidadeId: pacienteId,
