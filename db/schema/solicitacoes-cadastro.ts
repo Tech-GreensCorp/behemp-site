@@ -43,6 +43,21 @@ export type DocumentoDoParceiro =
       urlBlob: string;
       nomeArquivo: string | null;
       dataEmissao: string | null;
+    }
+  /**
+   * 🔴 O parceiro DISSE ter mandado, e não conseguimos buscar — 13/09/2026.
+   *
+   * Sem esta terceira forma, a recusa virava a mesma `string` do documento que o parceiro nunca
+   * mandou. Os dois fatos ficavam indistinguíveis no banco, e foi assim que 67 itens em 35
+   * handoffs passaram semanas sem ninguém saber de quem era o problema.
+   *
+   * ⚠️ `jsonb` não exige migration para esta mudança — a coluna já aceita qualquer forma. O que
+   * muda é o que o TypeScript passa a conhecer, e o que as telas podem afirmar.
+   */
+  | {
+      tipo: string;
+      recusadoPorque: string;
+      recusadoEm: string;
     };
 
 export const solicitacoesCadastro = pgTable(

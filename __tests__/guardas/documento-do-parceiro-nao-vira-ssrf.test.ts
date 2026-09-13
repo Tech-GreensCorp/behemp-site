@@ -263,12 +263,43 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
     expect(fn).toContain('await origemAutorizada(entrada.url)');
   });
 
+  /**
+   * ⚠️ ESTES DOIS OLHAM O `fetch`, ONDE QUER QUE ELE ESTEJA — e a mudança é de 13/09/2026.
+   *
+   * Eles liam só o corpo de `materializarArquivos`. Quando o download ganhou retentativa e saiu
+   * para `baixarComRetentativa`, os dois ficaram vermelhos acusando o código certo — **e isso
+   * foi útil**: as duas proteções são anti-SSRF, e um guarda que não as encontra mais é um
+   * guarda que deixou de vigiar. O conserto é olhar o `fetch`, não o recorte.
+   */
+  const blocoDoFetch = () => {
+    const i = semComent.indexOf('await fetch(');
+    expect(i, 'não há mais fetch do documento — o guarda perdeu o alvo').toBeGreaterThan(-1);
+    return semComent.slice(i, semComent.indexOf('});', i));
+  };
+
   it('cada download continua recusando redirect', () => {
-    expect(fn).toContain("redirect: 'error'");
+    // Seguir redirect é como se escapa de uma allowlist: o primeiro host passa, o segundo não.
+    expect(blocoDoFetch(), 'o fetch do documento voltou a seguir redirect').toContain(
+      "redirect: 'error'",
+    );
   });
 
   it('cada download continua com tempo limite', () => {
-    expect(fn).toContain('AbortSignal.timeout(TEMPO_LIMITE_MS)');
+    expect(blocoDoFetch(), 'o fetch do documento perdeu o tempo limite').toContain(
+      'AbortSignal.timeout(TEMPO_LIMITE_MS)',
+    );
+  });
+
+  it('🔴 e a retentativa NÃO insiste contra 403/404 — expirada é expirada', () => {
+    /**
+     * Insistir contra veredicto definitivo gasta a janela de validade de que as falhas
+     * transitórias precisam — e, no caso do 403, martela a assinatura do parceiro à toa.
+     */
+    const i = semComent.indexOf('async function baixarComRetentativa');
+    expect(i, 'a retentativa sumiu').toBeGreaterThan(-1);
+    const fnRetry = semComent.slice(i, semComent.indexOf('\n}', i));
+    expect(fnRetry, 'a retentativa insiste contra 403/404').toMatch(/403|404/);
+    expect(fnRetry, 'a retentativa não tem limite de vezes').toMatch(/TENTATIVAS_DE_DOWNLOAD/);
   });
 
   it('o MIME e o tamanho continuam conferidos por documento', () => {
@@ -276,12 +307,50 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
     expect(fn).toContain('bytes.byteLength > TAMANHO_MAXIMO');
   });
 
+  it('🔴 e o MOTIVO da recusa distingue — `erro.name` é sempre "Error"', () => {
+    /**
+     * 🔴 Medido em produção em 13/09/2026, e custou o diagnóstico do fluxo 1 inteiro:
+     *
+     *     [parceiros] documentos recusados: receita_medica:Error,comprovante_residencia:Error
+     *
+     * `erro.name` de um `new Error()` é **sempre** `'Error'`. Três documentos que podem ter
+     * falhado por motivos diferentes produziram a mesma palavra, e não havia como saber se foi
+     * allowlist, 403, MIME ou DNS — informações que o código já calcula e jogava fora.
+     */
+    expect(semComent, 'o motivo voltou a ser erro.name, que não distingue nada').not.toMatch(
+      /motivo: erro instanceof Error \? erro\.name/,
+    );
+
+    /**
+     * ⚠️ E NUNCA a URL: a `message` de um erro de `fetch` costuma trazer o endereço, e o do
+     * parceiro carrega assinatura de acesso ao S3 dele. Log não é lugar de credencial.
+     */
+    const i = semComent.indexOf('function motivoLegivel');
+    expect(i, 'a função que monta o motivo sumiu').toBeGreaterThan(-1);
+    const helper = semComent.slice(i, semComent.indexOf('\n}', i));
+    expect(helper, 'o motivo pode vazar a URL assinada do parceiro').toMatch(/https\?/);
+  });
+
   it('e o blob continua privado', () => {
     expect(fn).toMatch(/ACESSO_DO_BLOB = 'private'/);
   });
 
   it('🔴 uma falha não derruba as outras — cada documento tem o próprio catch', () => {
-    expect(fn).toMatch(/catch \(erro\)[\s\S]{0,220}erro_desconhecido/);
+    /**
+     * ⚠️ RETIFICADO EM 13/09/2026. A versão anterior exigia a string `erro_desconhecido` a até
+     * 220 caracteres do `catch` — e ficou vermelha quando o motivo passou a ser calculado por
+     * uma função, acusando o conserto. **Sexta vez nesta sessão que um guarda meu congela a
+     * forma em vez da propriedade.**
+     *
+     * A propriedade é: o `catch` existe DENTRO do map (um por documento) e **devolve** em vez
+     * de lançar — é isso que impede que um documento ruim derrube os outros e o handoff junto.
+     */
+    expect(fn, 'o catch por documento sumiu').toMatch(/catch \(erro\)/);
+
+    const i = fn.indexOf('catch (erro)');
+    const bloco = fn.slice(i, fn.indexOf('\n          }', i));
+    expect(bloco, 'o catch relança — uma falha derrubaria o handoff inteiro').not.toMatch(/throw /);
+    expect(bloco, 'o catch não devolve a recusa do documento').toMatch(/ok: false/);
     // `Promise.all` com rejeição derrubaria o lote inteiro; aqui nada rejeita.
     expect(fn).not.toContain('Promise.allSettled');
     expect(fn).not.toMatch(/^\s*throw /m);
@@ -289,5 +358,87 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
 
   it('o recusado continua sendo reportado, com o motivo', () => {
     expect(fn).toMatch(/recusados\.push\(\{ tipo: r\.tipo, motivo: r\.motivo \}\)/);
+  });
+});
+
+/**
+ * 🔴 O DOCUMENTO NÃO É CONVENIÊNCIA — decisão do dono em 13/09/2026.
+ *
+ *   _"o envio do documento é tão necessário quanto a criação da conta. O paciente passa por 2
+ *   formulários e 1 se torna à toa e o outro mentiroso, já que os dados nunca chegam. Para que
+ *   serve então esse fluxo todo que estamos criando?"_
+ *
+ * **Medido:** dos 67 itens de documento recebidos da Greens, ZERO tinham arquivo. E quando um
+ * download falhava, o item voltava ao banco como a mesma `string` do documento que o parceiro
+ * nunca mandou — tornando os dois fatos indistinguíveis.
+ */
+describe('a recusa de documento deixa rastro — não vira "nunca mandou"', () => {
+  const handoff = readFileSync(
+    path.join(process.cwd(), 'lib/parceiros/handoff.ts'),
+    'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('⚠️ VACUIDADE: o handoff ainda monta o manifesto a partir do que recusou', () => {
+    expect(handoff).toMatch(/materializarArquivos\(/);
+    expect(handoff).toMatch(/recusados/);
+  });
+
+  it('🔴 o item recusado guarda o MOTIVO — senão some a prova de que o parceiro mandou', () => {
+    /**
+     * Sem isto, "a Greens não mandou" e "a Greens mandou e nós não conseguimos buscar" viram o
+     * mesmo registro. Foi o que fez 67 itens passarem semanas sem dono — e o que quase me fez
+     * escrever na ADR que ela "nunca manda arquivo", quando o log provava o contrário.
+     */
+    expect(handoff, 'a recusa não é gravada no manifesto').toMatch(/recusadoPorque/);
+
+    const i = handoff.indexOf('const semArquivo');
+    expect(i, 'não achei a montagem do manifesto').toBeGreaterThan(-1);
+    const bloco = handoff.slice(i, handoff.indexOf('return [...semArquivo', i));
+    expect(bloco, 'o item recusado volta a ser string pura').toMatch(/recusadosPorTipo/);
+  });
+
+  it('🔴 e o tipo do manifesto CONHECE a recusa — sem lista paralela', () => {
+    /**
+     * A forma do manifesto estava escrita à mão em dois lugares. Quando a terceira variante
+     * nasceu, a cópia não soube — e só não divergiu em silêncio porque o type-check pegou.
+     */
+    const schema = readFileSync(
+      path.join(process.cwd(), 'db/schema/solicitacoes-cadastro.ts'),
+      'utf8',
+    );
+    expect(schema, 'o schema não conhece a recusa').toMatch(/recusadoPorque/);
+
+    const token = readFileSync(
+      path.join(process.cwd(), 'lib/chatpro/token-de-cadastro.ts'),
+      'utf8',
+    );
+    expect(token, 'voltou a declarar a forma do manifesto à mão').toMatch(
+      /documentosDoParceiro: DocumentoDoParceiro\[\] \| null/,
+    );
+  });
+
+  it('🔴 o código NÃO trata documento como conveniência dispensável', () => {
+    /**
+     * O comentário antigo dizia _"documento é conveniência; o cadastro é o que importa"_ em três
+     * arquivos. Não lançar continua certo — deixar o paciente sem conta E sem documento é pior.
+     * O que mudou é que a falha é **fato a cobrar**, não custo aceito.
+     */
+    for (const arq of [
+      'lib/parceiros/handoff.ts',
+      'lib/parceiros/documentos-do-parceiro.ts',
+      'lib/parceiros/materializar-documentos.ts',
+    ]) {
+      /**
+       * ⚠️ Só o CÓDIGO, não os comentários — que é onde a decisão antiga fica registrada como
+       * histórico. Apagar o registro do que se pensava antes é pior que mantê-lo: a ADR-0007
+       * mudou duas vezes, e o caminho ensinou mais que o destino.
+       */
+      const texto = readFileSync(path.join(process.cwd(), arq), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/.*$/gm, '$1');
+      expect(texto, `${arq} voltou a tratar documento como conveniência no CÓDIGO`).not.toMatch(
+        /[Dd]ocumento é conveniência/,
+      );
+    }
   });
 });

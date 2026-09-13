@@ -1104,3 +1104,310 @@ com a Greens). Os dois primeiros são nossos e cabem na sprint; o terceiro depen
 - **não mexeu nos seis criadores de ficha** que não gravam procedência — é escopo próprio, e o
   nulo já significa o que precisa significar
 - **não corrigiu os achados do lado da Greens** (Y1…Y6) — continuam para comunicar, não corrigir
+
+---
+
+# PARTE VIII — A medição em PRODUÇÃO, e o que ela desmente
+
+> **Escrita em 13/09/2026**, depois de o dono conseguir acesso ao servidor e pedir: _"vamos
+> investigar mais nos logs do servidor, não só esse problema mas todos que podem englobar os 4
+> fluxos com seus portões da Greens"_.
+>
+> 🔴 **É a primeira vez nesta ADR que os números vêm do banco de produção.** Tudo antes daqui
+> foi lido no código. Vários parágrafos das partes anteriores **estavam errados**, e esta parte
+> diz quais.
+
+## §38 — 🔴 O achado que reorganiza tudo: NINGUÉM nunca concluiu
+
+```
+origem            status          qtd   concluidas
+greens_handoff    link_gerado      27       0
+chatpro_bot       link_acessado    18       0
+chatpro_bot       link_gerado      11       0
+greens_handoff    link_acessado     8       0
+```
+
+**64 solicitações. Zero concluídas.** Nenhum paciente, desde que o fluxo existe, chegou ao fim
+do cadastro por link.
+
+⚠️ **Isto muda o peso de tudo que foi escrito antes.** As partes I a VII trataram o problema do
+dono como um caso — três e-mails de teste, um estado sujo. **Não é um caso: é o comportamento
+de todos.** O cadastro por link nunca funcionou para ninguém.
+
+E explica um silêncio que devia ter chamado atenção: `usadas_sem_vinculo: 0` em todas as
+linhas. Não há cadastro meio-feito no banco porque **não há cadastro feito**.
+
+## §39 — 🔴 E não há documento nenhum para materializar
+
+```
+protocolo     itens  com_arquivo  so_declaracao  tipos
+SOL-000063      1         0             1        [autorizacao_anvisa]
+SOL-000056      1         0             1        [receita_medica]
+SOL-000050      2         0             2        [documento_identidade, receita_medica]
+…
+```
+
+**Em DEZ solicitações medidas, `com_arquivo` é ZERO em todas.**
+
+O campo `documentos_do_parceiro` guarda uma lista mista de propósito: **string** para o que o
+parceiro só declarou ter, **objeto com `urlBlob`** para o que ele mandou de fato. E
+`materializarDocumentosDoParceiro` filtra por `ehArquivo`, que exige `urlBlob`.
+
+🔴 **Todo o manifesto em produção é declaração. Nenhum arquivo.**
+
+⚠️ **E aqui está a correção mais importante desta ADR:** o relato que a abriu — _"nenhum dos
+documentos que eu enviei chegaram na minha conta"_ — **não tem a causa que eu atribuí**. Não foi
+a materialização que falhou, nem a reconciliação que não rodou. **Não havia o que materializar.**
+
+Passei as partes IV a VII construindo sentinela, procedência, reconciliação e instrumento para
+um problema cuja causa estava um passo antes.
+
+### 39.1 Por que os arquivos não chegam — as duas pontas
+
+**Do lado da Greens** (`HandoffService.ts:180-210`): ela monta `{ tipo, url }` quando consegue
+assinar a URL do S3, e devolve **só o tipo** quando não consegue — com um log próprio
+_"documentos sem arquivo"_ e o motivo em `semUrl`.
+
+**Do nosso lado** (`handoff.ts:62`), o log de produção mostra:
+
+```
+[parceiros] documentos recusados: receita_medica:Error,comprovante_residencia:Error,documento_identidade:Error
+```
+
+🔴 **E o motivo é ILEGÍVEL, por um defeito que esta ADR já documentou e eu repeti:**
+
+```ts
+motivo: erro instanceof Error ? erro.name : 'erro_desconhecido';
+```
+
+`erro.name` de um `new Error()` é **sempre** `'Error'`. É exatamente o defeito do guarda
+`o-cadastro-feito-nao-vira-falha` — _"o log dizia só `{ erro: 'Error' }`"_ — cometido de novo,
+no módulo ao lado.
+
+**Consequência prática:** temos a prova de que os documentos são recusados e **nenhuma
+informação sobre por quê**. `origemAutorizada` sabe distinguir seis motivos
+(`sem_origens_configuradas`, `origem_nao_autorizada`, `http_403`, `tipo_de_arquivo_recusado`,
+`tamanho_fora_do_limite`, `dns_nao_resolveu`) — e o `catch` final joga todos fora.
+
+**G21 — o motivo da recusa de documento é `erro.name`, que não distingue nada.**
+
+## §40 — A ficha casca não é exceção: é a regra
+
+```
+total_fichas    154
+sem_origem      154
+sem_cpf          19
+sem_solicitacao 154
+```
+
+**As 154 fichas do sistema não têm procedência nem vínculo com solicitação.** O G2 e o G5, que
+as partes I e II trataram como defeito a corrigir daqui para frente, descrevem **o banco
+inteiro**.
+
+⚠️ A coluna `origem` existe desde a migration `0042` (12/09) e só é gravada por
+`cadastro-por-link.ts` — que, pelo §38, **nunca completou uma execução**. Daí 154 de 154.
+
+## §41 — Zero consentimentos no banco
+
+```
+===== F. CONSENTIMENTOS (0) =====
+(vazio)
+```
+
+Nenhuma linha em `consentimentos`, de nenhuma finalidade, para nenhum paciente.
+
+🔴 **Isto significa que o S8.0 — a revogação que para a fila — nunca teve o que barrar.** E que
+a transferência de cadastro para a Greens, que exige finalidade consentida, **não pode ter
+acontecido nenhuma vez**. Consistente com o §38.
+
+⚠️ **E dá a dimensão certa ao bloco `ConsentimentoQueFaltou`:** ele não é um remendo para o caso
+do dono. É o único caminho pelo qual um consentimento pode existir hoje, já que o do formulário
+depende de uma conclusão que nunca ocorre.
+
+## §42 — O que os LOGS dizem, em ordem de gravidade
+
+Medido com `pm2 logs --lines 3000`, agrupado por padrão:
+
+| ocorrências | linha                                                                                        | o que significa                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **254**     | `[chatpro] resposta de erro não recuperável { caminho: '/leads/findById', status: 401 }`     | 🔴 **o token do ChatPro está inválido** — 401 é credencial recusada, não indisponibilidade |
+| **~200**    | `[chatpro] contato não confirmado por findById`                                              | consequência direta do 401 acima                                                           |
+| 52          | `[parceiros] handoff recebido`                                                               | a Greens **está** chamando; a entrada funciona                                             |
+| 13          | `[chatpro] falha de conexão esgotou as tentativas`                                           | idem 401, por outro caminho                                                                |
+| 13+13+8     | `401` em `/endings/list`, `/departments/list`, `/sessions/getSessionById`                    | **toda** a API do ChatPro recusa                                                           |
+| 5+4+2       | `[chatpro] bot-link: documentos não reconhecidos { ignorados: ['autorizacao_anvisa?ses…'] }` | 🔴 **o `?sessionId` colado no valor — o bug do separador AINDA acontece**                  |
+| 6           | `[chatpro] bot-link com segredo inválido`                                                    | alguém chama com segredo errado                                                            |
+| 7           | `[chatpro] bot-link: contato não identificado`                                               | consequência do 401                                                                        |
+| 5           | `duplicate key … "consultas_medico_da…"` + `[Action] Erro ao reservar consulta`              | 🔴 agendamento falha por índice único                                                      |
+| 2           | `[parceiros] documentos recusados: …:Error`                                                  | §39.1                                                                                      |
+
+### 42.1 🔴 G22 — a credencial do ChatPro está recusada, e há 254 provas
+
+`401` não é rede instável: é o servidor dizendo que a credencial não vale. Toda a integração de
+leitura do ChatPro está fora do ar — e como `bot-link` depende de `findById` para identificar o
+contato, **o fluxo 2 (bot da Greens) e o fluxo 4 (ChatPro da BeHemp) estão comprometidos na
+origem**.
+
+⚠️ E o sistema **não avisa ninguém**. Ele degrada: loga, segue, e o paciente recebe um link sem
+manifesto ou não recebe link nenhum.
+
+### 42.2 🔴 G23 — o bug do `?sessionId` sobreviveu ao guarda
+
+```
+[chatpro] bot-link: documentos não reconhecidos no manifesto
+{ ignorados: [ 'autorizacao_anvisa?ses…' ] }
+```
+
+O `a-query-do-painel-aguenta-o-separador-errado` foi escrito para isto, com 28 casos e 13
+sabotagens. **E o log mostra que continua acontecendo.**
+
+Duas leituras possíveis, e não dá para escolher sem medir: ou o painel do ChatPro manda por um
+caminho que a correção não cobre, ou a correção não está no caminho que o `bot-link` usa. **Não
+vou supor qual** — o §43 diz como medir.
+
+### 42.3 G24 — reserva de consulta viola índice único
+
+`duplicate key value violates unique constraint "consultas_medico_da…"` com
+`[Action] Erro ao reservar consulta`. O paciente tenta agendar e recebe erro. Toca os **quatro**
+fluxos, porque todos terminam em consulta.
+
+## §43 — O que ainda NÃO foi medido, e como medir
+
+Aplicando a pergunta 6 da regra — listar o que falta, em vez de parar no que já explica:
+
+| #   | pergunta aberta                                               | como responder                                                                                                 |
+| --- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | **por que** os documentos são recusados                       | corrigir o `motivo` (G21) e ler o próximo handoff                                                              |
+| 2   | o `PARCEIRO_ORIGENS_DE_DOCUMENTO` tem o host do S3 da Greens? | conferir no servidor — `sem_origens_configuradas` e `origem_nao_autorizada` são as duas hipóteses mais baratas |
+| 3   | o token do ChatPro expirou ou mudou?                          | é credencial, não código — decisão do dono                                                                     |
+| 4   | o `?sessionId` chega por qual caminho hoje                    | logar a URL crua recebida pelo `bot-link`, uma vez                                                             |
+| 5   | a Greens loga `documentos sem arquivo`?                       | está no `HandoffService` deles — pedir o log                                                                   |
+
+🔴 **A 1 e a 2 são o caminho crítico do fluxo 1.** Sem elas, a reconciliação pode funcionar
+perfeitamente e continuar não trazendo documento nenhum — porque não há nenhum.
+
+## §44 — O que isto muda nas decisões já tomadas
+
+| decisão                            | continua valendo?                                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| D-05…D-08 (sentinela, procedência) | ✅ sim — mas operam sobre um banco onde 154/154 fichas não têm procedência                                                            |
+| D-09 (reconciliação)               | ⚠️ **sim, e insuficiente**: ela liga conta e solicitação, mas o manifesto não tem arquivo                                             |
+| D-14 (revogação para a fila)       | ✅ sim — sem efeito prático hoje (§41), e é isso que se quer                                                                          |
+| D-17 (retomada)                    | ✅ sim                                                                                                                                |
+| **D-18 (nova)**                    | 🔴 **o motivo da recusa de documento tem de ser o motivo, não `erro.name`**                                                           |
+| **D-19 (nova)**                    | 🔴 **falha de credencial de integração não pode degradar em silêncio** — 254 `401` sem um alerta é o sistema aceitando estar quebrado |
+
+⚠️ **E a lição de método, que é a mais cara:** eu construí quatro partes desta ADR — sentinela,
+reconciliação, instrumento, confirmação — em cima de uma causa que **nunca medi**. O código
+dizia que documentos eram materializados a partir do manifesto; eu nunca perguntei ao banco **o
+que havia no manifesto**. A resposta era zero, e estava a um `SELECT` de distância desde o
+começo.
+
+---
+
+# PARTE IX — O transporte do documento, pelas quatro etapas
+
+> **Escrita em 13/09/2026**, depois de o dono cobrar o método: _"e quanto ao nosso método
+> utilizado na ADR que é justamente aquelas 4 etapas envolvendo pesquisa, melhoria, adaptação?
+> isso está no claude.md certo? logo porque você não está aplicando?"_
+>
+> ⚠️ **Ele estava certo.** As partes VIII e anteriores corrigiram defeitos um a um, de forma
+> reativa. Esta parte aplica o método — nomear · comparar · julgar · decidir — ao problema que
+> a medição revelou: **os documentos da Greens não chegam**.
+
+## §45 — E o dono derrubou uma premissa do código antes de tudo
+
+Três arquivos diziam, em comentário: _"documento é conveniência; o cadastro é o que importa"_.
+
+> _"O envio do documento é tão necessário quanto a criação da conta. O paciente passa por 2
+> formulários e 1 se torna à toa e o outro mentiroso, já que os dados nunca chegam. Para que
+> serve então esse fluxo todo que estamos criando?"_
+
+🔴 **Ele tem razão, e os dados são piores que o argumento:** dos 67 itens de documento recebidos
+da Greens, **zero** tinham arquivo — e a nossa tela chega a dizer _"o que já recebemos: receita
+médica"_ sobre uma palavra, não sobre um arquivo.
+
+**D-20 — Documento do parceiro não é conveniência. A falha é fato a cobrar, não custo aceito.**
+
+⚠️ **O que NÃO muda:** continuar não lançando. Derrubar o cadastro porque um arquivo não copiou
+deixa o paciente sem conta **e** sem documento, que é pior. O que muda é o destino da falha:
+motivo legível, visível na tela (S8.4) e cobrável da origem.
+
+## §46 — 1. NOMEAR: é um Claim Check, e a referência é perecível
+
+O que Greens e BeHemp fazem com documento tem nome: **Claim Check** (Hohpe & Woolf, _Enterprise
+Integration Patterns_). O produtor não põe o arquivo na mensagem — guarda num store e manda uma
+**referência**; o consumidor busca. É literalmente o `{ tipo, url }` do handoff.
+
+## §47 — 2. COMPARAR: onde o padrão cobre, e onde ele não cobre
+
+| o que o padrão prevê            | o que temos                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| referência pequena na mensagem  | ✅ `{ tipo, url }`                                     |
+| payload em store externo        | ✅ S3 da Greens                                        |
+| consumidor busca quando precisa | 🔴 **não** — a URL expira em 1 h                       |
+| store acessível às duas pontas  | ⚠️ parcial — é o bucket **deles**, e nós re-hospedamos |
+
+🔴 **A divergência que importa: o padrão supõe a referência DURÁVEL.** A nossa é uma URL assinada
+de S3 com TTL de 1 h. Referência perecível quebra a premissa, e é a origem da fragilidade.
+
+⚠️ **E a doc da AWS traz um agravante que pode explicar `403` inesperado:** _"a presigned URL
+expires at either its configured expiration time or when its associated credentials expire,
+whichever occurs first"_. Se a Greens assina com credencial temporária (role de container ou
+Lambda), a URL pode morrer **antes** da hora que ela pediu — e nós veríamos apenas um 403, sem
+saber que a culpa não é do prazo.
+
+## §48 — 3. JULGAR: três caminhos, e o que havia era o pior
+
+| #   | caminho                                                         | custo                                                | veredicto                                  |
+| --- | --------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------ |
+| a   | uma tentativa síncrona na entrada                               | zero                                                 | 🔴 **era o que existia, e é indefensável** |
+| b   | a Greens faz PUSH do arquivo no handoff                         | muda o contrato, pesa o POST, cria limite de tamanho | troca um problema por outro                |
+| c   | referência **durável**: endpoint autenticado deles, sob demanda | trabalho do lado deles                               | 🥇 mais robusto, e não depende de nós      |
+
+🔴 **Por que (a) é indefensável, e foi medido:** `fetch` único, timeout de 30 s, **zero
+retentativa**. Uma queda de rede de um segundo perdia o documento **para sempre** — na próxima
+vez que alguém tentasse, a URL já teria expirado. Não havia caminho de volta.
+
+## §49 — 4. DECIDIR: adotar, com duas adaptações — e por que ficamos melhores
+
+**D-21 — Claim Check com referência perecível exige retentativa na janela e registro da recusa.**
+
+| adaptação                         | por que o padrão puro não basta                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **retentativa dentro da janela**  | a URL vale ~1 h; insistir por 1 s é gratuito e cobre a classe inteira de falha transitória        |
+| **a recusa vira fato registrado** | o padrão supõe que o consumidor sempre consegue buscar, e não diz o que fazer quando não consegue |
+
+⚠️ **O que NÃO se retenta, de propósito:** `403` e `404`. Expirada é expirada, ausente é ausente
+— insistir contra veredicto definitivo gasta a janela de que os transitórios precisam, e no caso
+do 403 martela a assinatura do parceiro à toa.
+
+🔴 **Ficamos melhores, ou só mais parecidos com o mercado?** (a pergunta 4, que impede pesquisa
+de virar enfeite) — **melhores, e de forma verificável:**
+
+- antes: falha de rede ⇒ documento perdido **para sempre**, sem rastro
+- depois: três tentativas; e se ainda falhar, o banco guarda `{ tipo, recusadoPorque, recusadoEm }`
+
+**E a segunda adaptação corrige um apagamento de prova.** Antes, o item recusado voltava ao banco
+como a mesma `string` do documento que o parceiro **nunca mandou**: _"a Greens não mandou"_ e _"a
+Greens mandou e nós não conseguimos buscar"_ viravam o mesmo registro. Foi isso que fez 67 itens
+passarem semanas sem dono — e o que quase me fez escrever aqui que ela _"nunca manda arquivo"_,
+quando o log provava o contrário em pelo menos dois casos.
+
+## §50 — O que fica para a Greens, e o que é decisão deles
+
+O caminho (c) do §48 — referência durável — é a solução completa, e é do lado deles. O pedido
+está em `docs/integracao-greens/PROMPT-PARA-A-GREENS-documentos-nao-chegam.md`, com o `grep` que
+responde a pergunta em uma linha:
+
+```bash
+grep "Handoff Be4Hope: documentos sem arquivo" <log> | tail -30
+```
+
+O campo `semUrl` deles traz `tipo:motivo` e separa as três causas: `falha_ao_assinar` (S3 ou
+credencial), `motivoSemUrl` (o pedido não tinha anexo — caso legítimo), ou nenhuma linha (o
+`plano` chega vazio).
+
+⚠️ **Nossa allowlist está correta e medida:**
+`PARCEIRO_ORIGENS_DE_DOCUMENTO = https://greens-site-bucket.s3.us-east-1.amazonaws.com`. Se
+vierem URLs assinadas desse bucket, elas passam.
