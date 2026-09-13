@@ -155,9 +155,35 @@ describe('a reconciliação termina o que já estava feito', () => {
      * pode ser o oitavo: ela chama a action que já existe, com as mesmas travas.
      */
     expect(PAGINA, 'a reconciliação grava por fora da action').toMatch(/concluirCadastroPorLink\(/);
-    expect(MODULO, 'o módulo de reconciliação escreve por conta própria').not.toMatch(
-      /db\.(insert|update|delete)\(/,
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026. A versão anterior proibia TODA escrita no módulo — e ficou
+     * vermelha quando a `reconciliarPelaSessao` nasceu, acusando o conserto.
+     *
+     * A propriedade que a ADR-0022 protege não é "nunca escreva": é **não seja o oitavo criador
+     * de ficha**. Os sete criadores documentados fizeram estrago porque cada um INSERE em
+     * `pacientes` com um conjunto de campos diferente. Atualizar uma ficha existente e
+     * materializar documentos não é isso.
+     *
+     * ⚠️ E a reconciliação pela sessão não pode usar a action: ela exige o token, que quem entra
+     * pela conta não tem — e não deveria precisar, porque a sessão autentica melhor.
+     */
+    expect(MODULO, 'a reconciliação virou o OITAVO criador de ficha').not.toMatch(
+      /insert\(pacientes\)/,
     );
+    expect(MODULO, 'a reconciliação apaga dado — ela só completa o que falta').not.toMatch(
+      /\.delete\(/,
+    );
+  });
+
+  it('🔴 sem ficha, a reconciliação DESISTE — não cria uma para si', () => {
+    /**
+     * O que impede o oitavo criador, na prática: se não há ficha, ela devolve `sem_ficha` e sai.
+     * Quem cria ficha continua sendo o `/redirect` e a action do cadastro.
+     */
+    const i = MODULO.indexOf('export async function reconciliarPelaSessao');
+    expect(i, 'a reconciliação pela sessão sumiu').toBeGreaterThan(-1);
+    const fn = MODULO.slice(i);
+    expect(fn, 'não há saída para o caso de ficha ausente').toMatch(/sem_ficha/);
   });
 
   it('⚠️ reconciliação que FALHA não vira tela de erro — cai no formulário', () => {

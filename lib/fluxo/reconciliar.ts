@@ -38,10 +38,11 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { solicitacoesCadastro } from '@/db/schema';
+import { documentos, pacientes, solicitacoesCadastro, users } from '@/db/schema';
+import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
 
 export type ResultadoDaReconciliacao =
-  | { reconciliou: true; pacienteId: string; destino: string }
+  | { reconciliou: true; pacienteId: string; documentosMaterializados: number }
   | { reconciliou: false; porque: string };
 
 /**
@@ -90,4 +91,131 @@ export async function solicitacaoAbertaDoEmail(email: string | null | undefined)
     .limit(1);
 
   return linha ?? null;
+}
+
+/**
+ * RECONCILIA PELO E-MAIL, SEM TOKEN — o caminho de quem entra pela conta.
+ *
+ * 🔴 ESTA FUNÇÃO NASCEU DE UM ERRO MEU, medido pelo dono em produção em 13/09/2026.
+ *
+ * A primeira versão da reconciliação vivia só em `/cadastro/[token]`: ela só rodava se o
+ * paciente **abrisse o link**. Ele fez o que qualquer pessoa faria — entrou na conta e navegou
+ * pelo menu até a ANVISA — e encontrou a tela pedindo os quatro documentos que ele já tinha
+ * mandado pela Greens. Palavras dele: _"a falsa reconciliação está acontecendo"_.
+ *
+ * E ele tinha pedido exatamente isto antes: _"era pra fazer isso automaticamente ANTES DE LOGAR
+ * na conta, já que a conta já tá criada e validada"_. Eu pus no lugar errado.
+ *
+ * ⚠️ POR QUE NÃO DÁ PARA REUSAR `concluirCadastroPorLink` AQUI: ela exige o token, que é a
+ * credencial do link. Quem entra pela conta não o tem — e não deveria precisar. O que autentica
+ * neste caminho é a **sessão**, que é mais forte: o Clerk já verificou o e-mail.
+ *
+ * ## O que ela faz, e o que deliberadamente NÃO faz
+ *
+ * Preenche a ficha com o que a Greens mandou, materializa os documentos e liga a solicitação ao
+ * paciente. **Não** consente, **não** responde pergunta clínica, **não** apaga nada.
+ *
+ * 🔴 E NÃO CONSOME O LINK. O token continua válido: se o paciente abrir o link depois, a tela
+ * do cadastro ainda funciona, agora com a ficha já preenchida. Queimar o link aqui tiraria dele
+ * um caminho que ele não pediu para perder.
+ */
+export async function reconciliarPelaSessao(params: {
+  clerkId: string;
+  email: string;
+}): Promise<ResultadoDaReconciliacao> {
+  const solicitacao = await solicitacaoAbertaDoEmail(params.email);
+  if (!solicitacao) return { reconciliou: false, porque: 'sem_solicitacao_aberta' };
+
+  const [usuario] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, params.clerkId))
+    .limit(1);
+
+  if (!usuario) return { reconciliou: false, porque: 'sem_usuario' };
+
+  const [ficha] = await db
+    .select({ id: pacientes.id, cpf: pacientes.cpf, origem: pacientes.origem })
+    .from(pacientes)
+    .where(and(eq(pacientes.userId, usuario.id), isNull(pacientes.deletedAt)))
+    .limit(1);
+
+  if (!ficha) return { reconciliou: false, porque: 'sem_ficha' };
+
+  /**
+   * ⚠️ SÓ PREENCHE O QUE ESTÁ VAZIO. A ficha pode ter sido completada pelo próprio paciente
+   * depois — sobrescrever com o dado do parceiro apagaria a correção que ele fez à mão, que é
+   * o oposto de reconciliar.
+   */
+  const aPreencher = {
+    ...(ficha.cpf ? {} : { cpf: solicitacao.cpf ?? undefined }),
+    ...(ficha.origem ? {} : { origem: solicitacao.origem, solicitacaoId: solicitacao.id }),
+  };
+
+  /**
+   * ⚠️ SÓ ATUALIZA SE HOUVER O QUE ATUALIZAR — e isto é outro defeito que a execução achou.
+   *
+   * Na SEGUNDA passada (esta função roda em todo login), a ficha já tem CPF e procedência, então
+   * o objeto fica vazio e o Drizzle recusa com `No values to set`. O erro subia, o `try/catch` do
+   * `/redirect` engolia, e a reconciliação parava de funcionar do segundo login em diante — em
+   * silêncio, que é o pior modo de falhar.
+   */
+  if (Object.keys(aPreencher).length > 0) {
+    await db.update(pacientes).set(aPreencher).where(eq(pacientes.id, ficha.id));
+  }
+
+  /**
+   * 🔴 O QUE O DONO FOI PROCURAR E NÃO ACHOU: os documentos da Greens viram documentos dele.
+   *
+   * ⚠️ E AQUI ESTAVA UM DEFEITO MEU, achado pelo teste de integração antes de chegar a produção.
+   *
+   * Eu havia escrito no comentário que `materializarDocumentosDoParceiro` "é idempotente".
+   * **Não é** — ele sempre insere. Isso era inofensivo enquanto ele rodava uma vez só, dentro do
+   * cadastro por link, que consome o token no caminho. Esta função roda em **todo login**: três
+   * visitas produziriam três cópias da mesma receita, e a tela da ANVISA viraria uma lista de
+   * duplicatas.
+   *
+   * A idempotência entra aqui, não lá: mexer no materializador mudaria o comportamento do
+   * cadastro por link, que tem guardas próprios e não pediu essa mudança.
+   */
+  const jaMaterializados = await db
+    .select({ urlBlob: documentos.urlBlob })
+    .from(documentos)
+    .where(and(eq(documentos.pacienteId, ficha.id), isNull(documentos.deletedAt)));
+
+  const urlsExistentes = new Set(jaMaterializados.map((d) => d.urlBlob));
+  const manifesto = Array.isArray(solicitacao.documentosDoParceiro)
+    ? solicitacao.documentosDoParceiro
+    : [];
+
+  /**
+   * A `urlBlob` é o identificador real do arquivo: mesma URL, mesmo documento. Comparar por
+   * TIPO recusaria um segundo RG legítimo (frente e verso chegam separados).
+   */
+  const aindaNaoCopiados = manifesto.filter(
+    (d) =>
+      typeof d === 'object' &&
+      d !== null &&
+      !urlsExistentes.has((d as { urlBlob?: string }).urlBlob ?? ''),
+  );
+
+  const copiados = await materializarDocumentosDoParceiro({
+    pacienteId: ficha.id,
+    documentosDoParceiro: aindaNaoCopiados,
+    protocolo: solicitacao.protocolo,
+  });
+
+  // O vínculo, para o painel e a sentinela pararem de ver a solicitação como órfã.
+  if (!solicitacao.pacienteId) {
+    await db
+      .update(solicitacoesCadastro)
+      .set({ pacienteId: ficha.id })
+      .where(eq(solicitacoesCadastro.id, solicitacao.id));
+  }
+
+  return {
+    reconciliou: true,
+    pacienteId: ficha.id,
+    documentosMaterializados: copiados.inseridos,
+  };
 }
