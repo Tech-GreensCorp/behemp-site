@@ -38,6 +38,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
 import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 import { z } from 'zod';
 
 import { DOCUMENTOS_DO_FLUXO, type DocumentoDoFluxo } from './documentos';
@@ -223,17 +224,6 @@ async function baixarComRetentativa(url: string): Promise<Response> {
   }
 
   return ultima!;
-}
-
-function motivoLegivel(erro: unknown): string {
-  if (!(erro instanceof Error)) return 'erro_desconhecido';
-  const causa = (erro as { cause?: { code?: string } }).cause?.code;
-  const texto = (causa ? causa + ': ' + erro.message : erro.message) || erro.name;
-  return texto
-    .replace(/https?:\/\/\S+/g, '<url>')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
 }
 
 export async function origemAutorizada(url: string): Promise<{ ok: boolean; motivo?: string }> {

@@ -283,6 +283,26 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **Onze pontos ainda logam `erro.name`, que é sempre `'Error'`** — catalogado em
+      13/09/2026, depois de esse mesmo defeito esconder por quatro dias a falha que impedia
+      **todo** documento de paciente de ser gravado. Os do caminho do Fluxo 1 · Portão 1 foram
+      corrigidos com `lib/erros/motivo-legivel.ts`; ficam: `lib/parceiros/notificar.ts:93`,
+      `enfileirar-transferencia.ts:84`, `cadastro-pendente.ts:102`, `enviador.ts:261`,
+      `lib/anvisa/avisar-aprovacao.ts:79,95,103`,
+      `app/(paciente)/_actions/consentimento.ts:201`,
+      `app/api/parceiros/greens/cadastro/route.ts:196`, `app/api/chatpro/triagem/route.ts:74`,
+      `app/api/parceiros/enviar/route.ts:32`. **Perigo de mexer: BAIXO, mas não zero** — trocar
+      por `erro.message` VAZA: medido contra Postgres real em 13/09, o Drizzle monta a mensagem
+      com a query inteira e os valores inline (`Failed query: insert into … values ('529.982.
+247-25', …)`). A troca correta é `motivoLegivel`, que já trata isso; cada ponto precisa
+      ser conferido pelo que ele pode carregar.
+- [ ] ⚠️ **`app/_actions/cadastro-por-link.ts:646` fica com `erro.name` DE PROPÓSITO** — não é
+      esquecimento, e o guarda `cadastro-por-link-abre-sem-conta` o exige. As colunas daquela
+      transação são CPF, telefone e texto clínico. Melhorar o diagnóstico ali sem vazar exige
+      usar `code`/`constraint` do driver e **nunca** a mensagem — `motivoLegivel` já faz isso
+      para erro de banco, mas aquele `catch` cobre a transação inteira, não só o `insert`, e
+      trocar sem medir cada caminho é o tipo de "melhoria" que vira incidente de LGPD.
+
 - [ ] 🔴 **`BLOB_READ_WRITE_TOKEN` não está na lista `gravar` do `deploy.yml`** — medido em
       13/09/2026: `grep -n BLOB .github/workflows/deploy.yml` dá **zero**. Hoje funciona porque o
       token vive no `.env` da VPS, herdado de um `pm2 start` antigo e copiado a cada deploy pelo

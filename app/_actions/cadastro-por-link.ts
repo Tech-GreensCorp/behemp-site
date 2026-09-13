@@ -643,6 +643,17 @@ export async function concluirCadastroPorLink(
        * O nome do erro continua aqui, mas ele sozinho não bastava: `erro.name` de um
        * `new Error(…)` é sempre `'Error'`, e foi exatamente o que produção registrou.
        */
+      /**
+       * 🔴 `erro.name` AQUI É DELIBERADO, e o guarda o exige — não é o defeito de log.
+       *
+       * Tentei trocar por `motivoLegivel` em 13/09/2026 e o guarda
+       * `cadastro-por-link-abre-sem-conta` ficou vermelho com razão: as colunas desta
+       * transação são CPF, telefone e texto clínico, e um erro de constraint do Postgres
+       * pode carregar o valor que a violou. `motivoLegivel` redige URL — não redige CPF.
+       *
+       * O diagnóstico aqui fica pobre de propósito. Melhorá-lo exige usar `code` e
+       * `constraint` do driver em vez da mensagem, e isso é trabalho próprio — catalogado.
+       */
       erro: erro instanceof Error ? erro.name : 'desconhecido',
       /**
        * ONDE, sem O QUÊ. A primeira linha do stack traz `arquivo:linha`; a MENSAGEM é que

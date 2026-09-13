@@ -6,10 +6,7 @@ import { documentos, pacientes, users } from '@/db/schema';
 import { eq, desc, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
-import {
-  apagarDocumentoPrivado,
-  guardarDocumentoPrivado,
-} from '@/lib/documentos/store-privado';
+import { apagarDocumentoPrivado, guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**

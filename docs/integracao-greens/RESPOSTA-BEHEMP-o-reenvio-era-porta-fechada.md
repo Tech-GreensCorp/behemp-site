@@ -106,13 +106,13 @@ funcionou** — e ao funcionar, destravou o erro seguinte, que estava escondido 
 
 ## O que o reenvio de vocês provou, em ordem
 
-| elo | estado | como sabemos |
-| --- | ------ | ------------ |
-| vocês mandam `{tipo, url}` | ✅ | manifesto gravado com **3 objetos** (antes: strings) |
-| a URL passa na nossa allowlist | ✅ | chegou ao download; nenhum `origem_nao_autorizada` |
-| o presigned do S3 abre | ✅ | os bytes chegaram |
-| o `porEvento` atualiza o manifesto | ✅ | **é a correção de ontem, e ela pegou** |
-| gravar o arquivo no nosso store | 🔴 | **falha aqui** |
+| elo                                | estado | como sabemos                                         |
+| ---------------------------------- | ------ | ---------------------------------------------------- |
+| vocês mandam `{tipo, url}`         | ✅     | manifesto gravado com **3 objetos** (antes: strings) |
+| a URL passa na nossa allowlist     | ✅     | chegou ao download; nenhum `origem_nao_autorizada`   |
+| o presigned do S3 abre             | ✅     | os bytes chegaram                                    |
+| o `porEvento` atualiza o manifesto | ✅     | **é a correção de ontem, e ela pegou**               |
+| gravar o arquivo no nosso store    | 🔴     | **falha aqui**                                       |
 
 ## O log da nossa VPS, sem edição
 

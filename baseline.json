@@ -25,7 +25,7 @@
   "tetos": {
     "lint_erros": 203,
     "lint_warnings": 130,
-    "prettier_arquivos": 321,
+    "prettier_arquivos": 319,
     "typecheck_erros": 0
   }
 }

@@ -569,7 +569,7 @@ desliga.
 > Os seis caminhos de documento **já pediam** `access: 'private'` desde 10/09, com comentário
 > explicando por quê. Nenhum funcionava: acesso é propriedade do **STORE**, escolhida na criação
 > e imutável, e o store que os tokens resolviam era público. O SDK recusava com `Cannot use
-> private access on a public store` — e **cinco dos seis engoliam o erro** num `catch` que
+private access on a public store` — e **cinco dos seis engoliam o erro** num `catch` que
 > logava `erro.name`, sempre `'Error'` para um `new Error`.
 >
 > **A consequência prática, e ela é diferente da do Item 6:** não havia documento em store

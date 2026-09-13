@@ -1632,14 +1632,14 @@ intenção que o SDK recusa**. E recusa corretamente.
 
 Seis caminhos deste repositório faziam exatamente isso:
 
-| caminho                                      | token que passava | desde |
-| -------------------------------------------- | ----------------- | ----- |
-| `lib/documentos/anexo-do-cadastro.ts`        | nenhum → default  | 10/09 |
-| `app/_actions/documentos.ts`                 | nenhum → default  | 11/09 |
-| `lib/parceiros/documentos-do-parceiro.ts`    | nenhum → default  | 13/09 |
-| `app/api/upload-documento/route.ts`          | `BLOB_BEHEMP_…`   | —     |
-| `app/_actions/documentos-paciente.ts`        | `BLOB_BEHEMP_…`   | —     |
-| `app/_actions/documentos-paciente-self.ts`   | `BLOB_BEHEMP_…`   | —     |
+| caminho                                    | token que passava | desde |
+| ------------------------------------------ | ----------------- | ----- |
+| `lib/documentos/anexo-do-cadastro.ts`      | nenhum → default  | 10/09 |
+| `app/_actions/documentos.ts`               | nenhum → default  | 11/09 |
+| `lib/parceiros/documentos-do-parceiro.ts`  | nenhum → default  | 13/09 |
+| `app/api/upload-documento/route.ts`        | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente.ts`      | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente-self.ts` | `BLOB_BEHEMP_…`   | —     |
 
 🔴 **E `BLOB_BEHEMP_READ_WRITE_TOKEN` não servia como store privado**, o que só apareceu ao
 varrer quem mais a usava: `app/api/upload-avatar/route.ts` e `app/api/upload-exame/route.ts`
@@ -1675,10 +1675,10 @@ Corrigido com `get(url, { access: 'private', token })`, que o SDK 2.3.3 já exp�
 
 ## §56 — A retratação: dois guardas ficavam VERDES com os seis quebrados
 
-| guarda                                        | exigia                               | por que não valia                       |
-| --------------------------------------------- | ------------------------------------ | --------------------------------------- |
-| `o-documento-do-paciente-nao-abre-sem-escopo` | `toContain("access: 'private'")`     | a intenção estava escrita; o resultado não |
-| `documento-do-parceiro-nao-vira-ssrf`         | `/ACESSO_DO_BLOB = 'private'/`       | idem, com uma constante no meio          |
+| guarda                                        | exigia                           | por que não valia                          |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------ |
+| `o-documento-do-paciente-nao-abre-sem-escopo` | `toContain("access: 'private'")` | a intenção estava escrita; o resultado não |
+| `documento-do-parceiro-nao-vira-ssrf`         | `/ACESSO_DO_BLOB = 'private'/`   | idem, com uma constante no meio            |
 
 **Os dois mediam FORMA.** E a forma estava perfeita: cada um dos seis pontos declarava
 `private`, com comentário explicando por quê. O que falhava era o efeito — e nenhum guarda
@@ -1712,3 +1712,73 @@ Mais um caso de **cobertura**, derivado do código: quem importar `put` do SDK e
 - **O guarda dos segredos não vê variável lida por DEPENDÊNCIA.** Ele deriva de `process.env.X`
   no nosso código, e o `@vercel/blob` lê o token por conta própria: ficou verde com o defeito
   presente, medido em 27/27. Classe nova, catalogada no `03`.
+
+## §58 — 🔴 D-24: o log diz o que aconteceu sem entregar o paciente junto
+
+**Achado ao seguir o fluxo até o fim**, logo depois do D-23 — e é o que a regra
+_"parar no primeiro achado"_ existe para evitar.
+
+Corrigido o `put`, o elo **seguinte** (`materializar-documentos.ts:141`) repetia exatamente o
+defeito que acabara de custar quatro dias: `erro instanceof Error ? erro.name : 'erro'`. Se o
+`insert` falhasse depois do store privado existir, o log diria `'Error'` e voltaríamos ao mesmo
+lugar. **Catorze pontos do repositório faziam isso.**
+
+### A correção óbvia estava errada, e um guarda provou
+
+Troquei quatro pontos por `motivoLegivel`. O guarda `cadastro-por-link-abre-sem-conta` ficou
+vermelho, com a explicação escrita nele: _"`erro.message` do Postgres carrega o valor que violou
+a constraint — e as colunas aqui são CPF, telefone e texto clínico."_
+
+**Medi contra um Postgres real em vez de decidir pelo comentário.** O comentário estava
+impreciso, e a realidade era **pior**:
+
+| camada                 | o que chega                                                           | vaza? |
+| ---------------------- | --------------------------------------------------------------------- | ----- |
+| `pg` cru, `message`    | `duplicate key value violates unique constraint "t_cpf_key"`          | não   |
+| `pg` cru, `detail`     | `Key (cpf)=(529.982.247-25) already exists.`                          | 🔴    |
+| **Drizzle, `message`** | `Failed query: insert into t2 values ('529.982.247-25', 'rg_maria…')` | 🔴🔴  |
+
+Não é o `detail` do Postgres — é o **Drizzle**, que monta a mensagem com a query inteira e os
+valores inline. Num `insert` de paciente isso é CPF, telefone, endereço e queixa clínica direto
+no log, e redigir por regex não resolve: os valores chegam **sem rótulo**, e uma regex de CPF não
+reconhece nome de arquivo nem texto clínico.
+
+### A decisão
+
+**Erro de banco não usa a mensagem. Nada dela.** O motivo sai de `code` + `constraint` + `table`,
+que o driver expõe separadamente e que **não carregam valor nenhum**:
+
+```
+banco:23505:pacientes_cpf_key:pacientes
+```
+
+⚠️ **E isso diagnostica MELHOR que a mensagem**, o que é o ponto que fecha a decisão. `23505` é
+`unique_violation` e a constraint diz qual campo — a pergunta fica respondida. `Failed query:
+insert…` responde a mesma pergunta **e entrega o paciente junto**.
+
+Distinguir erro de banco de erro de rede é por SQLSTATE (cinco caracteres começando por dígito),
+porque os dois usam o mesmo campo `cause.code` — rede traz `ECONNREFUSED`, `ENOTFOUND`,
+`UND_ERR_CONNECT_TIMEOUT`, e esses continuam valendo a pena.
+
+Mais uma rede de segurança: mensagem que **comece** com `Failed query:` não passa inteira, mesmo
+sem `cause` para reconhecê-la — driver diferente, versão nova do Drizzle, erro reembrulhado.
+
+### §58.1 — O que fica com `erro.name`, e por quê
+
+`app/_actions/cadastro-por-link.ts:646` **mantém** `erro.name`, com o motivo escrito no código.
+Aquele `catch` cobre a transação inteira do cadastro, não só um `insert`, e o guarda o exige.
+Melhorá-lo é trabalho próprio — catalogado no `03`, junto dos **onze** pontos restantes.
+
+🔴 **Isto não é dívida esquecida: é dívida medida.** O ponto ruim de diagnóstico continua ruim
+de propósito, porque a alternativa disponível hoje seria pior — e a diferença entre as duas está
+escrita onde quem for mexer vai ler.
+
+### §58.2 — O guarda
+
+`o-motivo-do-erro-diagnostica-sem-vazar` — **15 casos, provados por 7 sabotagens**, e todos
+**executam** a função. Fica vermelho nas duas direções: se o motivo voltar a ser `'Error'`, e se
+CPF, telefone, nome de arquivo ou queixa clínica aparecerem nele.
+
+⚠️ **As duas direções no mesmo guarda são de propósito.** Separadas, alguém "resolve" uma
+passando a logar a mensagem crua, e o outro guarda é que fica vermelho — em outro arquivo, em
+outro PR, talvez em outra semana.

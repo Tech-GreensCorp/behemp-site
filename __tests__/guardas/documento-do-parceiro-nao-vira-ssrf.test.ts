@@ -329,11 +329,18 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
     /**
      * ⚠️ E NUNCA a URL: a `message` de um erro de `fetch` costuma trazer o endereço, e o do
      * parceiro carrega assinatura de acesso ao S3 dele. Log não é lugar de credencial.
+     *
+     * 🔴 A função saiu deste arquivo em 13/09/2026 — o elo SEGUINTE do mesmo fluxo
+     * (`materializar-documentos.ts`) repetia o defeito que ela resolve, e uma função de
+     * segurança presa num arquivo não protege o vizinho. Ela vive em `lib/erros/`, com guarda
+     * próprio que a EXECUTA contra um Postgres real.
      */
-    const i = semComent.indexOf('function motivoLegivel');
-    expect(i, 'a função que monta o motivo sumiu').toBeGreaterThan(-1);
-    const helper = semComent.slice(i, semComent.indexOf('\n}', i));
-    expect(helper, 'o motivo pode vazar a URL assinada do parceiro').toMatch(/https\?/);
+    expect(semComent, 'o parceiro deixou de usar o motivo que não vaza').toContain(
+      'motivoLegivel(',
+    );
+    expect(semComent, 'a função voltou a ser declarada aqui, e o vizinho fica sem ela').not.toMatch(
+      /function motivoLegivel/,
+    );
   });
 
   it('e o blob continua privado', () => {

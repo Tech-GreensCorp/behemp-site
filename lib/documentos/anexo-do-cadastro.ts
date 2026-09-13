@@ -17,6 +17,7 @@
  */
 
 import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
@@ -128,7 +129,8 @@ export async function anexarDocumentoDoCadastro(params: {
   } catch (erro) {
     console.error(
       '[cadastro] falha ao anexar documento:',
-      erro instanceof Error ? erro.name : 'erro',
+      // `erro.name` é sempre 'Error'. Este catch engoliu 3 dias de falha silenciosa.
+      motivoLegivel(erro),
     );
     return false;
   }
