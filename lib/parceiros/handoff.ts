@@ -37,6 +37,20 @@ import { urlDeRetornoPermitida } from './retorno';
  */
 
 /**
+ * Um documento que o parceiro DISSE ter mandado e que não conseguimos buscar.
+ *
+ * 🔴 Existe para separar dois fatos que o banco confundia: _"o parceiro não mandou"_ e _"o
+ * parceiro mandou e nós não conseguimos pegar"_. Os dois viravam a mesma string, e por isso 67
+ * itens passaram semanas sem que ninguém soubesse de quem era o problema.
+ */
+export interface DocumentoRecusado {
+  tipo: string;
+  /** O motivo real — `origem_nao_autorizada`, `http_403`, `tipo_de_arquivo_recusado`… */
+  recusadoPorque: string;
+  recusadoEm: string;
+}
+
+/**
  * Monta o que vai para `documentos_do_parceiro`, baixando o que vier com URL.
  *
  * O campo guarda uma lista MISTA de propósito: nome puro para o que o parceiro só declarou
@@ -49,7 +63,7 @@ import { urlDeRetornoPermitida } from './retorno';
 async function manifestoComArquivos(
   documentos: Array<string | Record<string, unknown>> | null | undefined,
   referencia: string,
-): Promise<Array<string | ArquivoMaterializado>> {
+): Promise<Array<string | ArquivoMaterializado | DocumentoRecusado>> {
   const { manifesto, comArquivo } = normalizarEntradas(
     documentos as Parameters<typeof normalizarEntradas>[0],
   );
@@ -64,7 +78,36 @@ async function manifestoComArquivos(
     );
   }
   const comArquivoPorTipo = new Set(arquivos.map((a) => a.tipo));
-  const semArquivo = normalizarManifesto(manifesto).filter((n) => !comArquivoPorTipo.has(n));
+  const recusadosPorTipo = new Map(recusados.map((r) => [r.tipo, r.motivo]));
+
+  /**
+   * 🔴 A RECUSA FICA GRAVADA — e sem isto a evidência sumia do banco.
+   *
+   * Medido em produção em 13/09/2026, e quase fez o diagnóstico apontar para o lado errado: o
+   * log dizia `documentos recusados: receita_medica:Error`, mas no banco o item voltava a ser a
+   * STRING `"receita_medica"` — idêntico ao caso em que o parceiro nunca mandou arquivo nenhum.
+   *
+   * ⚠️ Ou seja: **"a Greens não mandou" e "a Greens mandou e nós não conseguimos buscar" viravam
+   * o mesmo registro.** Foram 67 itens em 35 handoffs, e por isso ninguém separou as duas coisas
+   * por semanas — inclusive eu, que cheguei a escrever na ADR que ela "nunca manda arquivo"
+   * quando o log provava o contrário em pelo menos dois casos.
+   *
+   * Agora o item recusado guarda `{ tipo, recusadoPorque }`. `normalizarManifesto` continua
+   * extraindo o tipo das duas formas, então a tela de pendências não muda — mas o paciente passa
+   * a poder saber **de quem é o problema** (S8.4, R6), e nós a cobrar da origem com o motivo.
+   */
+  const semArquivo = normalizarManifesto(manifesto)
+    .filter((n) => !comArquivoPorTipo.has(n))
+    .map((tipo) =>
+      recusadosPorTipo.has(tipo)
+        ? {
+            tipo,
+            recusadoPorque: recusadosPorTipo.get(tipo)!,
+            recusadoEm: new Date().toISOString(),
+          }
+        : tipo,
+    );
+
   return [...semArquivo, ...arquivos];
 }
 

@@ -24,7 +24,13 @@
  * teria expirado e o documento se perderia em silêncio. Baixamos no handoff, re-hospedamos, e
  * o que fica guardado é o NOSSO endereço.
  *
- * ⚠️ E ELE NUNCA DERRUBA O HANDOFF. Documento é conveniência; o cadastro é o que importa.
+ * ⚠️ E ELE NUNCA DERRUBA O HANDOFF — mas isso não faz do documento algo dispensável.
+ *
+ * Decisão do dono em 13/09/2026, derrubando o que este comentário dizia antes: _"o envio do
+ * documento é tão necessário quanto a criação da conta; o paciente passa por 2 formulários e 1
+ * se torna à toa e o outro mentiroso"_. Não lançar continua certo — deixar o paciente sem
+ * conta E sem documento é pior. Mas a falha é FATO A COBRAR, não custo aceito: motivo legível,
+ * visível na tela (S8.4), e cobrável da origem.
  * Falha de download vira pendência — o paciente envia manualmente, como sempre pôde.
  */
 
@@ -138,6 +144,98 @@ function enderecoInterno(ip: string): boolean {
  * 🔴 E O DNS É RESOLVIDO AQUI. Sem isso, um host permitido apontando para 127.0.0.1 passa —
  * é o ataque de DNS rebinding que o cheat sheet da OWASP nomeia.
  */
+/**
+ * Transforma a exceção em algo legível num log seis semanas depois.
+ *
+ * ⚠️ NUNCA a URL. A `message` de um erro de `fetch` costuma incluir o endereço — e o do parceiro
+ * carrega assinatura de acesso ao S3 dele. Por isso a substituição e o recorte.
+ */
+/** Quantas vezes tentar buscar o arquivo do parceiro antes de desistir. */
+const TENTATIVAS_DE_DOWNLOAD = 3;
+
+/**
+ * Baixa o documento do parceiro, com retentativa curta dentro da janela da URL.
+ *
+ * ## Por que isto existe — as quatro etapas do `CLAUDE.md`
+ *
+ * **1. NOMEAR.** O que a Greens e a BeHemp fazem com documento tem nome: **Claim Check**
+ * (Hohpe & Woolf, _Enterprise Integration Patterns_). O produtor não manda o arquivo na
+ * mensagem: guarda num store e manda uma **referência**; o consumidor busca. É exatamente o
+ * `{ tipo, url }` do handoff.
+ *
+ * **2. COMPARAR.** O padrão cobre a maior parte, e falha num ponto que nos atinge: ele supõe a
+ * referência **durável** — o consumidor busca quando quiser. A nossa é URL assinada de S3 com
+ * TTL de 1 h. **Referência perecível quebra a premissa do padrão.**
+ *
+ * ⚠️ E a doc da AWS traz um agravante que explica 403 inesperado: _"a presigned URL expires at
+ * either its configured expiration time or when its associated credentials expire, whichever
+ * occurs first"_. Se a Greens assina com credencial temporária (role de container/Lambda), a
+ * URL pode morrer **antes** da hora que ela pediu — e nós veríamos só um 403.
+ *
+ * **3. JULGAR.** Três caminhos: (a) manter uma única tentativa síncrona — o que havia; (b) pedir
+ * à Greens que faça PUSH do arquivo, mudando o contrato e pesando o handoff; (c) referência
+ * durável, com endpoint autenticado deles servindo sob demanda.
+ *
+ * 🔴 **(a) era indefensável, e foi o que medimos:** um `fetch` sem retentativa, timeout de 30 s.
+ * Uma queda de rede de um segundo perdia o documento **para sempre** — na próxima vez que
+ * alguém tentasse, a URL já teria expirado. (c) é o mais robusto e depende deles; (b) troca um
+ * problema por outro.
+ *
+ * **4. DECIDIR.** Claim Check com **duas adaptações** que o padrão puro não tem, e que existem
+ * porque a referência é perecível:
+ *
+ *   1. **retentativa dentro da janela** — aqui. A URL vale ~1 h; insistir por um segundo é
+ *      gratuito e cobre a classe inteira de falha transitória
+ *   2. **a recusa vira fato registrado** — em `handoff.ts`. O padrão supõe que o consumidor
+ *      sempre consegue buscar, e não diz o que fazer quando não consegue
+ *
+ * ⚠️ **O que NÃO se retenta, de propósito:** `403` e `404`. Expirada é expirada, ausente é
+ * ausente — insistir contra veredicto definitivo só gasta a janela de que os transitórios
+ * precisam.
+ *
+ * **Fontes:** [Claim Check — EIP](https://www.enterpriseintegrationpatterns.com/patterns/messaging/StoreInLibrary.html) ·
+ * [Claim-Check — Azure](https://learn.microsoft.com/en-us/azure/architecture/patterns/claim-check) ·
+ * [Presigned URL expiration — AWS](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+ */
+async function baixarComRetentativa(url: string): Promise<Response> {
+  let ultima: Response | undefined;
+
+  for (let tentativa = 1; tentativa <= TENTATIVAS_DE_DOWNLOAD; tentativa++) {
+    try {
+      const resposta = await fetch(url, {
+        signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+        redirect: 'error', // redirect é como se escapa de uma allowlist
+      });
+
+      if (resposta.ok) return resposta;
+      // Veredicto definitivo do outro lado: insistir não muda.
+      if (resposta.status === 403 || resposta.status === 404) return resposta;
+      ultima = resposta;
+    } catch (erro) {
+      // Rede caiu ou estourou o tempo. Se ainda há tentativa, insiste; senão, propaga.
+      if (tentativa === TENTATIVAS_DE_DOWNLOAD) throw erro;
+    }
+
+    // Espera curta e crescente: 300 ms, 600 ms. A janela da URL é de ~1 h; isto cabe.
+    if (tentativa < TENTATIVAS_DE_DOWNLOAD) {
+      await new Promise((r) => setTimeout(r, 300 * tentativa));
+    }
+  }
+
+  return ultima!;
+}
+
+function motivoLegivel(erro: unknown): string {
+  if (!(erro instanceof Error)) return 'erro_desconhecido';
+  const causa = (erro as { cause?: { code?: string } }).cause?.code;
+  const texto = (causa ? causa + ': ' + erro.message : erro.message) || erro.name;
+  return texto
+    .replace(/https?:\/\/\S+/g, '<url>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+}
+
 export async function origemAutorizada(url: string): Promise<{ ok: boolean; motivo?: string }> {
   let alvo: URL;
   try {
@@ -218,10 +316,7 @@ export async function materializarArquivos(
             };
           }
 
-          const resposta = await fetch(entrada.url, {
-            signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
-            redirect: 'error', // redirect é como se escapa de uma allowlist
-          });
+          const resposta = await baixarComRetentativa(entrada.url);
           if (!resposta.ok) {
             return { ok: false, tipo: entrada.tipo, motivo: `http_${resposta.status}` };
           }
@@ -266,11 +361,27 @@ export async function materializarArquivos(
             },
           };
         } catch (erro) {
-          // Documento é conveniência; o cadastro é o que importa. Nunca derruba o handoff.
+          // Nunca derruba o handoff — mas a recusa é fato a cobrar, não custo aceito (13/09).
           return {
             ok: false,
             tipo: entrada.tipo,
-            motivo: erro instanceof Error ? erro.name : 'erro_desconhecido',
+            /**
+             * 🔴 A MENSAGEM, NÃO O `name` — e isto custou o diagnóstico do fluxo 1 inteiro.
+             *
+             * Medido em produção em 13/09/2026: o log dizia
+             * `documentos recusados: receita_medica:Error,comprovante_residencia:Error`.
+             * **`erro.name` de um `new Error()` é sempre `'Error'`** — então três tipos que
+             * podem ter falhado por motivos diferentes produziram a mesma palavra inútil.
+             *
+             * ⚠️ É a MESMA classe que o guarda `o-cadastro-feito-nao-vira-falha` documentou
+             * (_"o log dizia só `{ erro: 'Error' }`"_), cometida de novo no módulo ao lado.
+             * Defeito corrigido num arquivo não se corrige nos outros sozinho.
+             *
+             * E o desperdício era grande: `origemAutorizada` distingue SEIS motivos, e o
+             * `fetch` distingue `http_403`, `tipo_de_arquivo_recusado` e
+             * `tamanho_fora_do_limite`. Este `catch` jogava todos fora.
+             */
+            motivo: motivoLegivel(erro),
           };
         }
       },

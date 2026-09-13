@@ -692,3 +692,81 @@ cadeia perdoa tudo que veio antes, não só o último comando.**
 | helper de domínio puro  | `lib/<dominio>/`                         | sem `db`, sem `auth`, sem `next/*`                                                      |
 
 Script novo declara no topo: o que faz · como se desfaz · se é idempotente.
+
+## 🔴 Temos acesso à VPS — e o banco responde o que o código não sabe
+
+**Decisão do dono em 13/09/2026:** ele conseguiu acesso SSH ao servidor. Isso **revoga a
+restrição** que moldou o D-16 da ADR-0022 (_"não tenho acesso ao banco de produção nem à VPS"_)
+e muda a ordem do diagnóstico.
+
+### A regra que sai disso
+
+🔴 **Antes de construir mecanismo para um problema, pergunte ao banco se o problema é esse.**
+
+O incidente que originou a regra, e ele é caro: passei 13/09 construindo sentinela, procedência,
+reconciliação, instrumento e confirmação explícita para explicar por que os documentos da Greens
+não chegavam à ficha do paciente. Ao medir em produção:
+
+```
+com_arquivo: 0   em TODAS as solicitações
+concluidas:  0   em TODAS as 64 solicitações
+```
+
+**Não havia documento para materializar, e ninguém jamais concluiu um cadastro.** A causa estava
+um passo antes de tudo que eu construí, e a um `SELECT` de distância desde o começo.
+
+⚠️ **O código diz o que ele FAZ com o dado. Só o banco diz QUE dado existe.** Ler
+`materializarDocumentosDoParceiro` prova que ele materializa a partir do manifesto; não prova
+que há manifesto.
+
+### Como investigar na VPS
+
+O app vive em `/home/ubuntu/behemp-site-main/.next/standalone` (o `pm2 jlist` confirma), e o
+`pg` está tanto ali quanto na raiz do projeto.
+
+```bash
+cd /home/ubuntu/behemp-site-main
+cat > d.cjs <<'JS'
+const { Pool } = require('pg');
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Trava: nada além de leitura chega ao banco.
+const ler = async (t, sql, p = []) => {
+  if (!/^\s*select/i.test(sql)) throw new Error('BLOQUEADO');
+  const r = await pool.query(sql, p);
+  console.log('\n== ' + t + ' ==');
+  console.log(JSON.stringify(r.rows, null, 1));
+};
+(async () => { await ler('titulo', `select …`); await pool.end(); })();
+JS
+set -a; . ./.env; set +a
+node d.cjs; rm -f d.cjs
+```
+
+**Três regras ao montar esses comandos**, as três aprendidas errando em 13/09:
+
+1. 🔴 **Bloco único, sem prosa no meio.** Texto explicativo colado junto vira comando e o shell
+   morre em `syntax error near unexpected token`. Explicação vai ANTES ou DEPOIS do bloco.
+2. 🔴 **Sem PII na saída.** O dono cola o resultado no chat. Compare dentro do SQL e devolva o
+   **veredicto**: `exists(select 1 from users u where lower(u.email)=lower(s.email))` responde
+   "os e-mails batem?" sem exibir nenhum. Mascare o resto: `substr(email,1,2)||'***@'||…`.
+3. **Nunca imprima segredo.** `echo "DATABASE_URL: $([ -n "$DATABASE_URL" ] && echo definido)"`.
+
+⚠️ **E o `/tmp` não enxerga o `node_modules`.** `node /tmp/x.js` falha com
+`Cannot find module 'pg'`. O script tem de ser criado **dentro** do diretório do app.
+
+### O log da VPS é de TODOS os fluxos, não do seu teste
+
+🔴 **Erro de leitura que eu cometi em 13/09 e confundiu o dono:** apresentei `254× [chatpro] 401`
+junto do diagnóstico do fluxo dele, que era `greens_handoff` e nunca tocou no ChatPro.
+
+**Produção tem tráfego de vários fluxos ao mesmo tempo.** Antes de correlacionar uma linha de log
+com um teste, confira a **origem**:
+
+```sql
+select origem, status, count(*) from solicitacoes_cadastro group by origem, status;
+```
+
+`greens_handoff` é o portão do admin/formulário da Greens. `chatpro_bot` e `chatpro_start` são o
+WhatsApp. **São portões diferentes, e um pode estar quebrado sem afetar o outro.** Misturá-los
+faz o diagnóstico apontar para o lugar errado — e faz quem lê perder a confiança no relatório,
+com razão.

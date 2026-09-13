@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { solicitacoesCadastro } from '@/db/schema';
+import type { DocumentoDoParceiro } from '@/db/schema/solicitacoes-cadastro';
 import { solicitacaoCadastroOrigemEnum } from '@/db/schema/enums';
 
 import { hashDoToken } from './solicitacao';
@@ -60,13 +61,18 @@ export interface SolicitacaoValidada {
   expiraEm: Date;
   /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
   /**
-   * Lista mista: nome puro, ou objeto com o arquivo já re-hospedado aqui. Quem só precisa
-   * saber o que falta usa `normalizarManifesto`, que lê as duas formas.
+   * Lista mista: nome puro, objeto com o arquivo já re-hospedado aqui, ou objeto de RECUSA —
+   * quando o parceiro disse ter mandado e não conseguimos buscar. Quem só precisa saber o que
+   * falta usa `normalizarManifesto`, que lê as três formas.
+   *
+   * 🔴 DERIVADO DO SCHEMA, e isto era uma lista paralela até 13/09/2026.
+   *
+   * A forma estava escrita à mão aqui e em `db/schema/solicitacoes-cadastro.ts`. Quando a
+   * terceira variante nasceu, esta cópia não soube dela e o type-check quebrou — que foi sorte:
+   * lista paralela costuma divergir **em silêncio**, e é o que o `contrato-da-ia-e-a-unica-fonte`
+   * já teve de fechar neste repositório, e o que faltou em `type Origem` (sem `greens_handoff`).
    */
-  documentosDoParceiro: Array<
-    | string
-    | { tipo: string; urlBlob: string; nomeArquivo: string | null; dataEmissao: string | null }
-  > | null;
+  documentosDoParceiro: DocumentoDoParceiro[] | null;
   /** Destino de volta, JÁ conferido contra a lista de origens quando foi gravado. */
   urlDeRetorno: string | null;
   /**

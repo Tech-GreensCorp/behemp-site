@@ -10,7 +10,27 @@
  * da Greens não é obrigado a subir tudo de novo aqui para fazer a procuração da ANVISA. A tela
  * da ANVISA lê a tabela `documentos` — a partir do momento em que a linha existe, ela aparece.
  *
- * ⚠️ NUNCA LANÇA. Documento é conveniência; o cadastro é o que importa. Se a inserção falhar,
+ * ⚠️ NUNCA LANÇA — e o motivo mudou em 13/09/2026.
+
+ * Até aqui o comentário dizia _"documento é conveniência; o cadastro é o que importa"_. **O dono
+ * derrubou essa premissa**, com um argumento que os dados confirmam:
+ *
+ *   _"o envio do documento é tão necessário quanto a criação da conta. O paciente passa por 2
+ *   formulários e 1 se torna à toa e o outro mentiroso, já que os dados nunca chegam. Para que
+ *   serve então esse fluxo todo que estamos criando?"_
+ *
+ * 🔴 Ele está certo, e medido: dos 67 itens de documento recebidos da Greens, **zero** tinham
+ * arquivo. O paciente anexa lá, e a nossa tela pede de novo aqui — chegando a afirmar _"o que já
+ * recebemos"_ sobre uma palavra, não um arquivo.
+ *
+ * **O que continua valendo:** não lançar. Derrubar o cadastro porque um arquivo não copiou
+ * deixaria o paciente sem conta E sem documento, que é pior que sem documento.
+ *
+ * 🔴 **O que MUDA:** a falha deixa de ser aceitável e passa a ser um FATO A COBRAR. Ela precisa
+ * ter motivo legível, ficar visível ao paciente (S8.4) e ser cobrável da origem. Engolir em
+ * silêncio é o que fez 67 documentos sumirem sem ninguém notar por semanas.
+ *
+ * Se a inserção falhar,
  * o paciente segue com a pendência e envia manualmente, como sempre pôde.
  */
 
