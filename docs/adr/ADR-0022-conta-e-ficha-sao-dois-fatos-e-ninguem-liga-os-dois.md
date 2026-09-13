@@ -1411,3 +1411,193 @@ credencial), `motivoSemUrl` (o pedido não tinha anexo — caso legítimo), ou n
 ⚠️ **Nossa allowlist está correta e medida:**
 `PARCEIRO_ORIGENS_DE_DOCUMENTO = https://greens-site-bucket.s3.us-east-1.amazonaws.com`. Se
 vierem URLs assinadas desse bucket, elas passam.
+
+---
+
+# PARTE X — O Fluxo 1 · Portão 1, de ponta a ponta
+
+> **O documento vivo deste fluxo**, por decisão do dono em 13/09/2026. Cada etapa abaixo foi
+> conferida no código, não descrita de memória — e a Etapa 2 existe aqui porque eu a havia
+> omitido, e ele corrigiu: _"ele ainda vai para aquela tela da BeHemp onde ele coloca e-mail,
+> consente, informa se já faz tratamento e aí depois ele confirma, recebe o código do e-mail e
+> aí com código válido e o sistema reconhecendo ele vai pra procuração da ANVISA"_.
+
+## §51 — As cinco etapas
+
+**Etapa 0 — Greens.** O admin gera o link pela solicitação de medicamento. Chega aqui um POST
+assinado (HMAC) com sete campos: `nomeCompleto · email · telefone · cpf · pedidoDoParceiro ·
+documentos · urlDeRetorno`. Nasce a solicitação (`SOL-0000xx`, origem `greens_handoff`) e um
+token de 7 dias. O link vai ao paciente por WhatsApp.
+
+**Etapa 1 — a tela da BeHemp** (`/cadastro/[token]`). Ele:
+
+- **confirma os dados** que vieram da Greens (nome, CPF, telefone) e **o e-mail** — campo
+  editável, e é o login
+- **cria a senha**
+- vê **"O que já recebemos"** e **"O que ainda vamos precisar"**
+- anexa o que faltar
+- **consente** o compartilhamento com a Greens — caixas desmarcadas, e **não é pedágio**
+- **informa se já faz tratamento** — obrigatório, e `null` significa "não respondeu"
+- confirma
+
+**Etapa 2 — o código.** `signUp.create({ emailAddress })` → o Clerk envia o código. Ele digita.
+
+🔴 **É aqui que o fluxo morre hoje**, com `sign_ups → 400`.
+
+**Etapa 3 — a conta nasce.** `attemptEmailAddressVerification` valida o código →
+`signUp.update({ password, firstName, lastName })` → a conta é criada **nesse instante**, já com
+senha → `setActive`.
+
+**Etapa 4 — a ficha.** `gravarFicha()` → `concluirCadastroPorLink`: garante `users`, cria
+`pacientes` com procedência, grava a declaração, **consome o link**, grava o consentimento,
+**materializa os documentos da Greens**.
+
+**Etapa 5 — o destino.** `destinoDepoisDoCadastro(pendências)` → **`/paciente/anvisa`**, com os
+documentos já lá.
+
+## §52 — 🔴 D-22: a confirmação do e-mail é REQUISITO, não detalhe de implementação
+
+**Decisão do dono, 13/09/2026**, respondendo à pergunta direta de por que a Etapa 2 existe:
+
+> _"é por conta do (a), pois tudo chega no e-mail do paciente, logo é necessário que ele confirme
+> o e-mail."_
+
+**O e-mail não é só o login.** É por onde chega a aprovação da ANVISA, o aviso de receita pronta,
+o lembrete de consulta. Um endereço não confirmado é um paciente que não recebe o tratamento —
+não apenas alguém que não consegue entrar.
+
+### 52.1 O que esta decisão REJEITA, e eu havia proposto
+
+⛔ **Criar a conta pela Backend API do Clerk** (`clerkClient.users.createUser()`), que eu
+propusera horas antes para contornar o `400`.
+
+Ela resolve de fato a classe inteira de falha — sem navegador no caminho, some o cookie
+cross-site, a bot protection, o `session_exists` e o `signUp`. E está disponível: o SDK já
+instalado (`@clerk/backend@3.4.4`) aceita `emailAddress`, `password`, `firstName`, `lastName`.
+
+🔴 **Mas ela cria a conta com o e-mail NÃO verificado** — e é exatamente o que o D-22 proíbe.
+
+⚠️ **A lição de método, e ela é minha:** eu propus a Backend API descrevendo o fluxo como
+_"confirma os dados e cai na procuração"_ — **omitindo a Etapa 2**. A solução parecia elegante
+porque o problema estava descrito errado. Quando o dono corrigiu a descrição, a solução caiu
+junto: eu não estava contornando um obstáculo, estava **amputando um requisito**.
+
+**Descrever o fluxo errado produz solução que resolve o problema errado** — e ela chega
+convincente, porque é coerente com a descrição.
+
+## §53 — O que sobra, então
+
+Com a Etapa 2 como requisito, o `400` do Clerk **tem de ser consertado**, não contornado. O que
+está medido sobre ele:
+
+| fato                                                                                         | medido em                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------ |
+| o servidor roda `pk_test_` / `sk_test_` — **instância de desenvolvimento**                   | `.env` da VPS, 13/09           |
+| a aplicação **Be4hope** TEM ambiente Production, e ele está **vazio** (0 sign-ups, 0 active) | painel do Clerk                |
+| o domínio do Production é **`behemp-site.vercel.app`** — e o site vive em **`be4hope.org`**  | painel + `deploy.yml`          |
+| **"Verify at sign-up"** está ligado, por código de e-mail                                    | painel → User & authentication |
+
+> 🔴 **RETRATAÇÃO, no mesmo dia — esta hipótese estava ERRADA, e eu a apresentei como causa.**
+>
+> O parágrafo abaixo atribuía o `400` ao cookie cross-site da instância de desenvolvimento.
+> **Não é.** O log do Clerk, aberto pelo dono horas depois, traz o motivo literal:
+>
+> ```json
+> {
+>   "email_address": "davimartins1110@gmail.com",
+>   "reason": "That email address is taken. Please try another."
+> }
+> ```
+>
+> **É `form_identifier_exists`** — o e-mail já tem conta. Os eventos `sign_up.captcha.passed`
+> aparecem em **todos** os casos, inclusive nos que falham, o que já derrubava a teoria do
+> cookie e eu não havia notado.
+>
+> ⚠️ E a causa estava escrita nesta ADR desde o §1.1: _"a conta existe, e com senha — foi criada
+> em alguma tentativa anterior que completou a verificação"_. **Eu tinha o diagnóstico no próprio
+> documento e fui procurar causa em infraestrutura.**
+>
+> **O que isso muda:** a instância de desenvolvimento **não é o bloqueio**. Migrar para produção
+> continua sendo o certo (§53), mas por higiene — não para destravar o fluxo.
+>
+> Ver a retificação completa no §54.
+
+🔴 **Em desenvolvimento o FAPI fica em `accounts.dev`, que é cross-site.** Navegador com
+proteção de rastreamento (Firefox estrito, Safari, Brave) bloqueia o cookie, e o
+`signUp.create` responde `400`.
+
+⚠️ **E não é bloqueio absoluto** — o dono conseguiu criar conta. É intermitente, e depende do
+navegador de quem tenta. Num fluxo com 35 pacientes, basta uma fração usar Firefox.
+
+**Fica aberto, e não vou supor:** quantos dos 8 links acessados morreram no `400` e quantos nos
+nove defeitos corrigidos em 13/09. O log não guarda o corpo da resposta, e os defeitos já foram
+consertados — **a única forma de separar é testar de novo**.
+
+## §54 — 🔴 A causa real do `sign_ups → 400`, medida no log do Clerk
+
+**13/09/2026.** O dono abriu o painel do Clerk (ambiente **Development**, que é onde o site
+roda) e clicou num evento `sign_up.failed`. O payload:
+
+```json
+{
+  "email_address": "davimartins1110@gmail.com",
+  "reason": "That email address is taken. Please try another.",
+  "sign_up_id": "sua_3JFlZK14e6423tdDb8OJXzbzV0p"
+}
+```
+
+**Timestamps: 12/09, 22:58 e 22:59** — os testes do próprio dono, com os e-mails que ele vinha
+reusando.
+
+### 54.1 A sequência que os logs mostram
+
+**Quando falha:**
+
+```
+sign_up.created → captcha.required → captcha.passed → sign_up.failed
+```
+
+**Quando funciona:**
+
+```
+sign_up.created → email_address.created → captcha.required → captcha.passed
+→ code_sent → email_address.verified → password.created → sign_up.completed
+→ user.created → session.created
+```
+
+🔴 **`sign_up.captcha.passed` aparece nos DOIS.** O Turnstile e o CSP corrigido funcionam. A
+falha vem depois do captcha e antes do `code_sent` — e o motivo é o e-mail tomado.
+
+### 54.2 O que isto corrige no diagnóstico
+
+| eu afirmei                                           | é                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| o `400` vem do cookie cross-site da instância de dev | **não** — vem de e-mail já cadastrado                             |
+| a instância de desenvolvimento bloqueia o cadastro   | **não bloqueia** — há `sign_up.completed` e `user.created` no log |
+| os 35 links com 0 concluídos são do Clerk            | **não** — são os nove defeitos do §3, todos corrigidos em 13/09   |
+
+⚠️ **E o nosso código já tratava este erro corretamente:**
+
+```ts
+if (e?.errors?.[0]?.code === 'form_identifier_exists') setJaTemConta(true);
+```
+
+A tela responde _"Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
+continuar de onde parou"_, com o botão de login **levando o token junto** (Item 35). O
+comportamento estava certo; faltava o diagnóstico.
+
+### 54.3 A lição, e ela é de método
+
+**Eu tinha três sinais apontando para a causa certa e segui uma hipótese de infraestrutura:**
+
+1. o §1.1 desta ADR já dizia que a conta existia de tentativa anterior
+2. o `captcha.passed` aparecia em todos os eventos de falha
+3. o dono havia dito, no começo da sessão: _"será se é porque eu já tentei criar uma conta com
+   esse e-mail antes?"_ — **e ele estava certo desde então**
+
+🔴 **A hipótese do cookie cross-site era mais interessante, e por isso sobreviveu mais do que
+devia.** Causa sistêmica explica um número grande (35 links, 0 concluídos); causa banal explica
+só os testes do dono. Escolhi a que explicava mais — sem medir qual explicava **o quê**.
+
+**A regra que sai:** quando o próprio usuário oferece uma hipótese simples no começo, ela se
+testa primeiro. Custa um clique no log e teria poupado dois dias.

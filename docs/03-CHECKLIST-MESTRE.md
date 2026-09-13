@@ -378,6 +378,28 @@ de passagem.**
 
 ---
 
+### 🔴 Achado de 13/09/2026 — o Clerk roda com instância de DESENVOLVIMENTO
+
+Medido no `.env` da VPS: `pk_test_` / `sk_test_`. E no painel: a aplicação **Be4hope** tem
+ambiente Production **vazio** (0 sign-ups), com domínio apontando para `behemp-site.vercel.app`
+— enquanto o site vive em `be4hope.org`.
+
+⚠️ **NÃO é o que bloqueia o cadastro** — isso foi medido e retratado (ADR-0022 §54). Há
+`sign_up.completed` e `user.created` no log. É higiene, não urgência.
+
+**O perigo de mexer:** as contas existentes vivem no ambiente Development e **não migram
+sozinhas**. Trocar as chaves sem corrigir o domínio derruba o login em `be4hope.org`, porque
+chave `pk_live_` só funciona no domínio registrado.
+
+**Ordem correta, quando for feito:** corrigir o domínio no painel → configurar DNS → decidir o
+que fazer com as contas atuais (o Clerk tem API de migração) → trocar os secrets no GitHub.
+
+🔴 **E uma armadilha medida:** `CLERK_SECRET_KEY` e `CLERK_WEBHOOK_SECRET` **não estão na lista
+`gravar` do `deploy.yml`** — vêm do `preservar-ambiente-do-pm2.mjs`. Trocar o secret no GitHub
+**não os leva ao servidor**. É a mesma classe que já mordeu três vezes
+(`o-segredo-cadastrado-chega-ao-servidor`), e o guarda não pega porque a chave é lida pelo SDK
+do Clerk, nunca pelo nosso código.
+
 ### 🔴 Achado de 13/09/2026 — as migrations NÃO RODAM DO ZERO
 
 **Medido** ao subir um Postgres em Docker para provar as migrations da Sprint 8 sem gastar
