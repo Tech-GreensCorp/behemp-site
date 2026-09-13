@@ -118,6 +118,36 @@ describe('🔴 e não vaza — a classe 2', () => {
     expect(m).not.toContain('b.com');
   });
 
+  /**
+   * 🔴 A SEGUNDA CAMADA — acrescentada em 13/09/2026.
+   *
+   * O ramo de banco descarta a mensagem inteira, e resolve o caso do Drizzle. Mas o `catch`
+   * da transação do cadastro cobre mais que o banco: erro do Clerk, do blob, de integração.
+   * A mensagem do Clerk cita o e-mail de quem tentou — foi assim que a causa do `400` apareceu
+   * em 13/09, com o endereço dentro.
+   */
+  it.each([
+    [
+      'e-mail',
+      'falhou para maria.silva+teste@exemplo.com.br agora',
+      'maria.silva+teste@exemplo.com.br',
+    ],
+    ['CPF com pontos', 'documento 529.982.247-25 recusado', '529.982.247-25'],
+    ['CPF sem pontos', 'documento 52998224725 recusado', '52998224725'],
+    ['telefone', 'ligar para (98) 97013-4822 depois', '97013-4822'],
+  ])('%s não sobrevive na mensagem', (_rotulo, mensagem, segredo) => {
+    const m = motivoLegivel(new Error(mensagem));
+    expect(m, `${_rotulo} vazou para o log`).not.toContain(segredo);
+  });
+
+  it('mas a frase continua legível depois de redigir', () => {
+    // Redigir não pode virar apagar: o log precisa continuar dizendo O QUE aconteceu.
+    const m = motivoLegivel(new Error('falhou para joao@exemplo.com no passo 3'));
+    expect(m).toContain('falhou para');
+    expect(m).toContain('no passo 3');
+    expect(m).toContain('<email>');
+  });
+
   it('o motivo cabe num log e numa coluna', () => {
     expect(motivoLegivel(new Error('x'.repeat(5000))).length).toBeLessThanOrEqual(120);
   });

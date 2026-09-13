@@ -77,8 +77,22 @@ export function motivoLegivel(erro: unknown): string {
    */
   if (/^Failed query:/i.test(texto)) return 'banco:query_falhou';
 
+  /**
+   * 🔴 REDAÇÃO EM PROFUNDIDADE — acrescentada em 13/09/2026.
+   *
+   * O ramo de banco acima já descarta a mensagem inteira, que é onde texto clínico apareceria.
+   * Aqui trata-se do resto: erro do Clerk, do blob, de integração. Esses trazem a mensagem, e a
+   * do Clerk costuma citar o **e-mail** de quem tentou (`"That email address is taken"` veio com
+   * o endereço em 13/09).
+   *
+   * ⚠️ Regex NÃO é garantia — texto livre não tem padrão, e é por isso que o ramo de banco não
+   * confia nela. Isto é a segunda camada, para os erros cuja mensagem precisamos ler.
+   */
   return texto
     .replace(/https?:\/\/\S+/g, '<url>')
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<email>')
+    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '<cpf>')
+    .replace(/\(?\d{2}\)?[\s-]?9?\d{4}-?\d{4}\b/g, '<telefone>')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, LIMITE);
