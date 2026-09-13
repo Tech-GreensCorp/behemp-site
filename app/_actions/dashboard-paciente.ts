@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db';
 import { cadastroPendenteDoEmail } from '@/lib/parceiros/cadastro-pendente';
+import { situacaoDoFluxo } from '@/lib/fluxo/sentinela';
 import { sql } from 'drizzle-orm';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { contarMensagensNaoLidas } from '@/app/_actions/chat';
@@ -66,6 +67,14 @@ export interface DadosDashboard {
    * enviado invisíveis. Medido com o dono em 12/09/2026.
    */
   cadastroPendente: { protocolo: string; parceiro: string | null; expiraEm: Date } | null;
+  /**
+   * 🔴 O PONTO DO FLUXO, vindo da sentinela — ADR-0022 D-05.
+   *
+   * É o que permite à tela distinguir "você não enviou" de "veio e não chegou" (R6) sem
+   * decidir por conta própria. Antes, cada tela decidia sozinha — e foi assim que a ficha
+   * casca do `/redirect` passou a mentir para todas.
+   */
+  situacao: { ponto: string; porque: string; destino: string | null; origem: string | null };
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -329,6 +338,9 @@ export async function obterDadosDashboard(): Promise<{
     ).rows as { email?: string }[];
     const cadastroPendente = await cadastroPendenteDoEmail(emailRes?.email);
 
+    /** A sentinela: um lugar só decide em que ponto esta pessoa está (D-05). */
+    const situacao = await situacaoDoFluxo(auth.clerkId);
+
     return {
       sucesso: true,
       dados: {
@@ -343,6 +355,7 @@ export async function obterDadosDashboard(): Promise<{
         userId,
         precisaDaProcuracao,
         cadastroPendente,
+        situacao,
       },
     };
   } catch (error) {

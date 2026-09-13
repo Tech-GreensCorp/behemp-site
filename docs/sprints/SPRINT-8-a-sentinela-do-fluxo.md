@@ -235,3 +235,41 @@ incompleto.
 3. abre o link logado em outra conta — e é avisado, com saída
 4. um documento que a Greens não entregou **aparece como não entregue**, não como ausente
 5. e os testes de comportamento rodam no CI, não só os estruturais
+
+---
+
+# ✅ ESTADO EM 13/09/2026 — o que foi entregue
+
+| item                                       | estado                          | onde                                                        |
+| ------------------------------------------ | ------------------------------- | ----------------------------------------------------------- |
+| **S8.0** revogação para a fila (LGPD)      | ✅                              | `lib/parceiros/consentimento-ainda-vale.ts` + `enviador.ts` |
+| **S8.1** por que o aviso não apareceu      | ✅ **por outro caminho** (D-16) | `app/api/fluxo/situacao/route.ts`                           |
+| **S8.1b** vínculo antes de queimar o link  | ✅                              | `cadastro-por-link.ts`                                      |
+| **S8.1c** `onConflictDoNothing` na corrida | ✅                              | `cadastro-por-link.ts`                                      |
+| **S8.2** a procedência sobrevive           | ✅                              | migrations 0042/0043 + `pacientes.origem`                   |
+| **S8.3** a sentinela                       | ✅                              | `lib/fluxo/sentinela.ts`                                    |
+| **S8.4** dizer o que não chegou            | ✅                              | `components/paciente/AvisoDoQueNaoChegou.tsx`               |
+| **S8.5** retomar de qualquer lugar         | 🟡 **parcial**                  | retoma na mesma aba; de outro aparelho volta à etapa 1      |
+| **S8.6** reconciliação                     | 🔴 **não feita**                | precisa do banco, que o dono não tem hoje                   |
+
+## O que ficou de fora, e por quê
+
+**S8.5 — retomada de outro aparelho.** Funciona na mesma aba (o `signUp` do Clerk vive no
+navegador) e, de outro aparelho, a pessoa volta à etapa 1 e o código é reenviado sem recriar o
+cadastro. **O que falta** é abrir direto na etapa certa vindo de outro dispositivo — exige
+persistir o progresso fora do navegador, e isso é desenho novo, não ajuste.
+
+**S8.6 — reconciliação.** É um script que escreve no banco de produção, e o dono informou em
+13/09 que não tem acesso à VPS nem ao banco. ⚠️ **Mas o instrumento do S8.1 já responde a
+pergunta que ela responderia** — `GET /api/fluxo/situacao?email=` diz em que ponto cada pessoa
+está, e por quê. A reconciliação passa a ser "agir sobre o que o instrumento mostrou", não
+"descobrir o que aconteceu".
+
+## 🔴 O que este trabalho NÃO garante
+
+**Nenhum destes guardas executa o fluxo.** Eles provam que o código está escrito do jeito certo
+— e foi por confundir as duas coisas que afirmei "está funcionando" cinco vezes em 12/09, com
+1152 guardas verdes, enquanto o dono encontrava seis defeitos seguidos.
+
+O teste que falta é o de comportamento, com estado sujo. Ele está no `CLAUDE.md` como regra
+desde 12/09, e continua sendo o próximo passo natural desta sprint.

@@ -33,6 +33,7 @@ import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
+import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -287,6 +288,16 @@ export default function PacienteDashboardPage() {
             pela metade não tem o que autorizar ainda. Mandá-lo à procuração primeiro seria
             pedir um passo que depende do anterior.
           */}
+          {/*
+            🔴 VEM PRIMEIRO DE TODOS (ADR-0022 R6): documento que o parceiro entregou e não
+            chegou é problema NOSSO. Cobrar o paciente por ele — que é o que os avisos abaixo
+            fazem — seria pedir que ele pague por uma falha nossa.
+          */}
+          <AvisoDoQueNaoChegou
+            ponto={dados?.situacao?.ponto ?? ''}
+            porque={dados?.situacao?.porque ?? ''}
+          />
+
           <AvisoDeCadastroPendente cadastro={dados?.cadastroPendente ?? null} />
 
           <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
