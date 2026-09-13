@@ -140,8 +140,33 @@ export class ServicoDeHandoff {
       return this.reemitir(porEvento.id, porEvento.protocolo, true);
     }
 
-    // 2 ── Mesmo paciente, evento diferente? Reaproveita em vez de duplicar.
-    const existente = await this.buscarAtivaPorContato({ email, telefone });
+    /**
+     * 2 ── Mesmo paciente, evento diferente? Reaproveita em vez de duplicar.
+     *
+     * 🔴 MAS "MESMO PACIENTE" NÃO PODE SER DECIDIDO PELO TELEFONE SOZINHO.
+     *
+     * Medido em produção em 13/09/2026, com o dono preso na própria tela: ele preencheu o
+     * formulário da Greens com `davi@greens-corp.com`, a Greens enviou esse e-mail, e a tela
+     * da BeHemp abriu com `davimartins1001@gmail.com` — o endereço de um teste anterior.
+     *
+     * **A causa:** `buscarAtivaPorContato` tenta e-mail e, se não achar, **telefone**. O e-mail
+     * novo não achava nada; o telefone (o mesmo de sempre) achava a solicitação velha. O
+     * `update` abaixo sobrescrevia nome, CPF, documentos e URL de retorno — e **não o e-mail**.
+     *
+     * ⚠️ E O ESTRAGO NÃO PAROU NA TELA ERRADA. A conta nasceu com o e-mail certo, a solicitação
+     * guardava o antigo, e a trava que compara a sessão com `solicitacao.email` (a proteção
+     * contra a ficha ir para a conta de outro) passou a **barrar o dono legítimo**. Beco
+     * fechado: sair e entrar com o outro e-mail não resolvia, porque a conta certa era a dele.
+     *
+     * 🔴 E HÁ O CASO PIOR, QUE NÃO ERA O DELE. Telefone é compartilhado — casal, mãe e filho,
+     * o aparelho da família. Sem esta trava, o segundo paciente recebe um link que aponta para
+     * a solicitação do primeiro: nome e CPF viram os dele, o e-mail continua sendo o do outro,
+     * e a ficha com documentos clínicos nasce na conta errada. É OWASP API1 por uma chave que
+     * não identifica pessoa.
+     *
+     * **A regra:** e-mail que chega vence, e divergência de e-mail impede o reaproveitamento.
+     */
+    const existente = await this.reaproveitavel({ email, telefone });
     if (existente) {
       await db
         .update(solicitacoesCadastro)
@@ -150,6 +175,13 @@ export class ServicoDeHandoff {
           eventoDoParceiro: entrada.eventoId,
           // `sql`-free: só sobrescreve o que veio preenchido, para não apagar dado bom
           // com nulo de um payload mais pobre que o anterior.
+          /**
+           * 🔴 O CONTATO QUE CHEGA VENCE O GRAVADO. O e-mail é o login do paciente: mantê-lo
+           * velho não é "preservar dado bom", é entregar a conta errada. Mesma razão do
+           * telefone, que é por onde o link viaja.
+           */
+          ...(email ? { email } : {}),
+          ...(telefone ? { telefone } : {}),
           ...(entrada.nomeCompleto?.trim() ? { nomeCompleto: entrada.nomeCompleto.trim() } : {}),
           ...(entrada.cpf ? { cpf: somenteDigitosDoCpf(entrada.cpf) } : {}),
           ...(entrada.pedidoDoParceiro ? { pedidoDoParceiro: entrada.pedidoDoParceiro } : {}),
@@ -224,6 +256,35 @@ export class ServicoDeHandoff {
    * Procura por e-mail primeiro — no fluxo da Greens ele é confirmado no intake, enquanto
    * o telefone pode ser um contato secundário.
    */
+  /**
+   * A solicitação aberta que PODE ser reaproveitada para este contato — ou `null`.
+   *
+   * 🔴 FALHA FECHADA: na dúvida, cria solicitação nova. Duplicar um cadastro custa um
+   * protocolo a mais; fundir duas pessoas custa a ficha clínica de alguém na conta de outro.
+   *
+   * ⚠️ Achar por e-mail é seguro — o e-mail identifica a pessoa. Achar por TELEFONE não é: se
+   * a solicitação encontrada já tem um e-mail e ele **diverge** do que chegou, ou é outra
+   * pessoa no mesmo aparelho, ou é a mesma pessoa corrigindo o endereço. Nos dois casos a
+   * resposta certa é a mesma: não misturar.
+   */
+  private async reaproveitavel(params: { email: string | null; telefone: string | null }) {
+    const existente = await this.buscarAtivaPorContato(params);
+    if (!existente) return null;
+
+    const divergeNoEmail =
+      Boolean(params.email) &&
+      Boolean(existente.email) &&
+      existente.email?.toLowerCase() !== params.email;
+
+    if (divergeNoEmail) {
+      // Sem PII no log: o fato basta para explicar por que nasceu um protocolo novo.
+      console.warn('[parceiros] solicitação não reaproveitada — e-mail diverge do contato');
+      return null;
+    }
+
+    return existente;
+  }
+
   private async buscarAtivaPorContato(params: { email: string | null; telefone: string | null }) {
     for (const criterio of [
       params.email ? eq(solicitacoesCadastro.email, params.email) : null,

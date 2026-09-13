@@ -211,7 +211,16 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
    */
   it('🔴 e DEPOIS do vínculo — senão uma falha apaga o aviso E o retorno ao parceiro', () => {
     const t = codigo(ACTION);
-    const vinculo = t.indexOf('update(solicitacoesCadastro)');
+    /**
+     * ⚠️ ÂNCORA ESPECÍFICA, e não "o primeiro `update(solicitacoesCadastro)`".
+     *
+     * Em 13/09/2026 a action ganhou um SEGUNDO update na mesma tabela — o que grava o e-mail
+     * corrigido pelo paciente — e ele fica ANTES deste. Três casos deste repositório ficaram
+     * vermelhos de uma vez, todos acusando o código certo. É a mesma classe que já custou caro
+     * aqui: `indexOf` acha a primeira ocorrência, e a primeira deixa de ser a certa assim que
+     * alguém acrescenta outra. **Ancore no que distingue o trecho, não na sua posição.**
+     */
+    const vinculo = t.indexOf('update(solicitacoesCadastro)', t.indexOf('pacienteId,') - 400);
     const consumo = t.indexOf('marcarComoUtilizada(solicitacao.id)');
 
     expect(vinculo, 'não achei o update da solicitação').toBeGreaterThan(-1);
@@ -222,7 +231,7 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
   it('⚠️ e o `pacienteId` é de fato gravado nesse update — não basta a ordem', () => {
     // Ordem certa de um update que não grava o vínculo não protege nada.
     const t = codigo(ACTION);
-    const i = t.indexOf('update(solicitacoesCadastro)');
+    const i = t.indexOf('update(solicitacoesCadastro)', t.indexOf('pacienteId,') - 400);
     expect(t.slice(i, t.indexOf('.where(', i))).toMatch(/\bpacienteId,/);
   });
 
