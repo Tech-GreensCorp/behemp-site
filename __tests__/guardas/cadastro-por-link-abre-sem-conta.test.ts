@@ -192,6 +192,40 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
     expect(t).toMatch(/db\.transaction\([\s\S]*?marcarComoUtilizada\(/);
   });
 
+  /**
+   * 🔴 O CASO QUE FALTAVA, e a ausência dele deixou a inversão passar em silêncio.
+   *
+   * O caso acima exige só que o consumo venha **depois da transação** — e isso era verdade
+   * nas DUAS ordens. Quando o consumo foi movido (13/09/2026, ADR-0022 G10), o guarda
+   * continuou verde sem provar nada sobre o que mudou.
+   *
+   * ⚠️ O PAR QUE O G10 DESCREVE: queimar o link antes de gravar `pacienteId` na solicitação
+   * deixava, numa falha, **link morto + vínculo nulo** ao mesmo tempo. E esse par apaga duas
+   * coisas de uma vez:
+   *   - `cadastro-pendente.ts` exige `usadoEm IS NULL` → o aviso nunca aparece, e o paciente
+   *     não tem como voltar;
+   *   - `notificar.ts` acha a solicitação **pelo paciente** → o parceiro nunca é avisado
+   *     quando a receita ficar pronta.
+   *
+   * Invertendo, o pior caso vira link válido de cadastro já vinculado: **recuperável**.
+   */
+  it('🔴 e DEPOIS do vínculo — senão uma falha apaga o aviso E o retorno ao parceiro', () => {
+    const t = codigo(ACTION);
+    const vinculo = t.indexOf('update(solicitacoesCadastro)');
+    const consumo = t.indexOf('marcarComoUtilizada(solicitacao.id)');
+
+    expect(vinculo, 'não achei o update da solicitação').toBeGreaterThan(-1);
+    expect(consumo, 'não achei o consumo do link').toBeGreaterThan(-1);
+    expect(consumo, 'o link é queimado ANTES de o vínculo existir').toBeGreaterThan(vinculo);
+  });
+
+  it('⚠️ e o `pacienteId` é de fato gravado nesse update — não basta a ordem', () => {
+    // Ordem certa de um update que não grava o vínculo não protege nada.
+    const t = codigo(ACTION);
+    const i = t.indexOf('update(solicitacoesCadastro)');
+    expect(t.slice(i, t.indexOf('.where(', i))).toMatch(/\bpacienteId,/);
+  });
+
   it('falha ao gravar NÃO manda o paciente recriar a conta', () => {
     // A conta já existe: repetir o formulário falharia com "e-mail já cadastrado", e ele
     // acharia que perdeu tudo.

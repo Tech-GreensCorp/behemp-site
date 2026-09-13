@@ -216,6 +216,86 @@ lido.
   quando e por quê. Bloqueio não se contorna editando o hook — se ele acusou um inocente,
   isso é defeito **do hook**: conserte a granularidade e acrescente o caso ao guarda.
 
+## 🔴 O suficiente nunca é suficiente
+
+**Decisão do dono em 12/09/2026**, depois de eu entregar diagnóstico atrás de diagnóstico
+baseado em três medições e dizer "tenho o suficiente":
+
+> _"o suficiente nunca é suficiente se ele já não teve todas as formas de pesquisa e busca de
+> dados possíveis. Você examinou todo escopo do código? Até mesmo o que vem da Greens? Você
+> analisou a lógica do começo ao fim? Pesquisou pra correlacionar? Achou mais gaps se existir?
+> Pensou nas possibilidades de erros pensando em como o sistema reagiria e se comportaria com
+> isso? Isso tudo tem que ser levado em conta."_
+
+**Antes de chamar uma investigação de concluída, as seis perguntas — todas, por escrito:**
+
+| #   | pergunta                                                       | o que não vale como resposta                   |
+| --- | -------------------------------------------------------------- | ---------------------------------------------- |
+| 1   | examinei **todo** o escopo do código?                          | ter aberto os arquivos que eu já suspeitava    |
+| 2   | examinei o que vem **do outro lado** (Greens, ChatPro, Clerk)? | supor o contrato pela nossa metade             |
+| 3   | segui a lógica **do começo ao fim**?                           | entender um trecho e inferir o resto           |
+| 4   | **pesquisei para correlacionar**?                              | lembrar da doc; citar sem ler                  |
+| 5   | procurei **mais** gaps, além do que motivou a busca?           | parar no primeiro achado que explica o sintoma |
+| 6   | listei os **modos de erro** e como o sistema reage a cada um?  | testar o caminho feliz                         |
+
+🔴 **A pergunta 6 é a que mais falha, e é a mais cara.** Sistema que só foi pensado no mundo
+perfeito quebra no primeiro estado sujo — e quem descobre é o paciente, no meio do cadastro.
+
+⚠️ **"Tenho o suficiente" é uma afirmação sobre o MUNDO, não sobre o meu cansaço.** Se as seis
+não estiverem respondidas, a frase honesta é _"medi isto, falta aquilo, e o que concluo vale só
+até ali"_.
+
+### Para que serve a pesquisa — e não é para citar
+
+🔴 **Decisão do dono em 12/09/2026:** _"isso é pra busca de melhorias e entendimento das nossas
+necessidades sobre o que já existe no mercado; se já existe um padrão que dá certo, e se
+conseguirmos ou não melhorá-lo, julgando se assim estaríamos melhor no desenvolvimento."_
+
+A pesquisa tem **quatro trabalhos**, nesta ordem:
+
+| #   | trabalho     | a pergunta                                                                    |
+| --- | ------------ | ----------------------------------------------------------------------------- |
+| 1   | **nomear**   | este problema já tem nome? Quem já o resolveu?                                |
+| 2   | **comparar** | o padrão estabelecido cobre a nossa necessidade, ou só parte dela?            |
+| 3   | **julgar**   | adotar como está, adaptar, ou temos razão para fazer diferente?               |
+| 4   | **decidir**  | com o padrão, ficamos **melhores** no desenvolvimento — ou só mais parecidos? |
+
+⚠️ **O passo 3 é o que separa pesquisa de cópia.** Um padrão do mercado resolve o problema
+_dele_, no contexto _dele_. Adotar sem julgar traz junto premissas que não são nossas — e aqui
+o contexto tem dado de saúde, duas empresas e um paciente esperando tratamento.
+
+⚠️ **E o passo 4 é o que impede pesquisa de virar enfeite.** Se a resposta for _"ficaríamos
+iguais, com mais trabalho"_, a decisão certa é **não adotar** — e isso se escreve, com o
+motivo, para ninguém repropor daqui a três meses.
+
+🔴 **Padrão que resolve o nosso problema entra como DECISÃO na ADR, não como citação.** Citar
+"usamos Saga" não decide nada. O que decide é: _qual variante, por quê, o que dela não serve, e
+o que colocamos no lugar._
+
+**O caso que originou esta regra**, e que mostra os quatro passos: em 12/09/2026 eu estava
+tratando "o cadastro parou no meio entre as duas empresas" como problema nosso. Ao pesquisar:
+
+1. **nomear** — é uma **saga distribuída**, e o estado do paciente é uma **orphaned account**
+2. **comparar** — a saga prevê compensação; a literatura de identidade prevê **reconciliação
+   periódica** contra uma fonte autoritativa. Não tínhamos nenhuma das duas
+3. **julgar** — coreografia (o que temos) contra orquestração: aqui **orquestração ganha**,
+   porque o paciente precisa saber em que passo está, e coreografia não tem quem responda isso
+4. **decidir** — a sentinela do ADR-0022 D-05 **é** o orquestrador, e a reconciliação deixou de
+   ser script de emergência para virar rotina permanente (D-09)
+
+**Sem a pesquisa, a sentinela teria nascido como "um helper que olha umas flags".**
+
+### E o que isto proíbe, na prática
+
+- **Afirmar que funciona sem ter executado.** Guarda estrutural prova que o código está
+  escrito; **não** prova que o fluxo roda. Em 12/09/2026 eu disse "está funcionando" cinco
+  vezes com 1152 guardas verdes, enquanto o dono encontrava seis defeitos seguidos no fluxo
+  real. Os guardas liam o código; nenhum executava o caminho.
+- **Parar no primeiro achado.** O primeiro achado costuma explicar o sintoma e esconder a
+  causa — e quase nunca é o único.
+- **Investigar só o nosso lado** quando o fluxo atravessa duas empresas. O contrato tem duas
+  pontas, e a outra está no disco: `/home/DK/Developer/Projects/greens-corp`.
+
 ## Fundamentação técnica obrigatória
 
 **Nenhuma decisão, diagnóstico ou implementação entra sem fundamento citado.** Vale

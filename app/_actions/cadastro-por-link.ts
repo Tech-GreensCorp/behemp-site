@@ -313,19 +313,62 @@ export async function concluirCadastroPorLink(
             ? dados.tratamentoAtual?.trim() || null
             : null,
         })
+        /**
+         * 🔴 A CORRIDA COM O WEBHOOK DO CLERK — ADR-0022, G11.
+         *
+         * O webhook `user.created` também cria esta linha, e é **assíncrono**: pode chegar
+         * entre o `SELECT` acima e este `INSERT`. Sem isto, o unique de `pacientes.userId`
+         * é violado, **a transação inteira aborta**, e o paciente lê "não conseguimos
+         * concluir seu cadastro" — com a conta já criada e sem caminho de volta.
+         *
+         * ⚠️ O webhook já tinha `onConflictDoNothing`; esta ponta não tinha. O lado que
+         * chega segundo precisa ceder, e aqui ceder é não estourar.
+         *
+         * É candidato ao erro que o dono viu em 11/09 (SOL-000046): o log dizia
+         * `{ erro: 'Error' }` e não distinguia violação de unique de qualquer outra coisa.
+         */
+        .onConflictDoNothing({ target: pacientes.userId })
         .returning({ id: pacientes.id });
 
-      return ficha.id;
+      /**
+       * 🔴 `onConflictDoNothing` DEVOLVE VAZIO quando o conflito acontece — e aí a ficha
+       * existe, mas não é esta. Buscar de novo é o que fecha a corrida: quem perdeu a
+       * disputa usa a linha de quem ganhou, em vez de seguir com `undefined`.
+       */
+      if (ficha?.id) return ficha.id;
+
+      const [doWebhook] = await tx
+        .select({ id: pacientes.id })
+        .from(pacientes)
+        .where(eq(pacientes.userId, usuario.id))
+        .limit(1);
+
+      if (!doWebhook?.id) {
+        // Nem inseriu nem achou: não há ficha, e seguir daria erro pior adiante.
+        throw new Error('ficha_nao_criada');
+      }
+      return doWebhook.id;
     });
 
     // Daqui para a frente, falhar é acessório: a conta e a ficha existem.
     cadastroGravado = true;
-    etapa = 'consumir-o-link';
 
-    // 6 ── Consome o link. Depois de gravar: se o envio falhasse antes, o paciente
-    // ficaria sem link E sem cadastro.
-    const consumiu = await marcarComoUtilizada(solicitacao.id);
-
+    /**
+     * 🔴 O VÍNCULO VEM ANTES DE QUEIMAR O LINK — invertido em 13/09/2026 (ADR-0022, G10).
+     *
+     * A ordem anterior consumia o link primeiro. Se a gravação seguinte falhasse, o paciente
+     * ficava com o **link morto** e o `pacienteId` **nulo** ao mesmo tempo — e esse par
+     * apaga duas coisas de uma vez:
+     *
+     *   - o aviso de cadastro pendente nunca aparece (`cadastro-pendente.ts` exige
+     *     `usadoEm IS NULL`), então ele não tem como voltar;
+     *   - `notificar.ts` procura a solicitação **pelo paciente**, e sem o vínculo o parceiro
+     *     nunca é avisado quando a receita ficar pronta.
+     *
+     * ⚠️ Invertendo, o pior caso muda de lado: se algo falhar entre as duas, sobra um link
+     * ainda válido de um cadastro já vinculado — recuperável, e visível pelo aviso. **Estado
+     * recuperável é melhor que estado perdido**, e essa é a escolha aqui.
+     */
     etapa = 'gravar-declaracao-na-solicitacao';
 
     // 7 ── O que ele declarou fica na solicitação também — é o registro do ato, e a
@@ -354,6 +397,21 @@ export async function concluirCadastroPorLink(
         declarouTerReceitaMedica: dados.temReceitaMedica ?? null,
       })
       .where(eq(solicitacoesCadastro.id, solicitacao.id));
+
+    /**
+     * 6 ── SÓ AGORA o link é consumido — depois de o vínculo existir (ADR-0022, G10).
+     *
+     * A ordem importa e foi invertida em 13/09/2026. Queimar antes deixava o par
+     * "link morto + `pacienteId` nulo", que apaga o aviso de pendência e o retorno ao
+     * parceiro de uma vez. Queimando depois, o pior caso é um link ainda válido de um
+     * cadastro já vinculado — recuperável, e visível.
+     *
+     * ⚠️ `marcarComoUtilizada` já é de uso único por construção (o `UPDATE` filtra
+     * `usadoEm IS NULL`), então consumir mais tarde não abre janela para dois cadastros:
+     * quem chegar segundo recebe `false` e o valor vira campo de auditoria.
+     */
+    etapa = 'consumir-o-link';
+    const consumiu = await marcarComoUtilizada(solicitacao.id);
 
     /**
      * 8 ── Os arquivos que o parceiro mandou junto viram documentos DESTE paciente.
