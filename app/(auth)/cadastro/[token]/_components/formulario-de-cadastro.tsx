@@ -299,6 +299,14 @@ export function FormularioDeCadastro({
    * preso sem nunca conseguir corrigir o que estava errado.
    */
   const [voltouDeProposito, setVoltouDeProposito] = useState(false);
+  /**
+   * 🔴 A ESCOLHA DO PACIENTE quando a sessão não é a do e-mail do link.
+   *
+   * Decisão do dono em 13/09/2026, depois de ficar preso: _"teoricamente, se eu logasse nessa
+   * conta, era para aparecer justamente essa tela"_. Bloquear era errado — a tela passa a
+   * **perguntar**, e a resposta dele é um fato, não uma inferência nossa.
+   */
+  const [continuarComASessao, setContinuarComASessao] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -319,7 +327,8 @@ export function FormularioDeCadastro({
     Boolean(emailDaSessao) &&
     Boolean(emailDoLink) &&
     emailDaSessao !== emailDoLink &&
-    emailDaSessao !== emailDigitado;
+    emailDaSessao !== emailDigitado &&
+    !continuarComASessao;
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
@@ -727,6 +736,29 @@ export function FormularioDeCadastro({
     setErro('');
 
     try {
+      /**
+       * 🔴 A CONTA JÁ EXISTE? ENTÃO NÃO HÁ CÓDIGO A CONFIRMAR — FALTA A FICHA.
+       *
+       * Achado com o dono preso nesta tela em 13/09/2026. O estado dele: conta criada, e-mail
+       * verificado pelo Clerk, sessão aberta — e a tela ainda na etapa do código, porque foi
+       * onde o fluxo morreu quando a action recusou.
+       *
+       * ⚠️ SEM ISTO, O BOTÃO É UM BECO. O caminho abaixo faz `signOut()` e chama
+       * `attemptEmailAddressVerification` — mas o `signUp` que geraria esse código já foi
+       * concluído. O paciente digita um código válido, é deslogado, e recebe um erro que não
+       * tem nada a ver com o que ele fez.
+       *
+       * O que falta, de verdade, é gravar a ficha. É o mesmo caminho de quem chega ao link já
+       * tendo conta — e a ficha é gravada por uma função só, para as duas portas não divergirem.
+       */
+      const contaJaExiste =
+        authCarregou && isSignedIn && Boolean(emailDaSessao) && !cadastroPendenteNoNavegador;
+
+      if (contaJaExiste) {
+        await gravarFicha();
+        return;
+      }
+
       /**
        * 🔴 REDE DE SEGURANÇA: sessão que apareceu ENTRE as duas etapas.
        *
@@ -1443,17 +1475,33 @@ export function FormularioDeCadastro({
             {sessaoEDeOutraPessoa && (
               <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
                 <p className="text-foreground text-sm leading-relaxed">
-                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, mas este link
-                  foi enviado para <strong>{emailDoLink}</strong>. Saia da conta atual para
-                  continuar o cadastro certo.
+                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, e este link
+                  foi enviado para <strong>{emailDoLink}</strong>.
                 </p>
+                {/*
+                  🔴 DUAS SAÍDAS, e antes havia UMA — que era a errada para o caso mais comum.
+                  Quem trocou o próprio e-mail (porque o parceiro mandou o antigo) não tem para
+                  onde ir com "sair desta conta": a conta certa é a que está aberta. Oferecer só
+                  a saída que não serve é o que transforma proteção em beco.
+                  ⚠️ A escolha é do paciente e fica explícita — o servidor registra a troca.
+                */}
+                <Button
+                  className="h-11 w-full rounded-xl"
+                  onClick={() => {
+                    setContinuarComASessao(true);
+                    setEmail(emailDaSessao);
+                  }}
+                  type="button"
+                >
+                  Continuar com {emailDaSessao}
+                </Button>
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-xl"
                   onClick={() => signOut()}
                   type="button"
                 >
-                  Sair desta conta e continuar
+                  Sair e entrar com outro e-mail
                 </Button>
               </div>
             )}

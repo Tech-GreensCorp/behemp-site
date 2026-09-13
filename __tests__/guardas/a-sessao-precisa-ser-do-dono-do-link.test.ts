@@ -150,10 +150,45 @@ describe('a sessão precisa ser do dono do link', () => {
     expect(TELA.slice(j, j + 260)).toMatch(/emailDaSessao !== emailDoLink/);
   });
 
-  it('⚠️ e o paciente tem SAÍDA — aviso sem caminho é paciente preso', () => {
-    expect(TELA).toMatch(/signOut\(\)/);
-    expect(ler('app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx')).toMatch(
-      /Sair desta conta e continuar/,
+  it('🔴 o paciente tem DUAS saídas — e a que faltava é a que resolve o caso comum', () => {
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026. A versão anterior exigia o texto literal
+     * `"Sair desta conta e continuar"` — congelava a redação **e** o desenho errado.
+     *
+     * Havia uma saída só: sair da conta. Para quem trocou o próprio e-mail porque o parceiro
+     * mandou o antigo, essa saída não serve — **a conta certa é a que está aberta**. O dono
+     * ficou preso exatamente aí: _"teoricamente, se eu logasse nessa conta, era para aparecer
+     * justamente essa tela"_. Oferecer só o caminho que não resolve é o que transforma
+     * proteção em beco.
+     *
+     * A propriedade: o aviso oferece **continuar com a sessão** e **sair**, e a escolha é do
+     * paciente — não uma inferência nossa.
+     */
+    /**
+     * ⚠️ O recorte termina no fechamento do BLOCO — a linha que contém só `)}`. Fatiar no
+     * primeiro `)}` que aparecer pega um fechamento interno do JSX e corta o aviso pela metade,
+     * acusando o que está logo abaixo do corte. Recorte se faz na granularidade do defeito.
+     */
+    const bloco = TELA.slice(TELA.indexOf('{sessaoEDeOutraPessoa && ('));
+    const fim = bloco.search(/\n\s*\)\}/);
+    expect(fim, 'não achei o fim do bloco do aviso').toBeGreaterThan(-1);
+    const aviso = bloco.slice(0, fim);
+
+    expect(aviso, 'sumiu a saída de trocar de conta').toMatch(/signOut\(\)/);
+    expect(aviso, 'sumiu a saída de continuar com a conta aberta').toMatch(
+      /setContinuarComASessao\(true\)/,
+    );
+  });
+
+  it('🔴 e continuar com a sessão ALINHA o e-mail do formulário — senão o servidor recusa', () => {
+    /**
+     * A action aceita a sessão quando ela casa com o e-mail confirmado no fluxo (`dados.email`).
+     * Escolher "continuar" sem levar o campo junto deixaria a tela dizendo uma coisa e o
+     * servidor recebendo outra — e o paciente voltaria ao mesmo erro, agora sem entender por quê.
+     */
+    const bloco = TELA.slice(TELA.indexOf('setContinuarComASessao(true)'));
+    expect(bloco.slice(0, 200), 'a escolha não alinha o e-mail do formulário').toMatch(
+      /setEmail\(emailDaSessao\)/,
     );
   });
 

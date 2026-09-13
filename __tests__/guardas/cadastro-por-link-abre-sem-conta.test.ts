@@ -181,7 +181,28 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
     // Um caminho novo que não prove sessão deixaria ficha órfã no banco. Se este caso
     // ficar vermelho, é porque alguém acrescentou um — e ele precisa entrar no caso acima.
     const t = codigo(FORM);
-    expect((t.match(/await gravarFicha\(\)/g) ?? []).length).toBe(2);
+    /**
+     * 🔴 A PROPRIEDADE É "CADA PONTO DE ENTRADA PROVA SESSÃO", não "existem N pontos".
+     *
+     * A versão anterior afirmava `toBe(2)`. Em 13/09/2026 nasceu um terceiro ponto legítimo —
+     * quem chega à etapa do código com a conta **já criada** precisa gravar a ficha em vez de
+     * tentar confirmar um código que não existe mais — e o caso ficou vermelho acusando o
+     * conserto. Contagem fixa vira alarme falso na primeira mudança legítima.
+     *
+     * O que não pode acontecer é um caminho gravar **sem sessão**: isso deixaria ficha órfã no
+     * banco. Então cada chamada é conferida pelo que a antecede.
+     */
+    const pontos = [...t.matchAll(/await gravarFicha\(\)/g)].map((m) => m.index ?? 0);
+    expect(pontos.length, 'ninguém grava a ficha — o guarda perdeu o alvo').toBeGreaterThan(0);
+
+    for (const ponto of pontos) {
+      const antes = t.slice(Math.max(0, ponto - 700), ponto);
+      expect(
+        /isSignedIn/.test(antes) || /setActive\(/.test(antes),
+        `há um caminho até gravarFicha() que não prova sessão (posição ${ponto})`,
+      ).toBe(true);
+    }
+
     // E a action continua sendo chamada de um lugar só.
     expect((t.match(/concluirCadastroPorLink\(\{/g) ?? []).length).toBe(1);
   });

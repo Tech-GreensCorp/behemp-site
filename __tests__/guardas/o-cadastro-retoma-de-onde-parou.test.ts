@@ -249,7 +249,15 @@ describe('o cadastro retoma de onde parou', () => {
     // paciente que veio pelo segundo caminho fica sem ele.
     expect((CODIGO.match(/concluirCadastroPorLink\(\{/g) ?? []).length).toBe(1);
     expect((CODIGO.match(/async function gravarFicha\(/g) ?? []).length).toBe(1);
-    expect((CODIGO.match(/await gravarFicha\(\)/g) ?? []).length).toBe(2);
+    /**
+     * ⚠️ SEM CONTAGEM FIXA. O que importa é a função ser uma só — as duas linhas acima — e não
+     * quantos pontos a chamam. Um ponto novo legítimo (a conta já criada, 13/09) fez a versão
+     * `toBe(2)` acusar o conserto.
+     */
+    expect(
+      (CODIGO.match(/await gravarFicha\(\)/g) ?? []).length,
+      'ninguém chama gravarFicha — os pontos de entrada sumiram',
+    ).toBeGreaterThan(1);
   });
 
   it('🔴 o botão NÃO promete criar conta a quem já tem', () => {
