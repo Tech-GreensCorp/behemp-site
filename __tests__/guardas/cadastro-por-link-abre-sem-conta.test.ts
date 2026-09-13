@@ -209,8 +209,13 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
 
   it('🔴 o link só é consumido DEPOIS da ficha gravada', () => {
     // Consumir antes deixaria o paciente sem link E sem cadastro se a gravação falhasse.
+    //
+    // ⚠️ A âncora é `.transaction(`, não `db.transaction(`: em 13/09/2026 o ponto passou a usar
+    // `dbTransacional()`, porque o cliente HTTP do Neon LANÇA em transaction(). Ver o guarda
+    // `a-transacao-usa-um-driver-que-a-suporta`. A ORDEM, que é o que este caso garante, não
+    // mudou — e é por isso que o caso continua, só com a âncora corrigida.
     const t = codigo(ACTION).replace(/\s+/g, ' ');
-    expect(t).toMatch(/db\.transaction\([\s\S]*?marcarComoUtilizada\(/);
+    expect(t).toMatch(/\.transaction\([\s\S]*?marcarComoUtilizada\(/);
   });
 
   /**
@@ -417,9 +422,38 @@ describe('CPF, telefone e texto clínico não vazam para log nem auditoria', () 
   });
 
   it('🔴 a mensagem de erro capturada não expõe valor de coluna', () => {
-    // `erro.message` do Postgres carrega o valor que violou a constraint — e as colunas
-    // aqui são CPF, telefone e texto clínico.
-    expect(codigo(ACTION)).toMatch(/erro instanceof Error \? erro\.name/);
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026 — este caso media a FORMA, e a forma custou um diagnóstico.
+     *
+     * Ele exigia o literal `erro instanceof Error ? erro.name`. A intenção estava certa:
+     * MEDIDO contra um Postgres real, o Drizzle monta a mensagem com a query inteira e os
+     * valores inline (`Failed query: insert into pacientes values ('529.982.247-25', …)`), e
+     * as colunas desta transação são CPF, telefone e texto clínico.
+     *
+     * Mas `erro.name` de um `new Error` é SEMPRE `'Error'` — e com isso produção registrou
+     * cinco falhas seguidas desta transação sem dizer nada. Exigir a forma travou também a
+     * saída segura: `motivoLegivel` passou a tratar erro de banco por `code`/`constraint`,
+     * descartando a mensagem, e o guarda continuaria vermelho.
+     *
+     * A propriedade é: NÃO USAR A MENSAGEM CRUA. Quem a satisfaz pode dizer o que quiser.
+     */
+    const t = codigo(ACTION);
+    expect(t, 'a mensagem crua do erro voltou ao log').not.toMatch(/erro\.message/);
+    expect(t, 'sem motivo legível, o log volta a dizer só "Error"').toContain('motivoLegivel(');
+  });
+
+  it('🔴 e o motivo do banco continua descartando a mensagem', () => {
+    /**
+     * A outra ponta: de nada adianta este `catch` chamar `motivoLegivel` se `motivoLegivel`
+     * voltar a devolver a mensagem do Drizzle. O guarda próprio dela
+     * (`o-motivo-do-erro-diagnostica-sem-vazar`) a EXECUTA contra erros reais; aqui se garante
+     * que o ramo de banco segue montado por `code`/`constraint`/`table`, e não por `message`.
+     */
+    const fonte = codigo('lib/erros/motivo-legivel.ts');
+    expect(fonte).toMatch(/SQLSTATE\.test\(causa\.code\)/);
+    expect(fonte, 'o ramo de banco passou a usar a mensagem').toMatch(
+      /\[\s*'banco',\s*causa\.code,\s*causa\.constraint,\s*causa\.table\s*\]/,
+    );
   });
 });
 

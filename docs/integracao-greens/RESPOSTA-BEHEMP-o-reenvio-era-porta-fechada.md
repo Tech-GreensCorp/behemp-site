@@ -183,3 +183,83 @@ incluindo o anexo que o paciente envia no nosso próprio formulário. Ou seja, o
 revelou um defeito que também atingia pacientes que nunca passaram pela Greens.
 
 — BeHemp, 13/09/2026
+
+---
+
+# LIBERAÇÃO, 13/09/2026 22:12 UTC — o store privado está em produção. Podem reenviar.
+
+O que faltava do nosso lado foi corrigido e está no ar.
+
+## Medido em produção, agora
+
+```
+token no processo: SIM · store: i9Cq0YBERLypCKIm · db: ok
+deploy 34785942888: completed success · migrations aplicadas · site 200 durante todo o restart
+```
+
+E antes do deploy, contra o store real:
+
+```
+✅ gravou no store privado
+✅ host é i9cq0yberlypckim.private.blob.vercel-storage.com
+✅ fetch sem autenticação é RECUSADO (HTTP 403)
+✅ lerDocumentoPrivado devolveu os bytes certos
+```
+
+🔴 **A linha do 403 é a que importa para vocês.** Os documentos dos pacientes de vocês, a partir
+de agora, **não abrem por URL**. Quem tiver o link não lê nada — a entrega passa por rota
+autenticada, com escopo de objeto e auditoria. Era o que faltava para receber o cuidado de vocês
+com cuidado equivalente.
+
+## 🔴 Correção ao P6 da ADR-0030 de vocês, e ela muda o diagnóstico
+
+A tabela de vocês diz:
+
+| P6 | Be4Hope recebe e grava | 🔴 **grava, mas não atualiza no reenvio** |
+
+**Não era "grava, mas não atualiza". Era: não gravava nada, nunca.** Os dois defeitos estavam
+empilhados:
+
+1. `reemitir` não atualizava o manifesto no reenvio — **real**, corrigido em 13/09 (PR #87)
+2. **atrás dele**, o upload falhava para TODO documento, do primeiro envio em diante, porque o
+   código pedia acesso privado num store criado como público e o SDK recusa
+
+⚠️ **O item 2 só apareceu porque o item 1 foi corrigido** — e foi o reenvio de vocês que o
+revelou. Se tivéssemos "resolvido" o P6 pela descrição antiga, o `67 documentos como nome, 0 como
+arquivo` continuaria igual, e a causa seguiria invisível: o log dizia `Error` e nada mais, porque
+`erro.name` de um `new Error` é sempre isso.
+
+**Sugerimos reescrever o P6 assim:** _"Be4Hope recebia o manifesto e falhava ao gravar o arquivo
+— dois defeitos empilhados, os dois corrigidos em 13/09"_.
+
+## E os outros dois portões de Be4Hope saíram do caminho
+
+|     | vocês registraram | estado real em 13/09                                            |
+| --- | ----------------- | --------------------------------------------------------------- |
+| P7  | 🔴 `400` no Clerk | ✅ corrigido — a causa era **e-mail já cadastrado**, não cookie |
+| P8  | ⏸️ não alcançado  | destravado; depende de P6 e P7 passarem                         |
+
+⚠️ Sobre o P7, vale a retratação: atribuímos o `400` a cookie cross-site e chegamos a propor
+mudança de arquitetura por causa disso. O log do Clerk trouxe `"That email address is taken"`.
+Três sinais apontavam para isso desde o começo e foram ignorados.
+
+## O pedido
+
+**Reenviem os pedidos que estão em `SENT_TO_BEHEMP`.** Comecem por um só, e nos digam qual — a
+gente confirma pelo protocolo antes de vocês mandarem o resto.
+
+⚠️ **Os arquivos do SOL-000046 não voltam.** O download aconteceu, a gravação falhou, e não há
+nada guardado deste lado — não é recuperável, é reenvio.
+
+## O que aprendemos com o trabalho de vocês
+
+O rigor de vocês em eliminar o próprio lado — o `grep` do `forcePathStyle`, a URL virtual-hosted,
+o download em 200, o `AWS_S3_PUBLIC_BASE_URL` vazio — foi o que permitiu achar isto. Sem aquela
+prova, teríamos passado mais dias procurando no lugar errado.
+
+E a lição de vocês sobre o dublê que devolvia a raiz bateu com a nossa no mesmo dia: **dois
+guardas nossos ficavam VERDES enquanto os seis caminhos de documento falhavam em produção.** Eles
+exigiam que o código dissesse `access: 'private'` — e dizia. O que falhava era o efeito, e nenhum
+teste executava nada. Mesma classe, dois repositórios, mesmo dia.
+
+— BeHemp, 13/09/2026 22:12 UTC

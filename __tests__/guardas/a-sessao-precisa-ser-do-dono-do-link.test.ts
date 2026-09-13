@@ -109,7 +109,9 @@ describe('a sessão precisa ser do dono do link', () => {
 
   it('🔴 e a recusa acontece ANTES de qualquer escrita', () => {
     const trava = ACTION.indexOf('if (!emailDaSessao');
-    const transacao = ACTION.indexOf('db.transaction');
+    // Âncora pela chamada, não pelo cliente: `db` não suporta transação em produção
+    // (neon-http lança), e o ponto passou a usar `dbTransacional()` em 13/09/2026.
+    const transacao = ACTION.search(/\.transaction\s*\(/);
     expect(trava).toBeGreaterThan(-1);
     expect(transacao).toBeGreaterThan(trava);
   });

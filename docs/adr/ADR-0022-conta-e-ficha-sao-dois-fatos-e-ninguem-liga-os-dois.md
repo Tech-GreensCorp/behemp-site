@@ -1842,3 +1842,125 @@ secret, e o `.env` da VPS é anterior ao cadastro — não há como confirmar qu
 divergirem, a próxima linha `gravar` sobrescreve o token que funciona e derruba avatar, exame e
 procuração. Trocar fragilidade latente por falha real é mau negócio: o caminho seguro é gerar
 tokens novos no painel, cadastrá-los e então acrescentar as linhas, num movimento só.
+
+---
+
+# Parte XII — A causa raiz: o driver não implementa transação
+
+## §60 — 🔴 D-25: transação exige um cliente que saiba fazer transação
+
+**Medida em 13/09/2026, depois de cinco falhas idênticas em produção e cinco hipóteses
+derrubadas.**
+
+```js
+// drizzle-orm/neon-http/session.js:152
+async transaction(_transaction, _config = {}) {
+  throw new Error('No transactions support in neon-http driver');
+}
+```
+
+`lib/db/index.ts` resolve para `neon-http` em produção. **`db.transaction()` lança na primeira
+linha, sempre.** Não é limitação de borda nem condição de corrida: o método inteiro é um `throw`.
+
+### §60.1 — Isto explica o D-16 inteiro, e explica melhor que tudo que escrevemos antes
+
+O §38 registrou a medição que orientou dias de trabalho:
+
+```
+com_arquivo: 0   em TODAS as solicitações
+concluidas:  0   em TODAS as 64 solicitações
+```
+
+Concluímos dali que faltava dado. **Faltava execução.** Nenhum dos 35 handoffs concluiu porque
+`concluirCadastroPorLink` nunca passou da primeira linha da transação — desde sempre, para todo
+paciente, por qualquer porta.
+
+⚠️ **E nada disso aparecia como erro legível**, por uma razão exata: é um `new Error(…)`, e
+`erro.name` disso é `'Error'`. O `catch` registrava `erro.name` (pelo motivo correto do §58: a
+mensagem do Drizzle carrega valores de coluna). O log rodou por semanas dizendo `{ erro:
+'Error' }` sobre a mensagem que descrevia o problema com todas as letras.
+
+### §60.2 — Por que nenhum teste pegou, e é a lição que fica
+
+O guarda `banco-usa-driver-certo` existe e está **correto**: URL de Neon → HTTP, qualquer outra
+→ TCP. É exatamente o desenho pretendido.
+
+O efeito colateral é que **em teste a URL nunca é de Neon**. Todo teste roda contra
+`node-postgres`, que implementa transação. O código passava local e lançava em produção, e a
+diferença não estava no código — estava na URL.
+
+🔴 **Nenhuma quantidade de guarda estrutural teria pego isto.** O código estava escrito
+corretamente; a chamada existia, a ordem estava certa, a atomicidade declarada. O que falhava
+era o **runtime**, e só em um ambiente.
+
+### §60.3 — A decisão
+
+**Um cliente transacional separado** — `lib/db/transacional.ts`, com `drizzle-orm/node-postgres`
+sobre um `Pool` do `pg`. `lib/db/index.ts` não muda: toda query que não precisa de transação
+segue pelo caminho de sempre.
+
+**Rejeitado — `neon-serverless` (WebSocket).** Suporta transação e é o que a doc do Neon
+recomenda. Exige o pacote `ws` no Node, que **não é dependência deste projeto**: seria
+dependência nova, em produção, num caminho de dado clínico, na véspera de um prazo. `pg` já é
+`dependencies` (`^8.23.0`), sobrevive ao `pnpm install --prod`, e **já rodou contra este banco** —
+todos os diagnósticos desta sessão na VPS usaram `require('pg')`, inclusive um `BEGIN`/`ROLLBACK`
+com três `update` reais.
+
+**Rejeitado — trocar o driver global para TCP.** Provavelmente é o certo a prazo: o neon-http
+existe para serverless, onde não se mantém conexão, e produção é EC2 com PM2, um processo longo.
+Mas isso toca **toda** query do produto e precisa ser medido em latência — não é mudança para
+fazer junto de uma correção urgente. **Fica catalogado.**
+
+**Rejeitado — reescrever sem transação.** Perderia a atomicidade entre `users` e `pacientes`. O
+§53 já registrou o custo de um cadastro meio gravado; em dado clínico isso não se negocia.
+
+### §60.4 — O guarda, e por que ele é estrutural
+
+`a-transacao-usa-um-driver-que-a-suporta` — **10 casos, provados por 5 sabotagens.** Fica
+vermelho se alguém chamar `db.transaction(` em qualquer arquivo (derivado do código, então
+nomeia o arquivo NOVO), se o cliente transacional voltar a ser HTTP, se o pool deixar de ser
+único por processo, ou se perder o timeout de conexão.
+
+Mais um bloco que cobre a armadilha do deploy: `pg` precisa estar em `dependencies`, porque
+`pnpm install --prod` poda `devDependencies` — um driver que só exista ali funcionaria em teste e
+sumiria em produção, que é exatamente a classe de falha silenciosa deste §60.
+
+⚠️ **É estrutural de propósito, e isso é uma limitação assumida:** executar a transação exigiria
+um Postgres, e executá-la contra o Neon exigiria produção. O que se garante aqui é que ninguém
+volte a pedir transação ao cliente errado.
+
+**A execução foi provada à parte**, contra Postgres 15 em Docker, antes do commit:
+
+```
+✅ transação executou e devolveu o resultado (n=1)
+✅ erro dentro da transação desfaz tudo (rollback real)
+✅ chamadas repetidas não estouram
+```
+
+E contra o **Neon de produção**, o `BEGIN` + três `update` + `ROLLBACK` do diagnóstico já havia
+provado que TCP com transação funciona naquele banco.
+
+## §61 — Cinco hipóteses medidas e derrubadas, e por que isso vale ser escrito
+
+Antes de achar a causa, cinco explicações foram levantadas e **medidas contra o banco de
+produção**. Nenhuma virou correção especulativa:
+
+| #   | hipótese                                                   | medição                              | veredicto |
+| --- | ---------------------------------------------------------- | ------------------------------------ | --------- |
+| 1   | duplicata de usuário ou ficha                              | `users: 1 · fichas: 1 · apagados: 0` | ❌        |
+| 2   | soft delete colidindo com o unique de `pacientes.userId`   | `ativas: 1 · apagadas: 0`            | ❌        |
+| 3   | e-mail com maiúscula, que o `eq()` case-sensitive não acha | `acha_como_o_codigo_busca: 1`        | ❌        |
+| 4   | `greens_handoff` fora do enum de `pacientes.origem`        | mesmo enum, valor presente           | ❌        |
+| 5   | índice unique em `clerk_id` que o schema não declara       | `pg_indexes`: não existe             | ❌        |
+
+🔴 **A quinta foi a mais útil**, e não por acertar: ela listou o que existe **no banco** em vez do
+que o schema declara. Foi ao eliminá-la que ficou claro que o problema não era de dado — e a
+atenção virou para o runtime.
+
+⚠️ **O custo disso foi alto e é honesto registrar:** cada hipótese exigiu uma rodada de comando
+na VPS do dono. E antes delas, quatro comandos meus tinham defeito próprio — nome de coluna
+inventado (`criado_em` por `created_at`), filtro por `created_at` que esconde reenvio (reenvio
+move `updated_at`), campo do manifesto errado (`url` por `urlBlob`) e `!!` em shell interativo,
+que o bash expande como histórico. **A partir da quinta, os comandos passaram a ser validados
+localmente (`node --check`, `bash -n`, contagem de `!`) antes de serem enviados** — e nenhum
+falhou depois disso.
