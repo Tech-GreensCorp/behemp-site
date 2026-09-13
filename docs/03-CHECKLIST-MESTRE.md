@@ -283,6 +283,21 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **A tela do cadastro diz "✓ Laudo médico" para um documento que NÃO chegou** — medido em
+      13/09/2026 no SOL-000046, com o fluxo real. `recebidosDe` (`lib/parceiros/documentos.ts:111`)
+      lista os **nomes** do manifesto via `normalizarManifesto` e nunca pergunta se o item tem
+      `urlBlob`. A Greens mandou 4 tipos e conseguiu anexar 3 — o `laudo_medico` saiu com
+      `tipo_nao_suportado` do lado deles. A tela mostra os quatro com ✓ e diz _"Chegaram junto com
+      o seu cadastro. Você não precisa enviar de novo."_
+      **O dano é diferido e caro:** o paciente acredita, não envia o laudo, e a falta só aparece
+      na ANVISA — quando ele já saiu da tela e a conversa recomeça do zero. É a mesma classe do
+      guarda `o-que-nao-chegou-e-dito-como-nosso`, que cobre o painel e **não** cobre esta tela.
+      **Perigo de mexer: BAIXO** — `recebidosDe` tem um ponto de chamada
+      (`app/(auth)/cadastro/[token]/page.tsx:218`), e a correção é filtrar por quem tem arquivo.
+      ⚠️ Mas exige decidir o que a tela diz do terceiro estado: _"o parceiro mandou e não
+      conseguimos buscar"_ não é nem "recebido" nem "falta você enviar" — e essa distinção é a
+      razão de a terceira forma do manifesto existir.
+
 - [ ] 🔴 **Onze pontos ainda logam `erro.name`, que é sempre `'Error'`** — catalogado em
       13/09/2026, depois de esse mesmo defeito esconder por quatro dias a falha que impedia
       **todo** documento de paciente de ser gravado. Os do caminho do Fluxo 1 · Portão 1 foram

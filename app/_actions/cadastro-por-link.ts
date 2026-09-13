@@ -31,6 +31,7 @@ import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
 import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
 import { dbTransacional } from '@/lib/db/transacional';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 import { FINALIDADES } from '@/lib/parceiros/consentimento';
 import { conceder } from '@/lib/parceiros/consentimento-registrado';
 import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
@@ -658,17 +659,24 @@ export async function concluirCadastroPorLink(
        * `new Error(…)` é sempre `'Error'`, e foi exatamente o que produção registrou.
        */
       /**
-       * 🔴 `erro.name` AQUI É DELIBERADO, e o guarda o exige — não é o defeito de log.
+       * 🔴 O MOTIVO, E POR QUE ELE PODE ESTAR AQUI AGORA — 13/09/2026, em duas etapas.
        *
-       * Tentei trocar por `motivoLegivel` em 13/09/2026 e o guarda
-       * `cadastro-por-link-abre-sem-conta` ficou vermelho com razão: as colunas desta
-       * transação são CPF, telefone e texto clínico, e um erro de constraint do Postgres
-       * pode carregar o valor que a violou. `motivoLegivel` redige URL — não redige CPF.
+       * Pela manhã este campo era `erro.name`, e o guarda o exigia. Tentei trocar por
+       * `motivoLegivel` e o guarda ficou vermelho com razão: as colunas desta transação são
+       * CPF, telefone e texto clínico, e MEDIDO contra um Postgres real, o Drizzle monta a
+       * mensagem com a query inteira e os valores inline — `Failed query: insert into
+       * pacientes values ('529.982.247-25', …)`.
        *
-       * O diagnóstico aqui fica pobre de propósito. Melhorá-lo exige usar `code` e
-       * `constraint` do driver em vez da mensagem, e isso é trabalho próprio — catalogado.
+       * À noite, `motivoLegivel` passou a tratar erro de banco por `code` + `constraint` +
+       * `table`, DESCARTANDO a mensagem, e a redigir e-mail, CPF e telefone no resto. O que
+       * era inseguro deixou de ser — e o guarda passou a medir a propriedade (não usar a
+       * mensagem crua) em vez da forma (`erro.name` literal).
+       *
+       * ⚠️ E a troca não é preciosismo: com `erro.name`, produção registrou CINCO falhas
+       * seguidas desta transação dizendo apenas `'Error'`. Usuário existente, ficha ativa,
+       * e-mail em minúscula — três hipóteses medidas e derrubadas sem chegar à causa.
        */
-      erro: erro instanceof Error ? erro.name : 'desconhecido',
+      erro: motivoLegivel(erro),
       /**
        * ONDE, sem O QUÊ. A primeira linha do stack traz `arquivo:linha`; a MENSAGEM é que
        * pode trazer valor de coluna — e as colunas aqui são CPF, telefone e texto clínico.
