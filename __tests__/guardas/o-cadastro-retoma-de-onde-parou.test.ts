@@ -82,13 +82,92 @@ describe('o cadastro retoma de onde parou', () => {
     expect(CODIGO).toMatch(/Boolean\(signUp\.emailAddress\)/);
   });
 
-  it('🔴 e NÃO retoma sem a senha em mãos — senão completaria o cadastro SEM senha', () => {
+  it('🔴 e NÃO retoma sem o FORMULÁRIO em mãos — senão grava ficha casca (S8.5)', () => {
     /**
-     * Desde a inversão da ordem, a senha é entregue ao Clerk depois da confirmação — é o que
-     * faz a conta nascer só ali. Ela vive no estado do React, que não sobrevive a fechar a
-     * aba. Retomar sem senha recriaria, por outro caminho, o buraco que a inversão fechou.
+     * 🔴 A VERSÃO ANTERIOR DESTE CASO EXIGIA `Boolean(senha)` LITERALMENTE, e por isso congelava
+     * um entendimento incompleto do próprio defeito.
+     *
+     * A senha era condição por um motivo verdadeiro (ela é entregue ao Clerk depois da
+     * confirmação, e retomar sem ela completaria a conta sem senha) e insuficiente. **Medido em
+     * 13/09/2026:** confirmar o código não termina no Clerk — chama `gravarFicha()`, que monta a
+     * ficha a partir do estado do React: `anexos`, `finalidadesConsentidas`, `jaFazTratamento`,
+     * `temAnvisa`, `temReceita`, `tratamentoAtual`.
+     *
+     * ⚠️ Pular para a etapa do código com o estado zerado grava ficha **sem documento, sem
+     * consentimento e sem as respostas clínicas** — e queima o link de uso único no caminho. É a
+     * FICHA CASCA (ADR-0022, G2) entrando pela porta da correção do S8.5.
+     *
+     * A propriedade que este caso protege: a condição confere mais que um campo, e inclui pelo
+     * menos uma resposta **sem fonte no servidor** — porque essas são as que somem no reload.
      */
-    expect(CODIGO).toMatch(/deveRetomar =[\s\S]{0,120}Boolean\(senha\)/);
+    const expressao = CODIGO.match(/const formularioEmMaos =([^;]+);/)?.[1];
+    expect(expressao, 'a condição do formulário em mãos sumiu ou foi renomeada').toBeTruthy();
+
+    expect(CODIGO, 'deveRetomar voltou a depender de um campo solto').toMatch(
+      /deveRetomar =[\s\S]{0,120}formularioEmMaos/,
+    );
+
+    /**
+     * Sem fonte no servidor = não existe prop `<campo>Inicial` que o repreencha depois do
+     * reload. `senha` nunca tem; as respostas clínicas também não. Derivado, não listado: um
+     * campo que ganhe `Inicial` amanhã sai desta conta sozinho.
+     */
+    const semFonteNoServidor = ['senha', 'jaFazTratamento', 'temAnvisa', 'temReceita'].filter(
+      (campo) => !CODIGO.includes(`${campo}Inicial`),
+    );
+    const conferidos = semFonteNoServidor.filter((campo) => expressao!.includes(campo));
+    expect(
+      conferidos.length,
+      `a condição só olha ${conferidos.length} campo(s) que somem no reload — um único campo é proxy, não garantia`,
+    ).toBeGreaterThan(1);
+  });
+
+  it('🔴 e quando NÃO dá para retomar, a tela DIZ — silêncio é o que fez o paciente achar que perdeu tudo', () => {
+    /**
+     * ⚠️ O comportamento já estava certo antes do S8.5: sem formulário em mãos, fica na etapa 1,
+     * e ao enviar de novo `pendenteDoMesmoEmail` reconhece o cadastro e só reenvia o código.
+     * **O defeito era o silêncio.** O paciente voltava, via a etapa 1 do zero e concluía que
+     * tinha perdido o cadastro — sem saber que ele estava guardado.
+     *
+     * É o R6 da ADR-0022 (verdade sobre o estado) aplicado à tela do próprio cadastro.
+     */
+    expect(CODIGO, 'a condição do aviso não existe').toMatch(/const retomandoSemFormulario =/);
+
+    /**
+     * 🔴 E NÃO PODE SER ÓRFÃO. Esta classe já mordeu neste repositório: o aviso da procuração
+     * passou quatro semanas importado e nunca renderizado. Declarar não é mostrar.
+     */
+    const declaracao = CODIGO.indexOf('const retomandoSemFormulario =');
+    const noJsx = CODIGO.indexOf('{retomandoSemFormulario', declaracao);
+    expect(noJsx, 'retomandoSemFormulario é declarado e nunca renderizado').toBeGreaterThan(-1);
+  });
+
+  it('🔴 e o aviso fala dos DOCUMENTOS — é o que se perde sem ninguém notar', () => {
+    /**
+     * `File` não sobrevive a recarregar a página e não é serializável, então os anexos somem
+     * mesmo quando o cadastro continua de pé. Avisar só a boa notícia ("seu cadastro está
+     * guardado") faria o paciente chegar ao fim **sem os arquivos** — que é exatamente como a
+     * ficha casca nasce.
+     */
+    const i = CODIGO.indexOf('{retomandoSemFormulario');
+    const bloco = CODIGO.slice(i, CODIGO.indexOf(')}', i));
+    expect(bloco, 'o aviso não diz que os documentos precisam ser reenviados').toMatch(
+      /documento|arquivo/i,
+    );
+  });
+
+  it('⚠️ VACUIDADE do S8.5: a ficha ainda é montada a partir do ESTADO — é o que torna a regra necessária', () => {
+    /**
+     * Se um dia o formulário passar a ser persistido no servidor, esta regra inteira muda de
+     * forma — e este caso fica vermelho para avisar, em vez de a proteção virar cerimônia.
+     */
+    const ficha = corpoDe('gravarFicha');
+    expect(ficha, 'gravarFicha não lê mais os anexos do estado').toMatch(
+      /anexos:\s*await lerAnexos\(anexos\)/,
+    );
+    expect(ficha, 'gravarFicha não lê mais o consentimento do estado').toMatch(
+      /finalidadesConsentidas/,
+    );
   });
 
   it('⚠️ a escolha do paciente vence a retomada', () => {

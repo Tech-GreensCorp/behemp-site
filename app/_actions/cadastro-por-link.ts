@@ -298,6 +298,22 @@ export async function concluirCadastroPorLink(
               : null,
           })
           .where(eq(pacientes.id, fichaExistente.id));
+
+        /**
+         * 🔴 A FICHA JÁ EXISTIA — e provavelmente é a casca que o `/redirect` cria (G2).
+         *
+         * Ela nasceu sem procedência, e este é o momento em que ela deixa de ser casca: o
+         * cadastro pelo link é o que dá sentido a ela. Sem isto, quem passou pelo painel
+         * antes de concluir o cadastro ficaria para sempre indistinguível de um legado.
+         *
+         * ⚠️ Só grava se ainda não tem. Uma ficha que já carrega procedência veio de um
+         * cadastro anterior, e sobrescrever apagaria de onde a pessoa **realmente** veio.
+         */
+        await tx
+          .update(pacientes)
+          .set({ origem: solicitacao.origem, solicitacaoId: solicitacao.id })
+          .where(and(eq(pacientes.id, fichaExistente.id), isNull(pacientes.origem)));
+
         return fichaExistente.id;
       }
 
@@ -306,6 +322,19 @@ export async function concluirCadastroPorLink(
         .values({
           userId: usuario.id,
           cpf,
+          /**
+           * 🔴 DE ONDE ELE VEIO, gravado na ficha — ADR-0022 D-08, fecha o G5.
+           *
+           * A procedência morria na solicitação. A partir daqui um paciente da Greens é
+           * distinguível de quem se cadastrou sozinho, e a sentinela consegue responder
+           * "há documentos do parceiro esperando esta pessoa?" sem adivinhar.
+           *
+           * ⚠️ As duas colunas andam juntas: a origem diz COMO ele chegou, a solicitação diz
+           * POR QUAL pedido. Gravar uma sem a outra deixaria a sentinela com metade da
+           * resposta.
+           */
+          origem: solicitacao.origem,
+          solicitacaoId: solicitacao.id,
           jaFazTratamentoCannabis: dados.jaFazTratamento,
           // Só guarda a descrição se ele disse que faz tratamento. Texto órfão de um
           // "não" é ruído na ficha, e ruído numa tela clínica custa atenção.

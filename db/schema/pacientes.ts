@@ -2,7 +2,12 @@ import { pgTable, text, date, index, boolean } from 'drizzle-orm/pg-core';
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { users } from './users';
 import { medicos } from './medicos';
-import { pacienteStatusEnum, tratamentoTipoEnum, jornadaFaseEnum } from './enums';
+import {
+  pacienteStatusEnum,
+  tratamentoTipoEnum,
+  jornadaFaseEnum,
+  solicitacaoCadastroOrigemEnum,
+} from './enums';
 
 /**
  * Tabela de pacientes — dados clínicos e vínculo com médico responsável.
@@ -24,7 +29,7 @@ export const pacientes = pgTable(
     dataNascimento: date('data_nascimento'),
     cpf: text('cpf'),
     rg: text('rg'),
-    genero: text('genero'),        // Masculino | Feminino | Outro | Não informado
+    genero: text('genero'), // Masculino | Feminino | Outro | Não informado
 
     // ── Endereço ─────────────────────────────────────
     cep: text('cep'),
@@ -54,7 +59,7 @@ export const pacientes = pgTable(
 
     // ── Dados da Associação ───────────────────────────
     atendimento: text('atendimento'),
-    temAdvogado: text('tem_advogado'),   // 'sim' | 'nao'
+    temAdvogado: text('tem_advogado'), // 'sim' | 'nao'
     nomeAdvogado: text('nome_advogado'),
     cid: text('cid'),
     categorizacao: text('categorizacao'),
@@ -63,7 +68,7 @@ export const pacientes = pgTable(
     entradaPaciente: text('entrada_paciente'),
     etapa: text('etapa'),
     hospitalProximo: text('hospital_proximo'),
-    homeCare: text('home_care'),         // 'sim' | 'nao'
+    homeCare: text('home_care'), // 'sim' | 'nao'
     planoSaude: text('plano_saude'),
     possuiPlanoSaude: text('possui_plano_saude'), // 'sim' | 'nao'
     rendaFamilia: text('renda_familia'),
@@ -84,6 +89,32 @@ export const pacientes = pgTable(
     status: pacienteStatusEnum('status').notNull().default('aguardando_consulta'),
     tratamentoTipo: tratamentoTipoEnum('tratamento_tipo'),
     jornadaFase: jornadaFaseEnum('jornada_fase').notNull().default('acolhimento'),
+
+    /**
+     * 🔴 DE ONDE ESTE PACIENTE VEIO — ADR-0022, D-08, e fecha o G5.
+     *
+     * A procedência nascia na solicitação, era usada durante o cadastro e **morria ali**.
+     * Depois disso, um paciente vindo da Greens era indistinguível de quem se cadastrou
+     * sozinho — e nenhuma tela sabia que havia documentos esperando por ele.
+     *
+     * ⚠️ `NULL` NÃO SIGNIFICA "ORIGEM DESCONHECIDA": significa **"ficha criada antes desta
+     * coluna existir"**. O D-07 exige que esse caso saia pelo ramo `completo_legado` da
+     * sentinela — conta antiga não é cadastro pela metade, e **não se bloqueia** (R9).
+     *
+     * Reusa o mesmo enum da solicitação, de propósito: dois vocabulários para a mesma coisa
+     * é o defeito que a ADR-0022 §16 descreve, e que já custou caro aqui.
+     */
+    origem: solicitacaoCadastroOrigemEnum('origem'),
+
+    /**
+     * A solicitação que originou esta ficha, quando houve uma.
+     *
+     * ⚠️ SEM FOREIGN KEY, e é a mesma escolha de `solicitacoes_cadastro.paciente_id`: as duas
+     * tabelas se apontam, e uma FK circular travaria a ordem de inserção. O G17 registra o
+     * custo disso — ponteiro morto é possível —, e a sentinela trata `null` e "aponta para
+     * nada" do mesmo jeito: como ausência.
+     */
+    solicitacaoId: text('solicitacao_id'),
 
     ...softDeleteColumn,
   },

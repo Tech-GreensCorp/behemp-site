@@ -581,3 +581,49 @@ path:db/migrations/meta/0041_snapshot.json
 # FONTE: doc oficial do Next.js, `deploymentId` — "When the client detects a mismatch
 # between its deployment ID and the server's (via the response header), it triggers a
 # hard navigation (full page reload) instead of a client-side navigation."
+
+# ── 13/09/2026 — Sprint 8: migration da procedência + status da fila ──
+#
+# PEDIDO DO DONO (13/09/2026, verbatim): "eu autorizo e pode seguir para finalizarmos a
+# sprint 8" — em resposta direta a duas coisas que eu tinha dito que exigiam autorização:
+# a coluna de procedência em `pacientes` (S8.2) e o status próprio da fila para evento
+# barrado por revogação (S8.0, que ficou de fora do commit anterior).
+#
+# O QUE AS MIGRATIONS FAZEM:
+#   1. ALTER TABLE pacientes ADD COLUMN origem  <enum>  NULL
+#      ALTER TABLE pacientes ADD COLUMN solicitacao_id text NULL
+#   2. ALTER TYPE parceiro_evento_saida_status ADD VALUE 'cancelado_por_revogacao'
+#
+# PERIGO MEDIDO, item por item:
+#
+#   (1) ADITIVA E NULLABLE, sem default. Postgres 11+ não reescreve a tabela nesse caso —
+#       é mudança de catálogo, não de dados. Nenhuma leitura existente é afetada: toda
+#       query atual lista colunas explicitamente ou usa o query builder tipado. `NULL`
+#       significa "ficha criada antes desta mudança", e o ADR-0022 D-07 exige que esse
+#       caso saia pelo ramo `completo_legado` — nunca tratado como cadastro incompleto.
+#       COMO SE DESFAZ: `ALTER TABLE pacientes DROP COLUMN origem, DROP COLUMN
+#       solicitacao_id`, sem perda de outro dado.
+#
+#   (2) ADD VALUE em enum é aditivo e irreversível no Postgres — não há DROP VALUE. O
+#       risco real é o inverso do usual: código antigo que faça `switch` exaustivo sobre
+#       o status passaria a receber um valor que não conhece. Medido: o único consumidor
+#       do status é `lib/parceiros/enviador.ts`, que compara com literais e não faz
+#       exaustividade. COMO SE DESFAZ: não se desfaz; o valor fica, sem uso, se a decisão
+#       mudar.
+#       ⚠️ ADD VALUE não roda dentro de transação em Postgres < 12. O migrador do
+#       drizzle-orm executa statement a statement, então isto precisa ficar em migration
+#       PRÓPRIA, sem outras instruções junto.
+#
+# QUANTOS ARQUIVOS TOCA: 2 migrations + `db/schema/pacientes.ts` + `db/schema/enums.ts` +
+# `app/_actions/cadastro-por-link.ts` (grava a procedência) + `lib/parceiros/enviador.ts`
+# (usa o status novo).
+#
+# ESTÁ EM PRODUÇÃO? Sim — `main` é produção, e o deploy aplica migration sem rollback.
+# Por isso as duas são aditivas: nenhuma remove nem altera coluna existente.
+#
+# ⚠️ LIÇÃO DE 11/09 QUE SE APLICA AQUI: o banco de desenvolvimento e o de produção são O
+# MESMO (Neon). Uma migration destrutiva contra ele derrubou a reserva de horário naquele
+# dia. Estas duas não removem nada — e é deliberado.
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: os guardas da Sprint 8 —
+# `toda-porta-declara-de-onde-veio`, `a-revogacao-para-a-fila` e o da sentinela.

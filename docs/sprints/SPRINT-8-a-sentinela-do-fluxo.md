@@ -235,3 +235,71 @@ incompleto.
 3. abre o link logado em outra conta — e é avisado, com saída
 4. um documento que a Greens não entregou **aparece como não entregue**, não como ausente
 5. e os testes de comportamento rodam no CI, não só os estruturais
+
+---
+
+# ✅ ESTADO EM 13/09/2026 — o que foi entregue
+
+| item                                       | estado                          | onde                                                              |
+| ------------------------------------------ | ------------------------------- | ----------------------------------------------------------------- |
+| **S8.0** revogação para a fila (LGPD)      | ✅ **corrigido em 13/09**       | `consentimento-ainda-vale.ts` + `enviador.ts` (`marcarCancelado`) |
+| **S8.1** por que o aviso não apareceu      | ✅ **por outro caminho** (D-16) | `app/api/fluxo/situacao/route.ts`                                 |
+| **S8.1b** vínculo antes de queimar o link  | ✅                              | `cadastro-por-link.ts`                                            |
+| **S8.1c** `onConflictDoNothing` na corrida | ✅                              | `cadastro-por-link.ts`                                            |
+| **S8.2** a procedência sobrevive           | ✅                              | migrations 0042/0043 + `pacientes.origem`                         |
+| **S8.3** a sentinela                       | ✅                              | `lib/fluxo/sentinela.ts`                                          |
+| **S8.4** dizer o que não chegou            | ✅                              | `components/paciente/AvisoDoQueNaoChegou.tsx`                     |
+| **S8.5** retomar de qualquer lugar         | ✅ **os 3 passos**              | `formulario-de-cadastro.tsx` — `formularioEmMaos` + o aviso       |
+| **S8.6** reconciliação                     | 🔴 **não feita**                | precisa do banco, que o dono não tem hoje                         |
+
+## O que ficou de fora, e por quê
+
+**S8.5 — completo em 13/09, e o "parcial" anterior era o passo 2 faltando.** Os três passos do
+plano estão feitos. O que mudou é o entendimento do passo 1, e é o achado da revisão da ADR
+(§33.3):
+
+🔴 **Abrir direto na etapa do código vindo de outro lugar NÃO PODE ACONTECER, e não por custo.**
+Medido: confirmar o código chama `gravarFicha()`, que monta a ficha a partir do estado do React —
+`anexos`, `finalidadesConsentidas`, `jaFazTratamento`, `temAnvisa`, `temReceita`. Com o estado
+zerado, isso grava ficha **sem documento, sem consentimento e sem as respostas clínicas**, e
+queima o link de uso único. **É a ficha casca (G2) chegando pelo caminho principal**, que é o
+defeito que a ADR-0022 inteira existe para fechar.
+
+⛔ E persistir o progresso fora do navegador foi rejeitado, não adiado: `File` de documento
+clínico não é serializável, e senha em storage do navegador é o que a regra de segurança proíbe.
+
+**O que entrou:** a condição virou declarada (`formularioEmMaos`, não `Boolean(senha)`, que era
+proxy acidental) e — o passo 2, que faltava — **a tela diz** que há cadastro guardado, que o
+código será reenviado, e que só os documentos precisam voltar. O comportamento já estava certo; o
+defeito era o silêncio.
+
+⚠️ **O que continua fora:** abrir na etapa do código vindo de outro aparelho. Não é pendência —
+é decisão, com o motivo acima.
+
+**S8.6 — reconciliação.** É um script que escreve no banco de produção, e o dono informou em
+13/09 que não tem acesso à VPS nem ao banco. ⚠️ **Mas o instrumento do S8.1 já responde a
+pergunta que ela responderia** — `GET /api/fluxo/situacao?email=` diz em que ponto cada pessoa
+está, e por quê. A reconciliação passa a ser "agir sobre o que o instrumento mostrou", não
+"descobrir o que aconteceu".
+
+## 🔴 Corrigido em 13/09, ao revisar a ADR: o S8.0 estava pela metade
+
+O D-14 decidiu que o evento revogado vira `cancelado_por_revogacao`, **não** `falhou`. A migration
+`0043` foi autorizada para isso. **E o enviador chamava `marcarFalha`** — o valor ficou no enum
+com zero usos em `lib/` e `app/`.
+
+⚠️ **E o guarda congelava o defeito:** ele exigia `marcarFalha` literalmente, então ficava verde
+com o defeito e vermelho com a correção. Reescrito para medir a propriedade — o status final
+distingue revogação de falha de entrega — e provado por 7 sabotagens, uma das quais achou um
+terceiro defeito meu (`toMatch(/ultimoErro:/)` sobrevivia a um literal fixo sem motivo).
+
+Ver ADR-0022 §33.1 e §33.2.
+
+## 🔴 O que este trabalho NÃO garante
+
+**Nenhum destes guardas executa o fluxo.** Eles provam que o código está escrito do jeito certo
+— e foi por confundir as duas coisas que afirmei "está funcionando" cinco vezes em 12/09, com
+1152 guardas verdes, enquanto o dono encontrava seis defeitos seguidos.
+
+O teste que falta é o de comportamento, com estado sujo. Ele está no `CLAUDE.md` como regra
+desde 12/09, e continua sendo o próximo passo natural desta sprint.

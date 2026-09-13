@@ -437,18 +437,6 @@ export function FormularioDeCadastro({
    * razão: _"Calling setState synchronously within an effect can trigger cascading renders"_.
    * O `AGENTS.md` proíbe isso, e o React documenta o padrão certo: **isto não precisa de
    * efeito**. A etapa é uma função do que já se sabe, então se calcula.
-   *
-   * 🔴 `senha` É CONDIÇÃO, e não por capricho. Desde a inversão da ordem, a senha é entregue
-   * ao Clerk DEPOIS da confirmação — é o que faz a conta nascer só ali. Ela vive no estado do
-   * React, que não sobrevive a fechar a aba. Retomar na etapa do código sem senha em mãos
-   * completaria o cadastro **sem senha**, recriando o buraco que a inversão veio fechar.
-   *
-   * ⚠️ E ter a senha em mãos implica MESMA SESSÃO DE NAVEGADOR — logo o `email` da tela já
-   * está preenchido. Por isso não há `setEmail` aqui: nada a sincronizar.
-   *
-   * Sem senha, fica na etapa 1. Ao enviar de novo, o cadastro pendente do mesmo e-mail é
-   * reconhecido e só o código é reenviado (o caminho que o Item 35 abriu). O paciente
-   * redigita a senha uma vez; não perde o cadastro nenhuma.
    */
   const cadastroPendenteNoNavegador =
     isLoaded &&
@@ -457,7 +445,55 @@ export function FormularioDeCadastro({
     Boolean(signUp.emailAddress) &&
     signUp.verifications?.emailAddress?.status === 'unverified';
 
-  const deveRetomar = cadastroPendenteNoNavegador && Boolean(senha) && !voltouDeProposito;
+  /**
+   * 🔴 S8.5 — POR QUE PULAR PARA O CÓDIGO EXIGE O FORMULÁRIO INTEIRO, e não só a senha.
+   *
+   * O dono declarou pendência real em 13/09/2026: _"retomar da mesma aba deve funcionar em
+   * todas as instâncias"_. Ao medir o que separa "todas as instâncias" do que existe, apareceu
+   * uma coisa que a versão anterior tratava por acidente — e que **inverte** a correção óbvia.
+   *
+   * A versão anterior exigia `Boolean(senha)`, e explicava isso pela senha: ela é entregue ao
+   * Clerk depois da confirmação, então retomar sem ela completaria a conta sem senha. Verdade,
+   * e insuficiente. **A senha era um proxy para algo maior.**
+   *
+   * 🔴 MEDIDO: confirmar o código não termina no Clerk. Ele chama `gravarFicha()`, que monta a
+   * ficha inteira a partir do ESTADO DO REACT — `cpf`, `telefone`, `jaFazTratamento`,
+   * `temAnvisa`, `temReceita`, `anexos`, `tratamentoAtual` e `finalidadesConsentidas`. Pular
+   * para a etapa do código com o estado zerado grava uma ficha **sem documento, sem
+   * consentimento e sem as respostas clínicas** — e consome o link de uso único no caminho.
+   *
+   * ⚠️ Ou seja: a correção ingênua do S8.5 produziria a FICHA CASCA (ADR-0022, G2) pelo caminho
+   * principal, com o paciente lendo "pronto". É o defeito que esta ADR inteira existe para
+   * fechar, entrando pela porta da correção dele.
+   *
+   * ⛔ E guardar o formulário no navegador para contornar isso está fora de questão: `File` de
+   * documento clínico não é serializável, e senha em `localStorage`/`sessionStorage` é
+   * exatamente o que a regra de segurança proíbe. Persistir para conveniência sairia mais caro
+   * que o problema.
+   *
+   * **Então a condição passa a ser declarada em vez de inferida.** O nome diz o que ela
+   * protege, e um campo novo que só viva em memória se acrescenta aqui — em vez de quebrar
+   * este cálculo em silêncio, como `Boolean(senha)` quebraria.
+   */
+  const formularioEmMaos = Boolean(senha) && Boolean(confirmarSenha) && jaFazTratamento !== null;
+
+  const deveRetomar = cadastroPendenteNoNavegador && formularioEmMaos && !voltouDeProposito;
+
+  /**
+   * 🔴 E ESTA É A OUTRA METADE DO S8.5 — a que faltava, e a que o dono viu faltando.
+   *
+   * Quando há cadastro pendente mas o formulário não está em mãos (recarregou a página, fechou
+   * a aba, voltou pelo link no mesmo navegador), o comportamento correto **já era** ficar na
+   * etapa 1: ao enviar de novo, `pendenteDoMesmoEmail` reconhece o cadastro e só reenvia o
+   * código, sem criar outro.
+   *
+   * ⚠️ O DEFEITO NÃO ERA O COMPORTAMENTO: ERA O SILÊNCIO. O paciente voltava, via a etapa 1 do
+   * zero e concluía que tinha perdido tudo — sem saber que o cadastro estava esperando, que o
+   * e-mail já fora enviado, nem que precisava anexar os documentos de novo. É o R6 (verdade
+   * sobre o estado) aplicado à própria tela do cadastro: **não basta funcionar, tem que dizer.**
+   */
+  const retomandoSemFormulario =
+    cadastroPendenteNoNavegador && !formularioEmMaos && !voltouDeProposito;
 
   /**
    * A etapa que a tela mostra. `etapa` é o que o paciente escolheu; esta é o que ele vê —
@@ -1392,6 +1428,32 @@ export function FormularioDeCadastro({
                 >
                   Sair desta conta e continuar
                 </Button>
+              </div>
+            )}
+
+            {/*
+              🔴 S8.5 — O CADASTRO PENDENTE SE ANUNCIA, em vez de deixar o paciente concluir
+              que perdeu tudo.
+
+              Aparece quando o Clerk tem um cadastro pendente deste navegador e o formulário
+              não está mais em memória — recarregou a página, fechou a aba, voltou pelo link.
+              O cadastro está intacto; o que se perdeu foram os campos desta tela.
+
+              ⚠️ DIZ OS DOIS LADOS DE PROPÓSITO: o que sobreviveu (o cadastro, o e-mail já
+              enviado) e o que não (os documentos anexados). Avisar só a boa notícia faria o
+              paciente chegar ao fim sem os arquivos — que é como a ficha casca nasce.
+            */}
+            {retomandoSemFormulario && !sessaoEDeOutraPessoa && !jaTemConta && (
+              <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você já tinha começado este cadastro e paramos na{' '}
+                  <strong>confirmação do e-mail</strong>. Ele continua guardado — confira os dados
+                  abaixo e continue, que reenviamos o código.
+                </p>
+                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                  Só os documentos precisam ser anexados de novo: arquivo não fica salvo no
+                  navegador.
+                </p>
               </div>
             )}
 

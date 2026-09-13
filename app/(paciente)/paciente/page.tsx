@@ -33,6 +33,7 @@ import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
+import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -99,19 +100,44 @@ export default function PacienteDashboardPage() {
 
   const [dados, setDados] = useState<DadosDashboard | null>(null);
   const [carregando, setCarregando] = useState(true);
+  /** `null` = nada falhou. Texto = a consulta falhou, e a tela precisa dizer isso. */
+  const [falhaAoCarregar, setFalhaAoCarregar] = useState<string | null>(null);
 
   const [teleconsultaAtiva, setTeleconsultaAtiva] = useState<{
-    roomId: string; medicoNome: string;
+    roomId: string;
+    medicoNome: string;
   } | null>(null);
 
+  /**
+   * 🔴 G18 (ADR-0022 §24) — AUSÊNCIA DE DADO E FALHA DA CONSULTA NÃO SÃO A MESMA COISA.
+   *
+   * A versão anterior fazia `if (res.sucesso && res.dados) setDados(...)` e **descartava o
+   * erro**. Quando a action falhava, `dados` ficava `null`, `carregando` virava `false`, e a
+   * tela renderizava o estado vazio — idêntico ao de quem realmente não tem nada.
+   *
+   * ⚠️ É metade do relato do dono em 12/09: _"eu entrei na conta e vim na área de meus
+   * documentos: nenhum dos documentos que eu enviei chegaram"_. Ninguém — nem ele, nem nós —
+   * tinha como saber se era ausência de dado ou falha da consulta. **São coisas diferentes, e a
+   * tela mostrava a mesma.**
+   *
+   * É o R6 da ADR-0022 aplicado ao painel: não basta não quebrar, tem que **dizer**.
+   */
   const carregar = useCallback(async () => {
     setCarregando(true);
+    setFalhaAoCarregar(null);
     const res = await obterDadosDashboard();
-    if (res.sucesso && res.dados) setDados(res.dados);
+    if (res.sucesso && res.dados) {
+      setDados(res.dados);
+    } else {
+      // O motivo vem da action, que já devolve texto seguro (sem stack, sem dado pessoal).
+      setFalhaAoCarregar(res.erro ?? 'Não conseguimos carregar seus dados agora.');
+    }
     setCarregando(false);
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   useEffect(() => {
     if (dados?.teleconsultaAtiva) {
@@ -144,44 +170,46 @@ export default function PacienteDashboardPage() {
   }, [dados?.userId, router]);
 
   // ── Próximos passos dinâmicos baseados em dados reais ───────
-  const proximosPassos = dados ? [
-    !dados.proximaConsulta && !dados.medicamentoAtivo
-      ? {
-          id: 1,
-          titulo: 'Agendar primeira consulta',
-          descricao: 'Você ainda não tem consulta marcada',
-          href: '/paciente/agendamento',
-          urgente: true,
-        }
-      : null,
-    dados.totalDocumentos === 0
-      ? {
-          id: 2,
-          titulo: 'Enviar documentos',
-          descricao: 'Nenhum documento cadastrado ainda',
-          href: '/paciente/documentos',
-          urgente: true,
-        }
-      : null,
-    !dados.medicoNome
-      ? {
-          id: 3,
-          titulo: 'Aguardando médico',
-          descricao: 'Nenhum médico responsável atribuído ainda',
-          href: '/paciente/chat',
-          urgente: false,
-        }
-      : null,
-    dados.mensagensNaoLidas > 0
-      ? {
-          id: 4,
-          titulo: 'Mensagens não lidas',
-          descricao: `${dados.mensagensNaoLidas} ${dados.mensagensNaoLidas === 1 ? 'mensagem aguarda' : 'mensagens aguardam'} sua resposta`,
-          href: '/paciente/chat',
-          urgente: false,
-        }
-      : null,
-  ].filter(Boolean) : [];
+  const proximosPassos = dados
+    ? [
+        !dados.proximaConsulta && !dados.medicamentoAtivo
+          ? {
+              id: 1,
+              titulo: 'Agendar primeira consulta',
+              descricao: 'Você ainda não tem consulta marcada',
+              href: '/paciente/agendamento',
+              urgente: true,
+            }
+          : null,
+        dados.totalDocumentos === 0
+          ? {
+              id: 2,
+              titulo: 'Enviar documentos',
+              descricao: 'Nenhum documento cadastrado ainda',
+              href: '/paciente/documentos',
+              urgente: true,
+            }
+          : null,
+        !dados.medicoNome
+          ? {
+              id: 3,
+              titulo: 'Aguardando médico',
+              descricao: 'Nenhum médico responsável atribuído ainda',
+              href: '/paciente/chat',
+              urgente: false,
+            }
+          : null,
+        dados.mensagensNaoLidas > 0
+          ? {
+              id: 4,
+              titulo: 'Mensagens não lidas',
+              descricao: `${dados.mensagensNaoLidas} ${dados.mensagensNaoLidas === 1 ? 'mensagem aguarda' : 'mensagens aguardam'} sua resposta`,
+              href: '/paciente/chat',
+              urgente: false,
+            }
+          : null,
+      ].filter(Boolean)
+    : [];
 
   const med = dados?.medicamentoAtivo;
   const consulta = dados?.proximaConsulta;
@@ -192,45 +220,71 @@ export default function PacienteDashboardPage() {
     <div className="space-y-6 sm:space-y-10">
       {/* ── Header Editorial ── */}
       <div className="animate-fade-up">
-        <p className="text-primary mb-2 sm:mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
+        <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase sm:mb-4">
           Área do Paciente
         </p>
-        <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
-          {carregando ? 'Carregando...' : (
-            <>Olá, <span>{primeiroNome}</span></>
+        <h1 className="font-display text-foreground text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl">
+          {carregando ? (
+            'Carregando...'
+          ) : (
+            <>
+              Olá, <span>{primeiroNome}</span>
+            </>
           )}
         </h1>
-        <p className="text-muted-foreground mt-2 sm:mt-4 max-w-2xl text-sm sm:text-base leading-relaxed">
+        <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed sm:mt-4 sm:text-base">
           Acompanhe suas consultas, medicamentos e documentos.
         </p>
       </div>
 
+      {/*
+        🔴 G18 — A FALHA SE ANUNCIA, e diz que o problema é NOSSO.
+        Sem isto, a tela vazia afirmava "você não tem nada" quando a verdade era "não
+        conseguimos perguntar". Dizer de quem é o problema evita que o paciente comece a
+        conversa tendo de provar que enviou algo — é a mesma regra do S8.4.
+      */}
+      {!carregando && falhaAoCarregar && (
+        <div
+          className="animate-fade-in rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4"
+          role="alert"
+        >
+          <p className="text-foreground text-sm leading-relaxed">
+            <strong>Não conseguimos carregar seus dados agora.</strong> O problema é nosso, não seu
+            — o que você enviou continua guardado.
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">{falhaAoCarregar}</p>
+          <Button className="mt-3 h-11 rounded-xl" onClick={carregar} type="button">
+            Tentar de novo
+          </Button>
+        </div>
+      )}
+
       {carregando ? (
         <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="text-primary h-8 w-8 animate-spin" />
         </div>
       ) : (
         <>
           {/* ── Card TELECONSULTA AO VIVO ─────────────────────── */}
           {teleconsultaAtiva && (
             <div className="animate-fade-up">
-              <Card className="border-2 border-red-500/60 bg-red-50/80 shadow-lg rounded-2xl overflow-hidden">
+              <Card className="overflow-hidden rounded-2xl border-2 border-red-500/60 bg-red-50/80 shadow-lg">
                 <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                      <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                      <div className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-display font-bold text-base text-red-700 leading-tight">
+                      <p className="font-display text-base leading-tight font-bold text-red-700">
                         🔴 Teleconsulta ao Vivo!
                       </p>
-                      <p className="text-sm text-red-600 mt-0.5">
+                      <p className="mt-0.5 text-sm text-red-600">
                         Dr(a). {teleconsultaAtiva.medicoNome} está esperando você
                       </p>
                     </div>
                   </div>
                   <Link href={`/paciente/teleconsulta/${teleconsultaAtiva.roomId}`}>
-                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold gap-2 rounded-xl shadow-md">
+                    <Button className="w-full gap-2 rounded-xl bg-red-600 font-bold text-white shadow-md hover:bg-red-700">
                       <Video className="h-4 w-4" />
                       Entrar Agora
                     </Button>
@@ -243,9 +297,9 @@ export default function PacienteDashboardPage() {
           {/* ── Card PÓS-CONSULTA (Recém-realizada) ───────────── */}
           {dados?.consultaRecenteRealizada && !dados.teleconsultaAtiva && (
             <div className="animate-fade-up">
-              <Card className="border-2 border-green-500/40 bg-green-50/50 rounded-2xl">
+              <Card className="rounded-2xl border-2 border-green-500/40 bg-green-50/50">
                 <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
                     </div>
@@ -258,13 +312,13 @@ export default function PacienteDashboardPage() {
                   </div>
                   {dados.consultaRecenteRealizada.temPrescricao ? (
                     <Link href="/paciente/anvisa">
-                      <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2 rounded-xl">
+                      <Button className="w-full gap-2 rounded-xl bg-green-600 text-white hover:bg-green-700">
                         <ShieldCheck className="h-4 w-4" />
                         Iniciar Autorização ANVISA
                       </Button>
                     </Link>
                   ) : (
-                    <p className="text-xs text-green-700 text-center">
+                    <p className="text-center text-xs text-green-700">
                       Aguardando emissão da prescrição pelo médico...
                     </p>
                   )}
@@ -287,12 +341,22 @@ export default function PacienteDashboardPage() {
             pela metade não tem o que autorizar ainda. Mandá-lo à procuração primeiro seria
             pedir um passo que depende do anterior.
           */}
+          {/*
+            🔴 VEM PRIMEIRO DE TODOS (ADR-0022 R6): documento que o parceiro entregou e não
+            chegou é problema NOSSO. Cobrar o paciente por ele — que é o que os avisos abaixo
+            fazem — seria pedir que ele pague por uma falha nossa.
+          */}
+          <AvisoDoQueNaoChegou
+            ponto={dados?.situacao?.ponto ?? ''}
+            porque={dados?.situacao?.porque ?? ''}
+          />
+
           <AvisoDeCadastroPendente cadastro={dados?.cadastroPendente ?? null} />
 
           <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
 
           {/* ── KPIs principais ── */}
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 animate-fade-up delay-75">
+          <div className="animate-fade-up grid grid-cols-2 gap-3 delay-75 lg:grid-cols-4">
             {[
               {
                 label: 'Médico',
@@ -331,14 +395,29 @@ export default function PacienteDashboardPage() {
             ].map((kpi) => {
               const Icon = kpi.icone;
               return (
-                <Card key={kpi.label} className="border border-border/20 bg-white shadow-sm rounded-2xl grain overflow-hidden">
+                <Card
+                  key={kpi.label}
+                  className="border-border/20 grain overflow-hidden rounded-2xl border bg-white shadow-sm"
+                >
                   <CardContent className="flex items-center gap-3 p-3 sm:p-4">
-                    <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', kpi.bg)}>
+                    <div
+                      className={cn(
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                        kpi.bg,
+                      )}
+                    >
                       <Icon className={cn('h-4 w-4', kpi.cor)} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] sm:text-xs text-muted-foreground/60 font-bold uppercase tracking-wider">{kpi.label}</p>
-                      <p className={cn('truncate text-sm font-semibold mt-0.5', kpi.vazio && 'text-muted-foreground italic')}>
+                      <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase sm:text-xs">
+                        {kpi.label}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-0.5 truncate text-sm font-semibold',
+                          kpi.vazio && 'text-muted-foreground italic',
+                        )}
+                      >
                         {kpi.valor}
                       </p>
                     </div>
@@ -351,11 +430,11 @@ export default function PacienteDashboardPage() {
           {/* ── Próximos passos (PRIORIDADE 1) ─────────────────── */}
           {proximosPassos.length > 0 && (
             <div className="animate-fade-up delay-100">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="mb-4 flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10">
                   <CheckCircle2 className="h-4 w-4 text-amber-600" />
                 </div>
-                <h2 className="font-display text-lg font-bold text-foreground">Próximos Passos</h2>
+                <h2 className="font-display text-foreground text-lg font-bold">Próximos Passos</h2>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {proximosPassos.map((passo, i) => (
@@ -363,8 +442,10 @@ export default function PacienteDashboardPage() {
                     key={passo!.id}
                     href={passo!.href}
                     className={cn(
-                      "group flex items-start gap-3 sm:gap-4 rounded-2xl sm:rounded-3xl border p-4 sm:p-5 transition-all hover:shadow-md bg-white grain cursor-pointer",
-                      passo!.urgente ? "border-amber-500/30 hover:border-amber-500/50" : "border-border/20 hover:border-primary/30"
+                      'group grain flex cursor-pointer items-start gap-3 rounded-2xl border bg-white p-4 transition-all hover:shadow-md sm:gap-4 sm:rounded-3xl sm:p-5',
+                      passo!.urgente
+                        ? 'border-amber-500/30 hover:border-amber-500/50'
+                        : 'border-border/20 hover:border-primary/30',
                     )}
                   >
                     <div
@@ -377,11 +458,15 @@ export default function PacienteDashboardPage() {
                     >
                       {i + 1}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold leading-tight text-foreground">{passo!.titulo}</p>
-                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{passo!.descricao}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-foreground text-sm leading-tight font-bold">
+                        {passo!.titulo}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                        {passo!.descricao}
+                      </p>
                     </div>
-                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                    <ChevronRight className="text-muted-foreground/40 group-hover:text-primary mt-0.5 h-4 w-4 shrink-0 transition-colors" />
                   </Link>
                 ))}
               </div>
@@ -389,27 +474,28 @@ export default function PacienteDashboardPage() {
           )}
 
           {/* ── Grid: Próxima consulta + Medicamento ────────────── */}
-          <div className="grid gap-6 lg:grid-cols-2 animate-fade-up delay-150">
-
+          <div className="animate-fade-up grid gap-6 delay-150 lg:grid-cols-2">
             {/* Próxima consulta (PRIORIDADE 2) */}
-            <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden">
-              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <Card className="border-border/20 grain overflow-hidden rounded-2xl border bg-white shadow-sm sm:rounded-3xl">
+              <CardContent className="space-y-4 p-4 sm:space-y-5 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-                    <Calendar className="h-5 w-5 text-primary" />
+                  <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-2xl">
+                    <Calendar className="text-primary h-5 w-5" />
                   </div>
-                  <h2 className="font-display text-lg font-bold text-foreground">Próxima Consulta</h2>
+                  <h2 className="font-display text-foreground text-lg font-bold">
+                    Próxima Consulta
+                  </h2>
                 </div>
 
                 {!consulta ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
-                      <Calendar className="h-7 w-7 text-muted-foreground/30" />
+                    <div className="bg-muted/50 mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
+                      <Calendar className="text-muted-foreground/30 h-7 w-7" />
                     </div>
-                    <p className="text-sm font-bold text-foreground">Nenhuma consulta agendada</p>
+                    <p className="text-foreground text-sm font-bold">Nenhuma consulta agendada</p>
                     <Link
                       href="/paciente/agendamento"
-                      className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                      className="text-primary mt-3 flex items-center gap-1.5 text-xs font-bold hover:underline"
                     >
                       Agendar agora
                       <ChevronRight className="h-3 w-3" />
@@ -417,19 +503,23 @@ export default function PacienteDashboardPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="rounded-2xl bg-primary/5 border border-primary/10 p-4">
-                      <p className="text-lg font-bold text-foreground capitalize">
-                        {format(new Date(consulta.dataHora), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                    <div className="bg-primary/5 border-primary/10 rounded-2xl border p-4">
+                      <p className="text-foreground text-lg font-bold capitalize">
+                        {format(new Date(consulta.dataHora), "EEEE, dd 'de' MMMM", {
+                          locale: ptBR,
+                        })}
                       </p>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        às {format(new Date(consulta.dataHora), "HH:mm", { locale: ptBR })}
+                      <p className="text-muted-foreground mt-0.5 text-sm">
+                        às {format(new Date(consulta.dataHora), 'HH:mm', { locale: ptBR })}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
-                      <Stethoscope className="h-4 w-4 text-muted-foreground/60" />
-                      <span className="text-sm text-muted-foreground">com</span>
-                      <span className="text-sm font-bold text-foreground">{consulta.medicoNome}</span>
+                    <div className="bg-muted/30 border-border/10 flex items-center gap-3 rounded-2xl border px-4 py-3">
+                      <Stethoscope className="text-muted-foreground/60 h-4 w-4" />
+                      <span className="text-muted-foreground text-sm">com</span>
+                      <span className="text-foreground text-sm font-bold">
+                        {consulta.medicoNome}
+                      </span>
                     </div>
 
                     {consulta.meetLink ? (
@@ -437,13 +527,16 @@ export default function PacienteDashboardPage() {
                         href={consulta.meetLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 shadow-md"
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold shadow-md transition-colors"
                       >
                         <Video className="h-4 w-4" />
                         Acessar Google Meet
                       </a>
                     ) : (
-                      <Badge variant="secondary" className="w-full justify-center py-2 rounded-2xl text-xs font-bold">
+                      <Badge
+                        variant="secondary"
+                        className="w-full justify-center rounded-2xl py-2 text-xs font-bold"
+                      >
                         Link do Meet em breve
                       </Badge>
                     )}
@@ -453,68 +546,88 @@ export default function PacienteDashboardPage() {
             </Card>
 
             {/* Medicamento atual (PRIORIDADE 3) */}
-            <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden">
-              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <Card className="border-border/20 grain overflow-hidden rounded-2xl border bg-white shadow-sm sm:rounded-3xl">
+              <CardContent className="space-y-4 p-4 sm:space-y-5 sm:p-6">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10">
                     <Pill className="h-5 w-5 text-violet-600" />
                   </div>
-                  <h2 className="font-display text-lg font-bold text-foreground">Medicamento Atual</h2>
+                  <h2 className="font-display text-foreground text-lg font-bold">
+                    Medicamento Atual
+                  </h2>
                 </div>
 
                 {!med ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
-                      <Pill className="h-7 w-7 text-muted-foreground/30" />
+                    <div className="bg-muted/50 mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
+                      <Pill className="text-muted-foreground/30 h-7 w-7" />
                     </div>
-                    <p className="text-sm font-bold text-foreground">Nenhum medicamento prescrito</p>
-                    <p className="mt-1.5 text-xs text-muted-foreground max-w-xs">
+                    <p className="text-foreground text-sm font-bold">
+                      Nenhum medicamento prescrito
+                    </p>
+                    <p className="text-muted-foreground mt-1.5 max-w-xs text-xs">
                       Seu médico irá configurar sua dosagem em breve.
                     </p>
                   </div>
                 ) : (
                   <>
                     <div>
-                      <p className="text-xl font-bold text-foreground">{formatarTipoCanabinoide(med.tipoCanabinoide)}</p>
-                      <p className="text-sm text-muted-foreground mt-0.5">{med.novaDosagem} — {med.frequencia}</p>
+                      <p className="text-foreground text-xl font-bold">
+                        {formatarTipoCanabinoide(med.tipoCanabinoide)}
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-sm">
+                        {med.novaDosagem} — {med.frequencia}
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       {med.concentracaoTHC && (
-                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
-                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">THC</p>
-                          <p className="font-bold text-foreground mt-0.5">{med.concentracaoTHC}</p>
+                        <div className="bg-muted/30 border-border/10 rounded-2xl border px-4 py-3">
+                          <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                            THC
+                          </p>
+                          <p className="text-foreground mt-0.5 font-bold">{med.concentracaoTHC}</p>
                         </div>
                       )}
                       {med.concentracaoCBD && (
-                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
-                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">CBD</p>
-                          <p className="font-bold text-foreground mt-0.5">{med.concentracaoCBD}</p>
+                        <div className="bg-muted/30 border-border/10 rounded-2xl border px-4 py-3">
+                          <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                            CBD
+                          </p>
+                          <p className="text-foreground mt-0.5 font-bold">{med.concentracaoCBD}</p>
                         </div>
                       )}
                       {med.viaAdministracao && (
-                        <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
-                          <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">Via</p>
-                          <p className="font-bold text-foreground mt-0.5">{med.viaAdministracao}</p>
+                        <div className="bg-muted/30 border-border/10 rounded-2xl border px-4 py-3">
+                          <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                            Via
+                          </p>
+                          <p className="text-foreground mt-0.5 font-bold">{med.viaAdministracao}</p>
                         </div>
                       )}
-                      <div className="rounded-2xl bg-muted/30 border border-border/10 px-4 py-3">
-                        <p className="text-muted-foreground/60 font-bold uppercase tracking-wider text-[10px]">Último ajuste</p>
-                        <p className="font-bold text-foreground mt-0.5">
-                          {format(new Date(med.dataAjuste + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                      <div className="bg-muted/30 border-border/10 rounded-2xl border px-4 py-3">
+                        <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                          Último ajuste
+                        </p>
+                        <p className="text-foreground mt-0.5 font-bold">
+                          {format(new Date(med.dataAjuste + 'T00:00:00'), 'dd/MM/yyyy', {
+                            locale: ptBR,
+                          })}
                         </p>
                       </div>
                     </div>
 
                     {med.proximaRevisao && (
-                      <div className="rounded-2xl bg-primary/5 border border-primary/10 px-4 py-3">
+                      <div className="bg-primary/5 border-primary/10 rounded-2xl border px-4 py-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-bold text-primary">Próxima revisão</span>
+                            <Calendar className="text-primary h-4 w-4" />
+                            <span className="text-primary text-sm font-bold">Próxima revisão</span>
                           </div>
-                          <span className="text-sm font-bold text-primary">
-                            {format(new Date(med.proximaRevisao + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                          <span className="text-primary text-sm font-bold">
+                            {format(new Date(med.proximaRevisao + 'T00:00:00'), 'dd/MM/yyyy', {
+                              locale: ptBR,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -522,10 +635,10 @@ export default function PacienteDashboardPage() {
 
                     <Link
                       href="/paciente/medicamentos"
-                      className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-bold text-primary transition-all hover:bg-primary/10 hover:border-primary/30"
+                      className="group border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/30 flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold transition-all"
                     >
                       Ver todos meus medicamentos
-                      <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   </>
                 )}
@@ -534,38 +647,42 @@ export default function PacienteDashboardPage() {
           </div>
 
           {/* ── Jornada / Status (PRIORIDADE 4) ───────────────── */}
-          <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up delay-200">
-            <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+          <Card className="border-border/20 grain animate-fade-up overflow-hidden rounded-2xl border bg-white shadow-sm delay-200 sm:rounded-3xl">
+            <CardContent className="space-y-4 p-4 sm:space-y-5 sm:p-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-                  <Route className="h-5 w-5 text-primary" />
+                <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-2xl">
+                  <Route className="text-primary h-5 w-5" />
                 </div>
-                <h2 className="font-display text-lg font-bold text-foreground">Sua Jornada</h2>
+                <h2 className="font-display text-foreground text-lg font-bold">Sua Jornada</h2>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl bg-primary/5 border border-primary/10 p-4">
-                  <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">Fase atual</p>
-                  <p className="mt-1.5 text-lg font-bold text-primary">{jornadaLabel}</p>
+                <div className="bg-primary/5 border-primary/10 rounded-2xl border p-4">
+                  <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                    Fase atual
+                  </p>
+                  <p className="text-primary mt-1.5 text-lg font-bold">{jornadaLabel}</p>
                 </div>
 
-                <div className="rounded-2xl bg-muted/30 border border-border/10 p-4">
-                  <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">Status</p>
-                  <p className="mt-1.5 text-lg font-bold text-foreground">{statusLabel}</p>
+                <div className="bg-muted/30 border-border/10 rounded-2xl border p-4">
+                  <p className="text-muted-foreground/60 text-[10px] font-bold tracking-wider uppercase">
+                    Status
+                  </p>
+                  <p className="text-foreground mt-1.5 text-lg font-bold">{statusLabel}</p>
                 </div>
               </div>
 
               {dados?.medicoNome ? (
                 <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                  <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                  <p className="text-sm leading-relaxed text-emerald-700 dark:text-emerald-400">
                     Seu tratamento está sendo acompanhado por <strong>{dados.medicoNome}</strong>.
                   </p>
                 </div>
               ) : (
                 <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
                   <UserX className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                  <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
+                  <p className="text-sm leading-relaxed text-amber-700 dark:text-amber-400">
                     Nenhum médico responsável atribuído ainda. Entre em contato com a equipe.
                   </p>
                 </div>
@@ -574,26 +691,35 @@ export default function PacienteDashboardPage() {
           </Card>
 
           {/* ── Dicas para o Tratamento ── */}
-          <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up delay-300">
-            <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+          <Card className="border-border/20 grain animate-fade-up overflow-hidden rounded-2xl border bg-white shadow-sm delay-300 sm:rounded-3xl">
+            <CardContent className="space-y-4 p-4 sm:space-y-5 sm:p-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-                  <HeartPulse className="h-5 w-5 text-primary" />
+                <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-2xl">
+                  <HeartPulse className="text-primary h-5 w-5" />
                 </div>
-                <h2 className="font-display text-lg font-bold text-foreground">Dicas para o seu Tratamento</h2>
+                <h2 className="font-display text-foreground text-lg font-bold">
+                  Dicas para o seu Tratamento
+                </h2>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 {DICAS.map((dica, index) => {
                   const Icon = dica.icone;
                   return (
-                    <div key={index} className="flex gap-3 items-start">
-                      <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', dica.bg)}>
+                    <div key={index} className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+                          dica.bg,
+                        )}
+                      >
                         <Icon className={cn('h-4 w-4', dica.cor)} />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-foreground">{dica.titulo}</p>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{dica.texto}</p>
+                        <p className="text-foreground text-sm font-bold">{dica.titulo}</p>
+                        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                          {dica.texto}
+                        </p>
                       </div>
                     </div>
                   );
