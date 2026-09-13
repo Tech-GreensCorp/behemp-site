@@ -679,6 +679,10 @@ quem lê a fila depois.
 | **G18** | painel vazio **sem erro**                                         | `paciente/page.tsx:109-111`             | a action falha, `dados` fica `null`, e a tela renderiza vazia sem mensagem — foi o que o dono viu                                                                                      |
 | **G19** | `laudo_medico` sem destino no enum                                | `anexo-do-cadastro.ts:79`               | o laudo enviado **desaparece** da ficha                                                                                                                                                |
 
+> ✅ **RETIFICADO em 13/09/2026 — o G18 está fechado.** O painel guarda `res.erro` e mostra um
+> aviso que assume o problema como nosso, com "Tentar de novo". Era o quarto estado que o S8.4
+> não cobria: os três dele supunham que a consulta **funcionou**.
+
 ⚠️ **O G18 explica metade do relato do dono.** Ele viu painel vazio; nós nunca soubemos se foi
 ausência de dado ou falha da consulta. **São coisas diferentes, e a tela mostrava a mesma
 coisa** — que é exatamente o R6.

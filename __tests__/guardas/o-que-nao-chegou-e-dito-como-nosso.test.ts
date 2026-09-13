@@ -95,4 +95,104 @@ describe('o que não chegou é dito como nosso', () => {
     expect(TELA).not.toMatch(/if \(dados\?\.situacao.*return null/);
     expect(TELA).not.toMatch(/disabled=\{dados\?\.situacao/);
   });
+
+  /**
+   * 🔴 G18 — A QUARTA POSSIBILIDADE, e a que a Sprint 8 tinha deixado passar.
+   *
+   * Os três estados acima supõem que a consulta FUNCIONOU. Existe um quarto: **ela falhou**. O
+   * painel fazia `if (res.sucesso && res.dados) setDados(...)` e descartava o erro — `dados`
+   * ficava `null`, `carregando` virava `false`, e a tela renderizava o estado vazio, idêntico
+   * ao de quem não tem nada.
+   *
+   * ⚠️ É metade do relato que abriu a ADR-0022, e ficou aberto como G18 no §24 enquanto o S8.4
+   * corrigia os outros três. Sem ele, **qualquer** erro durante um teste do fluxo aparece como
+   * "não tem nada" — e o diagnóstico se perde antes de começar.
+   */
+  describe('e quando a consulta FALHA, a tela não finge que está vazia (G18)', () => {
+    const PAINEL = ler('app/(paciente)/paciente/page.tsx');
+
+    it('⚠️ VACUIDADE: o painel ainda carrega por action que pode falhar', () => {
+      expect(PAINEL).toMatch(/await obterDadosDashboard\(\)/);
+    });
+
+    it('🔴 o erro é GUARDADO, não descartado', () => {
+      const i = PAINEL.indexOf('const res = await obterDadosDashboard()');
+      expect(i, 'não achei a chamada').toBeGreaterThan(-1);
+      const bloco = PAINEL.slice(i, PAINEL.indexOf('setCarregando(false)', i));
+
+      /**
+       * ⚠️ DEFEITO MEU, achado pela sabotagem: `toMatch(/else/)` sobrevivia a
+       * `else if (false)` — o ramo existia e era inalcançável. O que importa não é haver um
+       * `else`: é o ramo de falha ser **incondicional**, porque "a action não teve sucesso" já
+       * é a condição inteira.
+       */
+      expect(
+        bloco,
+        'o ramo de falha não existe ou é condicional — o erro volta a ser descartado',
+      ).toMatch(/\}\s*else\s*\{/);
+      expect(bloco, 'o motivo da action não é guardado').toMatch(/res\.erro/);
+    });
+
+    it('🔴 e CHEGA À TELA — guardar sem mostrar é o mesmo silêncio', () => {
+      /**
+       * A classe do componente órfão, que já custou quatro semanas no aviso da procuração:
+       * declarar não é mostrar.
+       */
+      const estado = PAINEL.match(/const \[(\w+), set\w+\] = useState<string \| null>\(null\)/);
+      expect(estado?.[1], 'não achei o estado da falha').toBeTruthy();
+      const nome = estado![1];
+
+      /**
+       * ⚠️ SEGUNDO DEFEITO MEU, e da classe que mais me pega: procurar o nome no arquivo inteiro
+       * achava os PRÓPRIOS SETTERS (`setFalhaAoCarregar(res.erro)`), então trocar o aviso por
+       * `{false && (` passava verde. **Menção não é uso.**
+       *
+       * O JSX é o que renderiza, então é onde se procura — a partir do `return (` do componente.
+       */
+      /**
+       * ⚠️ TERCEIRA TENTATIVA NESTE CASO, e as duas anteriores eram minhas sabotagens passando.
+       *
+       * Procurar o nome no arquivo achava os próprios setters. Procurar no "JSX" por
+       * `lastIndexOf('return (')` caía num `return` de dentro de um `map`. E procurar por uso
+       * fora da escrita sobrevivia a `{false && (`, porque o nome continuava **dentro** do bloco
+       * inalcançável, imprimindo o motivo.
+       *
+       * **A propriedade é alcançabilidade:** a CONDIÇÃO que decide se o aviso renderiza tem de
+       * depender do estado da falha. Um bloco cuja condição não menciona o estado nunca aparece
+       * por causa dele — que é a definição de órfão, mesmo com o nome escrito lá dentro.
+       */
+      const alerta = PAINEL.indexOf('role="alert"');
+      expect(alerta, 'o aviso de falha não existe').toBeGreaterThan(-1);
+
+      // A condição JSX é a última abertura de expressão antes do bloco.
+      const condicao = PAINEL.slice(
+        PAINEL.lastIndexOf('{', PAINEL.lastIndexOf('<div', alerta)),
+        alerta,
+      );
+      expect(
+        condicao,
+        `a condição que renderiza o aviso não depende de ${nome} — o bloco é inalcançável`,
+      ).toContain(nome);
+    });
+
+    it('🔴 o texto diz que o problema é NOSSO — mesma regra do S8.4', () => {
+      /**
+       * "Não conseguimos" é diferente de "você não tem". O primeiro assume o problema; o segundo
+       * faz o paciente começar a conversa tendo de provar algo.
+       */
+      const i = PAINEL.indexOf('role="alert"');
+      expect(i, 'o aviso de falha não existe').toBeGreaterThan(-1);
+      const bloco = PAINEL.slice(i, i + 700);
+      expect(bloco, 'o aviso não assume o problema como nosso').toMatch(
+        /problema é nosso|Não conseguimos/i,
+      );
+    });
+
+    it('⚠️ e oferece TENTAR DE NOVO — falha de rede costuma passar sozinha', () => {
+      const i = PAINEL.indexOf('role="alert"');
+      expect(PAINEL.slice(i, i + 900), 'sem caminho de volta, o aviso é um beco').toMatch(
+        /onClick=\{carregar\}/,
+      );
+    });
+  });
 });
