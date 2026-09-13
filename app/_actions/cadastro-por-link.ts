@@ -50,7 +50,18 @@ const esquema = z.object({
   cpf: z.string().refine((v) => cpfEhValido(v), 'CPF inválido'),
   telefone: z.string().trim().min(8, 'Informe seu telefone'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
-  jaFazTratamento: z.boolean(),
+  /**
+   * 🔴 `null` = NÃO INFORMADO, e é um estado legítimo — não uma lacuna.
+   *
+   * A coluna `jaFazTratamentoCannabis` é `boolean()` sem `notNull` e sem `default` de propósito,
+   * e há guarda garantindo isso: inventar "não faz tratamento" para quem não respondeu é dado
+   * clínico falso no prontuário.
+   *
+   * ⚠️ Quem preenche o formulário SEMPRE manda `true` ou `false` — a tela exige a resposta antes
+   * de habilitar o envio. O `null` existe para a RECONCILIAÇÃO automática (ADR-0022 D-09), que
+   * conclui o cadastro sem o paciente e por isso não pode responder por ele.
+   */
+  jaFazTratamento: z.boolean().nullable(),
   /**
    * 🔴 O PACIENTE DECLARA SE JÁ TEM A AUTORIZAÇÃO DA ANVISA.
    *

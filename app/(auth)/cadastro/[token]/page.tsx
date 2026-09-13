@@ -2,11 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AlertCircle, Clock, CheckCircle2, MessageCircle } from 'lucide-react';
 
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+
 import {
   validarTokenDeCadastro,
   registrarPrimeiroAcesso,
   type MotivoDeRecusa,
 } from '@/lib/chatpro/token-de-cadastro';
+import { podeReconciliarSozinho } from '@/lib/fluxo/reconciliar';
+import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
+import { destinoDepoisDoCadastro } from '@/lib/parceiros/destino-do-paciente';
 import { Button } from '@/components/ui/button';
 import { pendenciasDe, recebidosDe } from '@/lib/parceiros/documentos';
 
@@ -126,6 +132,73 @@ export default async function CadastroPorLinkPage({
 
   // Só depois de validar. Um token recusado não produz escrita nenhuma.
   await registrarPrimeiroAcesso(resultado.id);
+
+  /**
+   * 🔴 RECONCILIAÇÃO AUTOMÁTICA — ADR-0022 D-09 (S8.6).
+   *
+   * Decisão do dono em 13/09/2026, e o argumento é dele: _"não faz sentido ir novamente para o
+   * link que já foi preenchido, que veio de outro formulário preenchido… ele vai de novo
+   * preencher esses dados por conta de um erro NOSSO na ÚLTIMA ETAPA DE VALIDAÇÃO?"_
+   *
+   * Quem chega aqui **com a conta já criada e o e-mail verificado** não tem nada a preencher: a
+   * solicitação tem nome, CPF, telefone e os documentos re-hospedados; a conta prova a
+   * identidade. Só falta ligar as duas coisas — e isso é trabalho do servidor, não do paciente.
+   *
+   * ⚠️ NADA É INVENTADO AQUI. Nenhuma finalidade de consentimento é marcada (ato do titular), e
+   * a pergunta clínica fica em "não informado", que é um estado previsto na coluna. O que se
+   * grava é só o que o paciente já forneceu — na Greens ou nesta tela, antes de o nosso erro
+   * interromper.
+   *
+   * 🔴 E FALHA FECHADA: `podeReconciliarSozinho` recusa em qualquer dúvida de identidade. Se a
+   * sessão não for reconhecidamente a dona daquele cadastro, o formulário assume e a escolha é
+   * explícita — concluir para a pessoa errada gravaria documento clínico na conta de outro.
+   */
+  const { userId: clerkIdDaSessao } = await auth();
+  if (clerkIdDaSessao) {
+    const usuario = await currentUser();
+    const emailPrincipal = usuario?.emailAddresses?.[0];
+
+    const veredicto = podeReconciliarSozinho({
+      emailDaSessao: emailPrincipal?.emailAddress,
+      emailDaSolicitacao: resultado.email,
+      emailVerificado: emailPrincipal?.verification?.status === 'verified',
+    });
+
+    if (veredicto.pode) {
+      const concluido = await concluirCadastroPorLink({
+        token,
+        nomeCompleto: resultado.nomeCompleto ?? '',
+        cpf: resultado.cpf ?? '',
+        telefone: resultado.telefone ?? '',
+        email: emailPrincipal!.emailAddress,
+        // Não informado — e a coluna prevê isso. Responder por ele seria inventar dado clínico.
+        jaFazTratamento: null,
+        temAutorizacaoAnvisa: null,
+        temReceitaMedica: null,
+        anexos: [],
+        tratamentoAtual: null,
+        // Vazio porque consentir é ato do titular. A tela seguinte colhe, sem travar nada.
+        finalidadesConsentidas: [],
+      });
+
+      if (concluido.sucesso) {
+        /**
+         * ⚠️ O destino sai da MESMA função que o formulário usa. Duas regras de destino é como
+         * o paciente da procuração acabava mandado para o agendamento (ADR-0022, §31).
+         */
+        redirect(
+          destinoDepoisDoCadastro(pendenciasDe(resultado.documentosDoParceiro).map((p) => p.chave)),
+        );
+      }
+
+      /**
+       * Não conseguiu: segue para o formulário, que agora sabe dizer o que faltou. Reconciliação
+       * que falha não pode virar tela de erro — ela é uma tentativa de poupar trabalho, não um
+       * passo obrigatório do fluxo.
+       */
+      console.warn('[reconciliacao] não concluiu sozinha', { motivo: concluido.erro });
+    }
+  }
 
   return (
     <div className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 py-10 sm:py-16">
