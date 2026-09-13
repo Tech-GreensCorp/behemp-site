@@ -1411,3 +1411,434 @@ credencial), `motivoSemUrl` (o pedido não tinha anexo — caso legítimo), ou n
 ⚠️ **Nossa allowlist está correta e medida:**
 `PARCEIRO_ORIGENS_DE_DOCUMENTO = https://greens-site-bucket.s3.us-east-1.amazonaws.com`. Se
 vierem URLs assinadas desse bucket, elas passam.
+
+---
+
+# PARTE X — O Fluxo 1 · Portão 1, de ponta a ponta
+
+> **O documento vivo deste fluxo**, por decisão do dono em 13/09/2026. Cada etapa abaixo foi
+> conferida no código, não descrita de memória — e a Etapa 2 existe aqui porque eu a havia
+> omitido, e ele corrigiu: _"ele ainda vai para aquela tela da BeHemp onde ele coloca e-mail,
+> consente, informa se já faz tratamento e aí depois ele confirma, recebe o código do e-mail e
+> aí com código válido e o sistema reconhecendo ele vai pra procuração da ANVISA"_.
+
+## §51 — As cinco etapas
+
+**Etapa 0 — Greens.** O admin gera o link pela solicitação de medicamento. Chega aqui um POST
+assinado (HMAC) com sete campos: `nomeCompleto · email · telefone · cpf · pedidoDoParceiro ·
+documentos · urlDeRetorno`. Nasce a solicitação (`SOL-0000xx`, origem `greens_handoff`) e um
+token de 7 dias. O link vai ao paciente por WhatsApp.
+
+**Etapa 1 — a tela da BeHemp** (`/cadastro/[token]`). Ele:
+
+- **confirma os dados** que vieram da Greens (nome, CPF, telefone) e **o e-mail** — campo
+  editável, e é o login
+- **cria a senha**
+- vê **"O que já recebemos"** e **"O que ainda vamos precisar"**
+- anexa o que faltar
+- **consente** o compartilhamento com a Greens — caixas desmarcadas, e **não é pedágio**
+- **informa se já faz tratamento** — obrigatório, e `null` significa "não respondeu"
+- confirma
+
+**Etapa 2 — o código.** `signUp.create({ emailAddress })` → o Clerk envia o código. Ele digita.
+
+🔴 **É aqui que o fluxo morre hoje**, com `sign_ups → 400`.
+
+**Etapa 3 — a conta nasce.** `attemptEmailAddressVerification` valida o código →
+`signUp.update({ password, firstName, lastName })` → a conta é criada **nesse instante**, já com
+senha → `setActive`.
+
+**Etapa 4 — a ficha.** `gravarFicha()` → `concluirCadastroPorLink`: garante `users`, cria
+`pacientes` com procedência, grava a declaração, **consome o link**, grava o consentimento,
+**materializa os documentos da Greens**.
+
+**Etapa 5 — o destino.** `destinoDepoisDoCadastro(pendências)` → **`/paciente/anvisa`**, com os
+documentos já lá.
+
+## §52 — 🔴 D-22: a confirmação do e-mail é REQUISITO, não detalhe de implementação
+
+**Decisão do dono, 13/09/2026**, respondendo à pergunta direta de por que a Etapa 2 existe:
+
+> _"é por conta do (a), pois tudo chega no e-mail do paciente, logo é necessário que ele confirme
+> o e-mail."_
+
+**O e-mail não é só o login.** É por onde chega a aprovação da ANVISA, o aviso de receita pronta,
+o lembrete de consulta. Um endereço não confirmado é um paciente que não recebe o tratamento —
+não apenas alguém que não consegue entrar.
+
+### 52.1 O que esta decisão REJEITA, e eu havia proposto
+
+⛔ **Criar a conta pela Backend API do Clerk** (`clerkClient.users.createUser()`), que eu
+propusera horas antes para contornar o `400`.
+
+Ela resolve de fato a classe inteira de falha — sem navegador no caminho, some o cookie
+cross-site, a bot protection, o `session_exists` e o `signUp`. E está disponível: o SDK já
+instalado (`@clerk/backend@3.4.4`) aceita `emailAddress`, `password`, `firstName`, `lastName`.
+
+🔴 **Mas ela cria a conta com o e-mail NÃO verificado** — e é exatamente o que o D-22 proíbe.
+
+⚠️ **A lição de método, e ela é minha:** eu propus a Backend API descrevendo o fluxo como
+_"confirma os dados e cai na procuração"_ — **omitindo a Etapa 2**. A solução parecia elegante
+porque o problema estava descrito errado. Quando o dono corrigiu a descrição, a solução caiu
+junto: eu não estava contornando um obstáculo, estava **amputando um requisito**.
+
+**Descrever o fluxo errado produz solução que resolve o problema errado** — e ela chega
+convincente, porque é coerente com a descrição.
+
+## §53 — O que sobra, então
+
+Com a Etapa 2 como requisito, o `400` do Clerk **tem de ser consertado**, não contornado. O que
+está medido sobre ele:
+
+| fato                                                                                         | medido em                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------ |
+| o servidor roda `pk_test_` / `sk_test_` — **instância de desenvolvimento**                   | `.env` da VPS, 13/09           |
+| a aplicação **Be4hope** TEM ambiente Production, e ele está **vazio** (0 sign-ups, 0 active) | painel do Clerk                |
+| o domínio do Production é **`behemp-site.vercel.app`** — e o site vive em **`be4hope.org`**  | painel + `deploy.yml`          |
+| **"Verify at sign-up"** está ligado, por código de e-mail                                    | painel → User & authentication |
+
+> 🔴 **RETRATAÇÃO, no mesmo dia — esta hipótese estava ERRADA, e eu a apresentei como causa.**
+>
+> O parágrafo abaixo atribuía o `400` ao cookie cross-site da instância de desenvolvimento.
+> **Não é.** O log do Clerk, aberto pelo dono horas depois, traz o motivo literal:
+>
+> ```json
+> {
+>   "email_address": "davimartins1110@gmail.com",
+>   "reason": "That email address is taken. Please try another."
+> }
+> ```
+>
+> **É `form_identifier_exists`** — o e-mail já tem conta. Os eventos `sign_up.captcha.passed`
+> aparecem em **todos** os casos, inclusive nos que falham, o que já derrubava a teoria do
+> cookie e eu não havia notado.
+>
+> ⚠️ E a causa estava escrita nesta ADR desde o §1.1: _"a conta existe, e com senha — foi criada
+> em alguma tentativa anterior que completou a verificação"_. **Eu tinha o diagnóstico no próprio
+> documento e fui procurar causa em infraestrutura.**
+>
+> **O que isso muda:** a instância de desenvolvimento **não é o bloqueio**. Migrar para produção
+> continua sendo o certo (§53), mas por higiene — não para destravar o fluxo.
+>
+> Ver a retificação completa no §54.
+
+🔴 **Em desenvolvimento o FAPI fica em `accounts.dev`, que é cross-site.** Navegador com
+proteção de rastreamento (Firefox estrito, Safari, Brave) bloqueia o cookie, e o
+`signUp.create` responde `400`.
+
+⚠️ **E não é bloqueio absoluto** — o dono conseguiu criar conta. É intermitente, e depende do
+navegador de quem tenta. Num fluxo com 35 pacientes, basta uma fração usar Firefox.
+
+**Fica aberto, e não vou supor:** quantos dos 8 links acessados morreram no `400` e quantos nos
+nove defeitos corrigidos em 13/09. O log não guarda o corpo da resposta, e os defeitos já foram
+consertados — **a única forma de separar é testar de novo**.
+
+## §54 — 🔴 A causa real do `sign_ups → 400`, medida no log do Clerk
+
+**13/09/2026.** O dono abriu o painel do Clerk (ambiente **Development**, que é onde o site
+roda) e clicou num evento `sign_up.failed`. O payload:
+
+```json
+{
+  "email_address": "davimartins1110@gmail.com",
+  "reason": "That email address is taken. Please try another.",
+  "sign_up_id": "sua_3JFlZK14e6423tdDb8OJXzbzV0p"
+}
+```
+
+**Timestamps: 12/09, 22:58 e 22:59** — os testes do próprio dono, com os e-mails que ele vinha
+reusando.
+
+### 54.1 A sequência que os logs mostram
+
+**Quando falha:**
+
+```
+sign_up.created → captcha.required → captcha.passed → sign_up.failed
+```
+
+**Quando funciona:**
+
+```
+sign_up.created → email_address.created → captcha.required → captcha.passed
+→ code_sent → email_address.verified → password.created → sign_up.completed
+→ user.created → session.created
+```
+
+🔴 **`sign_up.captcha.passed` aparece nos DOIS.** O Turnstile e o CSP corrigido funcionam. A
+falha vem depois do captcha e antes do `code_sent` — e o motivo é o e-mail tomado.
+
+### 54.2 O que isto corrige no diagnóstico
+
+| eu afirmei                                           | é                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| o `400` vem do cookie cross-site da instância de dev | **não** — vem de e-mail já cadastrado                             |
+| a instância de desenvolvimento bloqueia o cadastro   | **não bloqueia** — há `sign_up.completed` e `user.created` no log |
+| os 35 links com 0 concluídos são do Clerk            | **não** — são os nove defeitos do §3, todos corrigidos em 13/09   |
+
+⚠️ **E o nosso código já tratava este erro corretamente:**
+
+```ts
+if (e?.errors?.[0]?.code === 'form_identifier_exists') setJaTemConta(true);
+```
+
+A tela responde _"Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
+continuar de onde parou"_, com o botão de login **levando o token junto** (Item 35). O
+comportamento estava certo; faltava o diagnóstico.
+
+### 54.3 A lição, e ela é de método
+
+**Eu tinha três sinais apontando para a causa certa e segui uma hipótese de infraestrutura:**
+
+1. o §1.1 desta ADR já dizia que a conta existia de tentativa anterior
+2. o `captcha.passed` aparecia em todos os eventos de falha
+3. o dono havia dito, no começo da sessão: _"será se é porque eu já tentei criar uma conta com
+   esse e-mail antes?"_ — **e ele estava certo desde então**
+
+🔴 **A hipótese do cookie cross-site era mais interessante, e por isso sobreviveu mais do que
+devia.** Causa sistêmica explica um número grande (35 links, 0 concluídos); causa banal explica
+só os testes do dono. Escolhi a que explicava mais — sem medir qual explicava **o quê**.
+
+**A regra que sai:** quando o próprio usuário oferece uma hipótese simples no começo, ela se
+testa primeiro. Custa um clique no log e teria poupado dois dias.
+
+---
+
+# Parte XI — O último elo: o acesso não é do upload, é do store
+
+## §55 — 🔴 D-23: um terceiro store, privado, e o acesso deixa de ser escolha do ponto de chamada
+
+**Medido em 13/09/2026**, depois de a Greens reenviar o SOL-000021 e o reenvio **funcionar**.
+
+O `porEvento` corrigido no §51 gravou o manifesto com três `{tipo, url}`, a allowlist deixou
+passar, o presigned do S3 abriu e os bytes chegaram. E aí:
+
+```
+[parceiros] documentos recusados: receita_medica:Vercel Blob: Cannot use private
+access on a public store. The store must be configured with private access.
+```
+
+### O que o erro ensina, e não é sobre o parceiro
+
+**Acesso não é propriedade do upload. É propriedade do STORE**, escolhida na criação e imutável.
+A doc da Vercel: _"You select a store's access mode, public or private, when you create it. If
+your app needs both public and private files, provision two separate stores from the start."_ Não
+existe `update-store` — só `create-store`, `get-store`, `delete-store` e `empty-store`.
+
+Passar `access: 'private'` num `put` contra um store público não configura nada: **declara uma
+intenção que o SDK recusa**. E recusa corretamente.
+
+### O alcance, e ele é maior que o handoff
+
+Seis caminhos deste repositório faziam exatamente isso:
+
+| caminho                                    | token que passava | desde |
+| ------------------------------------------ | ----------------- | ----- |
+| `lib/documentos/anexo-do-cadastro.ts`      | nenhum → default  | 10/09 |
+| `app/_actions/documentos.ts`               | nenhum → default  | 11/09 |
+| `lib/parceiros/documentos-do-parceiro.ts`  | nenhum → default  | 13/09 |
+| `app/api/upload-documento/route.ts`        | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente.ts`      | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente-self.ts` | `BLOB_BEHEMP_…`   | —     |
+
+🔴 **E `BLOB_BEHEMP_READ_WRITE_TOKEN` não servia como store privado**, o que só apareceu ao
+varrer quem mais a usava: `app/api/upload-avatar/route.ts` e `app/api/upload-exame/route.ts`
+gravam `access: 'public'` com ela. Um token resolve um store; um store tem um acesso. **As duas
+coisas não podem coexistir**, e reaproveitá-la teria quebrado avatar e exame para consertar
+documento.
+
+Por isso o D-23 é um **terceiro** store — `BLOB_TOKEN_PRIVADO` — e não um remanejamento.
+
+### A decisão
+
+**Um módulo único, `lib/documentos/store-privado.ts`, e o acesso deixa de ser parâmetro.**
+
+`guardarDocumentoPrivado(caminho, corpo, { contentType })` não aceita `access` nem `token`. Quem
+chama **não pode** escolher gravar em público — se pudesse, o módulo seria documentação em vez de
+garantia.
+
+🔴 **E ele falha FECHADO.** Sem `BLOB_TOKEN_PRIVADO`, lança `StorePrivadoNaoConfigurado` com o
+nome da variável que falta. Nunca cai para público. O que está em jogo é RG, laudo, receita e
+procuração assinada — e, no caminho do parceiro, documentos de pacientes de **outra empresa**.
+
+### §55.1 — O segundo elo, que ninguém tinha medido
+
+A entrega em `app/api/documentos/[id]/arquivo/route.ts` fazia `fetch(url)` **cru**. Isso abre blob
+público; blob privado responde **401** sem `Authorization: Bearer`.
+
+⚠️ **Esse defeito não teria aparecido em teste nenhum**, porque o primeiro elo impedia que
+qualquer blob privado chegasse a existir. Um defeito escondido atrás do outro — e é o argumento
+para corrigir a **classe** em vez do caso: consertar só o caminho da Greens teria trocado
+"documento não grava" por "documento não abre", com o paciente descobrindo qual dos dois.
+
+Corrigido com `get(url, { access: 'private', token })`, que o SDK 2.3.3 já expõe.
+
+## §56 — A retratação: dois guardas ficavam VERDES com os seis quebrados
+
+| guarda                                        | exigia                           | por que não valia                          |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------ |
+| `o-documento-do-paciente-nao-abre-sem-escopo` | `toContain("access: 'private'")` | a intenção estava escrita; o resultado não |
+| `documento-do-parceiro-nao-vira-ssrf`         | `/ACESSO_DO_BLOB = 'private'/`   | idem, com uma constante no meio            |
+
+**Os dois mediam FORMA.** E a forma estava perfeita: cada um dos seis pontos declarava
+`private`, com comentário explicando por quê. O que falhava era o efeito — e nenhum guarda
+executava nada.
+
+🔴 **É a mesma classe do §37 e da retratação de 24/08:** teste que congela como o código está
+escrito fica verde exatamente quando mais importa ficar vermelho.
+
+**Retificados para a propriedade:** o ponto **não chama `put`** e **não nomeia token**. E
+acrescentado um bloco que **executa** o módulo — sem token lança; `ehDoStorePrivado` decide pelo
+`host.endsWith`, provado contra `…public…/private/rg.pdf`,
+`https://private.blob.vercel-storage.com.evil.com/x` e a URL com o host na query string.
+
+**36 casos, provados por 8 sabotagens.** Duas sobreviveram à primeira rodada: `toContain(
+'lerDocumentoPrivado')` fica verde com o corpo trocado por `fetch(url)`, porque o nome continua
+no `import`. **Menção não é uso** — a mesma armadilha, pela oitava vez neste repositório, e a
+correção foi medir o corpo sem as linhas de import.
+
+Mais um caso de **cobertura**, derivado do código: quem importar `put` do SDK e gravar em
+`documentos` fica vermelho **com o nome do arquivo**. Provado criando um ponto sétimo.
+
+## §57 — O que isto NÃO resolve, e fica escrito
+
+- **Os arquivos do SOL-000046 não foram guardados.** O download aconteceu, a gravação falhou, e
+  não há o que recuperar deste lado. A Greens precisa reenviar depois que o store existir.
+- **Os blobs antigos continuam no store público** — Item 6 do `04`. A entrega os serve pelo
+  caminho legado, e migrá-los é trabalho próprio, não passageiro.
+- **`BLOB_READ_WRITE_TOKEN` nunca esteve no `deploy.yml`.** Hoje funciona por herança do `.env`
+  da VPS. Catalogado no `03`, com o agravante de que, no dia em que esse `.env` for reescrito sem
+  preservação, todo upload do produto para de funcionar de uma vez.
+- **O guarda dos segredos não vê variável lida por DEPENDÊNCIA.** Ele deriva de `process.env.X`
+  no nosso código, e o `@vercel/blob` lê o token por conta própria: ficou verde com o defeito
+  presente, medido em 27/27. Classe nova, catalogada no `03`.
+
+## §58 — 🔴 D-24: o log diz o que aconteceu sem entregar o paciente junto
+
+**Achado ao seguir o fluxo até o fim**, logo depois do D-23 — e é o que a regra
+_"parar no primeiro achado"_ existe para evitar.
+
+Corrigido o `put`, o elo **seguinte** (`materializar-documentos.ts:141`) repetia exatamente o
+defeito que acabara de custar quatro dias: `erro instanceof Error ? erro.name : 'erro'`. Se o
+`insert` falhasse depois do store privado existir, o log diria `'Error'` e voltaríamos ao mesmo
+lugar. **Catorze pontos do repositório faziam isso.**
+
+### A correção óbvia estava errada, e um guarda provou
+
+Troquei quatro pontos por `motivoLegivel`. O guarda `cadastro-por-link-abre-sem-conta` ficou
+vermelho, com a explicação escrita nele: _"`erro.message` do Postgres carrega o valor que violou
+a constraint — e as colunas aqui são CPF, telefone e texto clínico."_
+
+**Medi contra um Postgres real em vez de decidir pelo comentário.** O comentário estava
+impreciso, e a realidade era **pior**:
+
+| camada                 | o que chega                                                           | vaza? |
+| ---------------------- | --------------------------------------------------------------------- | ----- |
+| `pg` cru, `message`    | `duplicate key value violates unique constraint "t_cpf_key"`          | não   |
+| `pg` cru, `detail`     | `Key (cpf)=(529.982.247-25) already exists.`                          | 🔴    |
+| **Drizzle, `message`** | `Failed query: insert into t2 values ('529.982.247-25', 'rg_maria…')` | 🔴🔴  |
+
+Não é o `detail` do Postgres — é o **Drizzle**, que monta a mensagem com a query inteira e os
+valores inline. Num `insert` de paciente isso é CPF, telefone, endereço e queixa clínica direto
+no log, e redigir por regex não resolve: os valores chegam **sem rótulo**, e uma regex de CPF não
+reconhece nome de arquivo nem texto clínico.
+
+### A decisão
+
+**Erro de banco não usa a mensagem. Nada dela.** O motivo sai de `code` + `constraint` + `table`,
+que o driver expõe separadamente e que **não carregam valor nenhum**:
+
+```
+banco:23505:pacientes_cpf_key:pacientes
+```
+
+⚠️ **E isso diagnostica MELHOR que a mensagem**, o que é o ponto que fecha a decisão. `23505` é
+`unique_violation` e a constraint diz qual campo — a pergunta fica respondida. `Failed query:
+insert…` responde a mesma pergunta **e entrega o paciente junto**.
+
+Distinguir erro de banco de erro de rede é por SQLSTATE (cinco caracteres começando por dígito),
+porque os dois usam o mesmo campo `cause.code` — rede traz `ECONNREFUSED`, `ENOTFOUND`,
+`UND_ERR_CONNECT_TIMEOUT`, e esses continuam valendo a pena.
+
+Mais uma rede de segurança: mensagem que **comece** com `Failed query:` não passa inteira, mesmo
+sem `cause` para reconhecê-la — driver diferente, versão nova do Drizzle, erro reembrulhado.
+
+### §58.1 — O que fica com `erro.name`, e por quê
+
+`app/_actions/cadastro-por-link.ts:646` **mantém** `erro.name`, com o motivo escrito no código.
+Aquele `catch` cobre a transação inteira do cadastro, não só um `insert`, e o guarda o exige.
+Melhorá-lo é trabalho próprio — catalogado no `03`, junto dos **onze** pontos restantes.
+
+🔴 **Isto não é dívida esquecida: é dívida medida.** O ponto ruim de diagnóstico continua ruim
+de propósito, porque a alternativa disponível hoje seria pior — e a diferença entre as duas está
+escrita onde quem for mexer vai ler.
+
+### §58.2 — O guarda
+
+`o-motivo-do-erro-diagnostica-sem-vazar` — **15 casos, provados por 7 sabotagens**, e todos
+**executam** a função. Fica vermelho nas duas direções: se o motivo voltar a ser `'Error'`, e se
+CPF, telefone, nome de arquivo ou queixa clínica aparecerem nele.
+
+⚠️ **As duas direções no mesmo guarda são de propósito.** Separadas, alguém "resolve" uma
+passando a logar a mensagem crua, e o outro guarda é que fica vermelho — em outro arquivo, em
+outro PR, talvez em outra semana.
+
+## §59 — O store criado, e a prova contra o serviço real
+
+**13/09/2026, 18:32.** `behemp-documentos-privados` · `store_i9Cq0YBERLypCKIm` · `iad1` ·
+**Access: Private** · base URL `i9cq0yberlypckim.private.blob.vercel-storage.com`.
+
+### §59.1 — Por que `iad1` e não `gru1`, que é onde estão os outros dois
+
+Os dois stores que já existiam — `be4hope-public` (88 arquivos) e `medgreens-public` (31) —
+estão em **`gru1`**, São Paulo. A escolha faz sentido para eles e **não** para este:
+
+|                     | store público                       | store privado     |
+| ------------------- | ----------------------------------- | ----------------- |
+| quem busca os bytes | o **navegador do paciente**, direto | a **VPS**, sempre |
+| onde convém estar   | perto do paciente (Brasil)          | perto da VPS      |
+
+Blob privado não abre por link: a entrega passa obrigatoriamente por
+`/api/documentos/[id]/arquivo`, que roda na VPS em **us-east-1** — a mesma região do bucket de
+onde a Greens serve os documentos (`greens-site-bucket.s3.us-east-1`). Com `gru1`, cada arquivo
+faria Virginia→São Paulo ao gravar e São Paulo→Virginia→paciente ao ler. Com `iad1`, a gravação
+é local e a leitura sai de onde o servidor está.
+
+⚠️ **Isto fica escrito porque a inconsistência é aparente.** Quem olhar a lista de stores daqui
+a três meses vai ver dois em `gru1` e um em `iad1`, e a tentação é "padronizar". Região, como
+acesso, é **imutável** — padronizar custaria um store novo e uma migração de arquivos.
+
+### §59.2 — A prova, e ela não é guarda estrutural
+
+Executado contra o store real, com o código deste PR, antes de qualquer deploy:
+
+```
+✅ gravou no store privado
+   host: i9cq0yberlypckim.private.blob.vercel-storage.com
+✅ host é .private.
+✅ ehDoStorePrivado() reconhece a URL real
+✅ fetch sem autenticação é RECUSADO (HTTP 403)
+✅ lerDocumentoPrivado devolveu os bytes certos
+✅ teste apagado do store
+```
+
+🔴 **A quarta linha é a que fecha a decisão inteira.** Um `fetch` sem `Authorization` responde
+**403** — o arquivo não é legível por quem tem a URL. É precisamente o que o store público não
+garantia, e a razão de tudo isto existir. As outras cinco provam que o caminho funciona; essa
+prova que ele **protege**.
+
+E `ehDoStorePrivado`, escrito por dedução a partir da doc antes de o store existir, reconheceu o
+host real na primeira tentativa.
+
+### §59.3 — O que a criação do store revelou de graça
+
+`gh secret list` mostra `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **cadastrados
+desde 22/06/2026** — e nenhum dos dois na lista `gravar` do `deploy.yml`. O achado do §57 ganha
+evidência: os segredos existem, o deploy simplesmente não os escreve, e produção vive da herança
+do `.env` antigo.
+
+⚠️ **E fechar isso não é acrescentar duas linhas.** O GitHub não deixa **ler** o valor de um
+secret, e o `.env` da VPS é anterior ao cadastro — não há como confirmar que batem. Se
+divergirem, a próxima linha `gravar` sobrescreve o token que funciona e derruba avatar, exame e
+procuração. Trocar fragilidade latente por falha real é mau negócio: o caminho seguro é gerar
+tokens novos no painel, cadastrá-los e então acrescentar as linhas, num movimento só.

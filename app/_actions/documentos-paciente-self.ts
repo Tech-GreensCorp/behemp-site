@@ -5,7 +5,7 @@ import { documentos, users, pacientes } from '@/db/schema';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { obterUsuarioAtual } from '@/lib/auth';
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 
 /**
  * Server Actions de documentos — uso pelo paciente autenticado.
@@ -124,10 +124,9 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     const nomeSeguro = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const blobPath = `documentos/${pacienteId}/${nomeSeguro}`;
 
-    const blob = await put(blobPath, file, {
-      access: 'private',
-      token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
-    });
+    // O store sai de `store-privado`: `BLOB_BEHEMP_READ_WRITE_TOKEN` é a mesma
+    // variável com que avatar e exame gravam `public`, e um store tem um só acesso.
+    const blob = await guardarDocumentoPrivado(blobPath, file);
 
     // Calcular validade
     const emissao = new Date(parsed.data.dataEmissao);

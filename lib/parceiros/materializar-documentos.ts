@@ -35,6 +35,7 @@
  */
 
 import { db } from '@/lib/db';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 import { documentos } from '@/db/schema';
 import { calcularValidade } from '@/lib/documentos/validade';
 
@@ -138,7 +139,8 @@ export async function materializarDocumentosDoParceiro(params: {
   } catch (erro) {
     console.error(
       '[parceiros] falha ao materializar documentos:',
-      erro instanceof Error ? erro.name : 'erro',
+      // `erro.name` é sempre 'Error' — foi o que escondeu a falha do blob por 4 dias.
+      motivoLegivel(erro),
     );
     return { inseridos: 0 };
   }

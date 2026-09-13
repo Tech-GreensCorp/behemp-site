@@ -37,7 +37,8 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 import { z } from 'zod';
 
 import { DOCUMENTOS_DO_FLUXO, type DocumentoDoFluxo } from './documentos';
@@ -225,17 +226,6 @@ async function baixarComRetentativa(url: string): Promise<Response> {
   return ultima!;
 }
 
-function motivoLegivel(erro: unknown): string {
-  if (!(erro instanceof Error)) return 'erro_desconhecido';
-  const causa = (erro as { cause?: { code?: string } }).cause?.code;
-  const texto = (causa ? causa + ': ' + erro.message : erro.message) || erro.name;
-  return texto
-    .replace(/https?:\/\/\S+/g, '<url>')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
-}
-
 export async function origemAutorizada(url: string): Promise<{ ok: boolean; motivo?: string }> {
   let alvo: URL;
   try {
@@ -248,7 +238,27 @@ export async function origemAutorizada(url: string): Promise<{ ok: boolean; moti
 
   const permitidas = origensPermitidas();
   if (permitidas.length === 0) return { ok: false, motivo: 'sem_origens_configuradas' };
-  if (!permitidas.includes(alvo.origin)) return { ok: false, motivo: 'origem_nao_autorizada' };
+  if (!permitidas.includes(alvo.origin)) {
+    /**
+     * 🔴 A ORIGEM RECUSADA VAI NO MOTIVO — e ela NÃO é credencial.
+     *
+     * Medido em produção em 13/09/2026: o log dizia `receita_medica:origem_nao_autorizada` e
+     * parava aí. A allowlist tinha `https://greens-site-bucket.s3.us-east-1.amazonaws.com`, e
+     * mesmo assim recusava — sem dizer **qual** origem chegou, não havia como saber o que
+     * corrigir.
+     *
+     * ⚠️ O S3 serve o MESMO arquivo por dois endereços diferentes, e eles têm origens distintas:
+     *
+     *   virtual-hosted:  https://<bucket>.s3.<regiao>.amazonaws.com/<chave>
+     *   path-style:      https://s3.<regiao>.amazonaws.com/<bucket>/<chave>
+     *
+     * Uma allowlist com o primeiro recusa o segundo, e a mensagem antiga não deixava ver isso.
+     *
+     * 🔴 **Só o `origin`, nunca a URL inteira.** O host é público — aparece em qualquer
+     * requisição. O que não pode vazar é a query string, que carrega `X-Amz-Signature`.
+     */
+    return { ok: false, motivo: `origem_nao_autorizada:${alvo.origin}` };
+  }
 
   try {
     const { address } = await lookup(alvo.hostname);
@@ -338,17 +348,17 @@ export async function materializarArquivos(
            * um cuidado com descuido.
            *
            * A entrega é por `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
+           *
+           * ⚠️ O acesso NÃO é escolhido aqui, e essa é a correção de 13/09/2026. Ele é
+           * propriedade do STORE, e pedi-lo num store público falhava — foi o que aconteceu
+           * com os três documentos do SOL-000046, depois de a Greens reenviar e o download
+           * funcionar. `guardarDocumentoPrivado` resolve o store certo e falha fechado.
            */
-          const ACESSO_DO_BLOB = 'private' as const;
-
           const nome = entrada.nomeArquivo?.replace(/[^\w.-]/g, '_') ?? `${entrada.tipo}`;
-          const blob = await put(
+          const blob = await guardarDocumentoPrivado(
             `documentos/parceiro/${referencia}/${entrada.tipo}_${Date.now()}_${nome}`,
             bytes,
-            {
-              access: ACESSO_DO_BLOB,
-              contentType: mime,
-            },
+            { contentType: mime },
           );
 
           return {

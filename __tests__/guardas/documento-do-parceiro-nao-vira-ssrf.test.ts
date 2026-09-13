@@ -29,6 +29,11 @@ const BUSCADOR = 'lib/parceiros/documentos-do-parceiro.ts';
 const MATERIALIZAR = 'lib/parceiros/materializar-documentos.ts';
 const CADASTRO = 'app/_actions/cadastro-por-link.ts';
 
+const FONTE_MOD = readFileSync(
+  path.join(process.cwd(), 'lib/parceiros/documentos-do-parceiro.ts'),
+  'utf8',
+);
+
 describe('a URL do parceiro é conferida antes de qualquer requisição', () => {
   it('recusa http — segredo e documento não trafegam em claro', async () => {
     process.env.PARCEIRO_ORIGENS_DE_DOCUMENTO = 'https://greens-corp.com';
@@ -41,7 +46,7 @@ describe('a URL do parceiro é conferida antes de qualquer requisição', () => 
     process.env.PARCEIRO_ORIGENS_DE_DOCUMENTO = 'https://greens-corp.com';
     const r = await origemAutorizada('https://outra-empresa.com/doc.pdf');
     expect(r.ok).toBe(false);
-    expect(r.motivo).toBe('origem_nao_autorizada');
+    expect(r.motivo).toMatch(/^origem_nao_autorizada/);
   });
 
   /**
@@ -65,7 +70,7 @@ describe('a URL do parceiro é conferida antes de qualquer requisição', () => 
      * Exigir `origem_nao_autorizada` prova que a recusa veio da comparação de ORIGEM, e não
      * de um acidente de resolução de nome.
      */
-    expect(r.motivo).toBe('origem_nao_autorizada');
+    expect(r.motivo).toMatch(/^origem_nao_autorizada/);
   });
 
   it('sem origens configuradas, nada é baixado — falha fechada', async () => {
@@ -324,15 +329,37 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
     /**
      * ⚠️ E NUNCA a URL: a `message` de um erro de `fetch` costuma trazer o endereço, e o do
      * parceiro carrega assinatura de acesso ao S3 dele. Log não é lugar de credencial.
+     *
+     * 🔴 A função saiu deste arquivo em 13/09/2026 — o elo SEGUINTE do mesmo fluxo
+     * (`materializar-documentos.ts`) repetia o defeito que ela resolve, e uma função de
+     * segurança presa num arquivo não protege o vizinho. Ela vive em `lib/erros/`, com guarda
+     * próprio que a EXECUTA contra um Postgres real.
      */
-    const i = semComent.indexOf('function motivoLegivel');
-    expect(i, 'a função que monta o motivo sumiu').toBeGreaterThan(-1);
-    const helper = semComent.slice(i, semComent.indexOf('\n}', i));
-    expect(helper, 'o motivo pode vazar a URL assinada do parceiro').toMatch(/https\?/);
+    expect(semComent, 'o parceiro deixou de usar o motivo que não vaza').toContain(
+      'motivoLegivel(',
+    );
+    expect(semComent, 'a função voltou a ser declarada aqui, e o vizinho fica sem ela').not.toMatch(
+      /function motivoLegivel/,
+    );
   });
 
   it('e o blob continua privado', () => {
-    expect(fn).toMatch(/ACESSO_DO_BLOB = 'private'/);
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026 — este caso media a FORMA e ficava verde com o defeito.
+     *
+     * Ele exigia a constante `ACESSO_DO_BLOB = 'private'`, que existia e estava certa —
+     * enquanto o `put` falhava com `Cannot use private access on a public store` em TODOS os
+     * documentos do SOL-000046. Acesso não é propriedade do upload: é do STORE, escolhido na
+     * criação e imutável. Declarar a intenção no ponto de chamada não guarda nada.
+     *
+     * A propriedade que importa: este arquivo não chama `put` — ele delega a `store-privado`,
+     * que resolve o store certo e LANÇA quando o token falta, em vez de cair para público com
+     * documento de paciente de outra empresa dentro.
+     */
+    expect(fn).toContain('guardarDocumentoPrivado');
+    expect(fn, 'escolher o store aqui é escolher se o RG fica legível sem auth').not.toMatch(
+      /\bput\(/,
+    );
   });
 
   it('🔴 uma falha não derruba as outras — cada documento tem o próprio catch', () => {
@@ -440,5 +467,43 @@ describe('a recusa de documento deixa rastro — não vira "nunca mandou"', () =
         /[Dd]ocumento é conveniência/,
       );
     }
+  });
+});
+
+/**
+ * 🔴 A ORIGEM RECUSADA APARECE NO MOTIVO — e a assinatura NÃO.
+ *
+ * Medido em produção em 13/09/2026: o log dizia `receita_medica:origem_nao_autorizada` e parava
+ * aí. A allowlist tinha o bucket certo e mesmo assim recusava — sem dizer **qual** origem
+ * chegou, não havia o que corrigir.
+ *
+ * ⚠️ O S3 serve o mesmo arquivo por dois endereços com origens diferentes:
+ *   virtual-hosted: https://<bucket>.s3.<regiao>.amazonaws.com/<chave>
+ *   path-style:     https://s3.<regiao>.amazonaws.com/<bucket>/<chave>
+ *
+ * Uma allowlist com o primeiro recusa o segundo em silêncio.
+ */
+describe('a origem recusada é dita, sem vazar a assinatura', () => {
+  it('🔴 o motivo carrega a origem que chegou', async () => {
+    const { origemAutorizada } = await import('@/lib/parceiros/documentos-do-parceiro');
+    const r = await origemAutorizada(
+      'https://s3.us-east-1.amazonaws.com/bucket/x.pdf?X-Amz-Signature=abc123',
+    );
+    expect(r.ok).toBe(false);
+    expect(r.motivo, 'o motivo não diz qual origem chegou').toContain('s3.us-east-1.amazonaws.com');
+  });
+
+  it('🔴 e NUNCA a query string — é lá que vive o X-Amz-Signature', () => {
+    /**
+     * O host é público: aparece em qualquer requisição. A query string do S3 carrega a
+     * assinatura, e quem a tiver baixa o documento clínico sem mais nada.
+     */
+    const i = FONTE_MOD.indexOf('origem_nao_autorizada:');
+    expect(i, 'o motivo não carrega a origem').toBeGreaterThan(-1);
+    const linha = FONTE_MOD.slice(FONTE_MOD.lastIndexOf('\n', i), FONTE_MOD.indexOf('\n', i));
+    expect(linha, 'o motivo usa a URL inteira — vaza a assinatura').not.toMatch(
+      /alvo\.href|\burl\b/,
+    );
+    expect(linha, 'o motivo deveria usar só o origin').toMatch(/alvo\.origin/);
   });
 });

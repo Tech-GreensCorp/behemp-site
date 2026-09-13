@@ -283,6 +283,55 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **Onze pontos ainda logam `erro.name`, que é sempre `'Error'`** — catalogado em
+      13/09/2026, depois de esse mesmo defeito esconder por quatro dias a falha que impedia
+      **todo** documento de paciente de ser gravado. Os do caminho do Fluxo 1 · Portão 1 foram
+      corrigidos com `lib/erros/motivo-legivel.ts`; ficam: `lib/parceiros/notificar.ts:93`,
+      `enfileirar-transferencia.ts:84`, `cadastro-pendente.ts:102`, `enviador.ts:261`,
+      `lib/anvisa/avisar-aprovacao.ts:79,95,103`,
+      `app/(paciente)/_actions/consentimento.ts:201`,
+      `app/api/parceiros/greens/cadastro/route.ts:196`, `app/api/chatpro/triagem/route.ts:74`,
+      `app/api/parceiros/enviar/route.ts:32`. **Perigo de mexer: BAIXO, mas não zero** — trocar
+      por `erro.message` VAZA: medido contra Postgres real em 13/09, o Drizzle monta a mensagem
+      com a query inteira e os valores inline (`Failed query: insert into … values ('529.982.
+247-25', …)`). A troca correta é `motivoLegivel`, que já trata isso; cada ponto precisa
+      ser conferido pelo que ele pode carregar.
+- [ ] ⚠️ **`app/_actions/cadastro-por-link.ts:646` fica com `erro.name` DE PROPÓSITO** — não é
+      esquecimento, e o guarda `cadastro-por-link-abre-sem-conta` o exige. As colunas daquela
+      transação são CPF, telefone e texto clínico. Melhorar o diagnóstico ali sem vazar exige
+      usar `code`/`constraint` do driver e **nunca** a mensagem — `motivoLegivel` já faz isso
+      para erro de banco, mas aquele `catch` cobre a transação inteira, não só o `insert`, e
+      trocar sem medir cada caminho é o tipo de "melhoria" que vira incidente de LGPD.
+
+- [ ] 🔴 **`BLOB_READ_WRITE_TOKEN` não está na lista `gravar` do `deploy.yml`** — medido em
+      13/09/2026: `grep -n BLOB .github/workflows/deploy.yml` dá **zero**. Hoje funciona porque o
+      token vive no `.env` da VPS, herdado de um `pm2 start` antigo e copiado a cada deploy pelo
+      `preservar-ambiente-do-pm2.mjs`. **É a mesma classe que já mordeu três vezes**
+      (`PARCEIRO_ORIGENS_DE_DOCUMENTO`, `PARCEIRO_TRANSFERENCIA_ATIVA`,
+      `PARCEIRO_GREENS_SEGREDO_CADASTRO`), com um agravante: o dia em que esse `.env` for
+      reescrito sem preservação, **todo upload do produto para de funcionar de uma vez** — e
+      cinco dos seis pontos engolem o erro. **Perigo de mexer: BAIXO** — acrescentar uma linha
+      `gravar` e cadastrar o secret. Espera a decisão do store privado, para gravar os dois
+      tokens no mesmo movimento.
+      ⚠️ **MEDIDO em 13/09/2026, e muda o que fazer:** `gh secret list` mostra que
+      `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **estão cadastrados no GitHub
+      desde 22/06** — o que falta é só a linha `gravar`. Mas acrescentá-la agora é aposta: o
+      GitHub não deixa **ler** o valor de um secret, e o `.env` da VPS vem de um `pm2 start`
+      anterior a isso. Se os valores divergirem, o próximo deploy sobrescreve o token que hoje
+      funciona e quebra avatar, exame e procuração. **Fechar isto exige confirmar ou renovar os
+      dois valores primeiro** — o que é seguro fazer é gerar tokens novos no painel, cadastrá-los
+      e só então acrescentar as linhas, num movimento só e com o site observado.
+- [ ] 🔴 **O guarda `o-segredo-cadastrado-chega-ao-servidor` não vê variável lida por DEPENDÊNCIA**
+      — achado em 13/09/2026 ao investigar o item acima. Ele deriva de `process.env.X` dentro de
+      cinco áreas (`lib/parceiros`, `lib/chatpro`, `app/api/parceiros`, `app/api/chatpro`,
+      `lib/anvisa`). `BLOB_READ_WRITE_TOKEN` escapa por **duas** razões independentes: mora fora
+      dessas áreas, e **quem o lê é o SDK do `@vercel/blob`**, não o nosso código — nenhum
+      `process.env.BLOB_READ_WRITE_TOKEN` existe no repositório. O guarda ficou verde com o
+      defeito presente, medido: 27/27 passando. **A classe é nova:** variável que uma biblioteca
+      lê por conta própria. `lib/env.ts` a declara, e é de lá que a derivação deveria sair.
+      **Perigo de mexer: BAIXO** — é teste, não produção; mas nasce vermelho, então entra junto
+      da correção do item acima.
+
 - [ ] **Fluxo de comprovação de renda / medicamento gratuito não existe** — `DO-28`, catalogado
       em 20/08 e **fora de escopo por decisão do dono**. Medido: `app/(public)/programa-acesso-solidario/page.tsx`
       é institucional (612 linhas, **zero formulário**), e `db/schema/pacientes.ts:55` tem
@@ -377,6 +426,28 @@ de passagem.**
 > de propósito.
 
 ---
+
+### 🔴 Achado de 13/09/2026 — o Clerk roda com instância de DESENVOLVIMENTO
+
+Medido no `.env` da VPS: `pk_test_` / `sk_test_`. E no painel: a aplicação **Be4hope** tem
+ambiente Production **vazio** (0 sign-ups), com domínio apontando para `behemp-site.vercel.app`
+— enquanto o site vive em `be4hope.org`.
+
+⚠️ **NÃO é o que bloqueia o cadastro** — isso foi medido e retratado (ADR-0022 §54). Há
+`sign_up.completed` e `user.created` no log. É higiene, não urgência.
+
+**O perigo de mexer:** as contas existentes vivem no ambiente Development e **não migram
+sozinhas**. Trocar as chaves sem corrigir o domínio derruba o login em `be4hope.org`, porque
+chave `pk_live_` só funciona no domínio registrado.
+
+**Ordem correta, quando for feito:** corrigir o domínio no painel → configurar DNS → decidir o
+que fazer com as contas atuais (o Clerk tem API de migração) → trocar os secrets no GitHub.
+
+🔴 **E uma armadilha medida:** `CLERK_SECRET_KEY` e `CLERK_WEBHOOK_SECRET` **não estão na lista
+`gravar` do `deploy.yml`** — vêm do `preservar-ambiente-do-pm2.mjs`. Trocar o secret no GitHub
+**não os leva ao servidor**. É a mesma classe que já mordeu três vezes
+(`o-segredo-cadastrado-chega-ao-servidor`), e o guarda não pega porque a chave é lida pelo SDK
+do Clerk, nunca pelo nosso código.
 
 ### 🔴 Achado de 13/09/2026 — as migrations NÃO RODAM DO ZERO
 

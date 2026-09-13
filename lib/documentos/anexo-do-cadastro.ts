@@ -16,7 +16,8 @@
  * como pendência — que já é um estado previsto (ADR-0016 D-06): ela informa, não bloqueia.
  */
 
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
 
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
@@ -83,24 +84,25 @@ export async function anexarDocumentoDoCadastro(params: {
     if (bytes.byteLength === 0 || bytes.byteLength > TAMANHO_MAXIMO_DO_ANEXO) return false;
 
     const nomeSeguro = params.anexo.nomeArquivo.replace(/[^\w.-]/g, '_').slice(0, 120);
-    const blob = await put(
+    /**
+     * 🔴 PRIVADO. Decisão do dono em 10/09/2026: _"então vamos colocar no nosso store
+     * privado"_.
+     *
+     * Store público significa: quem tem a URL lê, sem autenticação — e o que está aqui é
+     * RG, receita e laudo. Obscuridade de URL não é controle de acesso.
+     *
+     * ⚠️ Um blob privado NÃO abre por link direto, e é esse o ponto. A entrega passa por
+     * `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e registra
+     * a leitura. Quem escrever tela nova deve usar aquela rota, nunca `urlBlob`.
+     *
+     * ⚠️ E o acesso não se pede no upload — ele é do STORE. Pedi-lo aqui contra um store
+     * público falhava desde 10/09, e o `catch` abaixo logava `erro.name`, que é sempre
+     * `'Error'`: quatro dias de log sem uma palavra sobre a causa. Corrigido em 13/09/2026.
+     */
+    const blob = await guardarDocumentoPrivado(
       `documentos/cadastro/${params.pacienteId}/${params.tipo}_${Date.now()}_${nomeSeguro}`,
       bytes,
-      {
-        /**
-         * 🔴 PRIVADO. Decisão do dono em 10/09/2026: _"então vamos colocar no nosso store
-         * privado"_.
-         *
-         * Store público significa: quem tem a URL lê, sem autenticação — e o que está aqui é
-         * RG, receita e laudo. Obscuridade de URL não é controle de acesso.
-         *
-         * ⚠️ Um blob privado NÃO abre por link direto, e é esse o ponto. A entrega passa por
-         * `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e registra
-         * a leitura. Quem escrever tela nova deve usar aquela rota, nunca `urlBlob`.
-         */
-        access: 'private',
-        contentType: params.anexo.tipoMime,
-      },
+      { contentType: params.anexo.tipoMime },
     );
 
     /**
@@ -127,7 +129,8 @@ export async function anexarDocumentoDoCadastro(params: {
   } catch (erro) {
     console.error(
       '[cadastro] falha ao anexar documento:',
-      erro instanceof Error ? erro.name : 'erro',
+      // `erro.name` é sempre 'Error'. Este catch engoliu 3 dias de falha silenciosa.
+      motivoLegivel(erro),
     );
     return false;
   }

@@ -16,13 +16,40 @@
  *      entrega o RG de qualquer paciente a qualquer médico.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  ehDoStorePrivado,
+  guardarDocumentoPrivado,
+  StorePrivadoNaoConfigurado,
+  tokenDoStorePrivado,
+} from '@/lib/documentos/store-privado';
 
 const raiz = process.cwd();
 const ler = (p: string) => readFileSync(path.join(raiz, p), 'utf8');
+
+/** Todos os `.ts`/`.tsx` sob os diretórios dados, em caminho relativo à raiz. */
+function varrer(dirs: string[]): string[] {
+  const saida: string[] = [];
+  const andar = (rel: string) => {
+    let entradas: string[];
+    try {
+      entradas = readdirSync(path.join(raiz, rel));
+    } catch {
+      return;
+    }
+    for (const nome of entradas) {
+      const filho = path.join(rel, nome);
+      if (statSync(path.join(raiz, filho)).isDirectory()) andar(filho);
+      else if (/\.tsx?$/.test(nome)) saida.push(filho);
+    }
+  };
+  dirs.forEach(andar);
+  return saida;
+}
 
 const ESCOPO = 'lib/auth/escopo-documento.ts';
 const ROTA = 'app/api/documentos/[id]/arquivo/route.ts';
@@ -56,10 +83,35 @@ describe('os pontos que gravam em `documentos` não gravam mais público', () =>
     'app/api/upload-documento/route.ts',
   ];
 
-  it.each(PONTOS.map((p) => [p] as const))('%s grava privado', (ponto) => {
+  /**
+   * 🔴 A PROPRIEDADE, NÃO A FORMA — retificado em 13/09/2026.
+   *
+   * A versão anterior exigia o literal `access: 'private'` em cada ponto. Ela ficava VERDE
+   * enquanto os seis caminhos gravavam contra um store PÚBLICO e o SDK recusava todos:
+   * `access` no `put` não escolhe nada, porque acesso é propriedade do STORE, imutável desde
+   * a criação. O guarda media a intenção escrita, e a intenção estava certa — o resultado é
+   * que não.
+   *
+   * O que importa agora: o ponto **não chama `put` direto**. Quem chama `put` pode escolher o
+   * store, e escolher o store é escolher se o RG do paciente fica legível sem autenticação.
+   */
+  it.each(PONTOS.map((p) => [p] as const))('%s grava pelo store privado', (ponto) => {
     const codigo = semComentarios(ler(ponto));
-    expect(codigo).toContain("access: 'private'");
+    expect(codigo).toContain('guardarDocumentoPrivado');
+    expect(codigo).not.toMatch(/\bput\(/);
     expect(codigo).not.toContain("access: 'public'");
+  });
+
+  /**
+   * ⚠️ E o token não se escolhe no ponto de chamada.
+   *
+   * Três destes passavam `BLOB_BEHEMP_READ_WRITE_TOKEN` — a MESMA variável com que
+   * `upload-avatar` e `upload-exame` gravam `access: 'public'`. Um token resolve um store, e
+   * um store tem um único acesso: enquanto o nome do token estiver espalhado, alguém aponta
+   * documento de paciente para o store errado sem que nada acuse.
+   */
+  it.each(PONTOS.map((p) => [p] as const))('%s não escolhe o token', (ponto) => {
+    expect(semComentarios(ler(ponto))).not.toMatch(/BLOB_[A-Z_]*TOKEN/);
   });
 });
 
@@ -84,15 +136,86 @@ describe('as telas abrem pela rota autenticada, nunca pela URL do blob', () => {
 });
 
 describe('os caminhos novos gravam privado', () => {
-  it('o anexo do cadastro', () => {
-    expect(semComentarios(ler(ANEXO))).toContain("access: 'private'");
-    expect(semComentarios(ler(ANEXO))).not.toContain("access: 'public'");
+  it.each([
+    ['o anexo do cadastro', ANEXO],
+    ['o documento que vem do parceiro', PARCEIRO],
+  ])('%s', (_nome, arquivo) => {
+    const codigo = semComentarios(ler(arquivo));
+    expect(codigo).toContain('guardarDocumentoPrivado');
+    expect(codigo).not.toMatch(/\bput\(/);
+    expect(codigo).not.toContain("access: 'public'");
+  });
+});
+
+/**
+ * 🔴 O MÓDULO É A GARANTIA — e ele falha FECHADO.
+ *
+ * Se `store-privado` cair para o store público quando o token faltar, todo o resto deste
+ * arquivo vira decoração: os seis pontos continuariam "gravando privado" e o RG do paciente
+ * ficaria legível para quem tem a URL. É a diferença entre um módulo que centraliza e um
+ * módulo que protege.
+ */
+describe('o store privado falha fechado', () => {
+  const modulo = semComentarios(ler('lib/documentos/store-privado.ts'));
+
+  it('lança quando o token não está configurado', () => {
+    expect(modulo).toContain('StorePrivadoNaoConfigurado');
+    expect(modulo).toMatch(/throw new StorePrivadoNaoConfigurado\(\)/);
   });
 
-  it('o documento que vem do parceiro', () => {
-    const codigo = semComentarios(ler(PARCEIRO));
-    expect(codigo).toContain("const ACESSO_DO_BLOB = 'private' as const");
-    expect(codigo).not.toMatch(/ACESSO_DO_BLOB = 'public'/);
+  it('e NUNCA cai para público', () => {
+    expect(modulo).not.toContain("access: 'public'");
+    expect(modulo).not.toMatch(/access:\s*[a-zA-Z]/);
+  });
+
+  it('o acesso não é parâmetro — quem chama não escolhe o store', () => {
+    expect(modulo).not.toMatch(/access[?]?:\s*(BlobAccessType|string)/);
+  });
+
+  /**
+   * ⚠️ A entrega é o segundo elo, e ele estava quebrado junto: `fetch(url)` cru responde 401
+   * num blob privado. Não teria aparecido em teste nenhum enquanto o primeiro elo impedia
+   * qualquer blob privado de existir.
+   */
+  it('a entrega sabe ler blob privado, não só fazer fetch', () => {
+    /**
+     * ⚠️ SEM AS LINHAS DE IMPORT — duas sabotagens sobreviveram por causa disto em
+     * 13/09/2026. `toContain('lerDocumentoPrivado')` fica verde com o corpo trocado por
+     * `fetch(url)`, porque o nome continua no import. Importar não é chamar; é a mesma
+     * "menção vs uso" que já custou sete guardas neste repositório.
+     */
+    const corpo = semComentarios(ler('app/api/documentos/[id]/arquivo/route.ts'))
+      .split('\n')
+      .filter((linha) => !/^\s*import\b/.test(linha) && !/^\s*\}\s*from\s*'/.test(linha))
+      .join('\n');
+
+    expect(corpo).toMatch(/if\s*\(\s*ehDoStorePrivado\(\s*url\s*\)\s*\)/);
+    expect(corpo).toMatch(/await lerDocumentoPrivado\(/);
+  });
+
+  it('e o host decide pelo fim, nunca por prefixo ou includes na URL inteira', () => {
+    expect(modulo).toMatch(/new URL\(url\)\.host\.endsWith\(/);
+  });
+});
+
+/**
+ * 🔴 COBERTURA — o que pega o ponto SÉTIMO, que ainda não existe.
+ *
+ * Lista fixa envelhece: quem acrescentar um upload de documento amanhã não vai lembrar de
+ * vir aqui. Este caso deriva do código — varre quem importa `put` do SDK — e fica vermelho
+ * nomeando o arquivo novo que grava documento sem passar pelo módulo.
+ */
+describe('nenhum ponto novo grava documento fora do store privado', () => {
+  it('quem importa `put` do SDK não grava em `documentos`', () => {
+    const suspeitos = varrer(['lib', 'app'])
+      .filter((f) => !f.includes('store-privado'))
+      .filter((f) => /import\s*\{[^}]*\bput\b[^}]*\}\s*from\s*'@vercel\/blob'/.test(ler(f)))
+      .filter((f) => {
+        const codigo = semComentarios(ler(f));
+        return /insert\(documentos\)|update\(documentos\)/.test(codigo);
+      });
+
+    expect(suspeitos).toEqual([]);
   });
 });
 
@@ -169,5 +292,49 @@ describe('controle — o guarda não pode acusar inocente', () => {
    */
   it('a rota ainda serve o blob antigo, sem quebrar o que existe', () => {
     expect(ler(ROTA)).toContain('NextResponse.redirect(url)');
+  });
+});
+
+/**
+ * 🔴 ESTES CASOS EXECUTAM O MÓDULO — os de cima só leem o arquivo.
+ *
+ * A distinção não é acadêmica: em 13/09/2026 este repositório tinha 1212 guardas verdes
+ * enquanto os SEIS caminhos de documento falhavam em produção. Todos liam o código, e o
+ * código estava escrito certo. O que não funcionava era o resultado.
+ */
+describe('o store privado, em execução', () => {
+  const original = process.env.BLOB_TOKEN_PRIVADO;
+  afterEach(() => {
+    process.env.BLOB_TOKEN_PRIVADO = original;
+  });
+
+  it('sem token configurado, LANÇA em vez de gravar', async () => {
+    delete process.env.BLOB_TOKEN_PRIVADO;
+    await expect(guardarDocumentoPrivado('x/y.pdf', Buffer.from([1, 2, 3]))).rejects.toThrow(
+      StorePrivadoNaoConfigurado,
+    );
+  });
+
+  it('token só com espaços conta como ausente', () => {
+    process.env.BLOB_TOKEN_PRIVADO = '   ';
+    expect(tokenDoStorePrivado()).toBeNull();
+  });
+
+  /**
+   * ⚠️ O HOST DECIDE, e as três últimas entradas são ataque.
+   *
+   * `url.includes('private')` acerta as duas primeiras e erra todas as outras — e errar aqui
+   * significa tratar blob público como privado (e devolver 502 a quem tinha direito de ler) ou,
+   * na direção que importa, buscar sem autenticação um arquivo que exigia token.
+   */
+  it.each([
+    ['https://abc.private.blob.vercel-storage.com/doc.pdf', true],
+    ['https://abc.public.blob.vercel-storage.com/doc.pdf', false],
+    ['https://abc.public.blob.vercel-storage.com/private/rg.pdf', false],
+    ['https://private.blob.vercel-storage.com.evil.com/x', false],
+    ['https://evil.com/?u=abc.private.blob.vercel-storage.com', false],
+    ['nao-e-url', false],
+  ])('%s → privado? %s', (url, esperado) => {
+    expect(ehDoStorePrivado(url)).toBe(esperado);
   });
 });

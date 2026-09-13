@@ -211,6 +211,11 @@ jobs:
             gravar CHATPRO_INSTANCE_ID             "${{ secrets.CHATPRO_INSTANCE_ID }}"
             gravar CHATPRO_INSTANCE_TOKEN          "${{ secrets.CHATPRO_INSTANCE_TOKEN }}"
             gravar CHATPRO_GREENS_URL_DE_RETORNO   "${{ secrets.CHATPRO_GREENS_URL_DE_RETORNO }}"
+            # 🔴 O store PRIVADO dos documentos de paciente. Sem ele no processo,
+            # `lib/documentos/store-privado.ts` lança e NENHUM documento é gravado — nem o
+            # anexo do formulário, nem o que a Greens envia. É falha fechada de propósito:
+            # dado de saúde não cai para store público quando a configuração falta.
+            gravar BLOB_TOKEN_PRIVADO              "${{ secrets.BLOB_TOKEN_PRIVADO }}"
             gravar CRON_SECRET                     "${{ secrets.CRON_SECRET }}"
             gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
             # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor

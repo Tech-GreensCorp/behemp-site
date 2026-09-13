@@ -303,3 +303,38 @@ Ver ADR-0022 §33.1 e §33.2.
 
 O teste que falta é o de comportamento, com estado sujo. Ele está no `CLAUDE.md` como regra
 desde 12/09, e continua sendo o próximo passo natural desta sprint.
+
+---
+
+## 🔴 13/09/2026 — o Fluxo 1 · Portão 1, e a causa do `400` medida
+
+Nove defeitos achados e corrigidos, **todos em produção**:
+
+| #   | defeito                                                              | quem achou                           |
+| --- | -------------------------------------------------------------------- | ------------------------------------ |
+| 1   | e-mail do reaproveitamento mantinha o antigo                         | dono                                 |
+| 2   | telefone fundia pessoas (OWASP API1)                                 | derivado do #1                       |
+| 3   | a trava virou beco para quem corrigiu o e-mail                       | dono                                 |
+| 4   | senha exigida de quem já tinha conta                                 | ao conferir a expectativa dele       |
+| 5   | a tela escondia que a conta existia                                  | dono                                 |
+| 6   | reconciliação só rodava se abrisse o link                            | dono                                 |
+| 7   | motivo da recusa era `erro.name` = sempre `"Error"`                  | log de produção                      |
+| 8   | download sem retentativa                                             | as 4 etapas aplicadas ao Claim Check |
+| 9   | **o reenvio era porta fechada** — `reemitir` não tocava no manifesto | 🔴 **a Greens**                      |
+
+### E a causa do `sign_ups → 400`, que eu atribuí a três coisas erradas antes
+
+```json
+{ "reason": "That email address is taken. Please try another." }
+```
+
+**E-mail já cadastrado.** Não é bot protection, não é cookie cross-site, não é instância de
+desenvolvimento. O `sign_up.captcha.passed` aparece em **todos** os eventos de falha.
+
+⚠️ **Consequência prática:** teste sempre com e-mail **e** telefone novos. Reusar endereço é
+reencontrar o estado sujo do teste anterior, não exercitar o fluxo.
+
+### O que ainda depende da Greens
+
+Os documentos só aparecem quando ela mandar `{ tipo, url }` — hoje manda só o nome. E os 35
+registros existentes continuam com o manifesto congelado: **precisam de reenvio**.
