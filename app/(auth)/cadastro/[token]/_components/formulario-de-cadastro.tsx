@@ -334,6 +334,21 @@ export function FormularioDeCadastro({
    * antes daria `Block-scoped variable 'email' used before its declaration`.
    */
   const emailDigitado = email.trim().toLowerCase();
+  /**
+   * 🔴 QUEM JÁ ESTÁ LOGADO NÃO CRIA CONTA — E POR ISSO NÃO INFORMA SENHA.
+   *
+   * Achado em 13/09/2026, ao conferir a expectativa do dono antes do merge: _"vou logar
+   * normalmente e vou parar na tela de confirmação do e-mail recebendo um novo código"_.
+   *
+   * Não é o que acontece, e o que acontecia era pior: com sessão viva, `criarConta` vai
+   * **direto** para `gravarFicha()` — o Clerk não é chamado, e a senha digitada **não é usada
+   * para nada**. Mas `podeEnviar` exigia `senhaValida && senhasConferem`, então o botão ficava
+   * desabilitado até o paciente inventar uma senha inútil, acreditando estar definindo a da
+   * conta que já tem.
+   *
+   * ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: o paciente acredita que aquilo
+   * teve efeito. Alguém sairia daqui convencido de que trocou a própria senha.
+   */
   const sessaoEDeOutraPessoa =
     authCarregou &&
     Boolean(isSignedIn) &&
@@ -342,6 +357,9 @@ export function FormularioDeCadastro({
     emailDaSessao !== emailDoLink &&
     emailDaSessao !== emailDigitado &&
     !continuarComASessao;
+
+  /** A sessão é utilizável para concluir ESTE cadastro — então não há conta a criar. */
+  const jaTemSessaoUtil = authCarregou && Boolean(isSignedIn) && !sessaoEDeOutraPessoa;
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
@@ -571,8 +589,8 @@ export function FormularioDeCadastro({
     cpfValido &&
     emailValido &&
     telefoneValido &&
-    senhaValida &&
-    senhasConferem &&
+    // Só quem vai criar conta precisa de senha. Ver `jaTemSessaoUtil`.
+    (jaTemSessaoUtil || (senhaValida && senhasConferem)) &&
     tratamentoRespondido;
 
   /** Força da senha, para dar retorno em vez de só recusar no envio. */
@@ -1113,54 +1131,74 @@ export function FormularioDeCadastro({
 
             <Separador />
 
-            <Secao titulo="Crie sua senha" icone={Lock}>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="senha">Senha</Label>
-                  <div className="relative">
-                    <Input
-                      id="senha"
-                      type={verSenha ? 'text' : 'password'}
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      autoComplete="new-password"
-                      placeholder="Mínimo de 8 caracteres"
-                      className="h-12 rounded-xl pr-11"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setVerSenha((v) => !v)}
-                      aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-                    >
-                      {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  </div>
-                  <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
-                </div>
+            {/*
+              🔴 QUEM JÁ ESTÁ LOGADO NÃO VÊ CAMPO DE SENHA.
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmar">Repita a senha</Label>
-                  <Input
-                    id="confirmar"
-                    type={verSenha ? 'text' : 'password'}
-                    value={confirmarSenha}
-                    onChange={(e) => setConfirmarSenha(e.target.value)}
-                    autoComplete="new-password"
-                    placeholder="Digite novamente"
-                    className={cn(
-                      'h-12 rounded-xl transition-shadow',
-                      confirmarSenha.length > 0 &&
-                        !senhasConferem &&
-                        'border-destructive/60 focus-visible:ring-destructive/30',
-                    )}
-                  />
-                  {confirmarSenha.length > 0 && !senhasConferem && (
-                    <p className="text-destructive text-xs">As senhas não são iguais</p>
-                  )}
-                </div>
+              Com sessão viva, `criarConta` vai direto para `gravarFicha()` — o Clerk não é
+              chamado e a senha digitada não é usada para nada. Mostrar os campos fazia o
+              paciente acreditar que estava definindo a senha da conta que já tem, e o
+              `podeEnviar` ainda exigia que ele preenchesse para liberar o botão.
+
+              ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: quem preenche acredita
+              que aquilo teve efeito.
+            */}
+            {jaTemSessaoUtil ? (
+              <div className="border-primary/25 bg-primary/5 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você já está logado como <strong>{emailDaSessao}</strong>, então{' '}
+                  <strong>não precisa criar senha</strong> — vamos apenas concluir o seu cadastro.
+                </p>
               </div>
-            </Secao>
+            ) : (
+              <Secao titulo="Crie sua senha" icone={Lock}>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="senha">Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="senha"
+                        type={verSenha ? 'text' : 'password'}
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        autoComplete="new-password"
+                        placeholder="Mínimo de 8 caracteres"
+                        className="h-12 rounded-xl pr-11"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVerSenha((v) => !v)}
+                        aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+                      >
+                        {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                    <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmar">Repita a senha</Label>
+                    <Input
+                      id="confirmar"
+                      type={verSenha ? 'text' : 'password'}
+                      value={confirmarSenha}
+                      onChange={(e) => setConfirmarSenha(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Digite novamente"
+                      className={cn(
+                        'h-12 rounded-xl transition-shadow',
+                        confirmarSenha.length > 0 &&
+                          !senhasConferem &&
+                          'border-destructive/60 focus-visible:ring-destructive/30',
+                      )}
+                    />
+                    {confirmarSenha.length > 0 && !senhasConferem && (
+                      <p className="text-destructive text-xs">As senhas não são iguais</p>
+                    )}
+                  </div>
+                </div>
+              </Secao>
+            )}
 
             {pendencias.length > 0 && (
               <>

@@ -274,4 +274,57 @@ describe('o cadastro retoma de onde parou', () => {
     expect(CODIGO).toMatch(/authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta/);
     expect(FONTE).toMatch(/sua conta não será criada de novo/i);
   });
+
+  it('🔴 quem JÁ TEM SESSÃO não é obrigado a inventar uma senha que não se usa', () => {
+    /**
+     * 🔴 Achado em 13/09/2026 ao conferir a expectativa do dono ANTES de mesclar — e ele teria
+     * travado de novo, num ponto que nenhum guarda cobria.
+     *
+     * Com sessão viva, `criarConta` vai direto para `gravarFicha()`: o Clerk não é chamado e a
+     * senha **não é usada para nada**. Mas `podeEnviar` exigia `senhaValida && senhasConferem`,
+     * então o botão ficava desabilitado até o paciente preencher uma senha inútil — acreditando
+     * estar definindo a da conta que já tem.
+     *
+     * ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: quem preenche acredita que
+     * aquilo teve efeito. Alguém sairia daqui convencido de que trocou a própria senha.
+     */
+    const i = CODIGO.indexOf('const podeEnviar');
+    expect(i, 'não achei podeEnviar').toBeGreaterThan(-1);
+    const condicao = CODIGO.slice(i, CODIGO.indexOf(';', i));
+
+    expect(condicao, 'a senha voltou a ser exigida de quem já tem conta').toMatch(
+      /jaTemSessaoUtil \|\|/,
+    );
+  });
+
+  it('🔴 e os campos de senha nem aparecem para quem já está logado', () => {
+    // Esconder e não exigir são duas coisas: exigir sem mostrar trava o botão sem explicação;
+    // mostrar sem exigir deixa o paciente preencher algo que será jogado fora.
+    const secao = CODIGO.indexOf('Crie sua senha');
+    expect(secao, 'a seção de senha sumiu — este guarda perdeu o alvo').toBeGreaterThan(-1);
+    /**
+     * ⚠️ SEM JANELA ARBITRÁRIA — é o erro que mais me pegou nesta sessão. Fatiar 400
+     * caracteres antes da seção não alcançava o ternário, porque o aviso que ocupa o outro
+     * ramo é maior que isso, e o guarda acusava o código certo.
+     *
+     * A propriedade é posicional: existe um ternário sobre `jaTemSessaoUtil` **antes** da
+     * seção, o que a põe no ramo de quem ainda não tem conta.
+     */
+    const ternario = CODIGO.lastIndexOf('jaTemSessaoUtil ?', secao);
+    expect(ternario, 'a seção de senha é renderizada mesmo com sessão viva').toBeGreaterThan(-1);
+  });
+
+  it('⚠️ e a condição da sessão útil EXCLUI a sessão de outra pessoa', () => {
+    /**
+     * Sem isto, quem chegasse com a conta de outro pularia a senha e cairia direto na gravação
+     * — que é o BOLA que a trava existe para impedir.
+     */
+    const i = CODIGO.indexOf('const jaTemSessaoUtil');
+    expect(i, 'não achei jaTemSessaoUtil').toBeGreaterThan(-1);
+    const condicao = CODIGO.slice(i, CODIGO.indexOf(';', i));
+    expect(condicao, 'a sessão de outra pessoa passaria como útil').toMatch(
+      /!sessaoEDeOutraPessoa/,
+    );
+    expect(condicao, 'não confere se há sessão').toMatch(/isSignedIn/);
+  });
 });
