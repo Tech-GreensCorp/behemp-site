@@ -123,13 +123,25 @@ jeito que já perguntamos pela ANVISA.
 
 # As cinco peças — estado em 10/09/2026
 
-| peça                                      | fecha    | estado                                            |
-| ----------------------------------------- | -------- | ------------------------------------------------- |
-| **P1** pergunta "já tem receita?"         | BeHemp 1 | ✅ **feita**                                      |
-| **P2** aviso pós-consulta com ação rápida | 4 passos | ✅ **componente pronto** — falta plugar nas telas |
-| **P3** formulário com anexo do que falta  | 5 fluxos | ✅ **feita**                                      |
-| **P4** tela de escolha (tenho conta?)     | Greens 3 | ✅ **feita** — `/acesso`                          |
-| **P5** envio à Greens com consentimento   | 5 passos | 🟡 texto e estrutura ✅ · envio 🔴 (Jurídico)     |
+| peça                                      | fecha    | estado                                               |
+| ----------------------------------------- | -------- | ---------------------------------------------------- |
+| **P1** pergunta "já tem receita?"         | BeHemp 1 | ✅ **feita**                                         |
+| **P2** aviso pós-consulta com ação rápida | 4 passos | ✅ **componente pronto** — falta plugar nas telas    |
+| **P3** formulário com anexo do que falta  | 5 fluxos | ✅ **feita**                                         |
+| **P4** tela de escolha (tenho conta?)     | Greens 3 | 🔵 **é da GREENS, e já existe lá** — ver nota abaixo |
+| **P5** envio à Greens com consentimento   | 5 passos | 🟡 texto e estrutura ✅ · envio 🔴 (Jurídico)        |
+
+🔵 **RETIFICADO em 13/09/2026 — a P4 não é nossa.** Correção do dono: _"isso é feito dentro da
+Greens, não da BeHemp, no fluxo 3"_ e _"isso já existe lá"_. A tela dos dois botões (tem conta /
+não tem) é do lado deles, e está pronta. Quando o paciente chega aqui, **já foi roteado**.
+
+⚠️ A nossa `/acesso` **duplica** esse trabalho, e é por isso que nenhuma navegação aponta para
+ela — não foi esquecimento, é que ela não tem função no fluxo. Fica no repositório por decisão
+do dono (_"se você já fez, deixa lá"_), mas **sai da lista de telas órfãs a ligar**.
+
+🔴 **O que continua sendo nosso:** a Greens roteia com o que ela sabe, e ela **não sabe** se o
+cadastro daqui foi concluído — um paciente mandado para o login pode ter conta **sem ficha**.
+Confirmar e corrigir esse roteamento é trabalho da sentinela (ADR-0022, D-05).
 
 ⚠️ **A P2 existe como componente e ainda não está numa tela.** Onde ela entra — depois do
 agendamento, no painel do paciente, ou nos dois — é decisão de produto, e o componente foi

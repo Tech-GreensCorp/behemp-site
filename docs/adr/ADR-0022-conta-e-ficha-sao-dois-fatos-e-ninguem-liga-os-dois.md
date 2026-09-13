@@ -768,8 +768,30 @@ Postgres só. **É uma máquina de estados** — mais simples e mais barata.
 | ----------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | **1 — sem ANVISA, da Greens** | documentos já preenchidos na tela da ANVISA; notificação; envio automático     | **S8.2** (a ficha sabe que veio da Greens) + **S8.4** (se um documento não chegou, **diz**) |
 | **2 — sem receita**           | pendências como aviso; vai ao agendamento; receita volta com consentimento     | **S8.0** — é aqui que a receita vai para a Greens, e é aqui que a revogação tem de valer    |
-| **3 — recompra**              | dois caminhos: tem conta / não tem                                             | **S8.3** — a sentinela é quem responde "esta pessoa tem conta **e** cadastro completo?"     |
+| **3 — recompra**              | receber o paciente **já roteado** pela Greens                                  | **S8.3** — a sentinela confirma o que a Greens supôs, e corrige quando ela errar            |
 | **4 — paciente novo**         | formulário completo; agendamento; aviso da ANVISA depois; consentimento no fim | **S8.5** (retomar) + **S8.3** (o aviso da ANVISA aparece no momento certo, não sempre)      |
+
+#### 🔴 RETIFICAÇÃO do fluxo 3, 13/09/2026 — a escolha é DELES, não nossa
+
+Escrevi acima, numa primeira versão, que o fluxo 3 precisava de _"dois caminhos: tem conta /
+não tem"_ do nosso lado. **Errado.** Correção do dono:
+
+> _"isso é feito dentro da Greens, não da BeHemp, no fluxo 3"_ — e, sobre a tela de escolha:
+> _"isso já existe lá"_.
+
+**A tela dos dois botões é da Greens, e já está pronta lá.** Quando o paciente chega aqui, ele
+**já foi roteado**: ou veio para o login, ou veio para o cadastro. A BeHemp não escolhe — recebe.
+
+⚠️ **E isto resolve uma pendência aberta desde 12/09:** a tela `/acesso` da BeHemp (a P4 do
+`docs/11`, marcada "feita" e sem nenhuma navegação apontando para ela) **duplica** o que já
+existe do outro lado. Fica como está — decisão do dono: _"se você já fez, deixa lá"_ —, mas
+**sai da lista de coisas a ligar**, e o `docs/11` precisa dizer que a P4 é responsabilidade da
+Greens.
+
+🔴 **O que continua sendo nosso no fluxo 3, e é onde a sentinela entra:** a Greens roteia com o
+que ela sabe — e ela **não sabe** se o cadastro daqui foi concluído. Um paciente que ela mandar
+para o login pode ter conta **sem ficha** (o vão do §28). A sentinela é quem confirma o
+roteamento dela e corrige quando ele estiver errado.
 
 🔴 **O que é comum aos quatro:** todos chegam na mesma tela, todos podem parar no meio, e hoje
 **nenhum deles sabe dizer onde parou**. A sentinela é a peça que serve aos quatro — **não é uma
