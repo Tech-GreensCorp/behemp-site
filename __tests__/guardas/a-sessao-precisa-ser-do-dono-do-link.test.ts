@@ -46,10 +46,52 @@ describe('a sessão precisa ser do dono do link', () => {
     expect(ACTION).toMatch(/eq\(users\.clerkId, clerkId\)/);
   });
 
-  it('🔴 O SERVIDOR compara o e-mail da SESSÃO com o da SOLICITAÇÃO', () => {
+  it('🔴 O SERVIDOR confere a SESSÃO contra o cadastro — e recusa quando não bate', () => {
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026, e a versão anterior deste caso era um guarda que congelava
+     * a implementação: ela exigia o literal `emailDaSessao !== emailDaSolicitacao`.
+     *
+     * Quando o dono ficou preso na própria tela — ele corrigira o e-mail pelo "Corrigir meus
+     * dados", a conta nasceu certa, e a trava comparou com a solicitação errada —, a correção
+     * fez este caso ficar VERMELHO. O sinal invertido de novo: verde com o beco, vermelho com
+     * o conserto.
+     *
+     * **A propriedade é: existe uma conferência da sessão, e ela recusa.** Não a forma dela.
+     */
     expect(ACTION).toMatch(/emailDaSessao/);
     expect(ACTION).toMatch(/emailDaSolicitacao/);
-    expect(ACTION).toMatch(/emailDaSessao !== emailDaSolicitacao/);
+
+    const i = ACTION.indexOf('if (!emailDaSessao');
+    expect(i, 'a conferência da sessão sumiu').toBeGreaterThan(-1);
+    const bloco = ACTION.slice(i, ACTION.indexOf('}', ACTION.indexOf('return falha', i)));
+    expect(bloco, 'a conferência não recusa nada').toMatch(/return falha\(/);
+  });
+
+  it('🔴 e a sessão só é aceita por uma razão DECLARADA — nunca por omissão', () => {
+    /**
+     * As duas razões válidas hoje: a sessão casa com o e-mail da solicitação, ou casa com o
+     * e-mail que o paciente confirmou neste fluxo (o Clerk só cria a conta depois do código,
+     * então esse endereço é comprovadamente controlado por quem está ali).
+     *
+     * ⚠️ Se alguém acrescentar uma terceira razão, este caso não impede — mas a condição tem
+     * de continuar sendo uma lista de razões explícitas, e não um `if` que virou sempre-falso.
+     */
+    const i = ACTION.indexOf('if (!emailDaSessao');
+    const condicao = ACTION.slice(i, ACTION.indexOf(') {', i));
+    expect(condicao, 'a condição não olha a solicitação').toMatch(/confereComASolicitacao/);
+    expect(condicao, 'a condição não olha o cadastro em curso').toMatch(/sessaoEDoCadastroEmCurso/);
+  });
+
+  it('🔴 e a correção do e-mail é GRAVADA — senão o beco volta pela próxima tela', () => {
+    /**
+     * Aceitar a correção e não persistir faria a sentinela, o aviso de pendência e o painel
+     * continuarem lendo o e-mail velho — o mesmo bloqueio, por outra porta.
+     */
+    const i = ACTION.indexOf('if (!confereComASolicitacao)');
+    expect(i, 'a correção do e-mail não é persistida').toBeGreaterThan(-1);
+    const bloco = ACTION.slice(i, i + 500);
+    expect(bloco, 'não atualiza a solicitação').toMatch(/update\(solicitacoesCadastro\)/);
+    expect(bloco, 'não grava o e-mail da sessão').toMatch(/email: emailDaSessao/);
   });
 
   it('🔴 e a comparação usa `solicitacao.email` — não o e-mail do formulário', () => {
@@ -62,11 +104,11 @@ describe('a sessão precisa ser do dono do link', () => {
   it('🔴 FALHA FECHADA: sem e-mail na sessão, recusa', () => {
     // Sem e-mail não há como provar que é a pessoa certa. Deixar passar "porque não deu
     // para verificar" é como a maioria dos controles morre.
-    expect(ACTION).toMatch(/if \(!emailDaSessao \|\| emailDaSessao !== emailDaSolicitacao\)/);
+    expect(ACTION, 'a falha fechada por sessão ausente sumiu').toMatch(/if \(!emailDaSessao \|\|/);
   });
 
   it('🔴 e a recusa acontece ANTES de qualquer escrita', () => {
-    const trava = ACTION.indexOf('emailDaSessao !== emailDaSolicitacao');
+    const trava = ACTION.indexOf('if (!emailDaSessao');
     const transacao = ACTION.indexOf('db.transaction');
     expect(trava).toBeGreaterThan(-1);
     expect(transacao).toBeGreaterThan(trava);

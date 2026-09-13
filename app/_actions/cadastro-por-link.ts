@@ -215,7 +215,41 @@ export async function concluirCadastroPorLink(
     const emailDaSolicitacao = (solicitacao.email ?? dados.email).trim().toLowerCase();
     const emailDaSessao = usuarioClerk?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? '';
 
-    if (!emailDaSessao || emailDaSessao !== emailDaSolicitacao) {
+    /**
+     * 🔴 RETIFICAÇÃO DE 13/09/2026 — A TRAVA ESTAVA BARRANDO O DONO DO CADASTRO.
+     *
+     * Decisão do dono, com ele preso na própria tela: _"a conta nasceu com e-mail certo porque
+     * eu alterei ele durante o 'corrigir meus dados'… esse bloqueio atual é inválido, já que o
+     * 'corrigir meus dados' serve basicamente pra isso"_.
+     *
+     * **Ele está certo, e a falha de desenho é minha.** A tela oferece "Corrigir meus dados" —
+     * que existe porque o parceiro erra, e naquele dia **nós** é que tínhamos errado: o
+     * reaproveitamento de solicitação por telefone manteve um e-mail antigo. O paciente corrigiu,
+     * a conta nasceu com o endereço certo, e então esta trava comparou a sessão (certa) com a
+     * solicitação (errada) e recusou. **Um botão que oferece correção e depois invalida o
+     * cadastro corrigido é uma armadilha, não uma proteção.**
+     *
+     * **O que passa a valer:** a sessão é aceita quando o e-mail dela é o que o paciente
+     * confirmou NESTE fluxo — e o Clerk só cria a conta depois do código, então esse e-mail é
+     * comprovadamente controlado por quem está ali.
+     *
+     * ⚠️ E ISTO CUSTA ALGO — está escrito para ninguém descobrir sozinho depois. A trava
+     * anterior barrava quem abrisse um link alheio e criasse conta com o próprio e-mail. Agora
+     * esse caminho passa. **O que continua valendo é que o token do link É a credencial**: ele
+     * chega por WhatsApp no número do paciente, e quem o tem sempre pôde concluir o cadastro.
+     * A trava do e-mail nunca foi a barreira contra quem tem o token — ela protegia contra o
+     * ACIDENTE de estar logado noutra conta, e esse caso continua coberto abaixo.
+     *
+     * 🔴 EM COMPENSAÇÃO, A DIVERGÊNCIA DEIXA RASTRO. Antes ela virava recusa e sumia; agora
+     * vira registro, porque trocar o e-mail de um cadastro é o tipo de fato que alguém vai
+     * precisar reconstruir depois.
+     */
+    const emailConfirmadoNoFluxo = dados.email.trim().toLowerCase();
+    const sessaoEDoCadastroEmCurso =
+      Boolean(emailDaSessao) && emailDaSessao === emailConfirmadoNoFluxo;
+    const confereComASolicitacao = Boolean(emailDaSessao) && emailDaSessao === emailDaSolicitacao;
+
+    if (!emailDaSessao || (!confereComASolicitacao && !sessaoEDoCadastroEmCurso)) {
       console.warn('[cadastro-por-link] sessão de outro e-mail', {
         // Nunca os endereços — só o FATO. O e-mail é dado pessoal, e log não é lugar dele.
         temSessao: Boolean(emailDaSessao),
@@ -224,6 +258,23 @@ export async function concluirCadastroPorLink(
       return falha(
         'Este link foi enviado para outro e-mail. Saia da conta atual e entre com o e-mail que recebeu o link.',
       );
+    }
+
+    if (!confereComASolicitacao) {
+      /**
+       * O paciente corrigiu o e-mail. A solicitação passa a valer com o endereço corrigido —
+       * senão a próxima leitura (o aviso de pendência, a sentinela, o painel) volta a divergir
+       * e reabre o mesmo beco por outra porta.
+       */
+      await db
+        .update(solicitacoesCadastro)
+        .set({ email: emailDaSessao })
+        .where(eq(solicitacoesCadastro.id, solicitacao.id));
+
+      console.warn('[cadastro-por-link] e-mail do cadastro corrigido pelo paciente', {
+        // O fato, nunca os endereços.
+        solicitacaoId: solicitacao.id,
+      });
     }
 
     const pacienteId = await db.transaction(async (tx) => {

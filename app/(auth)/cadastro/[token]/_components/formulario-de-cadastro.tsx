@@ -259,12 +259,25 @@ export function FormularioDeCadastro({
    * para impedir. A mesma razão pela qual o servidor compara com `solicitacao.email`.
    */
   const emailDoLink = (emailInicial ?? '').trim().toLowerCase();
-  const sessaoEDeOutraPessoa =
-    authCarregou &&
-    Boolean(isSignedIn) &&
-    Boolean(emailDaSessao) &&
-    Boolean(emailDoLink) &&
-    emailDaSessao !== emailDoLink;
+
+  /**
+   * 🔴 RETIFICADO EM 13/09/2026 — A TRAVA BARRAVA QUEM CORRIGIU O PRÓPRIO E-MAIL.
+   *
+   * Decisão do dono, preso nesta tela: _"esse bloqueio atual é inválido, já que o 'corrigir
+   * meus dados' serve basicamente pra isso"_. E ele estava certo: o botão existe porque o
+   * parceiro erra — e naquele dia **nós** erramos, mandando um e-mail antigo por reaproveitar
+   * a solicitação pelo telefone. Ele corrigiu, a conta nasceu certa, e a tela disse que o
+   * link era de outra pessoa.
+   *
+   * **O que a trava passa a comparar:** a sessão contra o e-mail do link **ou** contra o que
+   * o paciente digitou nesta tela. O campo é editável, sim — mas o Clerk só cria a conta
+   * depois do código, então uma sessão que casa com o campo digitado é uma sessão cujo e-mail
+   * foi comprovadamente confirmado aqui.
+   *
+   * ⚠️ O QUE ELA AINDA PEGA, e é o caso que a originou: chegar com a sessão de OUTRA conta
+   * (o dono, ontem, com três contas de teste no mesmo navegador). Aí a sessão não casa nem
+   * com o link nem com o que está sendo preenchido, e o aviso com "Sair desta conta" aparece.
+   */
 
   /**
    * Os quatro campos que o formulário do parceiro já coletou. Se os quatro vieram, a tela
@@ -293,6 +306,20 @@ export function FormularioDeCadastro({
   const [cpf, setCpf] = useState(cpfInicial ? formatarCpf(cpfInicial) : '');
   const [telefone, setTelefone] = useState(formatarTelefoneParaTela(telefoneInicial));
   const [email, setEmail] = useState(emailInicial ?? '');
+
+  /**
+   * ⚠️ DECLARADO AQUI, e não junto dos outros derivados lá em cima, por uma razão do
+   * compilador: desde a retificação de 13/09 ele depende de `email`, que é estado. Calcular
+   * antes daria `Block-scoped variable 'email' used before its declaration`.
+   */
+  const emailDigitado = email.trim().toLowerCase();
+  const sessaoEDeOutraPessoa =
+    authCarregou &&
+    Boolean(isSignedIn) &&
+    Boolean(emailDaSessao) &&
+    Boolean(emailDoLink) &&
+    emailDaSessao !== emailDoLink &&
+    emailDaSessao !== emailDigitado;
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
