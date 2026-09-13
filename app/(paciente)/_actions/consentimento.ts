@@ -20,6 +20,10 @@ import { pacientes, users } from '@/db/schema';
 import { obterUsuarioAtual } from '@/lib/auth/permissions';
 import { FINALIDADES, type Finalidade } from '@/lib/parceiros/consentimento';
 import { conceder, finalidadesVigentes, revogar } from '@/lib/parceiros/consentimento-registrado';
+import {
+  consentimentoPendente,
+  haCompartilhamentoComParceiro,
+} from '@/lib/parceiros/consentimento-pendente';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
 import { db as bancoDaSolicitacao } from '@/lib/db';
@@ -52,18 +56,27 @@ const esquemaDoAceite = z.object({
  * consentir — ou revogar — em nome de outro: é OWASP API1 (BOLA), e o caminho aqui é o mesmo
  * de `lib/auth/escopo-documento.ts`.
  */
-async function pacienteDaSessao(): Promise<{ id: string; userId: string } | null> {
+async function pacienteDaSessao(): Promise<{
+  id: string;
+  userId: string;
+  /**
+   * A procedência da ficha (S8.2, D-08) — é ela que responde se o dado desta pessoa atravessa
+   * para o parceiro, e portanto se há finalidade a autorizar. `null` em ficha antiga, e o
+   * `haCompartilhamentoComParceiro` trata isso como "não pedir".
+   */
+  origem: string | null;
+} | null> {
   const perm = await obterUsuarioAtual();
   if (!perm.autorizado || !perm.clerkId) return null;
 
   const [linha] = await db
-    .select({ pacienteId: pacientes.id, userId: users.id })
+    .select({ pacienteId: pacientes.id, userId: users.id, origem: pacientes.origem })
     .from(users)
     .innerJoin(pacientes, eq(pacientes.userId, users.id))
     .where(and(eq(users.clerkId, perm.clerkId), isNull(pacientes.deletedAt)))
     .limit(1);
 
-  return linha ? { id: linha.pacienteId, userId: linha.userId } : null;
+  return linha ? { id: linha.pacienteId, userId: linha.userId, origem: linha.origem } : null;
 }
 
 /** Grava o consentimento das finalidades escolhidas. */
@@ -187,5 +200,41 @@ async function enfileirarDoPainel(pacienteId: string): Promise<void> {
     console.error('[consentimento] falha ao enfileirar transferência do painel', {
       erro: erro instanceof Error ? erro.name : 'desconhecida',
     });
+  }
+}
+
+/**
+ * O que falta autorizar, para a tela decidir se pede.
+ *
+ * 🔴 Existe como action própria — e não dentro do dashboard — para que QUALQUER etapa possa
+ * perguntar. Decisão do dono em 13/09/2026: _"toda etapa que é compartilhada com a Greens deve
+ * aparecer esse modal de consentimento"_. Amarrar a resposta a uma tela só faria a próxima
+ * nascer sem ela, que é como o aviso da procuração passou quatro semanas invisível.
+ *
+ * ⚠️ SÓ LÊ. Nenhuma escrita, nenhum efeito — a concessão continua sendo `registrarConsentimento`,
+ * que exige ato do titular.
+ */
+export async function oQueFaltaAutorizar(): Promise<{
+  pedir: boolean;
+  faltando: Finalidade[];
+  porque: string;
+}> {
+  try {
+    const paciente = await pacienteDaSessao();
+    if (!paciente) return { pedir: false, faltando: [], porque: 'sem_paciente' };
+
+    const vigentes = await finalidadesVigentes(paciente.id);
+
+    return consentimentoPendente({
+      vigentes,
+      // A procedência é quem sabe se o dado atravessa (S8.2, D-08).
+      haCompartilhamento: haCompartilhamentoComParceiro(paciente.origem),
+    });
+  } catch {
+    /**
+     * ⚠️ FALHA FECHADA AO CONTRÁRIO, de propósito: se não dá para saber, NÃO pede. Pedir
+     * autorização por engano é pior que não pedir — treina a pessoa a marcar caixa sem ler.
+     */
+    return { pedir: false, faltando: [], porque: 'erro_ao_consultar' };
   }
 }

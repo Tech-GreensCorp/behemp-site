@@ -259,12 +259,25 @@ export function FormularioDeCadastro({
    * para impedir. A mesma razão pela qual o servidor compara com `solicitacao.email`.
    */
   const emailDoLink = (emailInicial ?? '').trim().toLowerCase();
-  const sessaoEDeOutraPessoa =
-    authCarregou &&
-    Boolean(isSignedIn) &&
-    Boolean(emailDaSessao) &&
-    Boolean(emailDoLink) &&
-    emailDaSessao !== emailDoLink;
+
+  /**
+   * 🔴 RETIFICADO EM 13/09/2026 — A TRAVA BARRAVA QUEM CORRIGIU O PRÓPRIO E-MAIL.
+   *
+   * Decisão do dono, preso nesta tela: _"esse bloqueio atual é inválido, já que o 'corrigir
+   * meus dados' serve basicamente pra isso"_. E ele estava certo: o botão existe porque o
+   * parceiro erra — e naquele dia **nós** erramos, mandando um e-mail antigo por reaproveitar
+   * a solicitação pelo telefone. Ele corrigiu, a conta nasceu certa, e a tela disse que o
+   * link era de outra pessoa.
+   *
+   * **O que a trava passa a comparar:** a sessão contra o e-mail do link **ou** contra o que
+   * o paciente digitou nesta tela. O campo é editável, sim — mas o Clerk só cria a conta
+   * depois do código, então uma sessão que casa com o campo digitado é uma sessão cujo e-mail
+   * foi comprovadamente confirmado aqui.
+   *
+   * ⚠️ O QUE ELA AINDA PEGA, e é o caso que a originou: chegar com a sessão de OUTRA conta
+   * (o dono, ontem, com três contas de teste no mesmo navegador). Aí a sessão não casa nem
+   * com o link nem com o que está sendo preenchido, e o aviso com "Sair desta conta" aparece.
+   */
 
   /**
    * Os quatro campos que o formulário do parceiro já coletou. Se os quatro vieram, a tela
@@ -286,6 +299,27 @@ export function FormularioDeCadastro({
    * preso sem nunca conseguir corrigir o que estava errado.
    */
   const [voltouDeProposito, setVoltouDeProposito] = useState(false);
+  /**
+   * 🔴 A ESCOLHA DO PACIENTE quando a sessão não é a do e-mail do link.
+   *
+   * Decisão do dono em 13/09/2026, depois de ficar preso: _"teoricamente, se eu logasse nessa
+   * conta, era para aparecer justamente essa tela"_. Bloquear era errado — a tela passa a
+   * **perguntar**, e a resposta dele é um fato, não uma inferência nossa.
+   */
+  const [continuarComASessao, setContinuarComASessao] = useState(false);
+  /**
+   * 🔴 A CONTA JÁ NASCEU NESTE FLUXO — e a tela precisa DIZER isso.
+   *
+   * Pergunta do dono em 13/09/2026, olhando a própria tela travada: _"o paciente fica travado
+   * nessa tela sem ter confirmação de que foi criado a conta"_. Ele estava certo: o código
+   * fora aceito, a conta existia, ele estava logado — e a tela mostrava só o erro do passo
+   * seguinte, o que faz parecer que **nada** funcionou.
+   *
+   * ⚠️ É a classe do `o-cadastro-feito-nao-vira-falha`, que já mordeu aqui: cadastro feito
+   * virando falha na tela. Aquele guarda cobria a FICHA gravada; este estado cobre a CONTA
+   * criada, que é o passo irreversível — e o que o paciente mais precisa saber que deu certo.
+   */
+  const [contaCriada, setContaCriada] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -293,6 +327,39 @@ export function FormularioDeCadastro({
   const [cpf, setCpf] = useState(cpfInicial ? formatarCpf(cpfInicial) : '');
   const [telefone, setTelefone] = useState(formatarTelefoneParaTela(telefoneInicial));
   const [email, setEmail] = useState(emailInicial ?? '');
+
+  /**
+   * ⚠️ DECLARADO AQUI, e não junto dos outros derivados lá em cima, por uma razão do
+   * compilador: desde a retificação de 13/09 ele depende de `email`, que é estado. Calcular
+   * antes daria `Block-scoped variable 'email' used before its declaration`.
+   */
+  const emailDigitado = email.trim().toLowerCase();
+  /**
+   * 🔴 QUEM JÁ ESTÁ LOGADO NÃO CRIA CONTA — E POR ISSO NÃO INFORMA SENHA.
+   *
+   * Achado em 13/09/2026, ao conferir a expectativa do dono antes do merge: _"vou logar
+   * normalmente e vou parar na tela de confirmação do e-mail recebendo um novo código"_.
+   *
+   * Não é o que acontece, e o que acontecia era pior: com sessão viva, `criarConta` vai
+   * **direto** para `gravarFicha()` — o Clerk não é chamado, e a senha digitada **não é usada
+   * para nada**. Mas `podeEnviar` exigia `senhaValida && senhasConferem`, então o botão ficava
+   * desabilitado até o paciente inventar uma senha inútil, acreditando estar definindo a da
+   * conta que já tem.
+   *
+   * ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: o paciente acredita que aquilo
+   * teve efeito. Alguém sairia daqui convencido de que trocou a própria senha.
+   */
+  const sessaoEDeOutraPessoa =
+    authCarregou &&
+    Boolean(isSignedIn) &&
+    Boolean(emailDaSessao) &&
+    Boolean(emailDoLink) &&
+    emailDaSessao !== emailDoLink &&
+    emailDaSessao !== emailDigitado &&
+    !continuarComASessao;
+
+  /** A sessão é utilizável para concluir ESTE cadastro — então não há conta a criar. */
+  const jaTemSessaoUtil = authCarregou && Boolean(isSignedIn) && !sessaoEDeOutraPessoa;
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
@@ -522,8 +589,8 @@ export function FormularioDeCadastro({
     cpfValido &&
     emailValido &&
     telefoneValido &&
-    senhaValida &&
-    senhasConferem &&
+    // Só quem vai criar conta precisa de senha. Ver `jaTemSessaoUtil`.
+    (jaTemSessaoUtil || (senhaValida && senhasConferem)) &&
     tratamentoRespondido;
 
   /** Força da senha, para dar retorno em vez de só recusar no envio. */
@@ -569,11 +636,17 @@ export function FormularioDeCadastro({
     });
 
     if (!gravado.sucesso) {
-      // A conta EXISTE e ele está logado. Mandá-lo de volta ao formulário seria pedir
-      // que criasse a conta outra vez — o que falharia com "e-mail já cadastrado".
-      setErro(
-        `${gravado.erro} Sua conta já foi criada: entre com seu e-mail e complete o cadastro pelo painel.`,
-      );
+      /**
+       * ⚠️ SÓ O MOTIVO, sem apêndice. A versão anterior emendava _"Sua conta já foi criada:
+       * entre com seu e-mail e complete o cadastro pelo painel"_ no fim de qualquer erro — e
+       * com a recusa por e-mail divergente o resultado eram DUAS instruções contraditórias na
+       * mesma frase: "saia da conta atual" e "entre com seu e-mail". Nenhuma das duas resolvia,
+       * e uma delas mandava o paciente sair de uma conta que era a certa.
+       *
+       * O que já deu certo agora é dito pelo bloco de `contaCriada`, separado do que falhou —
+       * porque são fatos diferentes e o paciente precisa dos dois.
+       */
+      setErro(gravado.erro ?? 'Não conseguimos concluir o cadastro agora.');
       return;
     }
 
@@ -701,6 +774,29 @@ export function FormularioDeCadastro({
 
     try {
       /**
+       * 🔴 A CONTA JÁ EXISTE? ENTÃO NÃO HÁ CÓDIGO A CONFIRMAR — FALTA A FICHA.
+       *
+       * Achado com o dono preso nesta tela em 13/09/2026. O estado dele: conta criada, e-mail
+       * verificado pelo Clerk, sessão aberta — e a tela ainda na etapa do código, porque foi
+       * onde o fluxo morreu quando a action recusou.
+       *
+       * ⚠️ SEM ISTO, O BOTÃO É UM BECO. O caminho abaixo faz `signOut()` e chama
+       * `attemptEmailAddressVerification` — mas o `signUp` que geraria esse código já foi
+       * concluído. O paciente digita um código válido, é deslogado, e recebe um erro que não
+       * tem nada a ver com o que ele fez.
+       *
+       * O que falta, de verdade, é gravar a ficha. É o mesmo caminho de quem chega ao link já
+       * tendo conta — e a ficha é gravada por uma função só, para as duas portas não divergirem.
+       */
+      const contaJaExiste =
+        authCarregou && isSignedIn && Boolean(emailDaSessao) && !cadastroPendenteNoNavegador;
+
+      if (contaJaExiste) {
+        await gravarFicha();
+        return;
+      }
+
+      /**
        * 🔴 REDE DE SEGURANÇA: sessão que apareceu ENTRE as duas etapas.
        *
        * O `criarConta` já sai de qualquer sessão antes de criar o cadastro. Mas entre uma
@@ -750,6 +846,8 @@ export function FormularioDeCadastro({
       }
 
       await setActive({ session: conclusao.createdSessionId });
+      // A partir daqui a conta EXISTE. O que vier depois pode falhar; isto não se desfaz.
+      setContaCriada(true);
 
       await gravarFicha();
     } catch (err) {
@@ -844,7 +942,49 @@ export function FormularioDeCadastro({
               </div>
             )}
 
+            {/*
+              🔴 O QUE JÁ DEU CERTO VEM ANTES DO QUE FALHOU — e esta ordem é a correção.
+
+              Pergunta do dono, olhando a tela travada: _"o paciente fica travado nessa tela sem
+              ter confirmação de que foi criado a conta"_. A conta nasce no `setActive`, duas
+              linhas ANTES da gravação da ficha. Quando a ficha falha, o passo irreversível já
+              aconteceu — e a tela mostrava só o erro, o que faz parecer que nada funcionou.
+
+              ⚠️ Sem isto, o paciente lê "não deu certo" sobre um cadastro cuja conta existe, e
+              a próxima coisa que ele tenta é criar a conta de novo — que falha com "e-mail já
+              cadastrado". O beco se fecha por cima do próprio sucesso.
+            */}
+            {contaCriada && erro && (
+              <div className="animate-fade-in border-primary/25 bg-primary/5 space-y-1 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  <strong>Sua conta foi criada e o e-mail está confirmado.</strong> Isso não se
+                  perde — você já pode entrar com {email.trim().toLowerCase()}.
+                </p>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  O que faltou foi guardar os dados do cadastro. O motivo está abaixo.
+                </p>
+              </div>
+            )}
+
             {erro && <Aviso texto={erro} />}
+
+            {/*
+              E uma saída que RESOLVE, em vez de uma instrução que não funciona. "Tentar de
+              novo" repete só a gravação da ficha — a conta não é recriada.
+            */}
+            {contaCriada && erro && (
+              <Button
+                className="h-12 w-full rounded-xl"
+                disabled={carregando}
+                onClick={() => {
+                  setErro('');
+                  void gravarFicha();
+                }}
+                type="button"
+              >
+                {carregando ? 'Tentando…' : 'Tentar guardar meus dados de novo'}
+              </Button>
+            )}
 
             <Button
               type="submit"
@@ -991,54 +1131,74 @@ export function FormularioDeCadastro({
 
             <Separador />
 
-            <Secao titulo="Crie sua senha" icone={Lock}>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="senha">Senha</Label>
-                  <div className="relative">
-                    <Input
-                      id="senha"
-                      type={verSenha ? 'text' : 'password'}
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      autoComplete="new-password"
-                      placeholder="Mínimo de 8 caracteres"
-                      className="h-12 rounded-xl pr-11"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setVerSenha((v) => !v)}
-                      aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-                    >
-                      {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  </div>
-                  <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
-                </div>
+            {/*
+              🔴 QUEM JÁ ESTÁ LOGADO NÃO VÊ CAMPO DE SENHA.
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmar">Repita a senha</Label>
-                  <Input
-                    id="confirmar"
-                    type={verSenha ? 'text' : 'password'}
-                    value={confirmarSenha}
-                    onChange={(e) => setConfirmarSenha(e.target.value)}
-                    autoComplete="new-password"
-                    placeholder="Digite novamente"
-                    className={cn(
-                      'h-12 rounded-xl transition-shadow',
-                      confirmarSenha.length > 0 &&
-                        !senhasConferem &&
-                        'border-destructive/60 focus-visible:ring-destructive/30',
-                    )}
-                  />
-                  {confirmarSenha.length > 0 && !senhasConferem && (
-                    <p className="text-destructive text-xs">As senhas não são iguais</p>
-                  )}
-                </div>
+              Com sessão viva, `criarConta` vai direto para `gravarFicha()` — o Clerk não é
+              chamado e a senha digitada não é usada para nada. Mostrar os campos fazia o
+              paciente acreditar que estava definindo a senha da conta que já tem, e o
+              `podeEnviar` ainda exigia que ele preenchesse para liberar o botão.
+
+              ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: quem preenche acredita
+              que aquilo teve efeito.
+            */}
+            {jaTemSessaoUtil ? (
+              <div className="border-primary/25 bg-primary/5 rounded-xl border px-4 py-4">
+                <p className="text-foreground text-sm leading-relaxed">
+                  Você já está logado como <strong>{emailDaSessao}</strong>, então{' '}
+                  <strong>não precisa criar senha</strong> — vamos apenas concluir o seu cadastro.
+                </p>
               </div>
-            </Secao>
+            ) : (
+              <Secao titulo="Crie sua senha" icone={Lock}>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="senha">Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="senha"
+                        type={verSenha ? 'text' : 'password'}
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        autoComplete="new-password"
+                        placeholder="Mínimo de 8 caracteres"
+                        className="h-12 rounded-xl pr-11"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVerSenha((v) => !v)}
+                        aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+                      >
+                        {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                    <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmar">Repita a senha</Label>
+                    <Input
+                      id="confirmar"
+                      type={verSenha ? 'text' : 'password'}
+                      value={confirmarSenha}
+                      onChange={(e) => setConfirmarSenha(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Digite novamente"
+                      className={cn(
+                        'h-12 rounded-xl transition-shadow',
+                        confirmarSenha.length > 0 &&
+                          !senhasConferem &&
+                          'border-destructive/60 focus-visible:ring-destructive/30',
+                      )}
+                    />
+                    {confirmarSenha.length > 0 && !senhasConferem && (
+                      <p className="text-destructive text-xs">As senhas não são iguais</p>
+                    )}
+                  </div>
+                </div>
+              </Secao>
+            )}
 
             {pendencias.length > 0 && (
               <>
@@ -1416,17 +1576,33 @@ export function FormularioDeCadastro({
             {sessaoEDeOutraPessoa && (
               <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
                 <p className="text-foreground text-sm leading-relaxed">
-                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, mas este link
-                  foi enviado para <strong>{emailDoLink}</strong>. Saia da conta atual para
-                  continuar o cadastro certo.
+                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, e este link
+                  foi enviado para <strong>{emailDoLink}</strong>.
                 </p>
+                {/*
+                  🔴 DUAS SAÍDAS, e antes havia UMA — que era a errada para o caso mais comum.
+                  Quem trocou o próprio e-mail (porque o parceiro mandou o antigo) não tem para
+                  onde ir com "sair desta conta": a conta certa é a que está aberta. Oferecer só
+                  a saída que não serve é o que transforma proteção em beco.
+                  ⚠️ A escolha é do paciente e fica explícita — o servidor registra a troca.
+                */}
+                <Button
+                  className="h-11 w-full rounded-xl"
+                  onClick={() => {
+                    setContinuarComASessao(true);
+                    setEmail(emailDaSessao);
+                  }}
+                  type="button"
+                >
+                  Continuar com {emailDaSessao}
+                </Button>
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-xl"
                   onClick={() => signOut()}
                   type="button"
                 >
-                  Sair desta conta e continuar
+                  Sair e entrar com outro e-mail
                 </Button>
               </div>
             )}

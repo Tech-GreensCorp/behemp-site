@@ -50,7 +50,18 @@ const esquema = z.object({
   cpf: z.string().refine((v) => cpfEhValido(v), 'CPF inválido'),
   telefone: z.string().trim().min(8, 'Informe seu telefone'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
-  jaFazTratamento: z.boolean(),
+  /**
+   * 🔴 `null` = NÃO INFORMADO, e é um estado legítimo — não uma lacuna.
+   *
+   * A coluna `jaFazTratamentoCannabis` é `boolean()` sem `notNull` e sem `default` de propósito,
+   * e há guarda garantindo isso: inventar "não faz tratamento" para quem não respondeu é dado
+   * clínico falso no prontuário.
+   *
+   * ⚠️ Quem preenche o formulário SEMPRE manda `true` ou `false` — a tela exige a resposta antes
+   * de habilitar o envio. O `null` existe para a RECONCILIAÇÃO automática (ADR-0022 D-09), que
+   * conclui o cadastro sem o paciente e por isso não pode responder por ele.
+   */
+  jaFazTratamento: z.boolean().nullable(),
   /**
    * 🔴 O PACIENTE DECLARA SE JÁ TEM A AUTORIZAÇÃO DA ANVISA.
    *
@@ -215,7 +226,41 @@ export async function concluirCadastroPorLink(
     const emailDaSolicitacao = (solicitacao.email ?? dados.email).trim().toLowerCase();
     const emailDaSessao = usuarioClerk?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? '';
 
-    if (!emailDaSessao || emailDaSessao !== emailDaSolicitacao) {
+    /**
+     * 🔴 RETIFICAÇÃO DE 13/09/2026 — A TRAVA ESTAVA BARRANDO O DONO DO CADASTRO.
+     *
+     * Decisão do dono, com ele preso na própria tela: _"a conta nasceu com e-mail certo porque
+     * eu alterei ele durante o 'corrigir meus dados'… esse bloqueio atual é inválido, já que o
+     * 'corrigir meus dados' serve basicamente pra isso"_.
+     *
+     * **Ele está certo, e a falha de desenho é minha.** A tela oferece "Corrigir meus dados" —
+     * que existe porque o parceiro erra, e naquele dia **nós** é que tínhamos errado: o
+     * reaproveitamento de solicitação por telefone manteve um e-mail antigo. O paciente corrigiu,
+     * a conta nasceu com o endereço certo, e então esta trava comparou a sessão (certa) com a
+     * solicitação (errada) e recusou. **Um botão que oferece correção e depois invalida o
+     * cadastro corrigido é uma armadilha, não uma proteção.**
+     *
+     * **O que passa a valer:** a sessão é aceita quando o e-mail dela é o que o paciente
+     * confirmou NESTE fluxo — e o Clerk só cria a conta depois do código, então esse e-mail é
+     * comprovadamente controlado por quem está ali.
+     *
+     * ⚠️ E ISTO CUSTA ALGO — está escrito para ninguém descobrir sozinho depois. A trava
+     * anterior barrava quem abrisse um link alheio e criasse conta com o próprio e-mail. Agora
+     * esse caminho passa. **O que continua valendo é que o token do link É a credencial**: ele
+     * chega por WhatsApp no número do paciente, e quem o tem sempre pôde concluir o cadastro.
+     * A trava do e-mail nunca foi a barreira contra quem tem o token — ela protegia contra o
+     * ACIDENTE de estar logado noutra conta, e esse caso continua coberto abaixo.
+     *
+     * 🔴 EM COMPENSAÇÃO, A DIVERGÊNCIA DEIXA RASTRO. Antes ela virava recusa e sumia; agora
+     * vira registro, porque trocar o e-mail de um cadastro é o tipo de fato que alguém vai
+     * precisar reconstruir depois.
+     */
+    const emailConfirmadoNoFluxo = dados.email.trim().toLowerCase();
+    const sessaoEDoCadastroEmCurso =
+      Boolean(emailDaSessao) && emailDaSessao === emailConfirmadoNoFluxo;
+    const confereComASolicitacao = Boolean(emailDaSessao) && emailDaSessao === emailDaSolicitacao;
+
+    if (!emailDaSessao || (!confereComASolicitacao && !sessaoEDoCadastroEmCurso)) {
       console.warn('[cadastro-por-link] sessão de outro e-mail', {
         // Nunca os endereços — só o FATO. O e-mail é dado pessoal, e log não é lugar dele.
         temSessao: Boolean(emailDaSessao),
@@ -225,6 +270,37 @@ export async function concluirCadastroPorLink(
         'Este link foi enviado para outro e-mail. Saia da conta atual e entre com o e-mail que recebeu o link.',
       );
     }
+
+    if (!confereComASolicitacao) {
+      /**
+       * O paciente corrigiu o e-mail. A solicitação passa a valer com o endereço corrigido —
+       * senão a próxima leitura (o aviso de pendência, a sentinela, o painel) volta a divergir
+       * e reabre o mesmo beco por outra porta.
+       */
+      await db
+        .update(solicitacoesCadastro)
+        .set({ email: emailDaSessao })
+        .where(eq(solicitacoesCadastro.id, solicitacao.id));
+
+      console.warn('[cadastro-por-link] e-mail do cadastro corrigido pelo paciente', {
+        // O fato, nunca os endereços.
+        solicitacaoId: solicitacao.id,
+      });
+    }
+
+    /**
+     * 🔴 O `users.id`, capturado de dentro da transação — e isto nasceu de um DEFEITO REAL.
+     *
+     * Achado em 13/09/2026 rodando o fluxo contra um Postgres de verdade: a auditoria do cadastro
+     * passava `userId: clerkId`, mas a FK `logs_auditoria.user_id` aponta para `users.id`. O
+     * insert violava a constraint **toda vez** — e `registrarAuditoria` engole o erro, então
+     * ninguém soube.
+     *
+     * ⚠️ Consequência: o cadastro por link **nunca foi auditado**. Era 1 das 62 chamadas de
+     * auditoria do repositório com o id errado, e a única que a tabela recusava em silêncio.
+     * Nenhum guarda estrutural pegaria isto — só executar contra o banco revela.
+     */
+    let usuarioId: string | null = null;
 
     const pacienteId = await db.transaction(async (tx) => {
       /**
@@ -276,6 +352,9 @@ export async function concluirCadastroPorLink(
           .set({ nome: dados.nomeCompleto, telefone })
           .where(eq(users.id, usuario.id));
       }
+
+      // Fora da transação a auditoria precisa deste id — a FK aponta para `users.id`.
+      usuarioId = usuario.id;
 
       /**
        * 5 ── A ficha do paciente. `pacientes.userId` é único, então o caminho de
@@ -526,7 +605,8 @@ export async function concluirCadastroPorLink(
 
     etapa = 'auditoria';
     await registrarAuditoria({
-      userId: clerkId,
+      // O `users.id`, nunca o `clerkId`: a FK desta tabela aponta para `users.id`.
+      userId: usuarioId ?? clerkId,
       acao: 'criar',
       entidade: 'pacientes',
       entidadeId: pacienteId,

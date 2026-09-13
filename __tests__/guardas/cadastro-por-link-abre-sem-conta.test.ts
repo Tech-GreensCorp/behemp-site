@@ -181,7 +181,28 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
     // Um caminho novo que não prove sessão deixaria ficha órfã no banco. Se este caso
     // ficar vermelho, é porque alguém acrescentou um — e ele precisa entrar no caso acima.
     const t = codigo(FORM);
-    expect((t.match(/await gravarFicha\(\)/g) ?? []).length).toBe(2);
+    /**
+     * 🔴 A PROPRIEDADE É "CADA PONTO DE ENTRADA PROVA SESSÃO", não "existem N pontos".
+     *
+     * A versão anterior afirmava `toBe(2)`. Em 13/09/2026 nasceu um terceiro ponto legítimo —
+     * quem chega à etapa do código com a conta **já criada** precisa gravar a ficha em vez de
+     * tentar confirmar um código que não existe mais — e o caso ficou vermelho acusando o
+     * conserto. Contagem fixa vira alarme falso na primeira mudança legítima.
+     *
+     * O que não pode acontecer é um caminho gravar **sem sessão**: isso deixaria ficha órfã no
+     * banco. Então cada chamada é conferida pelo que a antecede.
+     */
+    const pontos = [...t.matchAll(/await gravarFicha\(\)/g)].map((m) => m.index ?? 0);
+    expect(pontos.length, 'ninguém grava a ficha — o guarda perdeu o alvo').toBeGreaterThan(0);
+
+    for (const ponto of pontos) {
+      const antes = t.slice(Math.max(0, ponto - 700), ponto);
+      expect(
+        /isSignedIn/.test(antes) || /setActive\(/.test(antes),
+        `há um caminho até gravarFicha() que não prova sessão (posição ${ponto})`,
+      ).toBe(true);
+    }
+
     // E a action continua sendo chamada de um lugar só.
     expect((t.match(/concluirCadastroPorLink\(\{/g) ?? []).length).toBe(1);
   });
@@ -211,7 +232,16 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
    */
   it('🔴 e DEPOIS do vínculo — senão uma falha apaga o aviso E o retorno ao parceiro', () => {
     const t = codigo(ACTION);
-    const vinculo = t.indexOf('update(solicitacoesCadastro)');
+    /**
+     * ⚠️ ÂNCORA ESPECÍFICA, e não "o primeiro `update(solicitacoesCadastro)`".
+     *
+     * Em 13/09/2026 a action ganhou um SEGUNDO update na mesma tabela — o que grava o e-mail
+     * corrigido pelo paciente — e ele fica ANTES deste. Três casos deste repositório ficaram
+     * vermelhos de uma vez, todos acusando o código certo. É a mesma classe que já custou caro
+     * aqui: `indexOf` acha a primeira ocorrência, e a primeira deixa de ser a certa assim que
+     * alguém acrescenta outra. **Ancore no que distingue o trecho, não na sua posição.**
+     */
+    const vinculo = t.indexOf('update(solicitacoesCadastro)', t.indexOf('pacienteId,') - 400);
     const consumo = t.indexOf('marcarComoUtilizada(solicitacao.id)');
 
     expect(vinculo, 'não achei o update da solicitação').toBeGreaterThan(-1);
@@ -222,14 +252,44 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
   it('⚠️ e o `pacienteId` é de fato gravado nesse update — não basta a ordem', () => {
     // Ordem certa de um update que não grava o vínculo não protege nada.
     const t = codigo(ACTION);
-    const i = t.indexOf('update(solicitacoesCadastro)');
+    const i = t.indexOf('update(solicitacoesCadastro)', t.indexOf('pacienteId,') - 400);
     expect(t.slice(i, t.indexOf('.where(', i))).toMatch(/\bpacienteId,/);
   });
 
-  it('falha ao gravar NÃO manda o paciente recriar a conta', () => {
-    // A conta já existe: repetir o formulário falharia com "e-mail já cadastrado", e ele
-    // acharia que perdeu tudo.
-    expect(codigo(FORM)).toMatch(/Sua conta já foi criada/);
+  it('🔴 falha ao gravar DIZ que a conta existe — e não manda recriar', () => {
+    /**
+     * ⚠️ A versão anterior exigia o texto literal `"Sua conta já foi criada"`, e por isso
+     * acusou a melhoria do texto em 13/09/2026. **Quarta vez nesta sessão que um guarda meu
+     * congela redação em vez de propriedade** — e o padrão já rendeu uma regra: guarda mede o
+     * que o código GARANTE, nunca como ele está escrito hoje.
+     *
+     * A propriedade, e ela veio de uma pergunta do dono olhando a tela travada — _"o paciente
+     * fica travado nessa tela sem ter confirmação de que foi criado a conta"_:
+     *
+     *   1. existe um estado que registra que a conta nasceu neste fluxo, e
+     *   2. quando há erro, a tela afirma que a conta foi criada.
+     *
+     * Sem isso o paciente lê "não deu certo" sobre um cadastro cuja conta existe, tenta criar
+     * de novo, e recebe "e-mail já cadastrado" — o beco se fechando por cima do próprio sucesso.
+     */
+    const t = codigo(FORM);
+
+    expect(t, 'não há estado que registre que a conta nasceu').toMatch(/setContaCriada\(true\)/);
+
+    /**
+     * E ele é marcado DEPOIS de a conta existir de fato — antes do `setActive` seria mentira,
+     * e é o tipo de mentira que faz a tela prometer o que não aconteceu.
+     */
+    const marca = t.indexOf('setContaCriada(true)');
+    const ativa = t.indexOf('setActive(');
+    expect(ativa, 'não achei o setActive').toBeGreaterThan(-1);
+    expect(marca, 'a conta é dada como criada ANTES de existir').toBeGreaterThan(ativa);
+
+    // E a afirmação chega à tela, junto do erro.
+    const bloco = t.slice(t.indexOf('{contaCriada && erro && ('));
+    expect(bloco.slice(0, 600), 'a tela não afirma que a conta foi criada').toMatch(
+      /conta foi criada|conta já foi criada/i,
+    );
   });
 });
 

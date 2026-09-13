@@ -255,6 +255,29 @@ describe('a tela confirma o que já recebeu', () => {
  * 🔴 A DECLARAÇÃO VALE MESMO SEM ARQUIVO. "Não tenho" é informação, não ausência dela. Um
  * "conserto" que só gravasse quando há anexo perderia exatamente o caso que interessa.
  */
+/**
+ * O `update` da solicitação que grava a declaração da ANVISA.
+ *
+ * ⚠️ ÂNCORA DERIVADA DO CAMPO, nas DUAS pontas — e isto nasceu de um defeito.
+ *
+ * A versão anterior recortava do PRIMEIRO `.update(solicitacoesCadastro)` até o PRIMEIRO
+ * `.where(eq(solicitacoesCadastro.id, …))`. Em 13/09/2026 a action ganhou um segundo update na
+ * mesma tabela — o que grava o e-mail corrigido pelo paciente —, e ele fica antes deste. As
+ * duas âncoras passaram a apontar para o update errado, o slice virou lixo, e dois casos
+ * acusaram o código **certo**.
+ *
+ * `indexOf` acha a primeira ocorrência, e a primeira deixa de ser a certa assim que alguém
+ * acrescenta outra. **Ancore no que distingue o trecho — aqui, o próprio campo.**
+ */
+function updateQueGravaADeclaracao(acao: string): string {
+  const campo = acao.indexOf('declarouTerAutorizacaoAnvisa');
+  expect(campo, 'a declaração da ANVISA não é gravada em lugar nenhum').toBeGreaterThan(-1);
+  const inicio = acao.lastIndexOf('.update(solicitacoesCadastro)', campo);
+  expect(inicio, 'o campo não está dentro de um update da solicitação').toBeGreaterThan(-1);
+  const fim = acao.indexOf('.where(', campo);
+  return acao.slice(inicio, fim > -1 ? fim : undefined);
+}
+
 describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   it('a pergunta existe', () => {
     expect(codigo).toContain('Você já tem a Autorização de Importação da ANVISA?');
@@ -322,10 +345,7 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
       path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
       'utf8',
     );
-    const update = acao.slice(
-      acao.indexOf('.update(solicitacoesCadastro)'),
-      acao.indexOf('.where(eq(solicitacoesCadastro.id, solicitacao.id))'),
-    );
+    const update = updateQueGravaADeclaracao(acao);
     expect(update.length).toBeGreaterThan(100);
     expect(update).toContain('declarouTerAutorizacaoAnvisa:');
     expect(update).toContain('declarouTerReceitaMedica:');
@@ -336,10 +356,7 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
       path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
       'utf8',
     );
-    const update = acao.slice(
-      acao.indexOf('.update(solicitacoesCadastro)'),
-      acao.indexOf('.where(eq(solicitacoesCadastro.id, solicitacao.id))'),
-    );
+    const update = updateQueGravaADeclaracao(acao);
     expect(update).toMatch(/declarouTerAutorizacaoAnvisa: dados\.temAutorizacaoAnvisa \?\? null/);
     expect(update).toMatch(/declarouTerReceitaMedica: dados\.temReceitaMedica \?\? null/);
     expect(update).not.toMatch(/Boolean\(dados\.tem/);

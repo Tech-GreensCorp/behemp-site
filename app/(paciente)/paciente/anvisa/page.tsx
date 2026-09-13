@@ -24,6 +24,7 @@ import {
   XCircle, Info, ExternalLink, Download, Copy, CheckCheck, Users, Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConsentimentoQueFaltou } from '@/components/paciente/ConsentimentoQueFaltou';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus =
@@ -431,6 +432,16 @@ export default function AnvisaPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6 pb-12">
+      {/*
+        🔴 O CONSENTIMENTO QUE FALTOU — ADR-0022 D-09, e pedido do dono em 13/09/2026:
+        "toda etapa que é compartilhada com a Greens deve aparecer esse modal de consentimento".
+
+        Esta é a tela onde a reconciliação automática deixa o paciente, e é justamente ela que
+        não tem consentimento: a reconciliação conclui sem a pessoa presente, então não consente
+        por ela. O componente decide sozinho se aparece — só pede a quem veio de parceiro e ainda
+        não autorizou. Nunca bloqueia: aceite obtido como pedágio é viciado (LGPD art. 8º §3º).
+      */}
+      <ConsentimentoQueFaltou origem="tela_anvisa" />
       {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">

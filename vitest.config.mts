@@ -23,7 +23,21 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['__tests__/**/*.test.ts'],
-    exclude: ['node_modules/**', '.next/**'],
+    /**
+     * 🔴 A INTEGRAÇÃO FICA FORA DO `pnpm test`, e de propósito.
+     *
+     * `__tests__/integracao/` executa o fluxo real contra um Postgres de verdade — é o Nível 4
+     * da regra "Deploy CUSTA" do `CLAUDE.md`, e o único teste deste repositório que prova que o
+     * caminho RODA, em vez de provar que está escrito certo.
+     *
+     * ⚠️ Mas ele exige banco. Deixá-lo aqui faria o portão quebrar em toda máquina sem Docker —
+     * e portão que falha por ambiente é portão que alguém desliga.
+     *
+     * Rodar com:
+     *   docker start behemp-pg
+     *   DATABASE_URL=postgresql://postgres:local@localhost:5544/behemp npx vitest run __tests__/integracao/
+     */
+    exclude: ['node_modules/**', '.next/**', '__tests__/integracao/**'],
     reporters: ['default'],
   },
 });
