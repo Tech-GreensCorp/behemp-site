@@ -25,18 +25,30 @@ import { createHash, randomBytes } from 'node:crypto';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 
 import { solicitacoesCadastro } from '@/db/schema';
+import { solicitacaoCadastroOrigemEnum } from '@/db/schema/enums';
 import { db } from '@/lib/db';
 import { ClienteChatpro, type ContatoChatpro } from './cliente';
 import { montarMensagemDoLink, primeiroNomeDe } from './mensagem-do-link';
 import { mascararEmail, mascararTelefone, normalizarTelefoneWhatsapp } from './telefone';
 import { urlDeRetornoPermitida } from '@/lib/parceiros/retorno';
 
-type Origem =
-  | 'painel_admin'
-  | 'chatpro_bot'
-  | 'chatpro_start'
-  | 'chatpro_start_nao_verificado'
-  | 'chatpro_webhook';
+/**
+ * 🔴 DERIVA DO ENUM, e não de uma lista à mão — corrigido em 13/09/2026.
+ *
+ * A lista anterior era paralela ao `solicitacaoCadastroOrigemEnum` e **já estava
+ * desatualizada**: faltava `greens_handoff`, que `lib/parceiros/handoff.ts` grava desde que o
+ * handoff da Greens existe. Ninguém notou porque o handoff insere por outro caminho — então a
+ * divergência não quebrava nada, só mentia sobre o que é possível.
+ *
+ * ⚠️ É a mesma classe que o `contrato-da-ia-e-a-unica-fonte` já fechou: **lista paralela é o
+ * que desatualiza e aprova o errado**. Derivando do enum, um valor novo aparece aqui sozinho, e
+ * um valor removido quebra a compilação de quem o usava.
+ *
+ * 🔴 E ISTO SUSTENTA O D-15: a origem é obrigatória neste tipo, então a porta 3 (link do admin,
+ * que ainda não existe como tela) **não consegue nascer sem declarar de onde veio**. Decisão do
+ * dono, 13/09/2026: _"sim, deve gravar"_.
+ */
+type Origem = (typeof solicitacaoCadastroOrigemEnum.enumValues)[number];
 
 type CanalDeEntrega = 'bot_reply' | 'start_redirect' | 'manual';
 

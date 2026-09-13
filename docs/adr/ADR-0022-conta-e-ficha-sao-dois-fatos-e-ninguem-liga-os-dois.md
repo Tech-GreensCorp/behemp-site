@@ -691,3 +691,126 @@ A ordem da sprint estava errada. Com os achados:
 
 ⚠️ **Os itens 1b e 1c são de uma linha cada e fecham buracos graves.** Vão antes de qualquer
 coisa estrutural — é o oposto de começar pela arquitetura.
+
+---
+
+# PARTE VI — O planejamento, e como ele fecha as quatro portas
+
+> **Escrito em 13/09/2026**, a pedido do dono, depois de ele informar a peça que faltava:
+> **quatro caminhos diferentes chegam na mesma tela** `/cadastro/[token]`.
+
+## §27 — As quatro portas, e como cada uma se identifica hoje
+
+| a porta                                                | grava origem?                    | onde                           |
+| ------------------------------------------------------ | -------------------------------- | ------------------------------ |
+| 1. link automático do ChatPro (requisição externa)     | ✅ `chatpro_bot`                 | `lib/chatpro/solicitacao.ts`   |
+| 2. redirect do formulário da Greens                    | ✅ `greens_handoff`              | `lib/parceiros/handoff.ts`     |
+| 3. link do admin em solicitação de medicação           | ⚠️ **só pelo default da coluna** | `solicitacoes-cadastro.ts:132` |
+| 4. link do ChatPro da BeHemp (paciente sem procuração) | ✅ `chatpro_start`               | `lib/chatpro/solicitacao.ts`   |
+
+🔴 **A porta 3 funciona por acidente.** Ninguém grava `painel_admin` — ela cai no `default()` da
+coluna. Se alguém mudar esse default amanhã, **todo link de admin passa a mentir sobre de onde
+veio**. E `chatpro_webhook` existe no enum e ninguém grava: valor morto.
+
+**Isso não é detalhe:** todo o planejamento depende de saber de onde o paciente veio. Uma porta
+que só acerta por omissão é uma porta que vai errar.
+
+**G20 — a porta do admin não declara a própria origem.**
+**Decisão do dono, 13/09/2026:** _"sim, deve gravar"_. Vira o **D-15**.
+
+## §28 — O problema em uma frase
+
+**A BeHemp trata "conta criada" e "cadastro concluído" como se fossem a mesma coisa — e não
+são.** Entre os dois existe um vão onde o paciente cai, e ninguém olha para dentro dele.
+
+Foi exatamente onde o dono caiu: conta funcionando, painel vazio, documentos invisíveis, e o
+link ainda válido. **As três coisas verdadeiras ao mesmo tempo, e nenhuma tela ligando uma à
+outra.**
+
+## §29 — O plano, em três movimentos
+
+### Movimento 1 — Tapar os buracos que já estão sangrando
+
+Três itens, **dois deles de uma linha**. Antes de qualquer arquitetura.
+
+| item      | o quê                              | por que primeiro                                                                                                                                                                 |
+| --------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S8.0**  | a revogação tem que parar a fila   | o consentimento é conferido ao enfileirar, e o enviador **não relê**. Entre os dois passam horas. Revogar nesse intervalo não impede o envio — e a LGPD diz "a qualquer momento" |
+| **S8.1b** | inverter duas linhas               | o link é queimado **antes** de gravar o `pacienteId`. Falha ali e o paciente perde o link **e** o vínculo — some o aviso de pendência **e** o retorno ao parceiro, de uma vez    |
+| **S8.1c** | uma linha de `onConflictDoNothing` | o webhook do Clerk pode inserir a ficha no meio da transação e abortá-la inteira. **É candidato ao erro que o dono viu**                                                         |
+
+### Movimento 2 — Fazer o sistema saber de onde você veio e onde você está
+
+**S8.2 — a procedência sobrevive.** Hoje a origem morre quando a ficha nasce: depois disso, um
+paciente da Greens é indistinguível de quem se cadastrou sozinho. Vira coluna em `pacientes`,
+junto com o id da solicitação. **E é aqui que as quatro portas entram** — cada uma grava a sua,
+inclusive a 3.
+
+**S8.3 — a sentinela.** Uma função que responde _"em que ponto do fluxo esta pessoa está, e por
+quê"_. Todas as telas perguntam a ela; nenhuma decide sozinha — que é como a ficha casca do
+`/redirect` passou a mentir para todas as outras.
+
+⚠️ **A pesquisa mudou o que ela é** (§15.3). Eu ia construir um "orquestrador de saga". A
+literatura mostrou que saga serve para bancos separados, e dentro da BeHemp está tudo num
+Postgres só. **É uma máquina de estados** — mais simples e mais barata.
+
+### Movimento 3 — Verdade e recuperação
+
+| item     | o quê                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S8.4** | dizer o que **não chegou**. Hoje a tela mostra "0 documentos" tanto quando o paciente não enviou quanto quando a Greens enviou e não chegou. São coisas diferentes, e a tela dizia a mesma — foi o que o fez parar |
+| **S8.5** | retomar de qualquer lugar. Hoje só funciona na mesma aba                                                                                                                                                           |
+| **S8.6** | reconciliação — o ato que liga conta e solicitação para quem já ficou órfão                                                                                                                                        |
+
+## §30 — Como isso se encaixa nos quatro fluxos
+
+| fluxo                         | o que ele precisa                                                              | o que o plano entrega                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| **1 — sem ANVISA, da Greens** | documentos já preenchidos na tela da ANVISA; notificação; envio automático     | **S8.2** (a ficha sabe que veio da Greens) + **S8.4** (se um documento não chegou, **diz**) |
+| **2 — sem receita**           | pendências como aviso; vai ao agendamento; receita volta com consentimento     | **S8.0** — é aqui que a receita vai para a Greens, e é aqui que a revogação tem de valer    |
+| **3 — recompra**              | dois caminhos: tem conta / não tem                                             | **S8.3** — a sentinela é quem responde "esta pessoa tem conta **e** cadastro completo?"     |
+| **4 — paciente novo**         | formulário completo; agendamento; aviso da ANVISA depois; consentimento no fim | **S8.5** (retomar) + **S8.3** (o aviso da ANVISA aparece no momento certo, não sempre)      |
+
+🔴 **O que é comum aos quatro:** todos chegam na mesma tela, todos podem parar no meio, e hoje
+**nenhum deles sabe dizer onde parou**. A sentinela é a peça que serve aos quatro — **não é uma
+por fluxo**.
+
+## §31 — Por que isso resolve, e não só remedia
+
+Os seis defeitos achados em 12/09 eram sintomas do mesmo vão: destino 404, documentos
+invisíveis, sessão trocada, conta sem senha, aviso que não aparece, painel vazio. Cada um tinha
+correção própria — e eu fui corrigindo um por um, enquanto o dono achava o seguinte.
+
+**A sentinela ataca a causa:** se existe uma função que sabe em que ponto a pessoa está, nenhuma
+tela precisa adivinhar — e **a próxima porta de entrada que criarem já nasce coberta**.
+
+## §32 — 🔴 Sem banco e sem VPS: o S8.1 muda de forma
+
+**Restrição do dono, 13/09/2026:** _"eu não tenho acesso ao banco de produção agora nem à VPS e
+não vou conseguir; temos que contornar isso"_.
+
+O S8.1 dependia de consultar a solicitação em produção para descobrir **qual** das três condições
+barra o aviso. Sem banco, ele para — e ele **bloqueia a sentinela**.
+
+**D-16 — Constrói-se o instrumento, em vez de esperar o acesso.**
+
+É a mesma lição que o `%3F` cobrou caro em 11/09: duas correções falharam por adivinhação, e o
+que resolveu foi criar `GET /api/chatpro/eco` e **perguntar ao servidor o que ele via**. O
+comentário que ficou no módulo diz: _"eu gastei dois deploys porque não havia como perguntar ao
+servidor o que ele via. O instrumento custou menos que a segunda tentativa."_
+
+**O que muda no S8.1:**
+
+| antes                            | agora                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| consultar o banco de produção    | rota de diagnóstico **autenticada** que responde por que o aviso não apareceu |
+| descobrir qual condição barrou   | a própria função devolve **o motivo**, e a rota o expõe                       |
+| depende de acesso que não existe | depende de um deploy, que já temos                                            |
+
+⚠️ **E isto não é contorno temporário — é o D-06 antecipado.** A sentinela já ia ter de
+responder "o ponto **e o porquê**". Construir o porquê agora, pelo instrumento, é construir a
+metade da sentinela antes dela.
+
+**Regras do instrumento**, iguais às da rota de eco: exige o mesmo segredo, tem limite de
+requisição, **não ecoa cabeçalho nem corpo**, e nunca devolve dado pessoal — só o **fato** de
+cada condição ter passado ou não.
