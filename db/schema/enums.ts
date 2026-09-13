@@ -380,6 +380,17 @@ export const parceiroEventoSaidaStatusEnum = pgEnum('parceiro_evento_saida_statu
   'enviado',
   /** Esgotou as tentativas. Fica no banco para alguém ver — não some. */
   'falhou',
+  /**
+   * 🔴 O PACIENTE REVOGOU antes de o evento sair — ADR-0022 D-14.
+   *
+   * Distinto de `falhou` de propósito, e a diferença não é cosmética: `falhou` significa
+   * "tentamos e não deu" (rede, 5xx, segredo ausente) e convida a investigar o que quebrou.
+   * Isto significa **"não devia sair, e não saiu"** — o sistema funcionou. Misturar os dois
+   * faria alguém "consertar" um respeito à decisão do paciente.
+   *
+   * ⚠️ E é terminal: não reagenda. Revogação não é falha transitória.
+   */
+  'cancelado_por_revogacao',
 ]);
 
 /**

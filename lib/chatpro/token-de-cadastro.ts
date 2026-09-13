@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { solicitacoesCadastro } from '@/db/schema';
+import { solicitacaoCadastroOrigemEnum } from '@/db/schema/enums';
 
 import { hashDoToken } from './solicitacao';
 
@@ -44,7 +45,18 @@ export interface SolicitacaoValidada {
    * ⚠️ Não confundir com `parceiro`. O bot da Greens também grava `parceiro: 'greens'` —
    * mas não passou por formulário nenhum. Quem responde "ele já declarou?" é a ORIGEM.
    */
-  origem: string;
+  /**
+   * 🔴 O TIPO DO ENUM, não `string` — estreitado em 13/09/2026.
+   *
+   * Era `string`, e isso bastava enquanto a origem só era lida para decidir o que mostrar na
+   * tela. A partir do D-08 ela é **gravada na ficha**, e aí `string` deixa de servir: o
+   * compilador não teria como recusar um valor que a coluna não aceita, e o erro só
+   * apareceria em runtime, no meio do cadastro de alguém.
+   *
+   * ⚠️ Deriva do enum, nunca de uma lista paralela — a mesma lição do `type Origem` em
+   * `solicitacao.ts`, que já estava desatualizado quando foi medido (ADR-0022 §27).
+   */
+  origem: (typeof solicitacaoCadastroOrigemEnum.enumValues)[number];
   expiraEm: Date;
   /** Quais dos 5 documentos o parceiro já tem. `null` quando não veio de parceiro. */
   /**
@@ -124,7 +136,7 @@ export async function validarTokenDeCadastro(
     telefone: linha.telefone,
     cpf: linha.cpf,
     parceiro: linha.parceiro,
-    origem: linha.origem,
+    origem: linha.origem as (typeof solicitacaoCadastroOrigemEnum.enumValues)[number],
     expiraEm: linha.expiraEm,
     documentosDoParceiro: linha.documentosDoParceiro ?? null,
     urlDeRetorno: linha.urlDeRetorno ?? null,

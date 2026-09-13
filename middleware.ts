@@ -71,6 +71,15 @@ const isPublicRoute = createRouteMatcher([
    */
   '/api/chatpro(.*)',
   /**
+   * 🔴 Rota de diagnóstico da sentinela (ADR-0022 D-16). Pública **no middleware**, nunca sem
+   * credencial: ela exige o mesmo segredo do `bot-link`, no cabeçalho.
+   *
+   * ⚠️ Precisa estar aqui pelo mesmo motivo das rotas do ChatPro: o middleware do Clerk
+   * responde **redirect** a quem não tem sessão, e um chamador de máquina receberia um 307 em
+   * vez do 401 — que é diagnóstico errado sobre o próprio diagnóstico.
+   */
+  '/api/fluxo(.*)',
+  /**
    * 🔴 O HANDOFF DOS PARCEIROS TAMBÉM NÃO USA CLERK.
    * Quem chama é o servidor da Greens, não um navegador com sessão. A autenticação é
    * HMAC-SHA256 sobre id + timestamp + corpo, com janela de 300 s — mais forte que uma
