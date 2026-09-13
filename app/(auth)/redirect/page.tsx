@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { users, pacientes, autorizacoesAnvisa } from '@/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
+import { reconciliarPelaSessao } from '@/lib/fluxo/reconciliar';
 
 /**
  * Página de redirecionamento pós-login — Server Component.
@@ -68,7 +69,8 @@ export default async function AuthRedirectPage() {
   let registro = null;
   try {
     const [userDb] = await db
-      .select({ id: users.id, role: users.role, telefone: users.telefone })
+      // `email` entra aqui para a reconciliação abaixo — sem uma ida extra ao Clerk no login.
+      .select({ id: users.id, role: users.role, telefone: users.telefone, email: users.email })
       .from(users)
       .where(eq(users.clerkId, userId))
       .limit(1);
@@ -120,7 +122,8 @@ export default async function AuthRedirectPage() {
               role: userRole,
               telefone,
             })
-            .returning({ id: users.id, role: users.role });
+            // `email` também aqui: os dois caminhos que preenchem `registro` precisam dele.
+              .returning({ id: users.id, role: users.role, email: users.email });
           
           registro = novoUser;
           role = novoUser.role;
@@ -160,6 +163,40 @@ export default async function AuthRedirectPage() {
   // Redireciona para o dashboard conforme o role
   if (role === 'admin') redirect('/admin');
   if (role === 'medico') redirect('/medico');
+
+  /**
+   * 🔴 RECONCILIAÇÃO NO LOGIN — ADR-0022 D-09, e isto RETIFICA o rejeitado da própria decisão.
+   *
+   * O D-09 rejeitava _"reconciliar automaticamente no login"_ por um motivo real: trabalho de
+   * rede no caminho de entrada, e falha de rede viraria falha de login.
+   *
+   * **Medido em produção em 13/09/2026, e o rejeitado custou caro:** eu havia posto a
+   * reconciliação só em `/cadastro/[token]`, então ela só rodava para quem abrisse o link. O
+   * dono fez o que qualquer pessoa faz — entrou na conta e navegou pelo menu — e achou a tela
+   * da ANVISA pedindo os quatro documentos que ele já mandara pela Greens. _"A falsa
+   * reconciliação está acontecendo."_
+   *
+   * ⚠️ O RISCO DO REJEITADO CONTINUA VÁLIDO, E É POR ISSO QUE ISTO É `try/catch` MUDO: se
+   * qualquer coisa falhar aqui, o login segue. A reconciliação é oportunidade, nunca
+   * pré-requisito — ninguém pode ficar sem entrar na própria conta porque um documento não
+   * copiou.
+   *
+   * 🔴 E ela roda ANTES do `redirect('/paciente/anvisa')` de propósito: mandar para a tela da
+   * procuração antes de materializar é exatamente o que produziu o relato do dono.
+   */
+  if (registro?.email) {
+    try {
+      const r = await reconciliarPelaSessao({ clerkId: userId, email: registro.email });
+      if (r.reconciliou && r.documentosMaterializados > 0) {
+        console.log('[redirect] reconciliado', { documentos: r.documentosMaterializados });
+      }
+    } catch (erro) {
+      // Nunca derruba o login. Sem PII: só o fato.
+      console.warn('[redirect] reconciliação falhou — o login segue', {
+        tipo: erro instanceof Error ? erro.message.slice(0, 80) : 'desconhecido',
+      });
+    }
+  }
 
   // Paciente sem processo de autorização ANVISA iniciado: leva direto para lá
   if (registro) {

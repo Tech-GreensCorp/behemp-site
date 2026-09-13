@@ -56,7 +56,7 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {}
 const { db } = await import('@/lib/db');
 const schema = await import('@/db/schema');
 const { concluirCadastroPorLink } = await import('@/app/_actions/cadastro-por-link');
-const { podeReconciliarSozinho } = await import('@/lib/fluxo/reconciliar');
+const { podeReconciliarSozinho, reconciliarPelaSessao } = await import('@/lib/fluxo/reconciliar');
 const { gerarToken } = await import('@/lib/chatpro/solicitacao');
 const { consentimentoPendente, haCompartilhamentoComParceiro, FINALIDADES_DE_COMPARTILHAMENTO } =
   await import('@/lib/parceiros/consentimento-pendente');
@@ -422,5 +422,106 @@ describe('os documentos da Greens chegam à ficha', () => {
     // E pertence à ficha certa — documento órfão não aparece em tela nenhuma.
     const [ficha] = await db.select().from(schema.pacientes);
     expect(docs[0].pacienteId).toBe(ficha.id);
+  });
+});
+
+/**
+ * 🔴 O CAMINHO QUE O DONO REALMENTE PERCORREU — e que a primeira versão não cobria.
+ *
+ * Ele entrou na conta e navegou pelo menu até a ANVISA. Nunca abriu o link. A reconciliação
+ * vivia só em `/cadastro/[token]`, então nunca rodou — e a tela pediu os quatro documentos que
+ * ele já tinha mandado pela Greens. _"A falsa reconciliação está acontecendo."_
+ *
+ * Estes casos executam `reconciliarPelaSessao`, que é o caminho de quem entra pela conta: sem
+ * token, autenticado pela sessão.
+ */
+describe('reconciliação pela SESSÃO — quem entra pela conta, sem abrir o link', () => {
+  /** O estado de quem logou: conta, `users`, e a ficha casca que o `/redirect` cria (G2). */
+  async function semearQuemJaLogou() {
+    await semearOCasoDoDono();
+    const [u] = await db
+      .insert(schema.users)
+      .values({
+        email: EMAIL_ANTIGO_DA_SOLICITACAO,
+        nome: 'Davi Rhuan Silva Martins',
+        clerkId: CLERK_ID,
+        role: 'paciente',
+      })
+      .returning({ id: schema.users.id });
+
+    // A ficha CASCA: sem CPF, sem procedência — exatamente como o `/redirect` a cria.
+    await db.insert(schema.pacientes).values({
+      userId: u.id,
+      status: 'aguardando_consulta',
+      jornadaFase: 'acolhimento',
+    });
+  }
+
+  it('🔴 materializa os documentos da Greens SEM token — era o que faltava', async () => {
+    await semearQuemJaLogou();
+
+    const r = await reconciliarPelaSessao({
+      clerkId: CLERK_ID,
+      email: EMAIL_ANTIGO_DA_SOLICITACAO,
+    });
+
+    expect(r.reconciliou, `não reconciliou: ${JSON.stringify(r)}`).toBe(true);
+    if (r.reconciliou) {
+      expect(r.documentosMaterializados, 'nenhum documento chegou à ficha').toBe(1);
+    }
+
+    const docs = await db.select().from(schema.documentos);
+    expect(docs.length).toBe(1);
+    expect(docs[0].tipo).toBe('receita_medica');
+  });
+
+  it('🔴 e preenche a ficha CASCA com o que a Greens mandou', async () => {
+    await semearQuemJaLogou();
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+
+    const [ficha] = await db.select().from(schema.pacientes);
+    expect(ficha.cpf, 'o CPF da Greens não foi aproveitado').toBe('03939508837');
+    expect(ficha.origem, 'a procedência não foi gravada').toBe('greens_handoff');
+  });
+
+  it('🔴 e LIGA a solicitação à ficha — senão a sentinela continua vendo órfão', async () => {
+    await semearQuemJaLogou();
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+
+    const [sol] = await db.select().from(schema.solicitacoesCadastro);
+    const [ficha] = await db.select().from(schema.pacientes);
+    expect(sol.pacienteId).toBe(ficha.id);
+  });
+
+  it('⚠️ NÃO consome o link — o cadastro pelo token continua possível', async () => {
+    /**
+     * Queimar o link aqui tiraria do paciente um caminho que ele não pediu para perder. A
+     * reconciliação é oportunidade, não substituição do fluxo.
+     */
+    await semearQuemJaLogou();
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+
+    const [sol] = await db.select().from(schema.solicitacoesCadastro);
+    expect(sol.usadoEm, 'a reconciliação queimou o link').toBeNull();
+  });
+
+  it('🔴 é IDEMPOTENTE — rodar a cada login não duplica documento', async () => {
+    /**
+     * Ela roda em TODO login. Sem idempotência, o paciente acumularia uma cópia da receita por
+     * visita — e a tela da ANVISA viraria uma lista de duplicatas.
+     */
+    await semearQuemJaLogou();
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+    await reconciliarPelaSessao({ clerkId: CLERK_ID, email: EMAIL_ANTIGO_DA_SOLICITACAO });
+
+    const docs = await db.select().from(schema.documentos);
+    expect(docs.length, 'três logins geraram três cópias do mesmo documento').toBe(1);
+  });
+
+  it('⚠️ sem solicitação aberta, não faz nada — e diz por quê', async () => {
+    const r = await reconciliarPelaSessao({ clerkId: CLERK_ID, email: 'ninguem@exemplo.com' });
+    expect(r.reconciliou).toBe(false);
+    if (!r.reconciliou) expect(r.porque).toBe('sem_solicitacao_aberta');
   });
 });
