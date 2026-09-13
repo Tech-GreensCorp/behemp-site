@@ -5,6 +5,7 @@ import { parceiroEventosSaida } from '@/db/schema';
 
 import { assinar } from './assinatura';
 import { destinoDoEvento, type TipoDeEvento } from './destinos-do-envio';
+import { consentimentoAindaVale } from './consentimento-ainda-vale';
 
 /**
  * ENTREGA OS AVISOS PENDENTES AO PARCEIRO (ADR-0016 D-09).
@@ -139,7 +140,7 @@ export class EnviadorDeAvisos {
               LIMIT ${limite}
                 FOR UPDATE SKIP LOCKED
        )
-   RETURNING id, parceiro, tipo, payload, tentativas
+   RETURNING id, parceiro, tipo, payload, tentativas, solicitacao_id
     `);
 
     const registros = Array.isArray(linhas)
@@ -150,6 +151,8 @@ export class EnviadorDeAvisos {
       tipo: l.tipo as TipoDeEvento,
       payload: l.payload as Record<string, unknown>,
       tentativas: Number(l.tentativas ?? 1),
+      /** Por ela se chega ao paciente, e por ele ao consentimento (D-14). */
+      solicitacaoId: l.solicitacao_id == null ? null : String(l.solicitacao_id),
     }));
   }
 
@@ -158,7 +161,33 @@ export class EnviadorDeAvisos {
     tipo: TipoDeEvento;
     payload: Record<string, unknown>;
     tentativas: number;
+    solicitacaoId: string | null;
   }): Promise<'entregue' | 'reagendado' | 'falhou'> {
+    /**
+     * 🔴 O CONSENTIMENTO É RELIDO AQUI, IMEDIATAMENTE ANTES DO POST — ADR-0022 D-14.
+     *
+     * Ele era conferido UMA VEZ, ao enfileirar, e o `payload` ficava congelado. Entre
+     * enfileirar e enviar passam **horas** (fila a cada 5 min, backoff de até 60 min): se o
+     * paciente revogasse nesse intervalo, o dado saía assim mesmo.
+     *
+     * ⚠️ LGPD art. 8º §5º — a revogação é "a qualquer momento". Sem esta releitura era "até
+     * a fila rodar", e o paciente não tinha como saber quando isso foi.
+     *
+     * ⚠️ NÃO REAGENDA: revogação não é falha transitória. Reagendar faria o sistema tentar de
+     * novo, e de novo, contra uma decisão do paciente que não vai mudar sozinha.
+     */
+    if (evento.solicitacaoId) {
+      const veredicto = await consentimentoAindaVale(evento.solicitacaoId, evento.tipo);
+      if (!veredicto.pode) {
+        console.warn('[parceiros] envio barrado pelo consentimento', {
+          // Nunca o paciente nem o conteúdo — só o fato e o motivo.
+          tipo: evento.tipo,
+          motivo: veredicto.motivo,
+        });
+        return this.marcarFalha(evento.id, `consentimento: ${veredicto.motivo}`);
+      }
+    }
+
     const corpo = JSON.stringify(evento.payload);
     const timestamp = String(Math.floor(Date.now() / 1000));
 
