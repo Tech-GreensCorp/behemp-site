@@ -248,7 +248,27 @@ export async function origemAutorizada(url: string): Promise<{ ok: boolean; moti
 
   const permitidas = origensPermitidas();
   if (permitidas.length === 0) return { ok: false, motivo: 'sem_origens_configuradas' };
-  if (!permitidas.includes(alvo.origin)) return { ok: false, motivo: 'origem_nao_autorizada' };
+  if (!permitidas.includes(alvo.origin)) {
+    /**
+     * 🔴 A ORIGEM RECUSADA VAI NO MOTIVO — e ela NÃO é credencial.
+     *
+     * Medido em produção em 13/09/2026: o log dizia `receita_medica:origem_nao_autorizada` e
+     * parava aí. A allowlist tinha `https://greens-site-bucket.s3.us-east-1.amazonaws.com`, e
+     * mesmo assim recusava — sem dizer **qual** origem chegou, não havia como saber o que
+     * corrigir.
+     *
+     * ⚠️ O S3 serve o MESMO arquivo por dois endereços diferentes, e eles têm origens distintas:
+     *
+     *   virtual-hosted:  https://<bucket>.s3.<regiao>.amazonaws.com/<chave>
+     *   path-style:      https://s3.<regiao>.amazonaws.com/<bucket>/<chave>
+     *
+     * Uma allowlist com o primeiro recusa o segundo, e a mensagem antiga não deixava ver isso.
+     *
+     * 🔴 **Só o `origin`, nunca a URL inteira.** O host é público — aparece em qualquer
+     * requisição. O que não pode vazar é a query string, que carrega `X-Amz-Signature`.
+     */
+    return { ok: false, motivo: `origem_nao_autorizada:${alvo.origin}` };
+  }
 
   try {
     const { address } = await lookup(alvo.hostname);

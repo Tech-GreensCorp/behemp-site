@@ -29,6 +29,11 @@ const BUSCADOR = 'lib/parceiros/documentos-do-parceiro.ts';
 const MATERIALIZAR = 'lib/parceiros/materializar-documentos.ts';
 const CADASTRO = 'app/_actions/cadastro-por-link.ts';
 
+const FONTE_MOD = readFileSync(
+  path.join(process.cwd(), 'lib/parceiros/documentos-do-parceiro.ts'),
+  'utf8',
+);
+
 describe('a URL do parceiro é conferida antes de qualquer requisição', () => {
   it('recusa http — segredo e documento não trafegam em claro', async () => {
     process.env.PARCEIRO_ORIGENS_DE_DOCUMENTO = 'https://greens-corp.com';
@@ -41,7 +46,7 @@ describe('a URL do parceiro é conferida antes de qualquer requisição', () => 
     process.env.PARCEIRO_ORIGENS_DE_DOCUMENTO = 'https://greens-corp.com';
     const r = await origemAutorizada('https://outra-empresa.com/doc.pdf');
     expect(r.ok).toBe(false);
-    expect(r.motivo).toBe('origem_nao_autorizada');
+    expect(r.motivo).toMatch(/^origem_nao_autorizada/);
   });
 
   /**
@@ -65,7 +70,7 @@ describe('a URL do parceiro é conferida antes de qualquer requisição', () => 
      * Exigir `origem_nao_autorizada` prova que a recusa veio da comparação de ORIGEM, e não
      * de um acidente de resolução de nome.
      */
-    expect(r.motivo).toBe('origem_nao_autorizada');
+    expect(r.motivo).toMatch(/^origem_nao_autorizada/);
   });
 
   it('sem origens configuradas, nada é baixado — falha fechada', async () => {
@@ -440,5 +445,43 @@ describe('a recusa de documento deixa rastro — não vira "nunca mandou"', () =
         /[Dd]ocumento é conveniência/,
       );
     }
+  });
+});
+
+/**
+ * 🔴 A ORIGEM RECUSADA APARECE NO MOTIVO — e a assinatura NÃO.
+ *
+ * Medido em produção em 13/09/2026: o log dizia `receita_medica:origem_nao_autorizada` e parava
+ * aí. A allowlist tinha o bucket certo e mesmo assim recusava — sem dizer **qual** origem
+ * chegou, não havia o que corrigir.
+ *
+ * ⚠️ O S3 serve o mesmo arquivo por dois endereços com origens diferentes:
+ *   virtual-hosted: https://<bucket>.s3.<regiao>.amazonaws.com/<chave>
+ *   path-style:     https://s3.<regiao>.amazonaws.com/<bucket>/<chave>
+ *
+ * Uma allowlist com o primeiro recusa o segundo em silêncio.
+ */
+describe('a origem recusada é dita, sem vazar a assinatura', () => {
+  it('🔴 o motivo carrega a origem que chegou', async () => {
+    const { origemAutorizada } = await import('@/lib/parceiros/documentos-do-parceiro');
+    const r = await origemAutorizada(
+      'https://s3.us-east-1.amazonaws.com/bucket/x.pdf?X-Amz-Signature=abc123',
+    );
+    expect(r.ok).toBe(false);
+    expect(r.motivo, 'o motivo não diz qual origem chegou').toContain('s3.us-east-1.amazonaws.com');
+  });
+
+  it('🔴 e NUNCA a query string — é lá que vive o X-Amz-Signature', () => {
+    /**
+     * O host é público: aparece em qualquer requisição. A query string do S3 carrega a
+     * assinatura, e quem a tiver baixa o documento clínico sem mais nada.
+     */
+    const i = FONTE_MOD.indexOf('origem_nao_autorizada:');
+    expect(i, 'o motivo não carrega a origem').toBeGreaterThan(-1);
+    const linha = FONTE_MOD.slice(FONTE_MOD.lastIndexOf('\n', i), FONTE_MOD.indexOf('\n', i));
+    expect(linha, 'o motivo usa a URL inteira — vaza a assinatura').not.toMatch(
+      /alvo\.href|\burl\b/,
+    );
+    expect(linha, 'o motivo deveria usar só o origin').toMatch(/alvo\.origin/);
   });
 });
