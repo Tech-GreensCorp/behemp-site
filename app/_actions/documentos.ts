@@ -6,7 +6,10 @@ import { documentos, pacientes, users } from '@/db/schema';
 import { eq, desc, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
-import { put, del } from '@vercel/blob';
+import {
+  apagarDocumentoPrivado,
+  guardarDocumentoPrivado,
+} from '@/lib/documentos/store-privado';
 import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
@@ -82,10 +85,11 @@ export async function uploadDocumento(
     }
 
     // Upload para Vercel Blob
-    const blob = await put(
+    // Sem token explícito, isto caía no `BLOB_READ_WRITE_TOKEN` — o store PÚBLICO — e o
+    // SDK recusava `private`. O store certo sai de `store-privado`, que falha fechado.
+    const blob = await guardarDocumentoPrivado(
       `documentos/${pacienteId}/${tipo}_${Date.now()}_${arquivo.name}`,
       arquivo,
-      { access: 'private' },
     );
 
     // Calcular validade
@@ -147,7 +151,7 @@ export async function removerDocumento(documentoId: string): Promise<ActionResul
 
     if (doc?.urlBlob) {
       try {
-        await del(doc.urlBlob);
+        await apagarDocumentoPrivado(doc.urlBlob);
       } catch {
         // Se falhar a remoção do blob, continua com soft delete
         console.warn('[Action] Falha ao remover blob, continuando com soft delete');

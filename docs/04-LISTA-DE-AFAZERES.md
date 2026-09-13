@@ -564,6 +564,32 @@ desliga.
 
 ## Item 6 — 🔴 Todo documento clínico está em store público do Vercel Blob, e a doc afirma o contrário
 
+> 🔴 **RETIFICAÇÃO, 13/09/2026 — o Item 6 tinha um segundo andar, e ele era pior.**
+>
+> Os seis caminhos de documento **já pediam** `access: 'private'` desde 10/09, com comentário
+> explicando por quê. Nenhum funcionava: acesso é propriedade do **STORE**, escolhida na criação
+> e imutável, e o store que os tokens resolviam era público. O SDK recusava com `Cannot use
+> private access on a public store` — e **cinco dos seis engoliam o erro** num `catch` que
+> logava `erro.name`, sempre `'Error'` para um `new Error`.
+>
+> **A consequência prática, e ela é diferente da do Item 6:** não havia documento em store
+> público. Não havia documento **nenhum**. `anexo-do-cadastro.ts:101` desde 10/09,
+> `documentos-do-parceiro.ts` desde 13/09 — o paciente anexava, a tela dizia "pronto", e o
+> arquivo não existia em lugar algum. O Item 6 é sobre arquivo legível demais; isto era sobre
+> arquivo que não chegou a nascer.
+>
+> **Corrigido** com `lib/documentos/store-privado.ts` (D-23 da ADR-0022): um terceiro store,
+> `BLOB_TOKEN_PRIVADO`, e `access`/`token` deixam de ser parâmetro de quem chama. Falha fechada:
+> sem o token, lança — nunca cai para público.
+>
+> ⚠️ **E `BLOB_BEHEMP_READ_WRITE_TOKEN` não servia**, o que só apareceu ao varrer quem mais a
+> usa: `app/api/upload-avatar/route.ts:55` e `app/api/upload-exame/route.ts:78` gravam
+> `access: 'public'` com ela. Um token, um store, um acesso.
+>
+> **O que continua valendo deste Item 6:** os blobs **antigos** seguem no store público, e a
+> entrega os serve pelo caminho legado (`app/api/documentos/[id]/arquivo/route.ts`). Migrá-los é
+> trabalho próprio.
+
 Achado ao verificar o que significa **guardar** a imagem de uma receita — depois de o dono
 decidir que segurança e LGPD são requisito desta implementação.
 

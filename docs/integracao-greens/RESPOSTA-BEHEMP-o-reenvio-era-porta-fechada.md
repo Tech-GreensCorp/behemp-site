@@ -96,3 +96,90 @@ arquivos.** Antes desta correção, reenviar não adiantava nada — era exatame
 que vocês descreveram.
 
 — BeHemp, 13/09/2026
+
+---
+
+# ADENDO, 13/09/2026 — vocês reenviaram, funcionou, e o defeito seguinte é NOSSO
+
+Vocês reenviaram o SOL-000021 pela rota administrativa depois da correção acima. **Ela
+funcionou** — e ao funcionar, destravou o erro seguinte, que estava escondido atrás dela.
+
+## O que o reenvio de vocês provou, em ordem
+
+| elo | estado | como sabemos |
+| --- | ------ | ------------ |
+| vocês mandam `{tipo, url}` | ✅ | manifesto gravado com **3 objetos** (antes: strings) |
+| a URL passa na nossa allowlist | ✅ | chegou ao download; nenhum `origem_nao_autorizada` |
+| o presigned do S3 abre | ✅ | os bytes chegaram |
+| o `porEvento` atualiza o manifesto | ✅ | **é a correção de ontem, e ela pegou** |
+| gravar o arquivo no nosso store | 🔴 | **falha aqui** |
+
+## O log da nossa VPS, sem edição
+
+```
+15154: [parceiros] documentos recusados: receita_medica:Vercel Blob: Cannot use private
+       access on a public store. The store must be configured with private access.
+15161: (repetido)
+```
+
+E a consulta ao nosso banco, no pedido que nasceu do reenvio:
+
+```
+protocolo    | forma  | tipo                   | tem_arquivo | recusado
+-------------+--------+------------------------+-------------+--------------------------------
+SOL-000046   | object | receita_medica         | false       | 'Vercel Blob: Cannot use private
+                                                               access on a public store.
+                                                               The store must be configured
+                                                               with private access.'
+SOL-000046   | string | laudo_medico           | false       | null
+SOL-000046   | object | comprovante_residencia | false       | (mesmo erro)
+SOL-000046   | object | documento_identidade   | false       | (mesmo erro)
+
+== DOCUMENTOS MATERIALIZADOS NA FICHA ==
+(vazio)
+```
+
+⚠️ **Leiam a coluna `forma`.** Três `object` e um `string`. Os `object` são os que vocês
+reenviaram com `{tipo, url}` — e cada um deles chegou até o último passo. O `string`
+(`laudo_medico`) é o que vocês já haviam reportado como `tipo_nao_suportado` do lado de vocês, e
+está coerente: ele nunca foi enviado, então não tem o que recusar.
+
+## A causa, e ela é de configuração nossa
+
+Nosso código grava documento de paciente em **store privado**, por decisão explícita — são
+documentos de pacientes de vocês, e guardá-los num store público significaria que qualquer pessoa
+com a URL os lê **sem autenticação**. O store que o nosso token resolve hoje, porém, foi criado
+como **público**. O SDK recusa a combinação, e recusa **corretamente**.
+
+A doc da Vercel fecha a questão: _"You select a store's access mode, public or private, when you
+create it. If your app needs both public and private files, provision two separate stores from
+the start."_ Não existe conversão — a correção é provisionar o store privado e apontar estes
+caminhos para ele.
+
+🔴 **Nada disso é do lado de vocês.** Registramos aqui porque vocês investiram rigor no
+diagnóstico — o `grep` do `forcePathStyle`, a URL virtual-hosted, o download em 200, o
+`AWS_S3_PUBLIC_BASE_URL` vazio — e o resultado desse rigor foi eliminar o lado de vocês com
+prova, o que é o que permitiu achar isto aqui. **O lado da Greens está correto de ponta a ponta.**
+
+## O que muda para vocês
+
+**Nada no contrato, nada no código.** O formato `{tipo, url}` está certo, a origem está na nossa
+allowlist, o TTL do presigned serve.
+
+Um pedido só, e é operacional: **quando avisarmos que o store privado está no ar, reenviem os
+pedidos uma última vez.** Os arquivos de agora não foram guardados — o download aconteceu, mas a
+gravação falhou, então não há o que recuperar deste lado. Vamos avisar com a data e o protocolo do
+primeiro que passar inteiro, para vocês conferirem contra o de vocês.
+
+## O que aprendemos, e é a lição de vocês aplicada de volta
+
+O erro anterior dizia `Error`. Este diz a frase inteira. A diferença é uma correção de ontem —
+`erro.name` de um `new Error` é **sempre** `'Error'`, e por isso quatro dias de log não disseram
+nada. **Mensagem de erro registrada pela metade custa mais que erro não registrado**, porque
+parece diagnóstico e não é.
+
+E o defeito não era só do handoff: o mesmo `access: 'private'` está em **cinco** caminhos nossos,
+incluindo o anexo que o paciente envia no nosso próprio formulário. Ou seja, o reenvio de vocês
+revelou um defeito que também atingia pacientes que nunca passaram pela Greens.
+
+— BeHemp, 13/09/2026

@@ -1601,3 +1601,114 @@ só os testes do dono. Escolhi a que explicava mais — sem medir qual explicava
 
 **A regra que sai:** quando o próprio usuário oferece uma hipótese simples no começo, ela se
 testa primeiro. Custa um clique no log e teria poupado dois dias.
+
+---
+
+# Parte XI — O último elo: o acesso não é do upload, é do store
+
+## §55 — 🔴 D-23: um terceiro store, privado, e o acesso deixa de ser escolha do ponto de chamada
+
+**Medido em 13/09/2026**, depois de a Greens reenviar o SOL-000021 e o reenvio **funcionar**.
+
+O `porEvento` corrigido no §51 gravou o manifesto com três `{tipo, url}`, a allowlist deixou
+passar, o presigned do S3 abriu e os bytes chegaram. E aí:
+
+```
+[parceiros] documentos recusados: receita_medica:Vercel Blob: Cannot use private
+access on a public store. The store must be configured with private access.
+```
+
+### O que o erro ensina, e não é sobre o parceiro
+
+**Acesso não é propriedade do upload. É propriedade do STORE**, escolhida na criação e imutável.
+A doc da Vercel: _"You select a store's access mode, public or private, when you create it. If
+your app needs both public and private files, provision two separate stores from the start."_ Não
+existe `update-store` — só `create-store`, `get-store`, `delete-store` e `empty-store`.
+
+Passar `access: 'private'` num `put` contra um store público não configura nada: **declara uma
+intenção que o SDK recusa**. E recusa corretamente.
+
+### O alcance, e ele é maior que o handoff
+
+Seis caminhos deste repositório faziam exatamente isso:
+
+| caminho                                      | token que passava | desde |
+| -------------------------------------------- | ----------------- | ----- |
+| `lib/documentos/anexo-do-cadastro.ts`        | nenhum → default  | 10/09 |
+| `app/_actions/documentos.ts`                 | nenhum → default  | 11/09 |
+| `lib/parceiros/documentos-do-parceiro.ts`    | nenhum → default  | 13/09 |
+| `app/api/upload-documento/route.ts`          | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente.ts`        | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente-self.ts`   | `BLOB_BEHEMP_…`   | —     |
+
+🔴 **E `BLOB_BEHEMP_READ_WRITE_TOKEN` não servia como store privado**, o que só apareceu ao
+varrer quem mais a usava: `app/api/upload-avatar/route.ts` e `app/api/upload-exame/route.ts`
+gravam `access: 'public'` com ela. Um token resolve um store; um store tem um acesso. **As duas
+coisas não podem coexistir**, e reaproveitá-la teria quebrado avatar e exame para consertar
+documento.
+
+Por isso o D-23 é um **terceiro** store — `BLOB_TOKEN_PRIVADO` — e não um remanejamento.
+
+### A decisão
+
+**Um módulo único, `lib/documentos/store-privado.ts`, e o acesso deixa de ser parâmetro.**
+
+`guardarDocumentoPrivado(caminho, corpo, { contentType })` não aceita `access` nem `token`. Quem
+chama **não pode** escolher gravar em público — se pudesse, o módulo seria documentação em vez de
+garantia.
+
+🔴 **E ele falha FECHADO.** Sem `BLOB_TOKEN_PRIVADO`, lança `StorePrivadoNaoConfigurado` com o
+nome da variável que falta. Nunca cai para público. O que está em jogo é RG, laudo, receita e
+procuração assinada — e, no caminho do parceiro, documentos de pacientes de **outra empresa**.
+
+### §55.1 — O segundo elo, que ninguém tinha medido
+
+A entrega em `app/api/documentos/[id]/arquivo/route.ts` fazia `fetch(url)` **cru**. Isso abre blob
+público; blob privado responde **401** sem `Authorization: Bearer`.
+
+⚠️ **Esse defeito não teria aparecido em teste nenhum**, porque o primeiro elo impedia que
+qualquer blob privado chegasse a existir. Um defeito escondido atrás do outro — e é o argumento
+para corrigir a **classe** em vez do caso: consertar só o caminho da Greens teria trocado
+"documento não grava" por "documento não abre", com o paciente descobrindo qual dos dois.
+
+Corrigido com `get(url, { access: 'private', token })`, que o SDK 2.3.3 já expõe.
+
+## §56 — A retratação: dois guardas ficavam VERDES com os seis quebrados
+
+| guarda                                        | exigia                               | por que não valia                       |
+| --------------------------------------------- | ------------------------------------ | --------------------------------------- |
+| `o-documento-do-paciente-nao-abre-sem-escopo` | `toContain("access: 'private'")`     | a intenção estava escrita; o resultado não |
+| `documento-do-parceiro-nao-vira-ssrf`         | `/ACESSO_DO_BLOB = 'private'/`       | idem, com uma constante no meio          |
+
+**Os dois mediam FORMA.** E a forma estava perfeita: cada um dos seis pontos declarava
+`private`, com comentário explicando por quê. O que falhava era o efeito — e nenhum guarda
+executava nada.
+
+🔴 **É a mesma classe do §37 e da retratação de 24/08:** teste que congela como o código está
+escrito fica verde exatamente quando mais importa ficar vermelho.
+
+**Retificados para a propriedade:** o ponto **não chama `put`** e **não nomeia token**. E
+acrescentado um bloco que **executa** o módulo — sem token lança; `ehDoStorePrivado` decide pelo
+`host.endsWith`, provado contra `…public…/private/rg.pdf`,
+`https://private.blob.vercel-storage.com.evil.com/x` e a URL com o host na query string.
+
+**36 casos, provados por 8 sabotagens.** Duas sobreviveram à primeira rodada: `toContain(
+'lerDocumentoPrivado')` fica verde com o corpo trocado por `fetch(url)`, porque o nome continua
+no `import`. **Menção não é uso** — a mesma armadilha, pela oitava vez neste repositório, e a
+correção foi medir o corpo sem as linhas de import.
+
+Mais um caso de **cobertura**, derivado do código: quem importar `put` do SDK e gravar em
+`documentos` fica vermelho **com o nome do arquivo**. Provado criando um ponto sétimo.
+
+## §57 — O que isto NÃO resolve, e fica escrito
+
+- **Os arquivos do SOL-000046 não foram guardados.** O download aconteceu, a gravação falhou, e
+  não há o que recuperar deste lado. A Greens precisa reenviar depois que o store existir.
+- **Os blobs antigos continuam no store público** — Item 6 do `04`. A entrega os serve pelo
+  caminho legado, e migrá-los é trabalho próprio, não passageiro.
+- **`BLOB_READ_WRITE_TOKEN` nunca esteve no `deploy.yml`.** Hoje funciona por herança do `.env`
+  da VPS. Catalogado no `03`, com o agravante de que, no dia em que esse `.env` for reescrito sem
+  preservação, todo upload do produto para de funcionar de uma vez.
+- **O guarda dos segredos não vê variável lida por DEPENDÊNCIA.** Ele deriva de `process.env.X`
+  no nosso código, e o `@vercel/blob` lê o token por conta própria: ficou verde com o defeito
+  presente, medido em 27/27. Classe nova, catalogada no `03`.

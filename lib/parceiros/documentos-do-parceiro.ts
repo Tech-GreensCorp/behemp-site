@@ -37,7 +37,7 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 import { z } from 'zod';
 
 import { DOCUMENTOS_DO_FLUXO, type DocumentoDoFluxo } from './documentos';
@@ -358,17 +358,17 @@ export async function materializarArquivos(
            * um cuidado com descuido.
            *
            * A entrega é por `/api/documentos/<id>/arquivo`, com escopo de objeto e auditoria.
+           *
+           * ⚠️ O acesso NÃO é escolhido aqui, e essa é a correção de 13/09/2026. Ele é
+           * propriedade do STORE, e pedi-lo num store público falhava — foi o que aconteceu
+           * com os três documentos do SOL-000046, depois de a Greens reenviar e o download
+           * funcionar. `guardarDocumentoPrivado` resolve o store certo e falha fechado.
            */
-          const ACESSO_DO_BLOB = 'private' as const;
-
           const nome = entrada.nomeArquivo?.replace(/[^\w.-]/g, '_') ?? `${entrada.tipo}`;
-          const blob = await put(
+          const blob = await guardarDocumentoPrivado(
             `documentos/parceiro/${referencia}/${entrada.tipo}_${Date.now()}_${nome}`,
             bytes,
-            {
-              access: ACESSO_DO_BLOB,
-              contentType: mime,
-            },
+            { contentType: mime },
           );
 
           return {

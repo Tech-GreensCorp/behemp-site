@@ -114,6 +114,18 @@ const envSchema = z.object({
   // ── Upload de Arquivos (Vercel Blob) ─────────────────────────
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   BLOB_BEHEMP_READ_WRITE_TOKEN: z.string().optional(),
+  /**
+   * 🔴 O store PRIVADO — e é obrigatoriamente um terceiro.
+   *
+   * As duas variáveis acima resolvem stores PÚBLICOS: `upload-avatar` e `upload-exame` gravam
+   * `access: 'public'` com a `BEHEMP`. Um token resolve um store, e um store tem um único
+   * access mode, escolhido na criação e imutável (doc da Vercel: _"provision two separate
+   * stores from the start"_). Reaproveitar qualquer uma delas quebraria o que já funciona.
+   *
+   * Sem ela, `lib/documentos/store-privado.ts` LANÇA — documento de paciente não cai para
+   * store público.
+   */
+  BLOB_TOKEN_PRIVADO: z.string().optional(),
 
   // ── Jobs Agendados (Inngest) ──────────────────────────────────
   INNGEST_EVENT_KEY: z.string().optional(),

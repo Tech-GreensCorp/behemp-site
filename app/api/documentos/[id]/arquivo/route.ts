@@ -27,6 +27,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { head } from '@vercel/blob';
 
+import { ehDoStorePrivado, lerDocumentoPrivado } from '@/lib/documentos/store-privado';
+
 import { garantirLeitorDoDocumento } from '@/lib/auth/escopo-documento';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import {
@@ -99,7 +101,31 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const url = escopo.documento.urlBlob;
 
+  /** Cabeçalhos da entrega — os mesmos nos dois caminhos, para não divergirem em silêncio. */
+  const cabecalhos = (contentType: string) => ({
+    'content-type': contentType,
+    // `inline` para abrir no navegador; o nome ajuda quem salva.
+    'content-disposition': `inline; filename="${escopo.documento.nomeArquivo ?? id}"`,
+    // 🔴 Dado de saúde não entra em cache de CDN nem de proxy.
+    'cache-control': 'private, no-store',
+  });
+
   try {
+    /**
+     * 🔴 CAMINHO DO STORE PRIVADO — onde todo documento novo nasce desde 13/09/2026.
+     *
+     * `fetch(url)` cru NÃO abre blob privado: ele exige `Authorization: Bearer`, e sem isso
+     * responde 401. Era o segundo elo quebrado da mesma correção, e não teria aparecido em
+     * teste nenhum — o primeiro impedia que qualquer blob privado chegasse a existir.
+     */
+    if (ehDoStorePrivado(url)) {
+      const privado = await lerDocumentoPrivado(url);
+      if (!privado) {
+        return NextResponse.json({ erro: 'Documento indisponível' }, { status: 502 });
+      }
+      return new NextResponse(privado.stream, { headers: cabecalhos(privado.contentType) });
+    }
+
     const meta = await head(url);
 
     /**
@@ -118,20 +144,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return new NextResponse(resposta.body, {
-      headers: {
-        'content-type': meta.contentType ?? 'application/octet-stream',
-        // `inline` para abrir no navegador; o nome ajuda quem salva.
-        'content-disposition': `inline; filename="${escopo.documento.nomeArquivo ?? id}"`,
-        // 🔴 Dado de saúde não entra em cache de CDN nem de proxy.
-        'cache-control': 'private, no-store',
-      },
+      headers: cabecalhos(meta.contentType ?? 'application/octet-stream'),
     });
-  } catch {
+  } catch (erro) {
     /**
-     * ⚠️ O erro é genérico de propósito. Dizer "blob não encontrado" confirmaria a existência
-     * do registro a quem chegou até aqui por engano — e quem chegou aqui já passou pelo
-     * escopo, mas o princípio de não vazar estado interno continua valendo (AGENTS.md).
+     * ⚠️ O erro é genérico PARA QUEM CHAMA, e detalhado no log do servidor.
+     *
+     * Dizer "blob não encontrado" na resposta confirmaria a existência do registro a quem
+     * chegou até aqui por engano. Mas engolir a causa no servidor foi o que manteve o
+     * `Cannot use private access on a public store` invisível por quatro dias — e `erro.name`
+     * não serve, porque para um `new Error` ele é sempre `'Error'`.
      */
+    console.error(
+      '[documentos] falha ao entregar arquivo:',
+      erro instanceof Error ? erro.message : 'erro desconhecido',
+    );
     return NextResponse.json({ erro: 'Documento indisponível' }, { status: 502 });
   }
 }

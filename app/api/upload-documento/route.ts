@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
@@ -86,10 +86,9 @@ export async function POST(request: Request) {
     const nomeSeguro = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const blobPath = `documentos/${parsed.data.pacienteId}/${nomeSeguro}`;
 
-    const blob = await put(blobPath, file, {
-      access: 'private',
-      token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
-    });
+    // O store sai de `store-privado`: `BLOB_BEHEMP_READ_WRITE_TOKEN` é a mesma
+    // variável com que avatar e exame gravam `public`, e um store tem um só acesso.
+    const blob = await guardarDocumentoPrivado(blobPath, file);
 
     // Calcular data de validade baseada no tipo
     const emissao = new Date(parsed.data.dataEmissao);

@@ -283,6 +283,27 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **`BLOB_READ_WRITE_TOKEN` não está na lista `gravar` do `deploy.yml`** — medido em
+      13/09/2026: `grep -n BLOB .github/workflows/deploy.yml` dá **zero**. Hoje funciona porque o
+      token vive no `.env` da VPS, herdado de um `pm2 start` antigo e copiado a cada deploy pelo
+      `preservar-ambiente-do-pm2.mjs`. **É a mesma classe que já mordeu três vezes**
+      (`PARCEIRO_ORIGENS_DE_DOCUMENTO`, `PARCEIRO_TRANSFERENCIA_ATIVA`,
+      `PARCEIRO_GREENS_SEGREDO_CADASTRO`), com um agravante: o dia em que esse `.env` for
+      reescrito sem preservação, **todo upload do produto para de funcionar de uma vez** — e
+      cinco dos seis pontos engolem o erro. **Perigo de mexer: BAIXO** — acrescentar uma linha
+      `gravar` e cadastrar o secret. Espera a decisão do store privado, para gravar os dois
+      tokens no mesmo movimento.
+- [ ] 🔴 **O guarda `o-segredo-cadastrado-chega-ao-servidor` não vê variável lida por DEPENDÊNCIA**
+      — achado em 13/09/2026 ao investigar o item acima. Ele deriva de `process.env.X` dentro de
+      cinco áreas (`lib/parceiros`, `lib/chatpro`, `app/api/parceiros`, `app/api/chatpro`,
+      `lib/anvisa`). `BLOB_READ_WRITE_TOKEN` escapa por **duas** razões independentes: mora fora
+      dessas áreas, e **quem o lê é o SDK do `@vercel/blob`**, não o nosso código — nenhum
+      `process.env.BLOB_READ_WRITE_TOKEN` existe no repositório. O guarda ficou verde com o
+      defeito presente, medido: 27/27 passando. **A classe é nova:** variável que uma biblioteca
+      lê por conta própria. `lib/env.ts` a declara, e é de lá que a derivação deveria sair.
+      **Perigo de mexer: BAIXO** — é teste, não produção; mas nasce vermelho, então entra junto
+      da correção do item acima.
+
 - [ ] **Fluxo de comprovação de renda / medicamento gratuito não existe** — `DO-28`, catalogado
       em 20/08 e **fora de escopo por decisão do dono**. Medido: `app/(public)/programa-acesso-solidario/page.tsx`
       é institucional (612 linhas, **zero formulário**), e `db/schema/pacientes.ts:55` tem

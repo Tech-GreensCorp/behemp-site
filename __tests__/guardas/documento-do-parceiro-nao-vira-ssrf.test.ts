@@ -337,7 +337,22 @@ describe('os downloads acontecem em paralelo, sem perder proteção', () => {
   });
 
   it('e o blob continua privado', () => {
-    expect(fn).toMatch(/ACESSO_DO_BLOB = 'private'/);
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026 — este caso media a FORMA e ficava verde com o defeito.
+     *
+     * Ele exigia a constante `ACESSO_DO_BLOB = 'private'`, que existia e estava certa —
+     * enquanto o `put` falhava com `Cannot use private access on a public store` em TODOS os
+     * documentos do SOL-000046. Acesso não é propriedade do upload: é do STORE, escolhido na
+     * criação e imutável. Declarar a intenção no ponto de chamada não guarda nada.
+     *
+     * A propriedade que importa: este arquivo não chama `put` — ele delega a `store-privado`,
+     * que resolve o store certo e LANÇA quando o token falta, em vez de cair para público com
+     * documento de paciente de outra empresa dentro.
+     */
+    expect(fn).toContain('guardarDocumentoPrivado');
+    expect(fn, 'escolher o store aqui é escolher se o RG fica legível sem auth').not.toMatch(
+      /\bput\(/,
+    );
   });
 
   it('🔴 uma falha não derruba as outras — cada documento tem o próprio catch', () => {
