@@ -50,6 +50,14 @@ export interface DocumentoRecusado {
   recusadoEm: string;
 }
 
+/** Há pelo menos um item do manifesto que é arquivo de verdade, e não só a declaração. */
+function temArquivo(manifesto: unknown): boolean {
+  return (
+    Array.isArray(manifesto) &&
+    manifesto.some((i) => !!i && typeof i === 'object' && 'urlBlob' in i)
+  );
+}
+
 /**
  * Monta o que vai para `documentos_do_parceiro`, baixando o que vier com URL.
  *
@@ -177,10 +185,35 @@ export class ServicoDeHandoff {
       .limit(1);
 
     if (porEvento) {
-      // ⚠️ Token NOVO, solicitação a mesma. O token só existe como hash: o valor original
-      // não é recuperável nem por nós. Reemitir é a única forma de responder um reenvio —
-      // e invalida o anterior, que é o comportamento já documentado ao atendimento.
-      return this.reemitir(porEvento.id, porEvento.protocolo, true);
+      /**
+       * ⚠️ Token NOVO, solicitação a mesma. O token só existe como hash: o valor original não é
+       * recuperável nem por nós. Reemitir é a única forma de responder um reenvio — e invalida o
+       * anterior, que é o comportamento já documentado ao atendimento.
+       *
+       * 🔴 E O REENVIO PASSA A TRAZER DADO NOVO — antes de 13/09/2026 ele era porta fechada.
+       *
+       * **Achado pela equipe da Greens**, que mediu o banco deles e mandou a hipótese pronta:
+       * os pedidos tinham os quatro arquivos, todos os MIME eram aceitos, nenhum documento fora
+       * recusado do lado deles — e mesmo assim o nosso banco guardava 67 itens sem arquivo.
+       *
+       * A causa é este caminho. O `eventoId` é `medicationRequest.id`, **estável entre
+       * tentativas** — decisão dos dois lados, e foi ela que em 11/09 impediu o "Tentar de
+       * novo" do paciente de duplicar cadastros aqui. Mas ela faz **todo** reenvio cair em
+       * `porEvento`, e o `reemitir` só trocava token, prazo e status.
+       *
+       * ⚠️ Resultado: o manifesto congelava na PRIMEIRA versão para sempre. E a primeira é de
+       * antes de 10/09 19:54, quando a Greens ainda mandava só os nomes dos documentos. Ela
+       * passou a mandar `{ tipo, url }` e nós nunca soubemos.
+       *
+       * 🔴 **A solução NÃO é tornar o `eventoId` variável** — a própria Greens descartou isso, e
+       * com razão: trocaria este defeito por cadastro duplicado, com gateway e desconto errados
+       * do lado deles (a ADR-0016 deles). A idempotência continua intacta: mesma solicitação,
+       * mesmo protocolo. O que muda é que ela deixa de descartar o que chegou junto.
+       */
+      return this.reemitir(porEvento.id, porEvento.protocolo, true, {
+        entrada,
+        jaTemArquivo: temArquivo(porEvento.documentosDoParceiro),
+      });
     }
 
     /**
@@ -281,13 +314,59 @@ export class ServicoDeHandoff {
     id: string,
     protocolo: string,
     reenvio: boolean,
+    /**
+     * O que o reenvio trouxe. Ausente quando quem chama não tem corpo novo a oferecer —
+     * é o caso do caminho 2, que já atualizou os campos antes de chegar aqui.
+     */
+    novo?: { entrada: EntradaDoHandoff; jaTemArquivo: boolean },
   ): Promise<ResultadoDoHandoff> {
     const { token, hash } = gerarToken();
     const expiraEm = new Date(Date.now() + validadeEmHoras() * 60 * 60 * 1000);
 
+    /**
+     * 🔴 SÓ SOBRESCREVE COM ARQUIVO, NUNCA COM AUSÊNCIA DE ARQUIVO.
+     *
+     * A regra decidida com a Greens: _"atualizar quando o corpo trouxer documento com arquivo,
+     * e não mexer quando não trouxer"_. Sem esta condição, um reenvio pobre — o parceiro chama
+     * de novo sem anexar nada — apagaria os arquivos que já tínhamos baixado e re-hospedado.
+     *
+     * ⚠️ É a mesma cautela do caminho 2 (`...(entrada.documentos ? {…} : {})`), que este caminho
+     * não tinha. Dois caminhos para o mesmo fim com regras diferentes é como a divergência
+     * nasce — e nasceu.
+     */
+    const manifestoNovo =
+      novo && novo.entrada.documentos
+        ? await manifestoComArquivos(novo.entrada.documentos, id)
+        : null;
+
+    const trazArquivo = manifestoNovo ? temArquivo(manifestoNovo) : false;
+
     await db
       .update(solicitacoesCadastro)
-      .set({ tokenHash: hash, expiraEm, status: 'link_gerado' })
+      .set({
+        tokenHash: hash,
+        expiraEm,
+        status: 'link_gerado',
+        /**
+         * Atualiza quando o reenvio traz arquivo, ou quando ainda não temos nenhum — neste
+         * segundo caso o manifesto novo não pode ser pior que o que está lá.
+         */
+        ...(manifestoNovo && (trazArquivo || !novo!.jaTemArquivo)
+          ? { documentosDoParceiro: manifestoNovo }
+          : {}),
+        /**
+         * ⚠️ E os dados do paciente também, pela mesma razão que o caminho 2 os atualiza: o
+         * parceiro pode ter corrigido um nome ou um CPF entre uma tentativa e outra, e o
+         * reenvio era o único caminho que ignorava isso.
+         */
+        ...(novo?.entrada.nomeCompleto?.trim()
+          ? { nomeCompleto: novo.entrada.nomeCompleto.trim() }
+          : {}),
+        ...(novo?.entrada.cpf ? { cpf: somenteDigitosDoCpf(novo.entrada.cpf) } : {}),
+        ...(novo?.entrada.pedidoDoParceiro
+          ? { pedidoDoParceiro: novo.entrada.pedidoDoParceiro }
+          : {}),
+      })
       .where(eq(solicitacoesCadastro.id, id));
 
     return { referralId: id, protocolo, linkDeAcesso: montarLink(token), expiraEm, reenvio };
