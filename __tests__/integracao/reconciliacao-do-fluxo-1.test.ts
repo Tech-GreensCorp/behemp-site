@@ -104,16 +104,24 @@ async function semearOCasoDoDono() {
   return token;
 }
 
+/**
+ * ⚠️ NO ESCOPO DO ARQUIVO, e não dentro de um `describe`.
+ *
+ * Defeito meu, achado ao acrescentar o terceiro bloco: o `beforeEach` vivia dentro do primeiro
+ * `describe`, então os blocos seguintes rodavam sobre o estado deixado pelo anterior — e o
+ * segundo cadastro morria com protocolo duplicado. O sintoma apontava para o insert; a causa
+ * era o escopo da limpeza.
+ */
+beforeEach(async () => {
+  await limpar();
+  estadoDaSessao.clerkId = CLERK_ID;
+  estadoDaSessao.email = EMAIL_DA_CONTA;
+  estadoDaSessao.verificado = true;
+});
+
+afterAll(limpar);
+
 describe('o caso real do dono, executado contra um Postgres de verdade', () => {
-  beforeEach(async () => {
-    await limpar();
-    estadoDaSessao.clerkId = CLERK_ID;
-    estadoDaSessao.email = EMAIL_DA_CONTA;
-    estadoDaSessao.verificado = true;
-  });
-
-  afterAll(limpar);
-
   it('🔴 A DECISÃO: com e-mail DIVERGENTE, a reconciliação automática NÃO acontece', () => {
     /**
      * É o estado exato em que ele ficou: conta `davi@greens-corp.com`, solicitação com
@@ -371,5 +379,48 @@ describe('o consentimento que faltou se anuncia — e só quando há compartilha
       haCompartilhamento: haCompartilhamentoComParceiro(ficha.origem),
     });
     expect(r.pedir, 'o sistema não sabe que falta consentimento').toBe(true);
+  });
+});
+
+/**
+ * 🔴 O QUE MAIS IMPORTA AO DONO, e o que eu ainda NÃO tinha provado: os documentos que a Greens
+ * mandou aparecem na tela da procuração.
+ *
+ * _"era pra salvar os dados vindos e entregar já na tela de procuração"_ — é o objetivo do
+ * portão 1 inteiro. Concluir o cadastro sem os documentos seria fechar o fluxo pela metade.
+ */
+describe('os documentos da Greens chegam à ficha', () => {
+  it('🔴 quantos documentos viram linha em `documentos` depois do cadastro', async () => {
+    const token = await semearOCasoDoDono();
+    await concluirCadastroPorLink({
+      token,
+      nomeCompleto: 'Davi Rhuan Silva Martins',
+      cpf: '03939508837',
+      telefone: '5598970134822',
+      email: EMAIL_DA_CONTA,
+      jaFazTratamento: null,
+      temAutorizacaoAnvisa: null,
+      temReceitaMedica: null,
+      anexos: [],
+      tratamentoAtual: null,
+      finalidadesConsentidas: [],
+    });
+
+    const docs = await db.select().from(schema.documentos);
+    /**
+     * 🔴 MEDIDO EM 13/09/2026: 1 documento, tipo `receita_medica`. E note a URL do fixture —
+     * `https://exemplo.invalid/` **não existe**. Gravou assim mesmo, e isso confirma o que a
+     * ADR-0022 §20.2 afirmava: o arquivo é baixado e re-hospedado **na entrada do handoff**, não
+     * no cadastro. A materialização só cria a linha apontando para o que já é nosso.
+     *
+     * ⚠️ É o que sustenta o portão 1: sem esta linha, o paciente cai na procuração da ANVISA e a
+     * tela pede de novo o documento que a Greens já entregou.
+     */
+    expect(docs.length, 'o documento da Greens NÃO chegou à ficha').toBe(1);
+    expect(docs[0].tipo).toBe('receita_medica');
+
+    // E pertence à ficha certa — documento órfão não aparece em tela nenhuma.
+    const [ficha] = await db.select().from(schema.pacientes);
+    expect(docs[0].pacienteId).toBe(ficha.id);
   });
 });
