@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { cadastroPendenteDoEmail } from '@/lib/parceiros/cadastro-pendente';
 import { sql } from 'drizzle-orm';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { contarMensagensNaoLidas } from '@/app/_actions/chat';
@@ -57,6 +58,14 @@ export interface DadosDashboard {
    * e mesmo que fosse, o que existe vale mais que o que ele lembrou de responder.
    */
   precisaDaProcuracao: boolean;
+  /**
+   * 🔴 HÁ UM CADASTRO ESPERANDO ESTA PESSOA (ADR-0022, D-02).
+   *
+   * `null` quando não há. Quando há, o paciente entrou com uma solicitação aberta — e sem
+   * isto ele via um painel vazio sem nenhuma explicação, com os documentos que já tinha
+   * enviado invisíveis. Medido com o dono em 12/09/2026.
+   */
+  cadastroPendente: { protocolo: string; parceiro: string | null; expiraEm: Date } | null;
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -71,7 +80,18 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, consultaRecenteRes, userIdRes, anvisaRes] = await Promise.all([
+    const [
+      medicoRes,
+      medicamentoRes,
+      jornadaRes,
+      consultaRes,
+      documentosRes,
+      mensagensRes,
+      teleconsultaRes,
+      consultaRecenteRes,
+      userIdRes,
+      anvisaRes,
+    ] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -228,9 +248,8 @@ export async function obterDadosDashboard(): Promise<{
     ]);
 
     // Processar médico
-    const medicoNome = medicoRes.rows.length > 0
-      ? (medicoRes.rows[0] as any).medicoNome as string
-      : null;
+    const medicoNome =
+      medicoRes.rows.length > 0 ? ((medicoRes.rows[0] as any).medicoNome as string) : null;
 
     // Processar medicamento
     let medicamentoAtivo: DadosDashboard['medicamentoAtivo'] = null;
@@ -274,22 +293,41 @@ export async function obterDadosDashboard(): Promise<{
     const mensagensNaoLidas = mensagensRes.sucesso ? (mensagensRes.dados ?? 0) : 0;
 
     const teleconsultaAtivaRow = teleconsultaRes.rows[0] as any;
-    const teleconsultaAtiva = teleconsultaAtivaRow ? {
-      roomId: String(teleconsultaAtivaRow.roomId),
-      medicoNome: String(teleconsultaAtivaRow.medicoNome),
-      iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
-    } : null;
+    const teleconsultaAtiva = teleconsultaAtivaRow
+      ? {
+          roomId: String(teleconsultaAtivaRow.roomId),
+          medicoNome: String(teleconsultaAtivaRow.medicoNome),
+          iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
+        }
+      : null;
 
     const consultaRecenteRow = consultaRecenteRes.rows[0] as any;
-    const consultaRecenteRealizada = consultaRecenteRow ? {
-      dataHora: consultaRecenteRow.dataHora instanceof Date ? consultaRecenteRow.dataHora.toISOString() : String(consultaRecenteRow.dataHora),
-      medicoNome: String(consultaRecenteRow.medicoNome),
-      temPrescricao: Boolean(consultaRecenteRow.temPrescricao),
-    } : null;
+    const consultaRecenteRealizada = consultaRecenteRow
+      ? {
+          dataHora:
+            consultaRecenteRow.dataHora instanceof Date
+              ? consultaRecenteRow.dataHora.toISOString()
+              : String(consultaRecenteRow.dataHora),
+          medicoNome: String(consultaRecenteRow.medicoNome),
+          temPrescricao: Boolean(consultaRecenteRow.temPrescricao),
+        }
+      : null;
 
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
 
     const precisaDaProcuracao = !anvisaRes.rows[0]?.temAnvisa;
+
+    /**
+     * O cadastro que ficou pela metade, se houver. Casa pelo e-mail porque a solicitação
+     * nasce ANTES da conta: quando a Greens a cria, não existe `clerkId` nem `pacienteId`
+     * para amarrar. Ver ADR-0022 §1.5 — até hoje ninguém fazia esta pergunta.
+     */
+    const [emailRes] = (
+      await db.execute(sql`
+        SELECT u.email FROM users u WHERE u.clerk_id = ${auth.clerkId} LIMIT 1
+      `)
+    ).rows as { email?: string }[];
+    const cadastroPendente = await cadastroPendenteDoEmail(emailRes?.email);
 
     return {
       sucesso: true,
@@ -304,6 +342,7 @@ export async function obterDadosDashboard(): Promise<{
         consultaRecenteRealizada,
         userId,
         precisaDaProcuracao,
+        cadastroPendente,
       },
     };
   } catch (error) {

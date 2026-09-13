@@ -32,6 +32,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
+import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -281,6 +282,13 @@ export default function PacienteDashboardPage() {
             ⚠️ AVISA, NÃO BLOQUEIA (ADR-0016 D-06). O componente decide sozinho se aparece —
             passar `precisaDaProcuracao` falso simplesmente não renderiza nada.
           */}
+          {/*
+            🔴 VEM ANTES DA PROCURAÇÃO, e a ordem importa (ADR-0022, D-02): quem tem cadastro
+            pela metade não tem o que autorizar ainda. Mandá-lo à procuração primeiro seria
+            pedir um passo que depende do anterior.
+          */}
+          <AvisoDeCadastroPendente cadastro={dados?.cadastroPendente ?? null} />
+
           <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
 
           {/* ── KPIs principais ── */}
