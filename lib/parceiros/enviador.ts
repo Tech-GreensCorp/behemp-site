@@ -46,6 +46,14 @@ export interface ResultadoDoEnvio {
   entregues: number;
   reagendados: number;
   falharam: number;
+  /**
+   * 🔴 CONTA SEPARADO DE `falharam` DE PROPÓSITO (D-14).
+   *
+   * Somar os dois repetiria no agregado o erro que o status corrigiu: quem lê a saída do lote
+   * veria "3 falharam" e sairia procurar a Greens fora do ar, quando três pacientes apenas
+   * exerceram um direito. Falha de entrega se investiga; revogação se respeita.
+   */
+  cancelados: number;
   configurado: boolean;
 }
 
@@ -102,7 +110,14 @@ export class EnviadorDeAvisos {
        * Sem configuração, a fila espera.
        */
       console.warn('[parceiros] envio não configurado — a fila aguarda');
-      return { reivindicados: 0, entregues: 0, reagendados: 0, falharam: 0, configurado: false };
+      return {
+        reivindicados: 0,
+        entregues: 0,
+        reagendados: 0,
+        falharam: 0,
+        cancelados: 0,
+        configurado: false,
+      };
     }
 
     const eventos = await this.reivindicar(limite);
@@ -111,6 +126,7 @@ export class EnviadorDeAvisos {
       entregues: 0,
       reagendados: 0,
       falharam: 0,
+      cancelados: 0,
       configurado: true,
     };
 
@@ -118,6 +134,7 @@ export class EnviadorDeAvisos {
       const desfecho = await this.entregar(evento);
       if (desfecho === 'entregue') resultado.entregues++;
       else if (desfecho === 'reagendado') resultado.reagendados++;
+      else if (desfecho === 'cancelado') resultado.cancelados++;
       else resultado.falharam++;
     }
 
@@ -162,7 +179,7 @@ export class EnviadorDeAvisos {
     payload: Record<string, unknown>;
     tentativas: number;
     solicitacaoId: string | null;
-  }): Promise<'entregue' | 'reagendado' | 'falhou'> {
+  }): Promise<'entregue' | 'reagendado' | 'falhou' | 'cancelado'> {
     /**
      * 🔴 O CONSENTIMENTO É RELIDO AQUI, IMEDIATAMENTE ANTES DO POST — ADR-0022 D-14.
      *
@@ -184,7 +201,7 @@ export class EnviadorDeAvisos {
           tipo: evento.tipo,
           motivo: veredicto.motivo,
         });
-        return this.marcarFalha(evento.id, `consentimento: ${veredicto.motivo}`);
+        return this.marcarCancelado(evento.id, veredicto.motivo);
       }
     }
 
@@ -259,6 +276,40 @@ export class EnviadorDeAvisos {
       .set({ status: 'pendente', proximaTentativaEm: proxima, ultimoErro: motivo.slice(0, 300) })
       .where(eq(parceiroEventosSaida.id, id));
     return 'reagendado';
+  }
+
+  /**
+   * 🔴 REVOGAÇÃO NÃO É FALHA, E O BANCO PRECISA SABER DISSO (D-14).
+   *
+   * O evento foi barrado porque o paciente retirou o consentimento — o sistema fez a coisa
+   * certa. Gravar `falhou` aqui tem três consequências, e nenhuma é cosmética:
+   *
+   * 1. **Mente para quem investiga.** `falhou` significa "tentamos e não conseguiu chegar".
+   *    Quem abrir a fila procurando o que não chegou ao parceiro vai perseguir um envio que
+   *    nunca deveria ter saído, misturado com falhas reais de rede.
+   * 2. **Convida a reenviar.** Um reaper ou um botão de "retentar os que falharam" — que é
+   *    exatamente o que o G12 pede e ainda vamos construir — pegaria este evento junto e
+   *    tentaria de novo contra uma decisão do titular. A LGPD art. 8º §5º não é um estado
+   *    transitório que se reprocessa.
+   * 3. **Apaga a prova.** Se um dia alguém perguntar "vocês pararam de enviar quando ele
+   *    revogou?", a resposta tem de estar no banco, não numa linha de log que some no
+   *    próximo deploy.
+   *
+   * ⚠️ E é por isso que este método existe separado em vez de receber uma flag: status é
+   * contrato com quem lê depois, e um parâmetro booleano num `marcarFalha` deixaria fácil
+   * chamar o errado sem ninguém notar.
+   */
+  private async marcarCancelado(id: string, motivo: string): Promise<'cancelado'> {
+    await db
+      .update(parceiroEventosSaida)
+      .set({
+        status: 'cancelado_por_revogacao',
+        ultimoErro: `consentimento: ${motivo}`.slice(0, 300),
+      })
+      .where(eq(parceiroEventosSaida.id, id));
+    // `warn`, não `error`: o sistema funcionou. Quem lê `error` procura defeito.
+    console.warn('[parceiros] envio cancelado — consentimento revogado', { motivo });
+    return 'cancelado';
   }
 
   private async marcarFalha(id: string, motivo: string): Promise<'falhou'> {
