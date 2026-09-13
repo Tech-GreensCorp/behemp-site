@@ -152,7 +152,9 @@ describe('a ordem: o arquivo só vira documento quando o paciente existe', () =>
   const codigo = ler(CADASTRO);
 
   it('materializa DEPOIS de o pacienteId existir', () => {
-    const criacao = codigo.indexOf('const pacienteId = await db.transaction');
+    // `db.transaction` virou `dbTransacional().transaction` em 13/09/2026 — o cliente HTTP
+    // do Neon LANÇA em transaction(). A âncora é a atribuição, que é o que importa aqui.
+    const criacao = codigo.search(/const pacienteId = await \w+\(?\)?\.transaction/);
     const copia = codigo.indexOf('materializarDocumentosDoParceiro({');
     expect(criacao).toBeGreaterThan(-1);
     expect(copia).toBeGreaterThan(criacao);

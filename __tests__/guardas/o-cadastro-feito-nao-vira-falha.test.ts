@@ -52,7 +52,9 @@ function catchFinal(): string {
 
 describe('o cadastro feito não vira falha', () => {
   it('⚠️ VACUIDADE: o arquivo tem a transação que grava conta e ficha', () => {
-    expect(CODIGO).toContain('db.transaction');
+    // A propriedade é "grava conta e ficha ATOMICAMENTE", não o nome do cliente. Este
+    // ponto usa `dbTransacional()` desde 13/09/2026 — `db` é neon-http e lança.
+    expect(CODIGO).toMatch(/\.transaction\s*\(/);
     expect(CODIGO).toContain('insert(pacientes)');
   });
 

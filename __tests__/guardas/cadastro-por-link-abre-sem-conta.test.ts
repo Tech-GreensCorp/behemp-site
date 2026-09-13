@@ -209,8 +209,13 @@ describe('a ficha clínica só nasce depois da sessão existir', () => {
 
   it('🔴 o link só é consumido DEPOIS da ficha gravada', () => {
     // Consumir antes deixaria o paciente sem link E sem cadastro se a gravação falhasse.
+    //
+    // ⚠️ A âncora é `.transaction(`, não `db.transaction(`: em 13/09/2026 o ponto passou a usar
+    // `dbTransacional()`, porque o cliente HTTP do Neon LANÇA em transaction(). Ver o guarda
+    // `a-transacao-usa-um-driver-que-a-suporta`. A ORDEM, que é o que este caso garante, não
+    // mudou — e é por isso que o caso continua, só com a âncora corrigida.
     const t = codigo(ACTION).replace(/\s+/g, ' ');
-    expect(t).toMatch(/db\.transaction\([\s\S]*?marcarComoUtilizada\(/);
+    expect(t).toMatch(/\.transaction\([\s\S]*?marcarComoUtilizada\(/);
   });
 
   /**

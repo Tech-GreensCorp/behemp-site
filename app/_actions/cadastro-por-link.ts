@@ -30,6 +30,7 @@ import { db } from '@/lib/db';
 import { falha, ok, type ResultadoAction } from '@/lib/ia-clinica/resultado';
 import { anexarDocumentoDoCadastro } from '@/lib/documentos/anexo-do-cadastro';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
+import { dbTransacional } from '@/lib/db/transacional';
 import { FINALIDADES } from '@/lib/parceiros/consentimento';
 import { conceder } from '@/lib/parceiros/consentimento-registrado';
 import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
@@ -302,7 +303,20 @@ export async function concluirCadastroPorLink(
      */
     let usuarioId: string | null = null;
 
-    const pacienteId = await db.transaction(async (tx) => {
+    /**
+     * 🔴 `dbTransacional()`, NÃO `db` — e a diferença é a causa raiz do Fluxo 1 · Portão 1.
+     *
+     * `db` resolve para `neon-http` em produção, e esse driver não implementa transação: o
+     * método é um `throw` na primeira linha. Medido em 13/09/2026, depois de CINCO falhas
+     * idênticas em produção que o log registrava apenas como `{ erro: 'Error' }` — porque é um
+     * `new Error(…)`, e `erro.name` disso é sempre `'Error'`.
+     *
+     * Consequência: **zero dos 35 handoffs da Greens jamais concluiu o cadastro**. Não havia
+     * estado sujo para investigar; a transação não chegava a começar.
+     *
+     * Ver `lib/db/transacional.ts` para por que `pg` e não `neon-serverless`.
+     */
+    const pacienteId = await dbTransacional().transaction(async (tx) => {
       /**
        * 4 ── Garantir o `users`.
        *

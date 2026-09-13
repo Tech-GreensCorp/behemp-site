@@ -419,7 +419,8 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
       path.join(process.cwd(), 'app/_actions/cadastro-por-link.ts'),
       'utf8',
     );
-    const criacao = action.indexOf('const pacienteId = await db.transaction');
+    // Ver `a-transacao-usa-um-driver-que-a-suporta`: o cliente mudou, a ordem não.
+    const criacao = action.search(/const pacienteId = await \w+\(?\)?\.transaction/);
     const anexo = action.indexOf('anexarDocumentoDoCadastro({');
     expect(anexo).toBeGreaterThan(criacao);
   });
