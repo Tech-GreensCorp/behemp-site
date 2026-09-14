@@ -464,10 +464,34 @@ describe('a credencial da API do ChatPro é lida por um arquivo só', () => {
     // ⚠️ `lib/env.ts` é exceção declarada: ele DECLARA a variável no schema de validação,
     // não a consome para chamar a API. Sem essa exceção o guarda proibiria validar o
     // ambiente — que é justamente o que impede a aplicação de subir mal configurada.
+    //
+    // 🔴 SEGUNDA EXCEÇÃO, 14/09/2026: `lib/chatpro/contas.ts`.
+    //
+    // Cada conta é uma instância DIFERENTE do ChatPro, e o `leadId` de uma chamada só existe
+    // na instância de quem chamou. Procurar um lead da Greens na instância da BeHemp devolve
+    // `null`, que vira `throw ErroDeContatoNaoConfirmado` ANTES do insert — a solicitação não
+    // nasce e o painel transfere o paciente para um atendente. Foi o que travou o Fluxo 2.
+    //
+    // `contas.ts` RESOLVE qual credencial pertence a qual conta. Quem CHAMA a API continua
+    // sendo só o cliente — e o caso abaixo prova isso, para que a exceção não vire buraco.
+    const EXCECOES = new Set([CLIENTE, 'lib/env.ts', 'lib/chatpro/contas.ts']);
     const leitores = varrer(['app', 'lib', 'components'])
-      .filter((a) => a !== CLIENTE && a !== 'lib/env.ts')
+      .filter((a) => !EXCECOES.has(a))
       .filter((a) => /CHATPRO_INSTANCE_TOKEN/.test(codigo(a)));
     expect(leitores, `a credencial é lida fora do cliente: ${leitores.join(', ')}`).toEqual([]);
+  });
+
+  it('🔴 e `contas.ts` RESOLVE a credencial sem nunca CHAMAR a API', () => {
+    /**
+     * O que sustenta a exceção acima. Se `contas.ts` passar a fazer requisição, a credencial
+     * deixa de estar isolada em um ponto — e o motivo da regra (rotação viável, auditoria
+     * possível) se perde sem que nada mais fique vermelho.
+     */
+    const fonte = codigo('lib/chatpro/contas.ts');
+    expect(fonte, 'contas.ts passou a chamar a API do ChatPro').not.toMatch(/\bfetch\s*\(/);
+    expect(fonte, 'contas.ts passou a montar cabeçalho de autenticação').not.toMatch(
+      /instance-token/,
+    );
   });
 
   it('CONTROLE: env.ts pode declarar a variável, e continua declarando', () => {

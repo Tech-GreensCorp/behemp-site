@@ -1964,3 +1964,101 @@ move `updated_at`), campo do manifesto errado (`url` por `urlBlob`) e `!!` em sh
 que o bash expande como histórico. **A partir da quinta, os comandos passaram a ser validados
 localmente (`node --check`, `bash -n`, contagem de `!`) antes de serem enviados** — e nenhum
 falhou depois disso.
+
+## §62 — 🟢 O Fluxo 1 · Portão 1 fechou. Medido em 14/09/2026, 00:0x UTC
+
+```
+protocolo: SOL-000046  ·  status: 'enviada'  ·  na_ficha: 3
+```
+
+**Os três documentos que a Greens enviou estão na ficha do paciente.** É a primeira vez, em 35
+handoffs e várias semanas, que o caminho completa:
+
+```
+formulário da Greens → handoff assinado (E1) → allowlist → download do S3 presignado
+  → store privado (403 sem autenticação) → transação → ficha do paciente
+```
+
+### O que foi preciso, na ordem em que apareceu
+
+| #   | defeito                                                | onde                        | §     |
+| --- | ------------------------------------------------------ | --------------------------- | ----- |
+| 1   | o reenvio não atualizava o manifesto                   | `handoff.ts` (`reemitir`)   | §51   |
+| 2   | o `400` do Clerk era e-mail já cadastrado, não cookie  | diagnóstico                 | §54   |
+| 3   | a origem recusada não ia no motivo                     | `documentos-do-parceiro.ts` | §52   |
+| 4   | **o store era público e o código pedia privado**       | 6 caminhos                  | §55   |
+| 5   | a entrega fazia `fetch` cru, que não abre blob privado | rota do arquivo             | §55.1 |
+| 6   | o log dizia `'Error'` e escondia tudo                  | 4 pontos                    | §58   |
+| 7   | 🔴 **o driver de produção não implementa transação**   | `db.transaction`            | §60   |
+
+⚠️ **Os sete estavam empilhados, e cada um só apareceu depois do anterior.** O §61 registra as
+cinco hipóteses medidas e derrubadas entre o 6 e o 7 — nenhuma virou correção especulativa, e a
+causa real não era nenhuma delas.
+
+🔴 **O defeito 7 é o que explica o D-16 inteiro.** Ele estava lá desde sempre, para todo
+paciente, por qualquer porta. Os defeitos 1 a 6 são reais e precisavam ser corrigidos — mas
+nenhum deles, sozinho, teria feito um cadastro concluir.
+
+### A lição que sai, e ela vale mais que a correção
+
+**Os guardas estruturais estavam verdes durante todas as semanas.** 1212 casos no dia em que
+zero cadastros concluíam. Eles liam o código, e o código estava escrito certo: a chamada existia,
+a ordem estava correta, a atomicidade declarada, o `access: 'private'` no lugar.
+
+O que falhava era o **efeito**, e em três dos sete casos o guarda ficava verde **exatamente
+porque** media a forma:
+
+- `o-documento-do-paciente-nao-abre-sem-escopo` exigia o literal `access: 'private'`
+- `documento-do-parceiro-nao-vira-ssrf` exigia `ACESSO_DO_BLOB = 'private'`
+- `cadastro-por-link-abre-sem-conta` exigia `erro instanceof Error ? erro.name`
+
+Os três foram retificados para medir propriedade, e dois ganharam casos que **executam**.
+
+⚠️ **E o defeito 7 nenhum guarda teria pego**, por um motivo estrutural: em teste a URL nunca é
+de Neon, então `db` resolve para `node-postgres`, que suporta transação. A diferença não estava
+no código — estava no ambiente. **É o limite do que teste estático alcança, e fica escrito.**
+
+### O que continua aberto
+
+- **P8 (procuração da ANVISA)** — destravado, nunca executado
+- Os **11 pontos com `erro.name`**, e o `cadastro-por-link.ts` que o mantém de propósito (§58.1)
+- A tela que diz **"✓ Laudo médico"** para um documento que não chegou
+- `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` fora do `gravar` do `deploy.yml`
+- O **driver global**: `neon-http` existe para serverless, e produção é EC2 com PM2. Um pool TCP
+  provavelmente é melhor em tudo — mas toca toda query e precisa de medição
+
+## §63 — 🟢 E o teste LIMPO, com paciente novo, passou de primeira
+
+**14/09/2026, 01:02 UTC.** Depois do SOL-000046 — que fechou, mas com conta pré-existente —, um
+pedido inteiramente novo foi criado no formulário da Greens: nome, e-mail, CPF e telefone que
+nunca existiram neste banco.
+
+```
+protocolo     status     criado         com_arquivo   na_ficha
+SOL-000065    enviada    14/09 01:02    3             3
+```
+
+⚠️ **Este é o teste que vale, e a diferença importa.** O SOL-000046 exercitava o caminho de quem
+_já tem conta_ — útil, porque era onde o dono travava, mas não é o caminho comum. O SOL-000065
+percorre o que um paciente real percorre: formulário da Greens, handoff, download, store privado,
+criação de conta no Clerk, confirmação por e-mail, transação, ficha.
+
+**Sete portões, primeira tentativa, sem intervenção.**
+
+### O que isso prova que o anterior não provava
+
+|                        | SOL-000046                    | SOL-000065           |
+| ---------------------- | ----------------------------- | -------------------- |
+| conta no Clerk         | já existia                    | **criada agora**     |
+| `users`                | já existia                    | **inserido**         |
+| `pacientes`            | ficha ativa, ramo do `update` | **ramo do `insert`** |
+| confirmação por e-mail | pulada (sessão ativa)         | **percorrida**       |
+
+🔴 **O ramo do `insert` da transação nunca tinha executado.** Era exatamente onde o D-25
+(`neon-http` sem transação) mordia primeiro, e onde as hipóteses 1 e 2 do §61 imaginavam
+colisões. Nenhuma delas existia — e agora está provado pelo caminho, não por consulta.
+
+### O que continua sem prova
+
+**P8 — a procuração da ANVISA.** O cadastro concluiu e o paciente chegou ao destino; o que
+acontece dali em diante ainda não foi exercitado nesta sessão.

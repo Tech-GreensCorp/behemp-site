@@ -26,6 +26,28 @@ const envSchema = z.object({
   /** 🔴 Dá acesso a TODAS as conversas da instância. Só `lib/chatpro/cliente.ts` o lê. */
   CHATPRO_INSTANCE_TOKEN: z.string().optional(),
   CHATPRO_INSTANCE_ID: z.string().optional(),
+  /**
+   * 🔴 A INSTÂNCIA DE CHATPRO DA CONTA DA GREENS — 14/09/2026.
+   *
+   * Cada conta é uma instância diferente. O `leadId` que chega numa chamada da Greens só
+   * existe na instância DELES: procurá-lo na da BeHemp devolve `null`, e `null` vira
+   * `throw ErroDeContatoNaoConfirmado` ANTES do insert — a solicitação não nasce, o
+   * `/bot-link` responde 422, e o painel transfere o paciente para um atendente.
+   *
+   * Foi o que travou o Fluxo 2, com dezenas de `contato não confirmado por findById` no log.
+   *
+   * ⚠️ Sem estas duas, `instanciaDaConta('greens')` devolve `null` e a confirmação
+   * simplesmente não acontece — o fluxo segue pelo telefone, que é degradação aceitável
+   * porque o segredo do cabeçalho já autenticou a origem.
+   */
+  CHATPRO_INSTANCE_ID_GREENS: z.string().optional(),
+  CHATPRO_INSTANCE_TOKEN_GREENS: z.string().optional(),
+  /**
+   * 🔴 O host da instância da Greens. O ChatPro dá um subdomínio por conta, e `sparks` é o
+   * DELES — por isso o default de `CHATPRO_CHAT_API_URL` acerta a conta da Greens por acaso e
+   * erra a nossa. Fica declarada para que a assimetria seja escolha, não descuido.
+   */
+  CHATPRO_CHAT_API_URL_GREENS: z.string().url().optional(),
   CHATPRO_CHAT_API_URL: z.string().url().default('https://sparks.chatpro.com.br'),
   /** Validade do link em horas. 168 = 7 dias. */
   CHATPRO_LINK_TTL_HORAS: z.coerce.number().int().positive().default(168),
