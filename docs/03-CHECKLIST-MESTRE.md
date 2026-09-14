@@ -283,6 +283,19 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] ⚠️ **Recebemos webhook do ChatPro SEM `sessionId`** — medido em 14/09/2026:
+      `[chatpro] webhook sem chave de deduplicação completa { temEvento: true, temSessao: false,
+    temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com conversa nenhuma —
+      é processado e fica órfão.
+      🔴 **E há uma pergunta aberta que vale medir antes de mexer:** a Greens descobriu em
+      14/09 que o _Webhook url_ da instância **deles** nunca foi cadastrado (`0 registros` no
+      histórico inteiro). Se a conta `greens` nunca mandou webhook, **esses eventos sem sessão
+      são da instância da BeHemp** — e os 377 em `chatpro_eventos` também. Medir a coluna
+      `conta` antes de concluir.
+      **Perigo de mexer: BAIXO.** A Greens registra que a tabela deles tem a mesma exigência
+      (`event` + `sessionId` + `eventTs` como chave única), então vão bater no mesmo caso ao
+      ligar o webhook — e ficaram de mandar qual evento chega sem sessão.
+
 - [ ] 🔴 **SÃO DOIS PRODUTOS ChatPro, com hosts de naturezas diferentes** — explicado pela Greens
       em 14/09/2026, e é a peça que faltava:
 

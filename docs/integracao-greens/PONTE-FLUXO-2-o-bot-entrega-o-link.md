@@ -166,3 +166,48 @@ porque o log registrava `erro.name` — que para um `new Error(…)` é sempre `
    medições contra o banco não acharam nada porque o banco estava certo o tempo todo.
 
 — Be4Hope, 14/09/2026
+
+---
+
+# DESFECHO, 14/09/2026 — os três testes mediram o vazio
+
+A Greens achou a causa, e ela é anterior a tudo que foi corrigido:
+
+> _"O campo **Webhook url** da instância Greens no painel do ChatPro está **vazio** — nunca foi
+> cadastrado. `chatpro_webhook_events` tem **0 registros no histórico inteiro**, não só hoje."_
+
+Sem webhook cadastrado, **não havia instrumentação do lado deles para registrar a conversa** — e
+o funil não alcançava o bloco `[F2-01]` que chama a Be4Hope.
+
+## O que isso ensina, e vale mais que a correção
+
+🔴 **Três correções reais foram feitas hoje, e NENHUMA era o que travava este teste:**
+
+| #   | correção                                                        | era real?       | travava? |
+| --- | --------------------------------------------------------------- | --------------- | -------- |
+| 1   | instância por conta (`leadId` da Greens na instância da BeHemp) | ✅ sim          | não      |
+| 2   | host por conta (`sparks` é o subdomínio deles)                  | ✅ sim          | não      |
+| 3   | header (`instance-token`, não `Authorization`)                  | já estava certo | não      |
+
+**As três continuam valendo** — o `leadId` de fato seria procurado no lugar errado, o host de
+fato apontava para o servidor de outra empresa. Mas nenhuma delas chegava a ser exercitada,
+porque a chamada nunca acontecia.
+
+⚠️ **O sinal que estava lá desde o começo e ninguém leu como tal: o VAZIO.** A medição do lado
+deles devolveu três tabelas vazias, e a nossa devolveu nenhuma linha de `bot-link`. Vazio dos
+dois lados não é "não achei o defeito" — é **"nada aconteceu"**, que é uma informação diferente e
+mais forte.
+
+🔴 **A regra que sai:** quando os dois lados medem vazio no mesmo intervalo, a causa é anterior a
+qualquer um dos dois. Não adianta procurar defeito no caminho — o caminho não foi percorrido.
+
+## O que vale para a próxima
+
+- **Medir o vazio antes de corrigir.** Se tivéssemos perguntado "houve alguma chamada?" na
+  primeira rodada, três hipóteses teriam sido puladas.
+- **Correção real que não resolve o sintoma continua sendo correção.** As três de hoje ficam, e
+  vão importar no primeiro teste que de fato alcançar o bloco.
+- **Instrumentação ausente parece defeito de código.** Do nosso lado, a ausência de log parecia
+  "a chamada falhou em silêncio"; era "a chamada não existiu".
+
+— BeHemp, 14/09/2026
