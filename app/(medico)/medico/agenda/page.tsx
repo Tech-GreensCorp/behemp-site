@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   CalendarDays as CalendarIcon,
   CheckCircle2,
@@ -200,65 +201,60 @@ export default function AgendaPage() {
               <Loader2 size={32} className="animate-spin text-primary" />
             </div>
           ) : consultasAtivas.length === 0 ? (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="flex flex-col items-center py-16">
-                <CalendarIcon size={40} className="mb-3 text-muted-foreground/40" />
-                <p className="text-lg font-medium">Nenhuma consulta agendada</p>
-                <p className="mt-1 text-sm text-muted-foreground">Crie uma nova consulta na aba ao lado</p>
-              </CardContent>
-            </Card>
+            <DataEmpty
+              icon={<CalendarIcon size={24} />}
+              title="Nenhuma consulta agendada"
+              description="Crie uma nova consulta na aba ao lado"
+            />
           ) : (
-            consultasAtivas.map((c) => {
-              const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.agendada;
-              return (
-                <Card key={c.id} className="border-0 shadow-sm">
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <User size={20} className="text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{c.pacienteNome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(c.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
-                    <Badge className={cfg.cor}>{cfg.label}</Badge>
-                    <div className="flex gap-1">
-                      {(c.status === 'agendada' || c.status === 'confirmada') && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleIniciarTeleconsulta(c.id)}
-                          disabled={iniciando === c.id}
-                          className="gap-1.5 bg-primary hover:bg-primary/90 text-white"
-                        >
-                          {iniciando === c.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Video size={14} />
-                          )}
-                          {iniciando === c.id ? 'Iniciando...' : 'Iniciar Teleconsulta'}
-                        </Button>
-                      )}
-                      {c.googleMeetLink && (
-                        <a href={c.googleMeetLink} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="icon" title="Google Meet">
-                            <Video size={16} />
+            <DataList>
+              {consultasAtivas.map((c) => {
+                const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.agendada;
+                return (
+                  <DataRow
+                    key={c.id}
+                    icon={<User size={18} className="text-primary" />}
+                    title={c.pacienteNome}
+                    subtitle={format(new Date(c.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    trailing={
+                      <>
+                        <Badge className={cfg.cor}>{cfg.label}</Badge>
+                        {(c.status === 'agendada' || c.status === 'confirmada') && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleIniciarTeleconsulta(c.id)}
+                            disabled={iniciando === c.id}
+                            className="gap-1.5 bg-primary hover:bg-primary/90 text-white"
+                          >
+                            {iniciando === c.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Video size={14} />
+                            )}
+                            {iniciando === c.id ? 'Iniciando...' : 'Iniciar Teleconsulta'}
                           </Button>
-                        </a>
-                      )}
-                      <Button variant="ghost" size="icon" title="Remarcar"
-                        onClick={() => { setRemarcarId(c.id); setRemarcarData(undefined); setRemarcarHorSel(''); }}>
-                        <CalendarIcon size={16} />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Cancelar"
-                        onClick={() => { setCancelarId(c.id); setMotivo(''); }}>
-                        <X size={16} className="text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
+                        )}
+                        {c.googleMeetLink && (
+                          <a href={c.googleMeetLink} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" title="Google Meet">
+                              <Video size={16} />
+                            </Button>
+                          </a>
+                        )}
+                        <Button variant="ghost" size="icon" title="Remarcar"
+                          onClick={() => { setRemarcarId(c.id); setRemarcarData(undefined); setRemarcarHorSel(''); }}>
+                          <CalendarIcon size={16} />
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Cancelar"
+                          onClick={() => { setCancelarId(c.id); setMotivo(''); }}>
+                          <X size={16} className="text-destructive" />
+                        </Button>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </DataList>
           )}
         </TabsContent>
 
@@ -450,43 +446,39 @@ export default function AgendaPage() {
         {/* ── TAB: HISTÓRICO ── */}
         <TabsContent value="historico" className="mt-4 space-y-3">
           {consultasPassadas.length === 0 ? (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="flex flex-col items-center py-12">
-                <p className="text-sm text-muted-foreground">Nenhuma consulta no histórico</p>
-              </CardContent>
-            </Card>
-          ) : consultasPassadas.map((c) => {
-            const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.realizada;
-            return (
-              <Card key={c.id} className="border-0 shadow-sm opacity-70">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <User size={18} className="text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{c.pacienteNome}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(c.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <Badge className={cfg.cor}>{cfg.label}</Badge>
-
-                  {/* Botão Emitir Prescrição — só para consultas realizadas */}
-                  {c.status === 'realizada' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
-                      onClick={() => router.push(`/medico/pacientes/${c.pacienteId}?tab=prescricao`)}
-                    >
-                      <FileText size={14} />
-                      Emitir Prescrição
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+            <DataEmpty title="Nenhuma consulta no histórico" />
+          ) : (
+            <DataList>
+              {consultasPassadas.map((c) => {
+                const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.realizada;
+                return (
+                  <DataRow
+                    key={c.id}
+                    className="opacity-70"
+                    icon={<User size={16} className="text-muted-foreground" />}
+                    title={c.pacienteNome}
+                    subtitle={format(new Date(c.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    trailing={
+                      <>
+                        <Badge className={cfg.cor}>{cfg.label}</Badge>
+                        {c.status === 'realizada' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                            onClick={() => router.push(`/medico/pacientes/${c.pacienteId}?tab=prescricao`)}
+                          >
+                            <FileText size={14} />
+                            Emitir Prescrição
+                          </Button>
+                        )}
+                      </>
+                    }
+                  />
+                );
+              })}
+            </DataList>
+          )}
         </TabsContent>
 
         {/* ── TAB: CONFIGURAÇÕES ── */}

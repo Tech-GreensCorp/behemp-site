@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   AlertTriangle,
   Calendar,
@@ -612,20 +612,19 @@ export default function TriagensAdminPage() {
 
       {/* ── Lista ────────────────────────────────────────────── */}
       {triagensFiltradas.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <FileCheck size={48} className="mb-4 text-muted-foreground/30" />
-            <p className="text-lg font-medium">Nenhuma triagem encontrada</p>
-            <p className="text-sm text-muted-foreground">
-              {busca || filtroStatus !== 'todos'
-                ? 'Tente ajustar os filtros de busca.'
-                : 'Quando alguém preencher o formulário de triagem, os dados aparecerão aqui.'}
-            </p>
-            {(busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
+        <DataEmpty
+          icon={<FileCheck size={24} />}
+          title="Nenhuma triagem encontrada"
+          description={
+            busca || filtroStatus !== 'todos'
+              ? 'Tente ajustar os filtros de busca.'
+              : 'Quando alguém preencher o formulário de triagem, os dados aparecerão aqui.'
+          }
+          actions={
+            (busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4"
                 onClick={() => {
                   setBusca('');
                   setFiltroStatus('todos');
@@ -634,46 +633,41 @@ export default function TriagensAdminPage() {
               >
                 Limpar filtros
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        />
       ) : (
         <>
-          <div className="space-y-2">
+          <DataList>
             {triagensPagina.map((triagem) => {
               const config = STATUS_CONFIG[triagem.statusVisualizacao] || STATUS_CONFIG.pendente;
               const formulario =
                 (triagem.dados as Record<string, string>)['_formulario'] ?? '';
               return (
-                <Card
+                <DataRow
                   key={triagem.id}
                   className={cn(
-                    'group border-0 shadow-sm transition-all hover:shadow-md',
-                    triagem.statusVisualizacao === 'pendente' && 'ring-1 ring-primary/20',
+                    'group',
+                    triagem.statusVisualizacao === 'pendente' && 'bg-primary-soft/30',
                   )}
-                >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    {/* Ícone */}
+                  icon={
                     <div
-                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary/10"
+                      className="flex h-full w-full cursor-pointer items-center justify-center"
                       onClick={() => handleVisualizarTriagem(triagem)}
                     >
                       <FileCheck size={20} className="text-primary" />
                     </div>
-
-                    {/* Info principal */}
-                    <div
-                      className="min-w-0 flex-1 cursor-pointer"
-                      onClick={() => handleVisualizarTriagem(triagem)}
-                    >
-                      <p className="font-medium">{triagem.nomeContato || 'Sem nome'}</p>
-                      <p className="truncate text-sm text-muted-foreground">
+                  }
+                  title={
+                    <div className="cursor-pointer" onClick={() => handleVisualizarTriagem(triagem)}>
+                      <div className="truncate text-sm font-medium">{triagem.nomeContato || 'Sem nome'}</div>
+                      <div className="truncate text-xs text-muted-foreground">
                         {triagem.emailContato || triagem.telefoneContato || 'Sem contato'}
-                      </p>
+                      </div>
                     </div>
-
-                    {/* Meta */}
-                    <div className="hidden items-center gap-3 sm:flex">
+                  }
+                  meta={
+                    <div className="flex items-center gap-3">
                       {formulario && (
                         <Badge className="border-0 bg-violet-500/10 text-[11px] font-medium text-violet-600">
                           Elementor
@@ -685,16 +679,12 @@ export default function TriagensAdminPage() {
                           Via médico
                         </Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(triagem.createdAt).toLocaleDateString('pt-BR')}
-                      </span>
-                      <Badge className={cn('border-0 font-medium', config.cor)}>
-                        {config.label}
-                      </Badge>
+                      <span>{new Date(triagem.createdAt).toLocaleDateString('pt-BR')}</span>
+                      <Badge className={cn('border-0 font-medium', config.cor)}>{config.label}</Badge>
                     </div>
-
-                    {/* Ações */}
-                    <div className="flex items-center gap-1">
+                  }
+                  trailing={
+                    <>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -707,20 +697,17 @@ export default function TriagensAdminPage() {
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTriagemParaExcluir(triagem);
-                        }}
+                        onClick={() => setTriagemParaExcluir(triagem)}
                         title="Excluir triagem"
                       >
                         <Trash2 size={16} />
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </>
+                  }
+                />
               );
             })}
-          </div>
+          </DataList>
 
           {/* ── Paginação ─────────────────────────────────── */}
           {totalPaginas > 1 && (

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -20,6 +19,7 @@ import {
   Pill,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
 /**
  * Página de notificações do médico — dados reais do banco.
@@ -109,60 +109,37 @@ export default function NotificacoesPage() {
       />
 
       {notifs.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Bell size={40} className="mb-3 text-muted-foreground/40" />
-            <p className="text-lg font-medium">Nenhuma notificação</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Quando houver novidades, elas aparecerão aqui
-            </p>
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Bell size={24} />}
+          title="Nenhuma notificação"
+          description="Quando houver novidades, elas aparecerão aqui"
+        />
       ) : (
-        <div className="space-y-3">
+        <DataList>
           {notifs.map((notif) => {
             const Icon = TIPO_ICONES[notif.tipo] || Bell;
             return (
-              <Card
+              <DataRow
                 key={notif.id}
-                className={`cursor-pointer border-0 shadow-sm transition-all hover:shadow-md ${
-                  !notif.lida ? 'border-l-4 border-l-primary' : 'opacity-70'
-                }`}
-                onClick={() => !notif.lida && handleMarcarLida(notif.id)}
-              >
-                <CardContent className="flex items-start gap-4 p-4">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                      !notif.lida
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Icon size={20} />
+                onClick={!notif.lida ? () => handleMarcarLida(notif.id) : undefined}
+                className={!notif.lida ? 'bg-primary-soft/30' : 'opacity-70'}
+                icon={<Icon size={18} className={!notif.lida ? 'text-primary' : 'text-muted-foreground'} />}
+                title={
+                  <div className="flex items-center gap-2">
+                    {notif.titulo}
+                    {!notif.lida && <Badge className="h-5 text-[10px]">Nova</Badge>}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{notif.titulo}</p>
-                      {!notif.lida && (
-                        <Badge className="h-5 text-[10px]">Nova</Badge>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {notif.mensagem}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(notif.createdAt).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                }
+                subtitle={notif.mensagem}
+                meta={new Date(notif.createdAt).toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
     </div>
   );

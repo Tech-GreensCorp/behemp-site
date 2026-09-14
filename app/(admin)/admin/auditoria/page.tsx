@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
 /**
  * Página de auditoria LGPD — logs de operações sensíveis.
@@ -96,47 +96,36 @@ export default function AuditoriaPage() {
           <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : logs.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Shield size={40} className="mb-3 text-muted-foreground/40" />
-            <p className="text-lg font-medium">Nenhum registro de auditoria</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              As operações sensíveis serão registradas automaticamente
-            </p>
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Shield size={24} />}
+          title="Nenhum registro de auditoria"
+          description="As operações sensíveis serão registradas automaticamente"
+        />
       ) : (
-        <div className="space-y-2">
+        <DataList>
           {logs.map((log) => {
             const acaoConf = ACAO_CONFIG[log.acao] ?? ACAO_CONFIG.visualizar;
             const Icon = acaoConf?.icon ?? Shield;
 
             return (
-              <Card key={log.id} className="border-0 shadow-sm">
-                <CardContent className="flex items-start gap-4 p-4">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${acaoConf?.cor ?? 'bg-muted'}`}>
-                    <Icon size={18} />
+              <DataRow
+                key={log.id}
+                icon={<Icon size={18} />}
+                title={
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] capitalize">{log.acao}</Badge>
+                    <Badge variant="secondary" className="text-[10px] capitalize">{log.entidade}</Badge>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        {log.acao}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] capitalize">
-                        {log.entidade}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {log.entidadeId && (
-                        <span className="font-mono text-xs">ID: {log.entidadeId.slice(0, 8)}... </span>
-                      )}
-                      {log.userId && (
-                        <span className="text-xs">Usuário: {log.userId.slice(0, 8)}...</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">
-                    <div className="flex items-center gap-1">
+                }
+                subtitle={
+                  <>
+                    {log.entidadeId && <span className="font-mono">ID: {log.entidadeId.slice(0, 8)}... </span>}
+                    {log.userId && <span>Usuário: {log.userId.slice(0, 8)}...</span>}
+                  </>
+                }
+                meta={
+                  <>
+                    <div className="flex items-center justify-end gap-1">
                       <Calendar size={12} />
                       <span>
                         {new Date(log.createdAt).toLocaleString('pt-BR', {
@@ -149,12 +138,12 @@ export default function AuditoriaPage() {
                       </span>
                     </div>
                     {log.ip && <p className="mt-0.5">IP: {log.ip}</p>}
-                  </div>
-                </CardContent>
-              </Card>
+                  </>
+                }
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
     </div>
   );

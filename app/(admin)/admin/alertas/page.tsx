@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { DispararManualBtn } from './_components/disparar-manual-btn';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow } from '@/components/shared/data-list';
 import type { AlertaMedicacao, AlertaLicenca, AlertaMensalidade } from '@/lib/alertas/coletor';
 
 export default async function AlertasDashboardPage() {
@@ -77,58 +78,49 @@ export default async function AlertasDashboardPage() {
               Nenhum alerta pendente no momento. Tudo tranquilo! ✅
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs uppercase bg-creme/50 text-verde-musgo">
-                  <tr>
-                    <th className="px-4 py-3">Prioridade</th>
-                    <th className="px-4 py-3">Paciente</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3">Detalhe</th>
-                    <th className="px-4 py-3">Contato</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dadosAlertas.map((alerta: AlertaMedicacao | AlertaLicenca | AlertaMensalidade, i: number) => (
-                    <tr key={i} className="border-b border-creme hover:bg-creme/20">
-                      <td className="px-4 py-3">
-                        {alerta.prioridade === 'critico' && <Badge variant="destructive">Crítico</Badge>}
-                        {alerta.prioridade === 'atencao' && <Badge className="bg-amber-500 hover:bg-amber-600">Atenção</Badge>}
-                        {alerta.prioridade === 'aviso' && <Badge className="bg-blue-500 hover:bg-blue-600">Aviso</Badge>}
-                      </td>
-                      <td className="px-4 py-3 font-medium">{alerta.pacienteNome}</td>
-                      <td className="px-4 py-3 capitalize">{alerta.tipo.replace('_', ' ')}</td>
-                      <td className="px-4 py-3">
-                        {alerta.tipo === 'medicacao' && (
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-xs text-verde-musgo truncate max-w-[200px]" title={(alerta as AlertaMedicacao).medicamento}>
-                              {(alerta as AlertaMedicacao).medicamento}
-                            </span>
-                            <span className="text-xs">
-                              Termina em {alerta.diasRestantes} dias ({format(new Date((alerta as AlertaMedicacao).dataFim), 'dd/MM/yyyy')})
-                            </span>
-                          </div>
-                        )}
-                        {alerta.tipo === 'licenca_anvisa' && (
-                          <div className="text-xs">
-                            Vence em {alerta.diasRestantes} dias ({format(new Date((alerta as AlertaLicenca).dataValidade), 'dd/MM/yyyy')})
-                          </div>
-                        )}
-                        {alerta.tipo === 'mensalidade' && (
-                          <div className="text-xs">
-                            Atraso de {(alerta as AlertaMensalidade).diasAtraso} dias (Venceu {format(new Date((alerta as AlertaMensalidade).dataVencimento), 'dd/MM/yyyy')})
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        <div>{alerta.pacienteTelefone || 'N/A'}</div>
-                        <div className="text-muted-foreground">{alerta.pacienteEmail}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataList>
+              {dadosAlertas.map((alerta: AlertaMedicacao | AlertaLicenca | AlertaMensalidade, i: number) => (
+                <DataRow
+                  key={i}
+                  title={alerta.pacienteNome}
+                  subtitle={
+                    <>
+                      {alerta.tipo === 'medicacao' && (
+                        <>
+                          {(alerta as AlertaMedicacao).medicamento} — termina em {alerta.diasRestantes} dias (
+                          {format(new Date((alerta as AlertaMedicacao).dataFim), 'dd/MM/yyyy')})
+                        </>
+                      )}
+                      {alerta.tipo === 'licenca_anvisa' && (
+                        <>
+                          Licença vence em {alerta.diasRestantes} dias (
+                          {format(new Date((alerta as AlertaLicenca).dataValidade), 'dd/MM/yyyy')})
+                        </>
+                      )}
+                      {alerta.tipo === 'mensalidade' && (
+                        <>
+                          Atraso de {(alerta as AlertaMensalidade).diasAtraso} dias (venceu{' '}
+                          {format(new Date((alerta as AlertaMensalidade).dataVencimento), 'dd/MM/yyyy')})
+                        </>
+                      )}
+                    </>
+                  }
+                  meta={
+                    <>
+                      <div>{alerta.pacienteTelefone || 'N/A'}</div>
+                      <div>{alerta.pacienteEmail}</div>
+                    </>
+                  }
+                  trailing={
+                    <>
+                      {alerta.prioridade === 'critico' && <Badge variant="destructive">Crítico</Badge>}
+                      {alerta.prioridade === 'atencao' && <Badge className="bg-amber-500 hover:bg-amber-600">Atenção</Badge>}
+                      {alerta.prioridade === 'aviso' && <Badge className="bg-blue-500 hover:bg-blue-600">Aviso</Badge>}
+                    </>
+                  }
+                />
+              ))}
+            </DataList>
           )}
         </CardContent>
       </Card>

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { listarNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '@/app/_actions/notificacoes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   Bell,
   Calendar,
@@ -125,71 +125,63 @@ export default function NotificacoesPacientePage() {
         }
       />
 
-      {/* Lista / Card Vazio */}
+      {/* Lista */}
       {notificacoes.length === 0 ? (
-        <Card className="border border-border/30 bg-white shadow-sm rounded-3xl overflow-hidden transition-all hover:shadow-md animate-fade-up max-w-lg mx-auto text-center">
-          <CardContent className="flex flex-col items-center justify-center p-8 sm:p-12 relative grain">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Bell className="h-8 w-8" />
-            </div>
-            <h3 className="font-display text-2xl font-bold text-foreground">Nenhuma notificação</h3>
-            <p className="mt-3 text-sm text-muted-foreground max-w-xs leading-relaxed">
-              Quando houver atualizações sobre seu tratamento, elas aparecerão aqui.
-            </p>
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Bell size={24} />}
+          title="Nenhuma notificação"
+          description="Quando houver atualizações sobre seu tratamento, elas aparecerão aqui."
+        />
       ) : (
-        <div className="space-y-4 animate-fade-up">
+        <DataList className="animate-fade-up">
           {notificacoes.map((notificacao) => {
             const Icone = TIPO_ICONE[notificacao.tipo] || Bell;
             const cor = TIPO_COR[notificacao.tipo] || TIPO_COR.geral;
 
             return (
-              <Card
+              <DataRow
                 key={notificacao.id}
-                className={cn(
-                  "border border-border/30 bg-white shadow-sm rounded-3xl overflow-hidden transition-all hover:shadow-md",
-                  !notificacao.lida ? "ring-1 ring-primary/20" : "opacity-75 bg-white/70"
-                )}
-              >
-                <CardContent className="flex items-start gap-4 p-5">
-                  <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", cor)}>
-                    <Icone size={20} />
+                className={!notificacao.lida ? undefined : 'opacity-70'}
+                icon={
+                  <div className={cn('flex h-full w-full items-center justify-center rounded-full', cor)}>
+                    <Icone size={18} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-foreground text-sm leading-snug">{notificacao.titulo}</p>
-                      {!notificacao.lida && (
-                        <Badge className="bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">Nova</Badge>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{notificacao.mensagem}</p>
-                    <p className="mt-2 text-xs text-muted-foreground/60 flex items-center gap-1.5">
-                      {new Date(notificacao.createdAt).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                }
+                title={
+                  <div className="flex flex-wrap items-center gap-2">
+                    {notificacao.titulo}
+                    {!notificacao.lida && (
+                      <Badge className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                        Nova
+                      </Badge>
+                    )}
                   </div>
-                  {!notificacao.lida && (
+                }
+                subtitle={notificacao.mensagem}
+                meta={new Date(notificacao.createdAt).toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                trailing={
+                  !notificacao.lida && (
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleMarcarLida(notificacao.id)}
-                      className="shrink-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent h-8 w-8 cursor-pointer"
+                      className="h-8 w-8 shrink-0 rounded-xl"
                       title="Marcar como lida"
                     >
                       <CheckCircle2 size={16} />
                     </Button>
-                  )}
-                </CardContent>
-              </Card>
+                  )
+                }
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
     </div>
   );

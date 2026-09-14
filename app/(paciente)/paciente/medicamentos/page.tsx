@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Pill,
@@ -18,8 +17,8 @@ import {
 } from 'lucide-react';
 import { listarMeusMedicamentos, type ItemMedicamentoPaciente } from '@/app/_actions/medicamentos-paciente';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataEmpty } from '@/components/shared/data-list';
 
 // Agrupa itens pelo ajusteId para exibir por data de ajuste
 function agruparPorAjuste(itens: ItemMedicamentoPaciente[]) {
@@ -89,27 +88,20 @@ export default function MedicamentosPage() {
         </div>
       ) : grupos.length === 0 ? (
         /* ── Empty state ── */
-        <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up delay-75">
-          <CardContent className="flex flex-col items-center justify-center py-12 sm:py-20 text-center px-4 sm:px-6">
-            <div className="mb-5 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-2xl bg-primary/10">
-              <Pill className="h-8 w-8 sm:h-10 sm:w-10 text-primary/40" />
-            </div>
-            <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">
-              Nenhum medicamento prescrito
-            </h2>
-            <p className="mt-2 sm:mt-3 max-w-sm text-sm text-muted-foreground leading-relaxed">
-              Seu médico responsável irá configurar sua dosagem.
-              Caso já tenha consultado, entre em contato pelo chat.
-            </p>
+        <DataEmpty
+          icon={<Pill size={24} />}
+          title="Nenhum medicamento prescrito"
+          description="Seu médico responsável irá configurar sua dosagem. Caso já tenha consultado, entre em contato pelo chat."
+          actions={
             <Link
               href="/paciente/chat"
-              className="mt-5 sm:mt-6 inline-flex items-center gap-2 rounded-full bg-[#16a34a] hover:bg-[#148f43] px-6 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all duration-200"
+              className="inline-flex items-center gap-2 rounded-full bg-[#16a34a] hover:bg-[#148f43] px-6 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all duration-200"
             >
               <MessageSquare className="h-4 w-4" />
               Falar com a equipe
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <>
           {/* ── Dosagem atual (ajuste mais recente) ── */}

@@ -6,10 +6,10 @@ import { desc, eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShieldCheck, FileText, Download, CheckCircle2, Clock, AlertCircle, Send } from 'lucide-react';
+import { ShieldCheck, FileText, CheckCircle2, Clock, AlertCircle, Send } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
 type DocuSignStatus = 'nao_enviado' | 'enviado' | 'visualizado' | 'assinado' | 'concluido' | 'recusado' | 'expirado' | 'erro';
 
@@ -95,83 +95,65 @@ export default async function AdminProcuracoesPage() {
         </Card>
       </div>
 
-      <div className="rounded-xl border border-border bg-white overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
-              <tr>
-                <th className="px-6 py-4">Paciente</th>
-                <th className="px-6 py-4">Data Geração</th>
-                <th className="px-6 py-4">Status DocuSign</th>
-                <th className="px-6 py-4">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {procuracoes.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
-                    Nenhuma Procuração Específica encontrada.
-                  </td>
-                </tr>
-              ) : (
-                procuracoes.map((proc) => {
-                  const badge = STATUS_BADGE[proc.status as DocuSignStatus] ?? STATUS_BADGE.nao_enviado;
-                  
-                  return (
-                    <tr key={proc.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-foreground">{proc.nomeCompleto}</p>
-                        <p className="text-xs text-muted-foreground">{proc.email} • CPF: {proc.cpf}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-foreground">{format(proc.criadoEm, "dd/MM/yyyy", { locale: ptBR })}</p>
-                        <p className="text-xs text-muted-foreground">{format(proc.criadoEm, "HH:mm", { locale: ptBR })}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col items-start gap-1">
-                          <Badge className={badge.className + " gap-1"}>
-                            {badge.icon}
-                            {proc.stubAtivo && proc.status === 'nao_enviado' ? 'Em configuração' : badge.label}
-                          </Badge>
-                          {proc.stubAtivo && (
-                            <span className="text-[10px] text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded font-medium">STUB</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {proc.urlPdfGerado && (
-                            <a 
-                              href={proc.urlPdfGerado} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-xs gap-1"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              PDF Original
-                            </a>
-                          )}
-                          {proc.urlPdfAssinado && (
-                            <a 
-                              href={proc.urlPdfAssinado} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5" />
-                              PDF Assinado
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {procuracoes.length === 0 ? (
+        <DataEmpty icon={<FileText size={24} />} title="Nenhuma Procuração Específica encontrada." />
+      ) : (
+        <DataList>
+          {procuracoes.map((proc) => {
+            const badge = STATUS_BADGE[proc.status as DocuSignStatus] ?? STATUS_BADGE.nao_enviado;
+            return (
+              <DataRow
+                key={proc.id}
+                title={proc.nomeCompleto}
+                subtitle={`${proc.email} • CPF: ${proc.cpf}`}
+                meta={
+                  <>
+                    {format(proc.criadoEm, 'dd/MM/yyyy', { locale: ptBR })}
+                    <div>{format(proc.criadoEm, 'HH:mm', { locale: ptBR })}</div>
+                  </>
+                }
+                trailing={
+                  <>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge className={badge.className + ' gap-1'}>
+                        {badge.icon}
+                        {proc.stubAtivo && proc.status === 'nao_enviado' ? 'Em configuração' : badge.label}
+                      </Badge>
+                      {proc.stubAtivo && (
+                        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
+                          STUB
+                        </span>
+                      )}
+                    </div>
+                    {proc.urlPdfGerado && (
+                      <a
+                        href={proc.urlPdfGerado}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        PDF Original
+                      </a>
+                    )}
+                    {proc.urlPdfAssinado && (
+                      <a
+                        href={proc.urlPdfAssinado}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        PDF Assinado
+                      </a>
+                    )}
+                  </>
+                }
+              />
+            );
+          })}
+        </DataList>
+      )}
     </div>
   );
 }

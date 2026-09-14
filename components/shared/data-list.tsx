@@ -39,8 +39,8 @@ export function DataRow({ icon, title, subtitle, meta, trailing, href, onClick, 
     <>
       {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">{icon}</div>}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{title}</p>
-        {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="truncate text-sm font-medium">{title}</div>
+        {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
       </div>
       {meta && <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">{meta}</div>}
       {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
