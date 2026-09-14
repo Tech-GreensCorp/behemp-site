@@ -39,6 +39,29 @@ const LIMITE_DO_BOT = 60;
 /** Nunca cacheia: cada chamada cria ou reemite um link. */
 export const dynamic = 'force-dynamic';
 
+/**
+ * 🔴 TODA RESPOSTA NÃO-2xx CARREGA UM CÓDIGO CURTO — pedido da Greens em 14/09/2026, e é a
+ * melhor sugestão que saiu de três sessões de diagnóstico.
+ *
+ * Palavras deles: _"hoje cinco portões diferentes produzem a mesma transferência silenciosa
+ * para a Recepção, e foi isso que custou três sessões"_. Está certo: o painel do ChatPro
+ * transfere em qualquer status não-2xx, e quem testa vê só o atendente aparecer.
+ *
+ * | código      | portão                                    |
+ * | ----------- | ----------------------------------------- |
+ * | `E-LIMITE`  | 429 — limite de requisição                |
+ * | `E-CONFIG`  | 503 — nenhuma conta configurada aqui      |
+ * | `E-SEGREDO` | 401 — o segredo do cabeçalho não bate     |
+ * | `E-CONTATO` | 422 — sem contato confirmado e sem telefone |
+ * | `E-INTERNO` | 500 — exceção inesperada                  |
+ *
+ * ⚠️ **O código vai no CORPO, que vira a mensagem no WhatsApp.** Quem testa lê a causa na hora,
+ * sem abrir log e sem pedir para o outro lado medir. E não revela nada: `E-SEGREDO` diz que o
+ * segredo não bate, não qual é — a mesma informação que o 401 já dava, com um rótulo estável.
+ *
+ * 🔴 **Estável é o ponto.** O texto em português pode mudar; o código não. Quem correlaciona
+ * incidente ao longo do tempo precisa de algo que sobreviva a reescrita de mensagem.
+ */
 function textoPuro(corpo: string, status: number): NextResponse {
   return new NextResponse(corpo, {
     status,
@@ -58,7 +81,7 @@ export async function GET(request: NextRequest) {
    */
   const limite = consumir(identificarChamador(request.headers, 'botlink'), LIMITE_DO_BOT, 60);
   if (!limite.permitido) {
-    return new NextResponse('Muitas requisições. Tente novamente em instantes.', {
+    return new NextResponse('[E-LIMITE] Muitas requisições. Tente novamente em instantes.', {
       status: 429,
       headers: cabecalhosDoLimite(limite, LIMITE_DO_BOT),
     });
@@ -76,7 +99,7 @@ export async function GET(request: NextRequest) {
    */
   if (contasConfiguradas().length === 0) {
     console.error('[chatpro] nenhuma conta configurada — bot-link indisponível');
-    return textoPuro('Integração indisponível no momento.', 503);
+    return textoPuro('[E-CONFIG] Integração indisponível no momento.', 503);
   }
 
   const conta = identificarConta(lerSegredoDoCabecalho(request.headers));
@@ -85,7 +108,7 @@ export async function GET(request: NextRequest) {
     console.warn('[chatpro] bot-link com segredo inválido', {
       caminho: request.nextUrl.pathname,
     });
-    return textoPuro('Não autorizado.', 401);
+    return textoPuro('[E-SEGREDO] Não autorizado.', 401);
   }
 
   /**
@@ -142,12 +165,18 @@ export async function GET(request: NextRequest) {
     if (erro instanceof ErroDeContatoNaoConfirmado) {
       console.warn('[chatpro] bot-link: contato não identificado');
       // Status não-2xx dispara a "Ação em caso de falha" do painel: transfere para atendente.
-      return textoPuro('Não consegui identificar o seu contato. Vou chamar um atendente.', 422);
+      return textoPuro(
+        '[E-CONTATO] Não consegui identificar o seu contato. Vou chamar um atendente.',
+        422,
+      );
     }
 
     console.error('[chatpro] bot-link: falha inesperada', {
       mensagem: erro instanceof Error ? erro.message : String(erro),
     });
-    return textoPuro('Tive um problema para gerar o seu link. Vou chamar um atendente.', 500);
+    return textoPuro(
+      '[E-INTERNO] Tive um problema para gerar o seu link. Vou chamar um atendente.',
+      500,
+    );
   }
 }
