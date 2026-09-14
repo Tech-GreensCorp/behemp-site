@@ -19,6 +19,7 @@ import {
   Pill,
   User,
   Video,
+  Wallet,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -61,7 +62,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Configurações',
-    items: [{ label: 'Meu Perfil', href: '/medico/perfil', icon: User }],
+    items: [
+      { label: 'Pagamentos', href: '/medico/pagamentos', icon: Wallet },
+      { label: 'Meu Perfil', href: '/medico/perfil', icon: User },
+    ],
   },
 ];
 
