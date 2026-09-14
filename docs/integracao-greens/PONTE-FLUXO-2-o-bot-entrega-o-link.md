@@ -14,7 +14,53 @@
 | criação de conta + ficha                  | ✅ transação corrigida (nosso ADR-0022 §60) |
 | tela da ANVISA com os documentos de vocês | ✅ reconhece os três                        |
 
-## 🔴 A pergunta que decide tudo, e é UMA
+## 🔴 MEDIDO EM 14/09/2026, 02:1x — e muda tudo que vem abaixo
+
+Antes de vocês lerem o resto: **o Fluxo 2 já está ligado, e o que faltava era o mesmo defeito do
+Fluxo 1.** Medido no banco da Be4Hope:
+
+```
+origem       parceiro  status          total  com_lead_id  com_session  com_manifesto
+chatpro_bot  behemp    link_acessado      6            0            2              3
+chatpro_bot  behemp    link_gerado        5            0            5              0
+chatpro_bot  greens    link_acessado     12            0            5              5
+chatpro_bot  greens    link_gerado        6            0            3              2
+```
+
+| o que a medição diz                   | consequência                                       |
+| ------------------------------------- | -------------------------------------------------- |
+| **18 solicitações da conta `greens`** | o bot de vocês JÁ chama o endpoint e recebe o link |
+| **12 foram acessadas** pelo paciente  | o link chega e funciona                            |
+| **`com_lead_id: 0` em todas**         | ninguém manda `leadId` — a confirmação nunca roda  |
+| 🔴 **nenhuma com `status: enviada`**  | **zero concluíram**, pelo mesmo motivo do Fluxo 1  |
+
+🔴 **A hipótese que escrevemos abaixo NÃO se aplica.** O código só confirma o contato quando há
+`leadId` (`if (leadId && cliente.estaConfigurado())`), e `leadId` nunca vem. O `401` do
+`/departments/list` que aparece no nosso log é **inofensivo** para este fluxo: ele só traduz UUID
+para nome legível, e o próprio código garante que _"a tradução nunca bloqueia o processamento"_.
+
+⚠️ **E a causa de "zero concluíram" já foi corrigida em 14/09/2026, 23:50 UTC** — era
+`db.transaction()` lançando em produção (`No transactions support in neon-http driver`). O Fluxo
+1 fechou logo depois, com paciente novo, de ponta a ponta.
+
+**Portanto: o Fluxo 2 provavelmente funciona agora, sem mudança de código.** O que falta é
+executar um teste real e medir — não procurar defeito.
+
+### O que ainda vale alinhar
+
+1. **`com_manifesto` está pela metade**: 5 de 12 acessadas na conta `greens` têm manifesto. Sem
+   ele, `pendenciasDe(null)` devolve os cinco documentos e trata todo paciente como se não
+   tivesse nada. Se o bloco de vocês manda o que o paciente já tem, o `?tem=` precisa ir
+   **sempre** — e com `&`, nunca com um segundo `?`.
+2. **A rota de retorno de vocês** (ADR-0027/0028 D-02) — é por ela que a receita volta depois da
+   teleconsulta. Está de pé e verificando assinatura?
+
+O resto deste documento fica como **registro do raciocínio que a medição derrubou**, porque a
+hipótese era plausível e alguém vai levantá-la de novo.
+
+---
+
+## ~~A pergunta que decide tudo~~ — hipótese derrubada pela medição acima
 
 **Quem vai chamar a Be4Hope: o painel do ChatPro ou o backend de vocês?**
 
