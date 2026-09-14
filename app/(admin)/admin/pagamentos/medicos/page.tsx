@@ -49,7 +49,11 @@ export default async function PagamentosMedicosPage() {
               icon={
                 m.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.avatarUrl} alt={m.nome} className="h-full w-full rounded-full object-cover" />
+                  <img
+                    src={m.avatarUrl}
+                    alt={m.nome}
+                    className="h-full w-full rounded-full object-cover"
+                  />
                 ) : (
                   <Stethoscope size={20} className="text-violet-600" />
                 )
@@ -61,7 +65,7 @@ export default async function PagamentosMedicosPage() {
                   <Badge variant={m.configurado ? 'default' : 'secondary'}>
                     {m.configurado ? 'Configurado' : 'Pendente'}
                   </Badge>
-                  <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
+                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
                 </>
               }
             />

@@ -14,7 +14,9 @@ interface DataListProps {
  */
 export function DataList({ children, className }: DataListProps) {
   return (
-    <div className={cn('divide-y divide-border overflow-hidden rounded-2xl border bg-card', className)}>
+    <div
+      className={cn('divide-border bg-card divide-y overflow-hidden rounded-2xl border', className)}
+    >
       {children}
     </div>
   );
@@ -34,15 +36,32 @@ interface DataRowProps {
   className?: string;
 }
 
-export function DataRow({ icon, title, subtitle, meta, trailing, href, onClick, className }: DataRowProps) {
+export function DataRow({
+  icon,
+  title,
+  subtitle,
+  meta,
+  trailing,
+  href,
+  onClick,
+  className,
+}: DataRowProps) {
   const content = (
     <>
-      {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">{icon}</div>}
+      {icon && (
+        <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+          {icon}
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{title}</div>
-        {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
+        {subtitle && <div className="text-muted-foreground truncate text-xs">{subtitle}</div>}
       </div>
-      {meta && <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">{meta}</div>}
+      {meta && (
+        <div className="text-muted-foreground hidden shrink-0 text-right text-xs sm:block">
+          {meta}
+        </div>
+      )}
       {trailing && <div className="flex shrink-0 items-center gap-2">{trailing}</div>}
     </>
   );
@@ -82,14 +101,14 @@ interface DataEmptyProps {
 /** Estado vazio consistente para dentro de um DataList (ou sozinho). */
 export function DataEmpty({ icon, title, description, actions }: DataEmptyProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border bg-card py-16 text-center">
+    <div className="bg-card flex flex-col items-center justify-center rounded-2xl border py-16 text-center">
       {icon && (
-        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary-soft text-primary">
+        <div className="bg-primary-soft text-primary mb-3 flex h-14 w-14 items-center justify-center rounded-full">
           {icon}
         </div>
       )}
       <p className="text-lg font-medium">{title}</p>
-      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      {description && <p className="text-muted-foreground mt-1 text-sm">{description}</p>}
       {actions && <div className="mt-4 flex gap-2">{actions}</div>}
     </div>
   );
