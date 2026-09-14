@@ -38,6 +38,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  MapPin,
   Check,
   Phone,
   ShieldCheck,
@@ -53,6 +54,7 @@ import { cn } from '@/lib/utils';
 import { cpfEhValido, formatarCpf, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
 import { ConsentimentoDoCompartilhamento } from '@/components/paciente/ConsentimentoDoCompartilhamento';
+import { CepRapido, type ValoresDeEndereco } from '@/components/paciente/CepRapido';
 import type { Finalidade } from '@/lib/parceiros/consentimento';
 
 interface Props {
@@ -292,6 +294,33 @@ export function FormularioDeCadastro({
   const confirmandoDados = dadosVieramDoParceiro && !corrigindo;
 
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
+
+  /**
+   * 🔴 ETAPA VISUAL DENTRO DE `etapa === 'dados'` — puramente de apresentação.
+   *
+   * Não é um estado novo de submissão: `criarConta` continua lendo os MESMOS campos de
+   * sempre, e `podeEnviar` continua exigindo os mesmos requisitos. Isto só decide qual
+   * bloco de `<Secao>` fica visível, pra trocar um scroll único por passos — nada aqui
+   * muda o schema, a validação ou o que é enviado ao servidor.
+   */
+  const [subEtapa, setSubEtapa] = useState(0);
+
+  /**
+   * 🔴 ENDEREÇO — etapa própria, obrigatória (decisão do dono, 14/09/2026).
+   *
+   * `CepRapido` roda em `modoControlado`: a conta ainda não existe nesta etapa (é
+   * `criarConta`/`gravarFicha` quem cria), então só há estado local aqui. O valor entra
+   * junto do resto na MESMA transação de `concluirCadastroPorLink` — sem o problema de
+   * timing que `/registrar-se` tem (lá o `users` só existe depois do `setActive`).
+   */
+  const [endereco, setEndereco] = useState<ValoresDeEndereco>({
+    cep: '',
+    numero: '',
+    endereco: '',
+    cidade: '',
+    uf: '',
+    completo: false,
+  });
 
   /**
    * O paciente clicou em "Corrigir meus dados". É escolha dele, e escolha não se desfaz
@@ -623,6 +652,18 @@ export function FormularioDeCadastro({
     (jaTemSessaoUtil || (senhaValida && senhasConferem)) &&
     tratamentoRespondido;
 
+  /**
+   * Validade POR PASSO do wizard visual (ver `subEtapa`). Reusa exatamente os mesmos
+   * booleanos de `podeEnviar` — nenhum requisito novo, só fatiado por etapa visível.
+   */
+  const podeAvancarStep0 =
+    nomeValido &&
+    cpfValido &&
+    emailValido &&
+    telefoneValido &&
+    (jaTemSessaoUtil || (senhaValida && senhasConferem));
+  const podeAvancarStep1 = tratamentoRespondido;
+
   /** Força da senha, para dar retorno em vez de só recusar no envio. */
   const forcaDaSenha = useMemo(() => {
     let pontos = 0;
@@ -663,6 +704,10 @@ export function FormularioDeCadastro({
       tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       // Pode ser lista vazia, e vazia é uma resposta: ele leu e não autorizou nada.
       finalidadesConsentidas,
+      cep: endereco.cep || null,
+      endereco: endereco.endereco || null,
+      cidade: endereco.cidade || null,
+      uf: endereco.uf || null,
     });
 
     if (!gravado.sucesso) {
@@ -1054,6 +1099,7 @@ export function FormularioDeCadastro({
                    */
                   setVoltouDeProposito(true);
                   setEtapa('dados');
+                  setSubEtapa(0);
                   setErro('');
                 }}
                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
@@ -1073,7 +1119,16 @@ export function FormularioDeCadastro({
           </form>
         ) : (
           <form onSubmit={criarConta} className="space-y-7">
-            {confirmandoDados ? (
+            {/*
+              🔴 ETAPAS VISUAIS — puramente apresentação (ver `subEtapa` acima). Nenhum
+              campo muda de nome, nenhuma validação muda: `podeEnviar` e `criarConta`
+              continuam exatamente os mesmos, só o que fica visível em tela muda.
+            */}
+            <EtapasDoCadastro passo={subEtapa} />
+
+            {subEtapa === 0 && (
+              <>
+                {confirmandoDados ? (
               /**
                * 🔴 O PACIENTE QUE VEIO DO PARCEIRO CONFIRMA — NÃO DIGITA.
                *
@@ -1230,6 +1285,20 @@ export function FormularioDeCadastro({
               </Secao>
             )}
 
+                <Button
+                  type="button"
+                  onClick={() => setSubEtapa(1)}
+                  disabled={!podeAvancarStep0}
+                  className="h-12 w-full rounded-xl text-base"
+                >
+                  Continuar
+                  <ArrowRight size={18} />
+                </Button>
+              </>
+            )}
+
+            {subEtapa === 1 && (
+              <>
             {/*
               🔴 AS DUAS LISTAS SOMEM NO FLUXO DA TELECONSULTA (pedidos 1 e 2 do chefe,
               14/09/2026), e some o `<Separador />` junto — senão sobra um traço no vazio.
@@ -1649,6 +1718,74 @@ export function FormularioDeCadastro({
               </fieldset>
             </Secao>
 
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSubEtapa(0)}
+                    className="h-12 rounded-xl"
+                  >
+                    <ArrowLeft size={18} />
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setSubEtapa(2)}
+                    disabled={!podeAvancarStep1}
+                    className="h-12 flex-1 rounded-xl text-base"
+                  >
+                    Continuar
+                    <ArrowRight size={18} />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/*
+              🔴 ENDEREÇO — etapa própria e obrigatória (decisão do dono, 14/09/2026).
+              `modoControlado`: só reporta os valores em `endereco`; quem grava é
+              `gravarFicha`, na mesma transação da ficha inteira.
+            */}
+            {subEtapa === 2 && (
+              <>
+                <Secao titulo="Seu endereço" icone={MapPin}>
+                  <CepRapido modoControlado aoMudarValores={setEndereco} />
+                </Secao>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSubEtapa(1)}
+                    className="h-12 rounded-xl"
+                  >
+                    <ArrowLeft size={18} />
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setSubEtapa(3)}
+                    disabled={!endereco.completo}
+                    className="h-12 flex-1 rounded-xl text-base"
+                  >
+                    Continuar
+                    <ArrowRight size={18} />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {subEtapa === 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSubEtapa(2)}
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium transition-opacity"
+                >
+                  <ArrowLeft size={14} />
+                  Voltar
+                </button>
+
             <ConsentimentoDoCompartilhamento
               selecionadas={finalidadesConsentidas}
               onChange={setFinalidadesConsentidas}
@@ -1851,6 +1988,8 @@ export function FormularioDeCadastro({
                 </span>
               </p>
             </div>
+              </>
+            )}
           </form>
         )}
       </div>
@@ -1933,6 +2072,41 @@ function Secao({
 function Separador() {
   return (
     <div className="via-border h-px w-full bg-gradient-to-r from-transparent to-transparent" />
+  );
+}
+
+const ROTULOS_DA_ETAPA = ['Seus dados', 'Documentos', 'Endereço', 'Autorização'];
+
+/**
+ * INDICADOR DE PROGRESSO DO WIZARD VISUAL — puramente decorativo/informativo.
+ *
+ * Não controla nada: quem decide o que renderiza é `subEtapa` no componente pai. Existe
+ * só para o paciente saber onde está e quanto falta, em vez do scroll único de antes.
+ */
+function EtapasDoCadastro({ passo }: { passo: number }) {
+  return (
+    <div className="flex items-center gap-2" aria-hidden={false}>
+      {ROTULOS_DA_ETAPA.map((rotulo, i) => (
+        <div key={rotulo} className="flex flex-1 items-center gap-2">
+          <div className="flex flex-1 flex-col items-center gap-1.5">
+            <div
+              className={cn(
+                'h-1.5 w-full rounded-full transition-colors duration-300',
+                i <= passo ? 'bg-primary' : 'bg-border',
+              )}
+            />
+            <span
+              className={cn(
+                'text-[11px] font-medium transition-colors',
+                i === passo ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {rotulo}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -2064,6 +2238,12 @@ function Concluido({ urlDeRetorno }: { urlDeRetorno: string | null }) {
         Estamos abrindo sua agenda para você escolher o horário da teleconsulta.
       </p>
       <Loader2 size={22} className="text-primary mx-auto mt-6 animate-spin" />
+
+      {/*
+        🔴 O CEP JÁ FOI COLETADO — na etapa "Endereço" do formulário, antes da conta ser
+        criada. Pedir de novo aqui seria repetir a mesma pergunta duas vezes; ver
+        `EtapasDoCadastro` e o passo `subEtapa === 2`.
+      */}
 
       {/*
         🔴 D-08 — o caminho de volta. Ele veio de outro site porque quer comprar
