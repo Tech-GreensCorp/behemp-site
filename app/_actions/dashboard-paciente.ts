@@ -75,6 +75,12 @@ export interface DadosDashboard {
    * casca do `/redirect` passou a mentir para todas.
    */
   situacao: { ponto: string; porque: string; destino: string | null; origem: string | null };
+  /**
+   * `true` quando o paciente ainda não tem CEP salvo em `pacientes.cep` (inclusive quando
+   * a linha em `pacientes` nem existe ainda). É o que decide o aviso de endereço no painel —
+   * some sozinho assim que o CEP é gravado, sem precisar de flag de "já perguntei".
+   */
+  enderecoPendente: boolean;
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -100,6 +106,7 @@ export async function obterDadosDashboard(): Promise<{
       consultaRecenteRes,
       userIdRes,
       anvisaRes,
+      cepRes,
     ] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
@@ -254,6 +261,19 @@ export async function obterDadosDashboard(): Promise<{
             AND (a.data_validade IS NULL OR a.data_validade >= CURRENT_DATE)
         ) AS "temAnvisa"
       `),
+      /**
+       * 11. CEP já cadastrado?
+       *
+       * `LEFT JOIN` de propósito: paciente sem linha em `pacientes` (reconciliação
+       * automática que ainda não gravou ficha, por exemplo) também conta como pendente.
+       */
+      db.execute(sql`
+        SELECT p.cep
+        FROM users u
+        LEFT JOIN pacientes p ON p.user_id = u.id AND p.deleted_at IS NULL
+        WHERE u.clerk_id = ${auth.clerkId}
+        LIMIT 1
+      `),
     ]);
 
     // Processar médico
@@ -325,6 +345,7 @@ export async function obterDadosDashboard(): Promise<{
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
 
     const precisaDaProcuracao = !anvisaRes.rows[0]?.temAnvisa;
+    const enderecoPendente = !(cepRes.rows[0] as { cep?: string | null } | undefined)?.cep;
 
     /**
      * O cadastro que ficou pela metade, se houver. Casa pelo e-mail porque a solicitação
@@ -356,6 +377,7 @@ export async function obterDadosDashboard(): Promise<{
         precisaDaProcuracao,
         cadastroPendente,
         situacao,
+        enderecoPendente,
       },
     };
   } catch (error) {

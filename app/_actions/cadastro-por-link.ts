@@ -120,6 +120,21 @@ const esquema = z.object({
       z.enum([FINALIDADES.avaliacaoMedica, FINALIDADES.apoioAnvisa, FINALIDADES.retornoAoParceiro]),
     )
     .optional(),
+  /**
+   * 🔴 ENDEREÇO — obrigatório no FORMULÁRIO (etapa própria, `formulario-de-cadastro.tsx`),
+   * mas opcional AQUI de propósito.
+   *
+   * ⚠️ A RECONCILIAÇÃO AUTOMÁTICA (ADR-0022 D-09, `page.tsx`) chama esta mesma action sem
+   * nenhum humano na tela — não existe CEP nenhum pra ela informar. Se este campo fosse
+   * obrigatório no schema, toda reconciliação automática passaria a falhar validação e
+   * cairia pro formulário completo, matando o D-09 pra TODO MUNDO, não só pra quem falta
+   * endereço. Quem reconciliar sem CEP fica coberto pelo aviso do painel
+   * (`AvisoDeEnderecoPendente`) — não pela transação de cadastro em si.
+   */
+  cep: z.string().trim().max(20, 'CEP inválido').optional().nullable(),
+  endereco: z.string().trim().max(300, 'Endereço muito longo').optional().nullable(),
+  cidade: z.string().trim().max(150, 'Cidade muito longa').optional().nullable(),
+  uf: z.string().trim().max(10, 'UF inválida').optional().nullable(),
 });
 
 export type EntradaDoCadastro = z.input<typeof esquema>;
@@ -435,6 +450,11 @@ export async function concluirCadastroPorLink(
           tratamentoAtualDescricao: dados.jaFazTratamento
             ? dados.tratamentoAtual?.trim() || null
             : null,
+          // Opcional aqui (ver o comentário do schema) — obrigatório é regra da TELA.
+          cep: dados.cep?.trim() || null,
+          endereco: dados.endereco?.trim() || null,
+          cidade: dados.cidade?.trim() || null,
+          uf: dados.uf?.trim() || null,
         })
         /**
          * 🔴 A CORRIDA COM O WEBHOOK DO CLERK — ADR-0022, G11.
