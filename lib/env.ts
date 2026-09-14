@@ -42,6 +42,12 @@ const envSchema = z.object({
    */
   CHATPRO_INSTANCE_ID_GREENS: z.string().optional(),
   CHATPRO_INSTANCE_TOKEN_GREENS: z.string().optional(),
+  /**
+   * 🔴 O host da instância da Greens. O ChatPro dá um subdomínio por conta, e `sparks` é o
+   * DELES — por isso o default de `CHATPRO_CHAT_API_URL` acerta a conta da Greens por acaso e
+   * erra a nossa. Fica declarada para que a assimetria seja escolha, não descuido.
+   */
+  CHATPRO_CHAT_API_URL_GREENS: z.string().url().optional(),
   CHATPRO_CHAT_API_URL: z.string().url().default('https://sparks.chatpro.com.br'),
   /** Validade do link em horas. 168 = 7 dias. */
   CHATPRO_LINK_TTL_HORAS: z.coerce.number().int().positive().default(168),

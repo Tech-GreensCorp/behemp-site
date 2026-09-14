@@ -53,12 +53,32 @@ const CONTAS: {
    * provar que ninguém mandava `leadId`. Provava o contrário — as que mandavam morriam antes
    * de virar linha. **Contar o que sobreviveu não mede o que chegou.**
    */
-  instancia: { id: string; token: string };
+  instancia: {
+    id: string;
+    token: string;
+    /**
+     * 🔴 O HOST TAMBÉM É POR CONTA — 14/09/2026.
+     *
+     * O ChatPro não tem host único: cada conta responde num subdomínio próprio, e `sparks` é o
+     * da GREENS, não uma palavra do produto. Token válido no host errado devolve **401**, não
+     * 404 — e 401 se lê como "credencial errada", que foi exatamente o diagnóstico errado que
+     * isso produziu por semanas.
+     *
+     * ⚠️ E o default de `CHATPRO_CHAT_API_URL` aponta para `sparks`. Para a conta da Greens
+     * isso é correto por acaso; para a da BeHemp, faz toda chamada ir ao servidor deles, que
+     * responde `"Token inválido"` — corretamente, porque não conhece o nosso token.
+     */
+    host: string;
+  };
 }[] = [
   {
     conta: { id: 'behemp', rotulo: 'BeHemp', urlDeRetorno: null },
     variavel: 'CHATPRO_INTAKE_SECRET',
-    instancia: { id: 'CHATPRO_INSTANCE_ID', token: 'CHATPRO_INSTANCE_TOKEN' },
+    instancia: {
+      id: 'CHATPRO_INSTANCE_ID',
+      token: 'CHATPRO_INSTANCE_TOKEN',
+      host: 'CHATPRO_CHAT_API_URL',
+    },
   },
   {
     conta: {
@@ -69,7 +89,11 @@ const CONTAS: {
       urlDeRetorno: null,
     },
     variavel: 'CHATPRO_INTAKE_SECRET_GREENS',
-    instancia: { id: 'CHATPRO_INSTANCE_ID_GREENS', token: 'CHATPRO_INSTANCE_TOKEN_GREENS' },
+    instancia: {
+      id: 'CHATPRO_INSTANCE_ID_GREENS',
+      token: 'CHATPRO_INSTANCE_TOKEN_GREENS',
+      host: 'CHATPRO_CHAT_API_URL_GREENS',
+    },
   },
 ];
 
@@ -84,13 +108,25 @@ const CONTAS: {
  */
 export function instanciaDaConta(
   id: ContaDeChatpro['id'],
-): { instanceId: string; token: string } | null {
+): { instanceId: string; token: string; baseUrl?: string } | null {
   const entrada = CONTAS.find((c) => c.conta.id === id);
   if (!entrada) return null;
   const instanceId = process.env[entrada.instancia.id]?.trim();
   const token = process.env[entrada.instancia.token]?.trim();
   if (!instanceId || !token) return null;
-  return { instanceId, token };
+
+  /**
+   * ⚠️ O host é OPCIONAL de propósito, e a assimetria é deliberada.
+   *
+   * Sem ele, o cliente cai no default — que hoje é `sparks`, o subdomínio da Greens. Para a
+   * conta `greens` isso acerta; para a `behemp`, erra. Exigir o host quebraria a conta que
+   * funciona para consertar a que não funciona, e nenhuma das duas ficaria de pé.
+   *
+   * O caminho certo é cadastrar `CHATPRO_CHAT_API_URL` com o nosso subdomínio real — está
+   * catalogado. Até lá, quem tem host próprio usa o seu, e quem não tem usa o default.
+   */
+  const baseUrl = process.env[entrada.instancia.host]?.trim();
+  return baseUrl ? { instanceId, token, baseUrl } : { instanceId, token };
 }
 
 /**

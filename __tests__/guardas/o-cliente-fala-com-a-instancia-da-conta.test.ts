@@ -167,6 +167,30 @@ describe('🔴 instanciaDaConta, em execução', () => {
     expect(instanciaDaConta('greens')).not.toEqual(instanciaDaConta('behemp'));
   });
 
+  it('🔴 o host segue a conta quando configurado', () => {
+    /**
+     * `sparks` é o subdomínio da GREENS. Token válido no host errado devolve 401, não 404 — e
+     * 401 se lê como "credencial errada". Foi esse falso diagnóstico que custou semanas.
+     */
+    process.env.CHATPRO_INSTANCE_ID_GREENS = 'id';
+    process.env.CHATPRO_INSTANCE_TOKEN_GREENS = 'token';
+    process.env.CHATPRO_CHAT_API_URL_GREENS = 'https://outro.chatpro.com.br';
+    expect(instanciaDaConta('greens')?.baseUrl).toBe('https://outro.chatpro.com.br');
+  });
+
+  it('e sem host configurado NÃO inventa um — cai no default do cliente', () => {
+    /**
+     * ⚠️ Assimetria deliberada: exigir o host quebraria a conta que funciona hoje (greens, cujo
+     * subdomínio é justamente o default) para consertar a que não funciona.
+     */
+    process.env.CHATPRO_INSTANCE_ID_GREENS = 'id';
+    process.env.CHATPRO_INSTANCE_TOKEN_GREENS = 'token';
+    delete process.env.CHATPRO_CHAT_API_URL_GREENS;
+    const r = instanciaDaConta('greens');
+    expect(r).toBeTruthy();
+    expect(r).not.toHaveProperty('baseUrl');
+  });
+
   it('meia credencial conta como ausente', () => {
     // Um par pela metade daria um cliente que falha de um jeito mais difícil de ler.
     process.env.CHATPRO_INSTANCE_ID_GREENS = 'só-o-id';
