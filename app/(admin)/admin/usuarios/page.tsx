@@ -15,6 +15,7 @@ import {
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
@@ -220,44 +221,32 @@ export default function UsuariosPage() {
           <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : usuarios.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Users size={40} className="mb-3 text-muted-foreground/40" />
-            <p className="text-lg font-medium">Nenhum usuário encontrado</p>
-            {(buscaDebounced || filtroRole) && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tente ajustar os filtros de busca
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Users size={24} />}
+          title="Nenhum usuário encontrado"
+          description={(buscaDebounced || filtroRole) ? 'Tente ajustar os filtros de busca' : undefined}
+        />
       ) : (
-        <div className="space-y-3">
+        <DataList>
           {usuarios.map((user) => {
             const config = ROLE_CONFIG[user.role ?? 'paciente'];
+            const Icon = config?.icon ?? User;
             return (
-              <Card key={user.id} className="border-0 shadow-sm transition-all hover:shadow-md">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${config?.cor ?? 'bg-muted'}`}>
-                    {(() => { const DynIcon = config?.icon ?? User; return <DynIcon size={20} />; })()}
+              <DataRow
+                key={user.id}
+                icon={
+                  <div className={`flex h-full w-full items-center justify-center rounded-full ${config?.cor ?? 'bg-muted'}`}>
+                    <Icon size={18} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{user.nome}</p>
-                    <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <Badge variant={config?.variant ?? 'outline'}>
-                    {config?.label ?? 'Desconhecido'}
-                  </Badge>
-                </CardContent>
-              </Card>
+                }
+                title={user.nome}
+                subtitle={user.email}
+                meta={new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                trailing={<Badge variant={config?.variant ?? 'outline'}>{config?.label ?? 'Desconhecido'}</Badge>}
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
 
       {/* Paginação */}

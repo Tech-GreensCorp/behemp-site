@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   ChevronRight,
   Download,
@@ -350,23 +351,18 @@ export default function PacientesPage() {
           <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : pacientes.length === 0 ? (
-        <Card className="border-border/40 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <User size={48} className="mb-4 text-muted-foreground/30" />
-            <p className="text-lg font-medium">Nenhum paciente encontrado</p>
-            <p className="text-sm text-muted-foreground">
-              {busca || filtroStatus !== 'todos' || filtroTratamento !== 'todos' || filtroJornada !== 'todos'
-                ? 'Tente ajustar os filtros'
-                : 'Comece cadastrando ou importando pacientes'}
-            </p>
-            {!busca && filtroStatus === 'todos' && filtroTratamento === 'todos' && filtroJornada === 'todos' && (
-              <div className="mt-4 flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
+        <DataEmpty
+          icon={<User size={24} />}
+          title="Nenhum paciente encontrado"
+          description={
+            busca || filtroStatus !== 'todos' || filtroTratamento !== 'todos' || filtroJornada !== 'todos'
+              ? 'Tente ajustar os filtros'
+              : 'Comece cadastrando ou importando pacientes'
+          }
+          actions={
+            !busca && filtroStatus === 'todos' && filtroTratamento === 'todos' && filtroJornada === 'todos' && (
+              <>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
                   <Upload size={14} />
                   Importar CSV / XLSX
                 </Button>
@@ -376,43 +372,42 @@ export default function PacientesPage() {
                     Cadastrar paciente
                   </Button>
                 </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </>
+            )
+          }
+        />
       ) : (
-        <div className="space-y-3">
+        <DataList>
           {pacientes.map((paciente) => {
             const statusConfig = STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
+            const jornada = paciente.jornadaFase ? JORNADA_LABELS[paciente.jornadaFase] : undefined;
             return (
-              <Link key={paciente.id} href={`/medico/pacientes/${paciente.id}`}>
-                <Card className="group border-border/40 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-                  <CardContent className="flex items-center gap-4 p-4">
-                    {/* Inicial */}
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 font-heading text-sm font-semibold text-secondary">
-                      {paciente.nome.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{paciente.nome}</p>
-                      <p className="truncate text-sm text-muted-foreground">{paciente.email}</p>
-                    </div>
+              <DataRow
+                key={paciente.id}
+                href={`/medico/pacientes/${paciente.id}`}
+                icon={
+                  <span className="font-heading text-sm font-semibold text-secondary">
+                    {paciente.nome.charAt(0).toUpperCase()}
+                  </span>
+                }
+                title={paciente.nome}
+                subtitle={paciente.email}
+                trailing={
+                  <>
                     <div className="hidden items-center gap-2 sm:flex">
-                      {paciente.jornadaFase && (() => {
-                        const jornada = JORNADA_LABELS[paciente.jornadaFase!];
-                        return (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={{
-                              backgroundColor: jornada ? `${jornada.color}18` : undefined,
-                              color: jornada?.color,
-                              border: `1px solid ${jornada ? `${jornada.color}35` : 'transparent'}`,
-                            }}
-                          >
-                            <span>{jornada?.icon}</span>
-                            {jornada?.label ?? paciente.jornadaFase}
-                          </span>
-                        );
-                      })()}
+                      {jornada && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{
+                            backgroundColor: `${jornada.color}18`,
+                            color: jornada.color,
+                            border: `1px solid ${jornada.color}35`,
+                          }}
+                        >
+                          <span>{jornada.icon}</span>
+                          {jornada.label ?? paciente.jornadaFase}
+                        </span>
+                      )}
                       {paciente.tratamentoTipo && (
                         <Badge variant="outline" className="text-xs">
                           {TRATAMENTO_LABELS[paciente.tratamentoTipo] ?? paciente.tratamentoTipo}
@@ -422,13 +417,13 @@ export default function PacientesPage() {
                         {statusConfig.label}
                       </Badge>
                     </div>
-                    <ChevronRight size={16} className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                  </CardContent>
-                </Card>
-              </Link>
+                    <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
+                  </>
+                }
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
 
       {/* Paginação */}
