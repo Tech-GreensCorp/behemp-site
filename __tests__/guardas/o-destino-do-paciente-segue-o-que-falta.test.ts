@@ -284,8 +284,23 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   });
 
   it('🔴 e só aparece quando a autorização está pendente', () => {
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026 — terceiro caso do dia com o mesmo defeito. A versão
+     * anterior era `toMatch(/\{perguntarSobreAnvisa && \(/)`, que exige o bloco com
+     * **exatamente uma** condição. O `DO-57` acrescentou a segunda (`&& !fluxoDaTeleconsulta`,
+     * porque quem não tem receita não pode ter autorização) e o guarda ficou vermelho sem que
+     * a propriedade que ele protege — _a pergunta depende da pendência_ — tivesse mudado.
+     *
+     * Congelar a forma do gate impede acrescentar condição; e acrescentar condição a um gate
+     * é a coisa mais comum que acontece com um gate.
+     */
     expect(codigo).toContain('pendencias.some(');
-    expect(codigo).toMatch(/\{perguntarSobreAnvisa && \(/);
+    expect(codigo, 'a pergunta da ANVISA deixou de ser condicionada').toMatch(
+      /\{\s*perguntarSobreAnvisa\s*&&/,
+    );
+    expect(codigo, 'a derivação da pergunta deixou de olhar a pendência da autorização').toMatch(
+      /perguntarSobreAnvisa =[\s\S]{0,200}autorizacao_anvisa/,
+    );
   });
 
   /**
@@ -464,16 +479,43 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
  * receita válida. Era o buraco do fluxo BeHemp 1, apontado em 10/09/2026.
  */
 describe('a pergunta da receita, e o destino que a considera', () => {
-  it('a pergunta existe', () => {
-    expect(codigo).toContain('Você já tem uma receita médica de cannabis medicinal válida?');
+  it('a pergunta existe, e usa o termo que o produto decidiu', () => {
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026. A versão anterior era:
+     *
+     *     expect(codigo).toContain('Você já tem uma receita médica de cannabis medicinal válida?');
+     *
+     * Ela congelava a FRASE INTEIRA, e o chefe do dono trocou o vocabulário do produto:
+     * "cannabis medicinal" virou "fitocanabinoide". O guarda ficou vermelho por uma mudança
+     * de texto que era exatamente o que se pediu — e um guarda que reclama do pedido treina
+     * quem o lê a desligá-lo.
+     *
+     * A propriedade é: a pergunta sobre a receita existe, e não usa o termo antigo.
+     */
+    expect(codigo, 'a pergunta sobre a receita sumiu').toMatch(
+      /Você já tem uma receita médica de .* válida\?/,
+    );
+    expect(
+      /cannabis\s+medicinal/i.test(codigo),
+      'o termo antigo voltou — o produto decidiu "fitocanabinoide"',
+    ).toBe(false);
   });
 
   it('e vem ANTES da ANVISA na tela — sem receita não há o que autorizar', () => {
-    const receita = codigo.indexOf('{perguntarSobreReceita && (');
-    const anvisa = codigo.indexOf('{perguntarSobreAnvisa && (');
-    expect(receita).toBeGreaterThan(-1);
-    expect(anvisa).toBeGreaterThan(-1);
-    expect(receita).toBeLessThan(anvisa);
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026, segunda vez no mesmo caso. Exigia o literal
+     * `{perguntarSobreReceita && (` colado; o bloco ganhou uma segunda condição
+     * (`&& !fluxoDaTeleconsulta`, pedido 4 do chefe) e o literal deixou de casar — sem que
+     * a ORDEM, que é o que este caso protege, tivesse mudado.
+     *
+     * A ordem é regra clínica: perguntar pela autorização antes da receita sugere uma
+     * sequência que a norma não permite.
+     */
+    const receita = codigo.indexOf('perguntarSobreReceita &&');
+    const anvisa = codigo.indexOf('perguntarSobreAnvisa &&');
+    expect(receita, 'o bloco da receita sumiu da tela').toBeGreaterThan(-1);
+    expect(anvisa, 'o bloco da ANVISA sumiu da tela').toBeGreaterThan(-1);
+    expect(receita, 'a ANVISA passou a ser perguntada antes da receita').toBeLessThan(anvisa);
   });
 
   /**
