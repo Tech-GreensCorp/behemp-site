@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { PageHeader } from '@/components/shared/page-header';
 
 export default function CalculadoraDosagemPage() {
   const [volume, setVolume] = useState<number>(30);
@@ -16,14 +17,11 @@ export default function CalculadoraDosagemPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight text-verde-musgo">
-          Calculadora de Dosagem
-        </h1>
-        <p className="text-muted-foreground">
-          Simule posologias e preveja a duração do frasco para orientar seus pacientes.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Calculadora de Dosagem"
+        description="Simule posologias e preveja a duração do frasco para orientar seus pacientes."
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-terracota/20 shadow-sm">

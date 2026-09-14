@@ -1,5 +1,6 @@
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
 import { obterEstadoAgendamentoPaciente } from '@/app/(public)/_actions/agendamento';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Agendamento — única rota do fluxo (não existe versão pública). Protegida pelo
@@ -14,17 +15,11 @@ export default async function PacienteAgendamentoPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase">
-          Agendamento
-        </p>
-        <h1 className="font-display text-foreground text-2xl font-bold sm:text-3xl">
-          Agende sua consulta
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Escolha o médico, a data e o horário para a sua teleconsulta.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Agendamento"
+        title="Agende sua consulta"
+        description="Escolha o médico, a data e o horário para a sua teleconsulta."
+      />
 
       <AgendamentoWizard
         reservaAtivaInicial={estado.dados?.reservaAtiva ?? null}

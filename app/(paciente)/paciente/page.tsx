@@ -34,6 +34,7 @@ import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboa
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
 import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
+import { PageHeader } from '@/components/shared/page-header';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -218,24 +219,12 @@ export default function PacienteDashboardPage() {
 
   return (
     <div className="space-y-6 sm:space-y-10">
-      {/* ── Header Editorial ── */}
-      <div className="animate-fade-up">
-        <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase sm:mb-4">
-          Área do Paciente
-        </p>
-        <h1 className="font-display text-foreground text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl">
-          {carregando ? (
-            'Carregando...'
-          ) : (
-            <>
-              Olá, <span>{primeiroNome}</span>
-            </>
-          )}
-        </h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed sm:mt-4 sm:text-base">
-          Acompanhe suas consultas, medicamentos e documentos.
-        </p>
-      </div>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Área do Paciente"
+        title={carregando ? 'Carregando...' : `Olá, ${primeiroNome}`}
+        description="Acompanhe suas consultas, medicamentos e documentos."
+      />
 
       {/*
         🔴 G18 — A FALHA SE ANUNCIA, e diz que o problema é NOSSO.

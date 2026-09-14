@@ -313,13 +313,15 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
         {STEPS.map((s, i) => (
           <div key={s.label} className="flex items-center gap-2">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                i <= step
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all ${
+                i < step
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
+                  : i === step
+                    ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                    : 'bg-muted text-muted-foreground'
               }`}
             >
-              {i + 1}
+              {i < step ? <CheckCircle2 size={16} /> : i + 1}
             </div>
             <span
               className={`hidden text-sm font-medium sm:block ${
@@ -329,7 +331,7 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
               {s.label}
             </span>
             {i < STEPS.length - 1 && (
-              <div className={`mx-2 h-px w-8 ${i < step ? 'bg-primary' : 'bg-border'}`} />
+              <div className={`mx-2 h-1 w-8 rounded-full transition-colors ${i < step ? 'bg-primary' : 'bg-border'}`} />
             )}
           </div>
         ))}

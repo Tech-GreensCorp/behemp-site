@@ -5,6 +5,7 @@ import { TabPacientesPaginada } from './tab-pacientes-paginada';
 import { FormConfigAgenda } from '@/components/medicos/form-config-agenda';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ArrowLeft,
@@ -60,13 +61,11 @@ export default async function MedicoDetalhePage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Botão voltar */}
-      <Link
-        href="/admin"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft size={14} />
-        Voltar ao dashboard
+      <Link href="/admin">
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <ArrowLeft size={16} />
+          Voltar ao dashboard
+        </Button>
       </Link>
 
       {/* Header do médico */}

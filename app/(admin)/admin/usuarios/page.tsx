@@ -13,11 +13,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
+import { PageHeader } from '@/components/shared/page-header';
+import { PaginationBar } from '@/components/shared/pagination-bar';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Search,
   Shield,
@@ -130,13 +131,11 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Usuários</h1>
-        <p className="text-sm text-muted-foreground">
-          {stats.total} usuários registrados na plataforma
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Usuários"
+        description={`${stats.total} usuários registrados na plataforma`}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -222,103 +221,45 @@ export default function UsuariosPage() {
           <Loader2 size={32} className="animate-spin text-primary" />
         </div>
       ) : usuarios.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Users size={40} className="mb-3 text-muted-foreground/40" />
-            <p className="text-lg font-medium">Nenhum usuário encontrado</p>
-            {(buscaDebounced || filtroRole) && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tente ajustar os filtros de busca
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Users size={24} />}
+          title="Nenhum usuário encontrado"
+          description={(buscaDebounced || filtroRole) ? 'Tente ajustar os filtros de busca' : undefined}
+        />
       ) : (
-        <div className="space-y-3">
+        <DataList>
           {usuarios.map((user) => {
             const config = ROLE_CONFIG[user.role ?? 'paciente'];
+            const Icon = config?.icon ?? User;
             return (
-              <Card key={user.id} className="border-0 shadow-sm transition-all hover:shadow-md">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${config?.cor ?? 'bg-muted'}`}>
-                    {(() => { const DynIcon = config?.icon ?? User; return <DynIcon size={20} />; })()}
+              <DataRow
+                key={user.id}
+                icon={
+                  <div className={`flex h-full w-full items-center justify-center rounded-full ${config?.cor ?? 'bg-muted'}`}>
+                    <Icon size={18} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{user.nome}</p>
-                    <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <Badge variant={config?.variant ?? 'outline'}>
-                    {config?.label ?? 'Desconhecido'}
-                  </Badge>
-                </CardContent>
-              </Card>
+                }
+                title={user.nome}
+                subtitle={user.email}
+                meta={new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                trailing={<Badge variant={config?.variant ?? 'outline'}>{config?.label ?? 'Desconhecido'}</Badge>}
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
 
       {/* Paginação */}
       {totalPaginas > 0 && !carregando && usuarios.length > 0 && (
-        <div className="flex flex-col items-center gap-4 pt-2 sm:flex-row sm:justify-between">
-          {/* Info + itens por página */}
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              {totalFiltrado} resultado{totalFiltrado !== 1 ? 's' : ''}
-            </span>
-            <span className="text-border">·</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">Exibir</span>
-              <Select
-                value={String(porPagina)}
-                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
-              >
-                <SelectTrigger size="sm" className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {POR_PAGINA_OPCOES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs">por página</span>
-            </div>
-          </div>
-
-          {/* Controles de página */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina <= 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              className="gap-1"
-            >
-              <ChevronLeft size={14} />
-              Anterior
-            </Button>
-            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
-              Página {pagina} de {totalPaginas}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina >= totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              className="gap-1"
-            >
-              Próximo
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        </div>
+        <PaginationBar
+          page={pagina}
+          totalPages={totalPaginas}
+          onPageChange={setPagina}
+          totalItems={totalFiltrado}
+          pageSize={porPagina}
+          onPageSizeChange={setPorPagina}
+          pageSizeOptions={POR_PAGINA_OPCOES}
+        />
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { PagamentoStatusBadge } from '@/components/admin/pagamentos/pagamento-st
 import { PagamentoFunilBadge } from '@/components/admin/pagamentos/pagamento-funil-badge';
 import { PagamentoStatusForm } from '@/components/admin/pagamentos/pagamento-status-form';
 import { AlertTriangle, ChevronLeft, Wallet } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 function formatarValor(v: string): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,23 +29,20 @@ export default async function PagamentoDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/pagamentos">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ChevronLeft size={16} />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pagamento</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {p.pacienteNome} ·{' '}
-            {new Date(p.dataHora).toLocaleString('pt-BR', {
-              dateStyle: 'short',
-              timeStyle: 'short',
-            })}
-          </p>
-        </div>
-      </div>
+      <Link href="/admin/pagamentos">
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <ChevronLeft size={16} />
+          Pagamentos
+        </Button>
+      </Link>
+
+      <PageHeader
+        title="Pagamento"
+        description={`${p.pacienteNome} · ${new Date(p.dataHora).toLocaleString('pt-BR', {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        })}`}
+      />
 
       {p.erroConfirmacao && !p.confirmadoEm && (
         <Card className="border-0 bg-red-50 shadow-sm">
