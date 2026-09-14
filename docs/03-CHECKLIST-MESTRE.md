@@ -283,6 +283,108 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **SÃO DOIS PRODUTOS ChatPro, com hosts de naturezas diferentes** — explicado pela Greens
+      em 14/09/2026, e é a peça que faltava:
+
+      | produto          | host                                              | header           |
+      | ---------------- | ------------------------------------------------- | ---------------- |
+      | CHATPRO CHAT API | `https://<subdominio-da-conta>.chatpro.com.br`    | `instance-token` |
+      | CHATPRO API      | `https://v5.chatpro.com.br/{instance_id}/api/v1`  | `Authorization`  |
+
+      🔴 **O segundo leva o `instance_id` no CAMINHO, então um host serve todo mundo. O primeiro
+      resolve a conta pelo HOST** — por isso o subdomínio não é adivinhável, e por isso o nosso
+      default era fatal.
+      ⚠️ **Corolário da Greens, e ele vale como regra:** _"se o envio funcionar enquanto o chat
+      não funciona, não é coincidência"_ — são produtos diferentes, e um pode estar de pé com o
+      outro morto.
+      **Como achar o nosso subdomínio, sem suporte:** painel do ChatPro → F12 → Rede → F5 →
+      qualquer XHR → o host dela é o `CHATPRO_CHAT_API_URL`. ⚠️ **Não filtrar por `sparks`** — a
+      lista viria vazia e pareceria que o método não funciona.
+
+- [ ] 🔴 **ROTACIONAR o `CHATPRO_INSTANCE_TOKEN` da BeHemp** — recomendação da Greens em
+      14/09/2026, e ela é correta. Nosso token trafegou **repetidamente** para um host da conta
+      deles, por semanas. Eles registram que nada nosso entrou lá e nada deles saiu — o 401 em
+      100% das chamadas é o registro de que a fronteira segurou —, mas ninguém pode afirmar que
+      o painel não expõe requisições recusadas ao dono da conta.
+      **Ordem: trocar o host primeiro, rotacionar depois.** Rotacionar antes de saber o
+      subdomínio só produziria um token novo batendo no host errado, com o mesmo 401 — e a
+      leitura voltaria a ser "credencial errada".
+- [ ] ⚠️ **A assimetria do host guarda uma armadilha, e ela tem data** — apontada pela Greens.
+      Hoje o host é opcional por conta, e isso está certo: sem ele, cai no default `sparks`, que
+      é justamente o subdomínio da Greens — a conta `greens` acerta host e credencial de uma vez.
+      🔴 **Mas no dia em que alguém configurar o token da BeHemp SEM o host, volta o 401 — mesma
+      mensagem, causa oposta.** Com o subdomínio catalogado, o host deve virar **obrigatório por
+      conta** e o default deve ser **apagado**. Sem o default, faltar o host vira erro alto em vez
+      de chamada silenciosa ao servidor de outra empresa.
+
+- [ ] 🔴🔴 **O default de `CHATPRO_CHAT_API_URL` aponta para o host de OUTRA empresa** — medido
+      em 14/09/2026, e é a causa do 401 que estava sendo atribuído ao token.
+      `lib/env.ts:45` e `lib/chatpro/cliente.ts:78` trazem
+      `.default('https://sparks.chatpro.com.br')`. **`sparks` é o subdomínio da conta da
+      GREENS**, não um host do produto — a Greens descobriu isso e avisou. A variável nunca foi
+      configurada na nossa VPS (medido: `AUSENTE`), então **toda** chamada à CHAT API sempre foi
+      para o servidor deles, que responde `401 "Token inválido"` — corretamente, porque não
+      conhece o nosso token.
+      **Provado**: com o token da BeHemp contra `sparks`, `instance-token` **e** `Authorization`
+      dão 401 com a mesma mensagem. Não é o header, não é o token: é o host.
+      **E explica `chatpro_diretorio` vazia** — a CHAT API nunca funcionou do nosso lado, nem uma
+      vez, desde sempre.
+      🔴 **O perigo do default não é ele estar errado; é ele ser PLAUSÍVEL.** Um host inexistente
+      daria erro de DNS e alguém teria olhado no primeiro dia. Um host real de outra conta
+      responde 401, e 401 se lê como "credencial errada" — foi o que aconteceu, por semanas.
+      **Correção: descobrir o subdomínio da nossa instância no painel do ChatPro** e cadastrar
+      `CHATPRO_CHAT_API_URL`. ⚠️ E trocar o default por algo que **falhe alto**: sem a variável,
+      o cliente devia recusar-se a chamar, não adivinhar um host. Falha silenciosa que aponta
+      para o servidor de outra empresa é pior que falha ruidosa.
+
+- [ ] 🔴 **O `CHATPRO_INSTANCE_TOKEN` da BeHemp está RECUSADO na CHAT API** — medido pela Greens
+      na nossa VPS em 14/09/2026: `/departments/list → 401` e `/endings/list → 401`. Esses dois
+      endpoints **não dependem de lead nenhum** — listam o que é da própria instância. Dar 401
+      neles significa que o token não autentica, ponto.
+      ⚠️ **Não confundir com o defeito da instância por conta** (corrigido em `contas.ts`): são
+      dois, empilhados. O token da Greens resolve a conta `greens`; **o nosso continua morto** e
+      afeta todo caminho da conta `behemp` que dependa de confirmação reversa — `/intake`,
+      `/start`, e a tradução de UUID do diretório (que por isso nunca sincronizou: a tabela
+      `chatpro_diretorio` está vazia).
+      **Hoje degrada em silêncio**, porque o código foi desenhado para isso: `post` devolve
+      `null` em 4xx e a tradução nunca bloqueia o processamento. O custo é diagnóstico, não
+      dado — relatório de funil mostra UUID em vez de nome.
+      **Perigo de mexer: BAIXO** — é renovar a credencial no painel do ChatPro e recadastrar o
+      secret. ⚠️ Mas confirme primeiro que o token novo autentica (`/departments/list → 200`)
+      **antes** de trocar, como a Greens fez com o deles. Trocar um token morto por outro morto
+      gasta uma rodada e não ensina nada.
+
+- [ ] 🔴 **`/intake` e `/start` do ChatPro têm o mesmo defeito de instância, latente** — achado
+      em 14/09/2026 pelo guarda `o-cliente-fala-com-a-instancia-da-conta`, que nasceu vermelho e
+      apontou os dois. O `/bot-link` foi corrigido (o cliente segue a conta), mas
+      `lib/chatpro/solicitacao.ts:429-432` (`intake`) e `:476-479` (`start`) seguem usando
+      `this.cliente` — o do ambiente, sempre a instância da BeHemp.
+      **Hoje não quebra** porque nenhuma das duas rotas identifica a conta:
+      `app/api/chatpro/intake/route.ts:87` e `start/route.ts:41` chamam o serviço sem ela. No
+      dia em que a Greens passar a usar qualquer um dos dois, o `leadId` deles será procurado na
+      instância errada e o fluxo trava do mesmo jeito — `throw` antes do insert, 422, paciente
+      transferido para atendente.
+      **Perigo de mexer: MÉDIO** — exige acrescentar `conta` ao contrato de entrada dos dois
+      métodos e fazer as rotas identificarem a conta pelo segredo, como o `/bot-link` já faz.
+      ⚠️ O guarda recorta o **método** do bot-link de propósito: acusar o arquivo inteiro o
+      deixaria vermelho por um defeito que ninguém autorizou corrigir, e guarda que acusa o que
+      não se pode consertar é guarda que alguém desliga.
+
+- [ ] **A tela da ANVISA lista o documento recebido mas não deixa VER a imagem** — pedido do dono
+      em 14/09/2026, ao validar o SOL-000065: _"falta só adicionar uma opção de visualizar a
+      imagem enviada para revisão"_. Hoje a tela mostra `✓ nome-do-arquivo.png` e um botão
+      **Substituir**; não há como abrir o que chegou. O paciente precisa decidir se substitui sem
+      ver o que está lá — e no fluxo da Greens ele **nunca viu** aquele arquivo nesta tela, porque
+      quem enviou foi o parceiro.
+      **Perigo de mexer: BAIXO no código, ALTO se feito errado.** A URL crua do blob NÃO pode ir
+      para a tela: o store é privado justamente para que o arquivo não abra por link
+      (`fetch` sem auth → 403, medido em 13/09). A entrega tem de passar por
+      `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e audita — a mesma
+      rota que o guarda `o-documento-do-paciente-nao-abre-sem-escopo` protege.
+      ⚠️ E há uma decisão de produto junto: abrir em aba nova, modal, ou miniatura? Miniatura
+      significa a imagem renderizada na listagem, e aí o documento aparece na tela sem ato
+      deliberado de quem olha.
+
 - [ ] 🔴 **A tela do cadastro diz "✓ Laudo médico" para um documento que NÃO chegou** — medido em
       13/09/2026 no SOL-000046, com o fluxo real. `recebidosDe` (`lib/parceiros/documentos.ts:111`)
       lista os **nomes** do manifesto via `normalizarManifesto` e nunca pergunta se o item tem

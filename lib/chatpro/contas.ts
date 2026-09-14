@@ -33,10 +33,52 @@ export interface ContaDeChatpro {
  * para ficar simétrica com a nova quebraria o painel já configurado em produção, e
  * simetria de nome não vale um incidente.
  */
-const CONTAS: { conta: ContaDeChatpro; variavel: string }[] = [
+const CONTAS: {
+  conta: ContaDeChatpro;
+  variavel: string;
+  /**
+   * 🔴 AS CREDENCIAIS DA INSTÂNCIA DE CHATPRO DESTA CONTA — 14/09/2026.
+   *
+   * Cada conta é uma instância DIFERENTE do ChatPro. O `leadId` e o `sessionId` que chegam
+   * numa chamada só existem na instância de quem chamou: perguntar por um lead da Greens na
+   * instância da BeHemp devolve nada, e `buscarContatoPorId` responde `null`.
+   *
+   * ⚠️ E `null` ali não é "não achei": é `throw ErroDeContatoNaoConfirmado`, ANTES do insert.
+   * A solicitação nunca nasce, o `/bot-link` responde 422, e o painel do ChatPro transfere o
+   * paciente para um atendente. Foi o que travou o Fluxo 2 — dezenas de
+   * `[chatpro] contato não confirmado por findById` no log de produção, com leadIds
+   * diferentes, todos da instância da Greens.
+   *
+   * 🔴 E a medição enganou: `select count(chatpro_lead_id)` devolvia **0**, o que parecia
+   * provar que ninguém mandava `leadId`. Provava o contrário — as que mandavam morriam antes
+   * de virar linha. **Contar o que sobreviveu não mede o que chegou.**
+   */
+  instancia: {
+    id: string;
+    token: string;
+    /**
+     * 🔴 O HOST TAMBÉM É POR CONTA — 14/09/2026.
+     *
+     * O ChatPro não tem host único: cada conta responde num subdomínio próprio, e `sparks` é o
+     * da GREENS, não uma palavra do produto. Token válido no host errado devolve **401**, não
+     * 404 — e 401 se lê como "credencial errada", que foi exatamente o diagnóstico errado que
+     * isso produziu por semanas.
+     *
+     * ⚠️ E o default de `CHATPRO_CHAT_API_URL` aponta para `sparks`. Para a conta da Greens
+     * isso é correto por acaso; para a da BeHemp, faz toda chamada ir ao servidor deles, que
+     * responde `"Token inválido"` — corretamente, porque não conhece o nosso token.
+     */
+    host: string;
+  };
+}[] = [
   {
     conta: { id: 'behemp', rotulo: 'BeHemp', urlDeRetorno: null },
     variavel: 'CHATPRO_INTAKE_SECRET',
+    instancia: {
+      id: 'CHATPRO_INSTANCE_ID',
+      token: 'CHATPRO_INSTANCE_TOKEN',
+      host: 'CHATPRO_CHAT_API_URL',
+    },
   },
   {
     conta: {
@@ -47,8 +89,45 @@ const CONTAS: { conta: ContaDeChatpro; variavel: string }[] = [
       urlDeRetorno: null,
     },
     variavel: 'CHATPRO_INTAKE_SECRET_GREENS',
+    instancia: {
+      id: 'CHATPRO_INSTANCE_ID_GREENS',
+      token: 'CHATPRO_INSTANCE_TOKEN_GREENS',
+      host: 'CHATPRO_CHAT_API_URL_GREENS',
+    },
   },
 ];
+
+/**
+ * As credenciais da instância de ChatPro de uma conta, lidas do ambiente na hora.
+ *
+ * ⚠️ Lidas na CHAMADA, nunca no import: o mesmo motivo pelo qual `urlDeRetorno` é preenchida
+ * na identificação. Ler env no topo do módulo congela o valor de quando o arquivo carregou.
+ *
+ * Devolve `null` quando a conta não tem credencial configurada — e quem chama deve tratar isso
+ * como "não dá para confirmar", não como erro: o segredo do cabeçalho já autenticou a origem.
+ */
+export function instanciaDaConta(
+  id: ContaDeChatpro['id'],
+): { instanceId: string; token: string; baseUrl?: string } | null {
+  const entrada = CONTAS.find((c) => c.conta.id === id);
+  if (!entrada) return null;
+  const instanceId = process.env[entrada.instancia.id]?.trim();
+  const token = process.env[entrada.instancia.token]?.trim();
+  if (!instanceId || !token) return null;
+
+  /**
+   * ⚠️ O host é OPCIONAL de propósito, e a assimetria é deliberada.
+   *
+   * Sem ele, o cliente cai no default — que hoje é `sparks`, o subdomínio da Greens. Para a
+   * conta `greens` isso acerta; para a `behemp`, erra. Exigir o host quebraria a conta que
+   * funciona para consertar a que não funciona, e nenhuma das duas ficaria de pé.
+   *
+   * O caminho certo é cadastrar `CHATPRO_CHAT_API_URL` com o nosso subdomínio real — está
+   * catalogado. Até lá, quem tem host próprio usa o seu, e quem não tem usa o default.
+   */
+  const baseUrl = process.env[entrada.instancia.host]?.trim();
+  return baseUrl ? { instanceId, token, baseUrl } : { instanceId, token };
+}
 
 /**
  * Descobre de qual conta veio a chamada, pelo segredo.

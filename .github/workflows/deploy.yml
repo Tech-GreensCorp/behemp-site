@@ -210,6 +210,12 @@ jobs:
             gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"
             gravar CHATPRO_INSTANCE_ID             "${{ secrets.CHATPRO_INSTANCE_ID }}"
             gravar CHATPRO_INSTANCE_TOKEN          "${{ secrets.CHATPRO_INSTANCE_TOKEN }}"
+            # 🔴 A instância da conta da GREENS. Sem ela, o leadId de uma chamada deles
+            # é procurado na instância da BeHemp, não é encontrado, e o /bot-link responde
+            # 422 — o painel transfere o paciente para um atendente. Travou o Fluxo 2.
+            gravar CHATPRO_INSTANCE_ID_GREENS      "${{ secrets.CHATPRO_INSTANCE_ID_GREENS }}"
+            gravar CHATPRO_INSTANCE_TOKEN_GREENS   "${{ secrets.CHATPRO_INSTANCE_TOKEN_GREENS }}"
+            gravar CHATPRO_CHAT_API_URL_GREENS    "${{ secrets.CHATPRO_CHAT_API_URL_GREENS }}"
             gravar CHATPRO_GREENS_URL_DE_RETORNO   "${{ secrets.CHATPRO_GREENS_URL_DE_RETORNO }}"
             # 🔴 O store PRIVADO dos documentos de paciente. Sem ele no processo,
             # `lib/documentos/store-privado.ts` lança e NENHUM documento é gravado — nem o
