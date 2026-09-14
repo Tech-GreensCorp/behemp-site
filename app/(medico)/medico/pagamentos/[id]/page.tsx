@@ -1,25 +1,29 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { obterPagamento } from '@/app/(admin)/_actions/pagamentos';
+import { obterPagamentoMedico } from '@/app/(medico)/_actions/pagamentos';
 import { PagamentoStatusBadge } from '@/components/shared/pagamentos/pagamento-status-badge';
 import { PagamentoFunilBadge } from '@/components/shared/pagamentos/pagamento-funil-badge';
-import { PagamentoStatusForm } from '@/components/admin/pagamentos/pagamento-status-form';
 import { AlertTriangle, ChevronLeft, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+
+export const metadata: Metadata = {
+  title: 'Pagamento — Área Médica Be4Hope',
+};
 
 function formatarValor(v: string): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default async function PagamentoDetalhePage({
+export default async function PagamentoDetalheMedicoPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const resultado = await obterPagamento(id);
+  const resultado = await obterPagamentoMedico(id);
 
   if (!resultado.sucesso || !resultado.dados) {
     notFound();
@@ -29,7 +33,7 @@ export default async function PagamentoDetalhePage({
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/pagamentos">
+      <Link href="/medico/pagamentos">
         <Button variant="ghost" size="sm" className="gap-1.5">
           <ChevronLeft size={16} />
           Pagamentos
@@ -86,9 +90,7 @@ export default async function PagamentoDetalhePage({
               </div>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">
-                Valor (recebido integralmente pelo médico)
-              </p>
+              <p className="text-muted-foreground text-xs">Valor</p>
               <p className="mt-1 text-lg font-bold">
                 {p.moeda} {formatarValor(p.valor)}
               </p>
@@ -96,14 +98,6 @@ export default async function PagamentoDetalhePage({
             <div>
               <p className="text-muted-foreground text-xs">Paciente</p>
               <p className="mt-1 font-medium">{p.pacienteNome}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Recebido por</p>
-              <p className="mt-1 font-medium">{p.medicoNome}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Criado em</p>
-              <p className="mt-1">{new Date(p.createdAt).toLocaleString('pt-BR')}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Pago em</p>
@@ -152,12 +146,12 @@ export default async function PagamentoDetalhePage({
             )}
           </div>
 
-          <div>
-            <p className="text-muted-foreground mb-2 text-xs font-medium">
-              Alterar status do pagamento
-            </p>
-            <PagamentoStatusForm pagamentoId={p.id} statusAtual={p.status} />
-          </div>
+          {p.observacoes && (
+            <div className="border-t pt-4">
+              <p className="text-muted-foreground mb-1 text-xs font-medium">Observações</p>
+              <p className="text-sm">{p.observacoes}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

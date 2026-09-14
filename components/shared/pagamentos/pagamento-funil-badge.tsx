@@ -11,7 +11,7 @@ interface PagamentoFunilBadgeProps {
  * Estágio do funil derivado do rastreamento (nunca é lido do banco como coluna própria —
  * é sempre calculado a partir dos timestamps, para nunca divergir deles).
  *
- * O caso que mais importa para o admin: pagamento concluído mas confirmação falhou —
+ * O caso que mais importa para quem lê: pagamento concluído mas confirmação falhou —
  * paciente passou pela etapa de pagamento e o agendamento não saiu do papel.
  */
 export function PagamentoFunilBadge({
