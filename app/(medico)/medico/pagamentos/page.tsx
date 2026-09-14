@@ -45,15 +45,26 @@ export default async function PagamentosMedicoPage({
   const porPagina = 20;
   const offset = (pagina - 1) * porPagina;
 
-  const [resultado, resultadoExportacao, configResultado, evolucaoResultado, distribuicaoResultado] =
-    await Promise.all([
-      listarPagamentosMedico({ status, busca: busca || undefined, atencao, limite: porPagina, offset }),
-      // Mesmos filtros da tela, mas sem paginar — é o que o CSV exporta.
-      listarPagamentosMedico({ status, busca: busca || undefined, atencao, limite: 1000, offset: 0 }),
-      obterConfigPagamentoMedicoLogado(),
-      obterEvolucaoRecebidosMedico(),
-      obterDistribuicaoStatusMedico(),
-    ]);
+  const [
+    resultado,
+    resultadoExportacao,
+    configResultado,
+    evolucaoResultado,
+    distribuicaoResultado,
+  ] = await Promise.all([
+    listarPagamentosMedico({
+      status,
+      busca: busca || undefined,
+      atencao,
+      limite: porPagina,
+      offset,
+    }),
+    // Mesmos filtros da tela, mas sem paginar — é o que o CSV exporta.
+    listarPagamentosMedico({ status, busca: busca || undefined, atencao, limite: 1000, offset: 0 }),
+    obterConfigPagamentoMedicoLogado(),
+    obterEvolucaoRecebidosMedico(),
+    obterDistribuicaoStatusMedico(),
+  ]);
 
   const itens = resultado.dados?.items ?? [];
   const total = resultado.dados?.total ?? 0;
@@ -87,8 +98,8 @@ export default async function PagamentosMedicoPage({
           <>
             {total} pagamento{total !== 1 ? 's' : ''} das suas consultas
             <span className="mt-1 block text-xs">
-              O valor vai direto para você — a Be4Hope não retém nem intermedeia. Esta tela é
-              só um registro de acompanhamento; a etapa de pagamento do paciente ainda está em
+              O valor vai direto para você — a Be4Hope não retém nem intermedeia. Esta tela é só um
+              registro de acompanhamento; a etapa de pagamento do paciente ainda está em
               desenvolvimento.
             </span>
           </>
@@ -115,8 +126,8 @@ export default async function PagamentosMedicoPage({
                 Você ainda não tem nenhum meio de recebimento ativo
               </p>
               <p className="mt-1 text-sm text-amber-800">
-                Cadastre sua chave PIX e/ou dados bancários — o administrador precisa
-                revisar e ativar antes de aparecer na tela de pagamento do paciente.
+                Cadastre sua chave PIX e/ou dados bancários — o administrador precisa revisar e
+                ativar antes de aparecer na tela de pagamento do paciente.
               </p>
               <Link href="/medico/pagamentos/config" className="mt-2 inline-block">
                 <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 bg-white">

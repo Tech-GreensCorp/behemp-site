@@ -55,9 +55,7 @@ type FormConfigPagamentoMedicoProps =
        */
       perfil: 'medico';
       configInicial: CamposConfigPagamentoMedico;
-      aoSalvar: (
-        dados: CamposDadosPagamentoMedico,
-      ) => Promise<{ sucesso: boolean; erro?: string }>;
+      aoSalvar: (dados: CamposDadosPagamentoMedico) => Promise<{ sucesso: boolean; erro?: string }>;
     };
 
 type PixTipoChave = 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria' | '';

@@ -147,13 +147,7 @@ function TooltipHero({
 }
 
 /* ── Seletor de período — interatividade real sobre o array já carregado ── */
-function SeletorPeriodo({
-  valor,
-  aoMudar,
-}: {
-  valor: 3 | 6;
-  aoMudar: (v: 3 | 6) => void;
-}) {
+function SeletorPeriodo({ valor, aoMudar }: { valor: 3 | 6; aoMudar: (v: 3 | 6) => void }) {
   return (
     <div className="bg-card/70 border-border/50 inline-flex items-center gap-0.5 rounded-full border p-0.5 backdrop-blur-sm">
       {([3, 6] as const).map((opt) => (
@@ -194,9 +188,11 @@ export function PainelFinanceiroPagamentos({
   );
   const totalStatus = ordenados.reduce((s, d) => s + d.quantidade, 0);
 
-  const ticketMedio = resumo.quantidadePaga > 0 ? Number(resumo.totalRecebido) / resumo.quantidadePaga : 0;
+  const ticketMedio =
+    resumo.quantidadePaga > 0 ? Number(resumo.totalRecebido) / resumo.quantidadePaga : 0;
   const totalPagoEPendente = resumo.quantidadePaga + resumo.quantidadePendente;
-  const pctPendente = totalPagoEPendente > 0 ? (resumo.quantidadePendente / totalPagoEPendente) * 100 : 0;
+  const pctPendente =
+    totalPagoEPendente > 0 ? (resumo.quantidadePendente / totalPagoEPendente) * 100 : 0;
   const donoTexto = escopo === 'medico' ? 'você' : 'a plataforma';
 
   return (
@@ -204,7 +200,7 @@ export function PainelFinanceiroPagamentos({
       {/* ═══ Bento principal: hero full-bleed + (comparativo / anéis) ═══ */}
       <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
         {/* ── Hero: número sobreposto à área, full-bleed ── */}
-        <div className="relative flex min-h-[380px] flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-card shadow-[var(--shadow-soft)] lg:col-span-7">
+        <div className="border-border/50 bg-card relative flex min-h-[380px] flex-col overflow-hidden rounded-[1.75rem] border shadow-[var(--shadow-soft)] lg:col-span-7">
           <div
             className="pointer-events-none absolute -top-20 -right-16 h-72 w-72 rounded-full opacity-70 blur-3xl"
             style={{ background: 'color-mix(in oklab, var(--chart-1) 22%, transparent)' }}
@@ -244,7 +240,12 @@ export function PainelFinanceiroPagamentos({
                     strokeWidth={2.75}
                     fill={`url(#${gradientId})`}
                     dot={false}
-                    activeDot={{ r: 6, strokeWidth: 3, stroke: 'var(--card)', fill: 'var(--chart-1)' }}
+                    activeDot={{
+                      r: 6,
+                      strokeWidth: 3,
+                      stroke: 'var(--card)',
+                      fill: 'var(--chart-1)',
+                    }}
                     animationDuration={900}
                     animationEasing="ease-out"
                   />
@@ -294,14 +295,18 @@ export function PainelFinanceiroPagamentos({
         {/* ── Coluna direita: comparativo em barras + anéis de status ── */}
         <div className="flex flex-col gap-4 lg:col-span-5">
           {/* Comparativo mensal — barras, mês atual em destaque */}
-          <div className="border-border/50 bg-card shadow-[var(--shadow-card)] relative flex-1 overflow-hidden rounded-[1.75rem] border p-5">
+          <div className="border-border/50 bg-card relative flex-1 overflow-hidden rounded-[1.75rem] border p-5 shadow-[var(--shadow-card)]">
             <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
               Comparativo mensal
             </p>
             <div className="mt-1 h-[124px]">
               {temMovimento ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={serie} margin={{ top: 6, right: 2, bottom: 0, left: 2 }} barCategoryGap="30%">
+                  <BarChart
+                    data={serie}
+                    margin={{ top: 6, right: 2, bottom: 0, left: 2 }}
+                    barCategoryGap="30%"
+                  >
                     <XAxis
                       dataKey="mes"
                       tick={{ fontSize: 10.5, fill: 'var(--muted-foreground)' }}
@@ -309,8 +314,16 @@ export function PainelFinanceiroPagamentos({
                       tickLine={false}
                       dy={4}
                     />
-                    <Tooltip content={<TooltipHero serie={serie} />} cursor={{ fill: 'var(--muted)', radius: 8 }} />
-                    <Bar dataKey="total" radius={[7, 7, 7, 7]} maxBarSize={20} animationDuration={700}>
+                    <Tooltip
+                      content={<TooltipHero serie={serie} />}
+                      cursor={{ fill: 'var(--muted)', radius: 8 }}
+                    />
+                    <Bar
+                      dataKey="total"
+                      radius={[7, 7, 7, 7]}
+                      maxBarSize={20}
+                      animationDuration={700}
+                    >
                       {serie.map((_, i) => (
                         <Cell
                           key={`bar-${i}`}
@@ -333,7 +346,7 @@ export function PainelFinanceiroPagamentos({
           </div>
 
           {/* Anéis concêntricos — distribuição por status (metáfora de atividade/saúde) */}
-          <div className="border-border/50 bg-card shadow-[var(--shadow-card)] relative flex-1 overflow-hidden rounded-[1.75rem] border p-5">
+          <div className="border-border/50 bg-card relative flex-1 overflow-hidden rounded-[1.75rem] border p-5 shadow-[var(--shadow-card)]">
             <div
               className="pointer-events-none absolute -right-8 -bottom-8 h-32 w-32 rounded-full opacity-50 blur-3xl"
               style={{ background: 'color-mix(in oklab, var(--chart-3) 20%, transparent)' }}
@@ -366,7 +379,10 @@ export function PainelFinanceiroPagamentos({
                         animationEasing="ease-out"
                       >
                         {ordenados.map((entry, i) => (
-                          <Cell key={`ring-${i}`} fill={STATUS_INFO[entry.status]?.cor ?? 'var(--chart-5)'} />
+                          <Cell
+                            key={`ring-${i}`}
+                            fill={STATUS_INFO[entry.status]?.cor ?? 'var(--chart-5)'}
+                          />
                         ))}
                       </RadialBar>
                     </RadialBarChart>
@@ -410,20 +426,27 @@ export function PainelFinanceiroPagamentos({
       {/* ═══ Tira unificada — sem repetir chrome de card por métrica ═══ */}
       <div
         className={cn(
-          'border-border/50 bg-card shadow-[var(--shadow-card)] divide-border/60 grid grid-cols-1 divide-y overflow-hidden rounded-[1.75rem] border sm:divide-x sm:divide-y-0',
+          'border-border/50 bg-card divide-border/60 grid grid-cols-1 divide-y overflow-hidden rounded-[1.75rem] border shadow-[var(--shadow-card)] sm:divide-x sm:divide-y-0',
           atencaoHref ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
         )}
       >
         <div className="flex items-center gap-3 p-5">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'color-mix(in oklab, var(--chart-4) 15%, transparent)', color: 'var(--chart-4)' }}
+            style={{
+              backgroundColor: 'color-mix(in oklab, var(--chart-4) 15%, transparent)',
+              color: 'var(--chart-4)',
+            }}
           >
             <Clock3 size={18} strokeWidth={2.25} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Pendente</p>
-            <p className="text-xl font-bold tabular-nums">R$ {formatarValor(resumo.totalPendente)}</p>
+            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+              Pendente
+            </p>
+            <p className="text-xl font-bold tabular-nums">
+              R$ {formatarValor(resumo.totalPendente)}
+            </p>
             <div className="mt-1.5 flex items-center gap-1.5">
               <div className="bg-muted h-1 w-14 overflow-hidden rounded-full">
                 <div
@@ -431,7 +454,9 @@ export function PainelFinanceiroPagamentos({
                   style={{ width: `${pctPendente}%`, backgroundColor: 'var(--chart-4)' }}
                 />
               </div>
-              <p className="text-muted-foreground text-[11px]">{resumo.quantidadePendente} aguardando</p>
+              <p className="text-muted-foreground text-[11px]">
+                {resumo.quantidadePendente} aguardando
+              </p>
             </div>
           </div>
         </div>
@@ -439,25 +464,36 @@ export function PainelFinanceiroPagamentos({
         <div className="flex items-center gap-3 p-5">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'color-mix(in oklab, var(--chart-3) 16%, transparent)', color: 'var(--chart-3)' }}
+            style={{
+              backgroundColor: 'color-mix(in oklab, var(--chart-3) 16%, transparent)',
+              color: 'var(--chart-3)',
+            }}
           >
             <Receipt size={18} strokeWidth={2.25} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Ticket médio</p>
+            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+              Ticket médio
+            </p>
             <p className="text-xl font-bold tabular-nums">R$ {formatarValor(ticketMedio)}</p>
             <p className="text-muted-foreground text-[11px]">por consulta paga</p>
           </div>
         </div>
 
         {atencaoHref && (
-          <Link href={atencaoHref} className="hover:bg-muted/40 flex items-center gap-3 p-5 transition-colors">
+          <Link
+            href={atencaoHref}
+            className="hover:bg-muted/40 flex items-center gap-3 p-5 transition-colors"
+          >
             <div
               className={cn(
                 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
                 (resumo.quantidadeAtencao ?? 0) > 0 && 'animate-gentle-pulse',
               )}
-              style={{ backgroundColor: 'color-mix(in oklab, var(--destructive) 14%, transparent)', color: 'var(--destructive)' }}
+              style={{
+                backgroundColor: 'color-mix(in oklab, var(--destructive) 14%, transparent)',
+                color: 'var(--destructive)',
+              }}
             >
               <AlertTriangle size={18} strokeWidth={2.25} />
             </div>

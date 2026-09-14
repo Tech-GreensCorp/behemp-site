@@ -46,7 +46,10 @@ interface CamposParaValidarHabilitacao {
 }
 
 /** Regra do ADMIN: PIX habilitado exige chave; boleto habilitado exige os dados bancários completos. */
-export function validarRegrasConfigPagamento(dados: CamposParaValidarHabilitacao, ctx: z.RefinementCtx) {
+export function validarRegrasConfigPagamento(
+  dados: CamposParaValidarHabilitacao,
+  ctx: z.RefinementCtx,
+) {
   if (dados.pixHabilitado && (!dados.pixTipoChave || !dados.pixChave?.trim())) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -87,7 +90,10 @@ interface CamposParaValidarDados {
  * PIX sem tipo (ou vice-versa), e dados bancários são tudo-ou-nada, pra não gerar boleto
  * com conta pela metade quando o admin habilitar depois.
  */
-export function validarCoerenciaDadosPagamento(dados: CamposParaValidarDados, ctx: z.RefinementCtx) {
+export function validarCoerenciaDadosPagamento(
+  dados: CamposParaValidarDados,
+  ctx: z.RefinementCtx,
+) {
   const temChave = Boolean(dados.pixChave?.trim());
   const temTipo = Boolean(dados.pixTipoChave);
   if (temChave !== temTipo) {
