@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -16,14 +15,13 @@ import { listarPacientesMedicoPaginado } from '@/app/_actions/admin-medicos';
 import type { PacienteDoMedico } from '@/app/_actions/admin-medicos';
 import {
   ArrowDownAZ,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Search,
   Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PaginationBar } from '@/components/shared/pagination-bar';
 
 /**
  * Tab de pacientes paginada com busca e ordenação.
@@ -196,61 +194,16 @@ export function TabPacientesPaginada({ medicoId }: TabPacientesPaginadaProps) {
 
         {/* Paginação */}
         {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-            {/* Info + itens por página */}
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>
-                {total} paciente{total !== 1 ? 's' : ''}
-              </span>
-              <span className="text-border">·</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs">Exibir</span>
-                <Select
-                  value={String(porPagina)}
-                  onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
-                >
-                  <SelectTrigger size="sm" className="w-16">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {POR_PAGINA_OPCOES.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-xs">por página</span>
-              </div>
-            </div>
-
-            {/* Controles de página */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagina <= 1}
-                onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                className="gap-1"
-              >
-                <ChevronLeft size={14} />
-                Anterior
-              </Button>
-              <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
-                Página {pagina} de {totalPaginas}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagina >= totalPaginas}
-                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                className="gap-1"
-              >
-                Próximo
-                <ChevronRight size={14} />
-              </Button>
-            </div>
-          </div>
+          <PaginationBar
+            page={pagina}
+            totalPages={totalPaginas}
+            onPageChange={setPagina}
+            totalItems={total}
+            itemLabel="paciente"
+            pageSize={porPagina}
+            onPageSizeChange={setPorPagina}
+            pageSizeOptions={POR_PAGINA_OPCOES}
+          />
         )}
       </CardContent>
     </Card>
