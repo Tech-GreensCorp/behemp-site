@@ -44,7 +44,7 @@ export function PaginationBar({
         className,
       )}
     >
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <div className="text-muted-foreground flex items-center gap-3 text-sm">
         {typeof totalItems === 'number' && (
           <span>
             {totalItems} {itemLabel}
@@ -90,7 +90,7 @@ export function PaginationBar({
           <ChevronLeft size={14} />
           Anterior
         </Button>
-        <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
+        <span className="text-muted-foreground min-w-[6rem] text-center text-sm tabular-nums">
           Página {page} de {totalPages}
         </span>
         <Button

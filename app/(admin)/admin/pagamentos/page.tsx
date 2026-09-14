@@ -87,8 +87,11 @@ export default async function PagamentosPage({
               subtitle={p.medicoNome ?? '—'}
               meta={
                 <>
-                  {new Date(p.dataHora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                  <div className="font-semibold text-foreground">
+                  {new Date(p.dataHora).toLocaleString('pt-BR', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                  <div className="text-foreground font-semibold">
                     {p.moeda} {formatarValor(p.valor)}
                   </div>
                 </>
