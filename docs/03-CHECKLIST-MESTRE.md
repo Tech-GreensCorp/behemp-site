@@ -283,6 +283,40 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **SÃO DOIS PRODUTOS ChatPro, com hosts de naturezas diferentes** — explicado pela Greens
+      em 14/09/2026, e é a peça que faltava:
+
+      | produto          | host                                              | header           |
+      | ---------------- | ------------------------------------------------- | ---------------- |
+      | CHATPRO CHAT API | `https://<subdominio-da-conta>.chatpro.com.br`    | `instance-token` |
+      | CHATPRO API      | `https://v5.chatpro.com.br/{instance_id}/api/v1`  | `Authorization`  |
+
+      🔴 **O segundo leva o `instance_id` no CAMINHO, então um host serve todo mundo. O primeiro
+      resolve a conta pelo HOST** — por isso o subdomínio não é adivinhável, e por isso o nosso
+      default era fatal.
+      ⚠️ **Corolário da Greens, e ele vale como regra:** _"se o envio funcionar enquanto o chat
+      não funciona, não é coincidência"_ — são produtos diferentes, e um pode estar de pé com o
+      outro morto.
+      **Como achar o nosso subdomínio, sem suporte:** painel do ChatPro → F12 → Rede → F5 →
+      qualquer XHR → o host dela é o `CHATPRO_CHAT_API_URL`. ⚠️ **Não filtrar por `sparks`** — a
+      lista viria vazia e pareceria que o método não funciona.
+
+- [ ] 🔴 **ROTACIONAR o `CHATPRO_INSTANCE_TOKEN` da BeHemp** — recomendação da Greens em
+      14/09/2026, e ela é correta. Nosso token trafegou **repetidamente** para um host da conta
+      deles, por semanas. Eles registram que nada nosso entrou lá e nada deles saiu — o 401 em
+      100% das chamadas é o registro de que a fronteira segurou —, mas ninguém pode afirmar que
+      o painel não expõe requisições recusadas ao dono da conta.
+      **Ordem: trocar o host primeiro, rotacionar depois.** Rotacionar antes de saber o
+      subdomínio só produziria um token novo batendo no host errado, com o mesmo 401 — e a
+      leitura voltaria a ser "credencial errada".
+- [ ] ⚠️ **A assimetria do host guarda uma armadilha, e ela tem data** — apontada pela Greens.
+      Hoje o host é opcional por conta, e isso está certo: sem ele, cai no default `sparks`, que
+      é justamente o subdomínio da Greens — a conta `greens` acerta host e credencial de uma vez.
+      🔴 **Mas no dia em que alguém configurar o token da BeHemp SEM o host, volta o 401 — mesma
+      mensagem, causa oposta.** Com o subdomínio catalogado, o host deve virar **obrigatório por
+      conta** e o default deve ser **apagado**. Sem o default, faltar o host vira erro alto em vez
+      de chamada silenciosa ao servidor de outra empresa.
+
 - [ ] 🔴🔴 **O default de `CHATPRO_CHAT_API_URL` aponta para o host de OUTRA empresa** — medido
       em 14/09/2026, e é a causa do 401 que estava sendo atribuído ao token.
       `lib/env.ts:45` e `lib/chatpro/cliente.ts:78` trazem
