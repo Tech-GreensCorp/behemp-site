@@ -403,9 +403,7 @@ export async function salvarConfigPagamentoMedicoLogado(
         .set(parsed.data)
         .where(eq(medicosPagamentoConfig.medicoId, medico.medicoId));
     } else {
-      await db
-        .insert(medicosPagamentoConfig)
-        .values({ medicoId: medico.medicoId, ...parsed.data });
+      await db.insert(medicosPagamentoConfig).values({ medicoId: medico.medicoId, ...parsed.data });
     }
 
     // Dado bancário é sensível e muda de estado — sempre auditado, mesmo sendo o
