@@ -1327,18 +1327,50 @@ export function FormularioDeCadastro({
                   }
                   icone={FileText}
                 >
-                  <p className="text-muted-foreground -mt-1 mb-4 text-xs">
-                    Envie agora ou depois, pela sua área. Nada disso impede você de continuar.
+                  {/*
+                    🔴 UMA FRASE SÓ, E ELA NÃO PODE MENTIR. O dono apontou em 14/09/2026 que a
+                    tela dizia "nada disso impede você de continuar" tendo um campo necessário
+                    logo abaixo. Havia duas frases — esta e outra no rodapé da seção — dizendo
+                    coisas diferentes sobre a mesma lista, e a de cima é a que o olho lê
+                    primeiro. As duas viraram esta.
+                  */}
+                  <p className="text-muted-foreground -mt-1 mb-4 text-xs leading-relaxed">
+                    {fluxoDaTeleconsulta ? (
+                      <>
+                        O{' '}
+                        <strong className="text-foreground font-medium">documento com foto</strong>{' '}
+                        é o que precisamos para identificar você. Os outros dois você pode enviar
+                        depois, com calma, pela sua área — e o médico já pode te atender antes.
+                      </>
+                    ) : (
+                      'Envie agora ou depois, pela sua área. Nada disso impede você de continuar.'
+                    )}
                   </p>
                   <div className="space-y-4">
                     {documentosParaAnexar.map((doc) => (
                       <div key={doc.chave} className="space-y-1.5">
                         <Label htmlFor={`anexo-${doc.chave}`}>
                           {doc.rotulo}
-                          {ehOpcionalAqui(doc) && (
+                          {ehOpcionalAqui(doc) ? (
                             <span className="text-muted-foreground/70 ml-1.5 text-xs">
                               (opcional)
                             </span>
+                          ) : (
+                            fluxoDaTeleconsulta && (
+                              /*
+                                🔴 "precisamos deste", e NÃO "obrigatório" — decisão do dono em
+                                14/09/2026: _"não trave, apenas deixe esse alerta"_.
+
+                                `podeEnviar` (acima) não exige anexo nenhum, e continua sem
+                                exigir. Um rótulo "obrigatório" com o botão liberado é a tela
+                                prometendo uma trava que não existe — o mesmo defeito, do outro
+                                lado, de dizer "nada disso impede" com um campo necessário.
+                                Pendência informa, não impede (ADR-0016 D-06).
+                              */
+                              <span className="text-primary/80 ml-1.5 text-xs">
+                                (precisamos deste)
+                              </span>
+                            )
                           )}
                         </Label>
                         <Input
@@ -1362,12 +1394,6 @@ export function FormularioDeCadastro({
                     saiu; sem ele, o paciente do fluxo da teleconsulta leria três campos de
                     arquivo e nenhuma frase dizendo que pode seguir sem eles.
                   */}
-                  {fluxoDaTeleconsulta && (
-                    <p className="border-border/60 text-muted-foreground mt-4 border-t pt-3 text-xs leading-relaxed">
-                      Nada disso impede você de continuar agora. Você envia depois, com calma, pela
-                      sua área — e o médico já pode te atender antes.
-                    </p>
-                  )}
                 </Secao>
 
                 <Separador />
@@ -1457,8 +1483,21 @@ export function FormularioDeCadastro({
               </>
             )}
 
-            {perguntarSobreAnvisa && (
+            {perguntarSobreAnvisa && !fluxoDaTeleconsulta && (
               <>
+                {/*
+                  🔴 A ANVISA NÃO É PERGUNTADA NO FLUXO DA TELECONSULTA — consequência direta
+                  do `DO-57`, e o dono apontou em 14/09/2026: _"se ele não tem receita ele não
+                  tem ANVISA, logo tem que tirar os 2, começando pela tela da teleconsulta"_.
+
+                  Perguntar "você já tem a autorização?" a quem a própria regra diz que não
+                  pode tê-la é pedir que o paciente responda uma pergunta já respondida — e
+                  um "Sim" mandaria para a procuração alguém sem receita para autorizar.
+
+                  ⚠️ E ELA VOLTA DEPOIS, EM OUTRO LUGAR. Terminada a teleconsulta e emitida a
+                  receita, a ANVISA passa a ser a única pendência — e é aí que ela aparece,
+                  na área do paciente. Está registrado como pendente de implementação.
+                */}
                 <Secao titulo="Autorização da ANVISA" icone={FileText}>
                   <fieldset className="space-y-3">
                     <legend className="text-muted-foreground mb-3 text-sm">

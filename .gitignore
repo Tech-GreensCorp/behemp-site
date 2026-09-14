@@ -87,3 +87,7 @@ Thumbs.db
 /.clerk/
 
 .env*.local
+
+# Prévia de tela gerada localmente (instrumento, não artefato)
+previa-da-tela.html
+previa-da-tela.png

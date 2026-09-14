@@ -283,6 +283,23 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] ⏳ **PENDENTE DE APROVAÇÃO — depois da teleconsulta, a ANVISA vira a única pendência, e a
+      tela precisa dizer isso.** Descrito pelo dono em 14/09/2026: _"depois que ele termina a
+      teleconsulta que ele agendou com médico, fica o status de ANVISA tanto na tela quanto no
+      ícone de ANVISA, que falta somente a procuração da ANVISA"_.
+
+      **Por que isto existe:** o `DO-57` tira a pergunta da ANVISA do cadastro — quem não tem
+      receita não pode ter autorização. Mas a autorização **continua sendo necessária**, e some
+      da vista do paciente até a consulta acontecer. Sem este item, o paciente termina a
+      teleconsulta, recebe a receita, e **nada na tela diz que ainda falta a procuração**.
+
+      **O que já existe e serviria:** `pendenciasDe` deriva a pendência do manifesto, e
+      `/paciente/anvisa` já é rota. Falta o gatilho — o que marca "a consulta aconteceu e a
+      receita saiu" — e o ponto da interface (tela + ícone).
+
+      **Perigo de mexer: MÉDIO.** Toca a área do paciente, que a Dryelle está redesenhando.
+      Precisa de aprovação e de combinar o gatilho antes de escrever qualquer coisa.
+
 - [ ] 🔴 **O `.env` do servidor diverge do ambiente do processo PM2 nos DOIS segredos do
       ChatPro** — medido em 14/09/2026, comparando impressão SHA-256 dos 12 primeiros hex:
 

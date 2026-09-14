@@ -284,8 +284,23 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
   });
 
   it('🔴 e só aparece quando a autorização está pendente', () => {
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026 — terceiro caso do dia com o mesmo defeito. A versão
+     * anterior era `toMatch(/\{perguntarSobreAnvisa && \(/)`, que exige o bloco com
+     * **exatamente uma** condição. O `DO-57` acrescentou a segunda (`&& !fluxoDaTeleconsulta`,
+     * porque quem não tem receita não pode ter autorização) e o guarda ficou vermelho sem que
+     * a propriedade que ele protege — _a pergunta depende da pendência_ — tivesse mudado.
+     *
+     * Congelar a forma do gate impede acrescentar condição; e acrescentar condição a um gate
+     * é a coisa mais comum que acontece com um gate.
+     */
     expect(codigo).toContain('pendencias.some(');
-    expect(codigo).toMatch(/\{perguntarSobreAnvisa && \(/);
+    expect(codigo, 'a pergunta da ANVISA deixou de ser condicionada').toMatch(
+      /\{\s*perguntarSobreAnvisa\s*&&/,
+    );
+    expect(codigo, 'a derivação da pergunta deixou de olhar a pendência da autorização').toMatch(
+      /perguntarSobreAnvisa =[\s\S]{0,200}autorizacao_anvisa/,
+    );
   });
 
   /**

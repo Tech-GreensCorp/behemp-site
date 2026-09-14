@@ -8,12 +8,19 @@
 > desta ADR.** Elas convivem no mesmo arquivo de propósito, para ninguém confundir plano com
 > decisão:
 >
-> | seção      | o quê                                                    | status                                        |
-> | ---------- | -------------------------------------------------------- | --------------------------------------------- |
-> | §1 – §8    | o Fluxo 2 entra pelo handoff assinado, e não pelo painel | ✅ **aprovado** — é o que está sendo feito    |
-> | `DO-57/58` | a regra da receita e os cinco ajustes de tela            | ✅ **aprovado** pelo chefe do dono            |
-> | **§10**    | o **menu de 3 escolhas** antes da tela da ANVISA         | ⛔ **NÃO APROVADO** — aguarda o chefe do dono |
-> | §9         | a parte da Greens                                        | ⏳ a preencher                                |
+> | o quê                                                           | status                                         |
+> | --------------------------------------------------------------- | ---------------------------------------------- |
+> | `DO-58` — os **cinco ajustes de tela** do fluxo da teleconsulta | ✅ **APROVADO** — é a única coisa implementada |
+> | `DO-57` — a regra "quem não tem receita não tem ANVISA"         | ✅ **aprovado**, e é o que sustenta os cinco   |
+> | §1 – §8 — o Fluxo 2 entrar pelo **handoff assinado**            | ⏳ **pendente de aprovação**                   |
+> | §10 — o **menu de 3 escolhas** antes da tela da ANVISA          | ⏳ **pendente de aprovação**                   |
+> | §9 — a parte da Greens                                          | ⏳ a preencher                                 |
+>
+> 🔴 **O QUE FOI IMPLEMENTADO ATÉ AGORA É SÓ O `DO-58`.** Os cinco ajustes de tela estão no
+> commit `38b59c5`, com guarda próprio e condicionados ao fluxo da teleconsulta. **Nada do §1
+> ao §8 e nada do §10 foi construído** — as duas coisas são plano, e plano aqui não é decisão.
+> Palavras do dono em 14/09/2026: _"a única coisa que tá aprovada são essas cinco mudanças,
+> todo resto é não aprovado ainda"_.
 >
 > **Decisão do dono, 14/09/2026:** _"nós literalmente imitaremos 99% do que já funciona no
 > fluxo 1 sem ANVISA, só que para receita. A única diferença é que quando é marcado que não
@@ -295,9 +302,9 @@ _(a preencher)_
 
 ---
 
-## §10 — ⛔ Ideia registrada e **NÃO APROVADA**: o menu de 3 escolhas
+## §10 — ⏳ Ideia registrada, **PENDENTE DE APROVAÇÃO**: o menu de 3 escolhas
 
-> **Status:** ⛔ **não aprovada.** Ideia do dono em 14/09/2026, registrada para não se perder.
+> **Status:** ⏳ **pendente de aprovação.** Ideia do dono em 14/09/2026, registrada para não se perder.
 > _"é apenas a ideia que eu tive, eu tenho que esperar aprovação do meu chefe"_. **Nada aqui
 > foi implementado, e nada aqui deve ser implementado até haver aprovação por escrito.**
 

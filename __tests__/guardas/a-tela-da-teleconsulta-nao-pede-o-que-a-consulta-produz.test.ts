@@ -169,15 +169,66 @@ describe('a tela fala a língua que o produto decidiu', () => {
     expect(compacto).toMatch(/tratamento à base de fitocanabinoide/);
   });
 
-  it('🔴 a frase que diz "isto não bloqueia" não se perdeu', () => {
+  it('🔴 o texto diz o que é preciso E o que pode vir depois', () => {
     /**
-     * Ela vivia na lista que saiu. Sem ela, o paciente do fluxo da teleconsulta leria três
-     * campos de arquivo e nenhuma frase dizendo que pode seguir sem eles — e pendência que
-     * parece obrigatória é pendência que faz desistir (ADR-0016 D-06).
+     * ⚠️ RETIFICADO em 14/09/2026, no mesmo dia em que nasceu. A versão anterior exigia a
+     * frase _"Nada disso impede você de continuar agora"_ — e o dono apontou que ela é
+     * FALSA nesta tela: há um documento que precisamos, e dizer que nada é preciso é a tela
+     * desmentindo a si mesma.
+     *
+     * Havia duas frases sobre a mesma lista, dizendo coisas diferentes: esta e a do rodapé.
+     * Viraram uma. A propriedade agora é a que importa: o texto **nomeia** o que precisamos
+     * e **oferece** o adiamento do resto.
      */
-    expect(compacto, 'o aviso de que nada bloqueia sumiu do fluxo da teleconsulta').toMatch(
-      /fluxoDaTeleconsulta &&[\s\S]{0,400}Nada disso impede você de continuar agora/,
+    const trecho = compacto.slice(
+      compacto.indexOf('Documentos para a sua consulta'),
+      compacto.indexOf('Documentos para a sua consulta') + 900,
     );
+    expect(trecho, 'o texto deixou de dizer QUAL documento precisamos').toMatch(
+      /documento com foto/,
+    );
+    expect(trecho, 'o texto deixou de oferecer o envio posterior').toMatch(/enviar depois/);
+  });
+
+  it('🔴 o texto NÃO promete que nada é preciso', () => {
+    // A contradição que o dono pegou: "nada disso impede" com um campo marcado logo abaixo.
+    /**
+     * ⚠️ SÓ O RAMO VERDADEIRO. A primeira versão pegava 600 caracteres a partir do `? (` e
+     * abocanhava o `else` junto — onde a frase antiga é CORRETA, porque o fluxo da ANVISA
+     * não tem documento necessário. O caso nasceu vermelho acusando o ramo errado.
+     */
+    const inicio = compacto.indexOf('fluxoDaTeleconsulta ? (');
+    const ramoVerdadeiro = compacto.slice(inicio, compacto.indexOf(') : (', inicio));
+    expect(ramoVerdadeiro, 'o ramo do fluxo da teleconsulta sumiu').not.toBe('');
+    expect(
+      /Nada disso impede/.test(ramoVerdadeiro),
+      'voltou a dizer "nada disso impede" no fluxo que tem documento necessário',
+    ).toBe(false);
+  });
+
+  it('🔴 o rótulo AVISA, não promete trava', () => {
+    /**
+     * Decisão do dono em 14/09/2026: _"não trave, apenas deixe esse alerta"_. `podeEnviar`
+     * não exige anexo nenhum — um rótulo "obrigatório" com o botão liberado promete uma
+     * trava que não existe, que é o mesmo defeito do outro lado.
+     */
+    expect(compacto, 'o aviso do documento necessário sumiu').toMatch(/\(precisamos deste\)/);
+    expect(
+      /\(obrigatório\)/.test(compacto),
+      'o rótulo passou a dizer "obrigatório" — e nada bloqueia o envio',
+    ).toBe(false);
+  });
+
+  it('🔴 a ANVISA não é perguntada no fluxo da teleconsulta', () => {
+    /**
+     * Consequência direta de `DO-57`: quem não tem receita não tem ANVISA. Perguntar é pedir
+     * que o paciente responda algo que a regra já respondeu — e um "Sim" mandaria para a
+     * procuração alguém sem receita para autorizar.
+     *
+     * ⚠️ E ela continua existindo para o outro fluxo, onde é a pergunta que decide o destino.
+     */
+    const cond = condicaoDoBloco('{perguntarSobreAnvisa');
+    expect(cond, 'a pergunta da ANVISA sumiu ou perdeu a condição').toMatch(/!fluxoDaTeleconsulta/);
   });
 
   it('a seção de envio tem nome próprio no fluxo da teleconsulta', () => {
