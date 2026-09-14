@@ -165,6 +165,16 @@ E os três casos, com o destino que cada um produz:
 | **Fluxo 2** — tem ANVISA    | `autorizacao_anvisa` (+ RG, comprovante…) | receita          | `/paciente/agendamento` |
 | **não tem nenhum dos dois** | só RG, comprovante…                       | receita + ANVISA | `/paciente/agendamento` |
 
+⚠️ **ACRESCENTADO em 14/09/2026, e põe a linha do meio em revisão.** O chefe do dono fixou
+`DO-57`: _"se o paciente não tem receita, logo ele não tem ANVISA, já que a ANVISA é solicitada
+baseada na receita"_. Se isso valer sem exceção, o caso "tem ANVISA e não tem receita" **não
+existe**, e a linha do meio da tabela acima sai.
+
+Mas `VAL-02` (**RDC 660/2022, Arts. 7º e 8º**) registra que a autorização vale **2 anos** e a
+norma **não** declara prazo para a receita — logo a autorização sobrevive à prescrição, e o
+paciente de recompra é exatamente esse caso. A tabela fica como está **até a revisão a três**,
+porque apagar uma linha por causa de uma leitura ainda não confirmada é como se perde regra.
+
 🔴 **O erro que derruba o Fluxo 2 é omitir `autorizacao_anvisa` do manifesto.** Se ele não
 vier, `pendenciasDe` devolve ANVISA como pendente, e o paciente é levado a tirar uma procuração
 que ele **já tem**. É o mesmo buraco que o manifesto veio fechar, por um caminho novo.
@@ -251,6 +261,10 @@ agendamento é só a primeira tela que abre. Ele navega para onde quiser.
   texto de WhatsApp. O diagnóstico existe, em outro formato.
 - **Timestamp no log** continua pendente, na branch `fix/o-log-carimba-a-hora`. Foi a ausência
   dele que produziu as duas retratações de hoje.
+- 🔴 **`DO-57` × `VAL-02` está em aberto** — ver a nota no §5. Enquanto não se resolve, o
+  código aplica `DO-57` **só na tela do fluxo da teleconsulta**, por condição
+  (`fluxoDaTeleconsulta`), e o caminho da ANVISA fica intocado. A pergunta a levar ao chefe do
+  dono é uma: _o paciente que já tem autorização da ANVISA e precisa de receita nova existe?_
 - **Rotação do `CHATPRO_INTAKE_SECRET_GREENS`** — pedida pela Greens para 14/09, ainda não
   feita. Não bloqueia este desenho, porque o handoff usa outro segredo
   (`PARCEIRO_GREENS_SEGREDO_ENTRADA`), **e isso é de propósito**: poderes diferentes não

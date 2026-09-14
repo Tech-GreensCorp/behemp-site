@@ -464,16 +464,43 @@ describe('a tela pergunta pela ANVISA, e a resposta é gravada', () => {
  * receita válida. Era o buraco do fluxo BeHemp 1, apontado em 10/09/2026.
  */
 describe('a pergunta da receita, e o destino que a considera', () => {
-  it('a pergunta existe', () => {
-    expect(codigo).toContain('Você já tem uma receita médica de cannabis medicinal válida?');
+  it('a pergunta existe, e usa o termo que o produto decidiu', () => {
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026. A versão anterior era:
+     *
+     *     expect(codigo).toContain('Você já tem uma receita médica de cannabis medicinal válida?');
+     *
+     * Ela congelava a FRASE INTEIRA, e o chefe do dono trocou o vocabulário do produto:
+     * "cannabis medicinal" virou "fitocanabinoide". O guarda ficou vermelho por uma mudança
+     * de texto que era exatamente o que se pediu — e um guarda que reclama do pedido treina
+     * quem o lê a desligá-lo.
+     *
+     * A propriedade é: a pergunta sobre a receita existe, e não usa o termo antigo.
+     */
+    expect(codigo, 'a pergunta sobre a receita sumiu').toMatch(
+      /Você já tem uma receita médica de .* válida\?/,
+    );
+    expect(
+      /cannabis\s+medicinal/i.test(codigo),
+      'o termo antigo voltou — o produto decidiu "fitocanabinoide"',
+    ).toBe(false);
   });
 
   it('e vem ANTES da ANVISA na tela — sem receita não há o que autorizar', () => {
-    const receita = codigo.indexOf('{perguntarSobreReceita && (');
-    const anvisa = codigo.indexOf('{perguntarSobreAnvisa && (');
-    expect(receita).toBeGreaterThan(-1);
-    expect(anvisa).toBeGreaterThan(-1);
-    expect(receita).toBeLessThan(anvisa);
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026, segunda vez no mesmo caso. Exigia o literal
+     * `{perguntarSobreReceita && (` colado; o bloco ganhou uma segunda condição
+     * (`&& !fluxoDaTeleconsulta`, pedido 4 do chefe) e o literal deixou de casar — sem que
+     * a ORDEM, que é o que este caso protege, tivesse mudado.
+     *
+     * A ordem é regra clínica: perguntar pela autorização antes da receita sugere uma
+     * sequência que a norma não permite.
+     */
+    const receita = codigo.indexOf('perguntarSobreReceita &&');
+    const anvisa = codigo.indexOf('perguntarSobreAnvisa &&');
+    expect(receita, 'o bloco da receita sumiu da tela').toBeGreaterThan(-1);
+    expect(anvisa, 'o bloco da ANVISA sumiu da tela').toBeGreaterThan(-1);
+    expect(receita, 'a ANVISA passou a ser perguntada antes da receita').toBeLessThan(anvisa);
   });
 
   /**
