@@ -17,6 +17,7 @@ import type { Metadata } from 'next';
 import { meusConsentimentos } from '@/app/(paciente)/_actions/consentimento';
 
 import { PainelDoConsentimento } from './_components/painel-do-consentimento';
+import { PageHeader } from '@/components/shared/page-header';
 
 export const metadata: Metadata = {
   title: 'Privacidade | Be4Hope',
@@ -28,13 +29,10 @@ export default async function PrivacidadePage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8">
-      <header className="space-y-1.5">
-        <h1 className="text-foreground text-xl font-semibold">Privacidade</h1>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Aqui fica o que você autorizou. Pode mudar quando quiser — vale a partir do momento em que
-          você salva.
-        </p>
-      </header>
+      <PageHeader
+        title="Privacidade"
+        description="Aqui fica o que você autorizou. Pode mudar quando quiser — vale a partir do momento em que você salva."
+      />
 
       <PainelDoConsentimento iniciais={vigentes} />
 

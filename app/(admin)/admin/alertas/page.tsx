@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { DispararManualBtn } from './_components/disparar-manual-btn';
+import { PageHeader } from '@/components/shared/page-header';
 import type { AlertaMedicacao, AlertaLicenca, AlertaMensalidade } from '@/lib/alertas/coletor';
 
 export default async function AlertasDashboardPage() {
@@ -14,18 +15,12 @@ export default async function AlertasDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-verde-musgo">
-            Central de Alertas
-          </h1>
-          <p className="text-muted-foreground">
-            Monitoramento inteligente de medicamentos, licenças e mensalidades.
-          </p>
-        </div>
-        
-        <DispararManualBtn />
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Central de Alertas"
+        description="Monitoramento inteligente de medicamentos, licenças e mensalidades."
+        actions={<DispararManualBtn />}
+      />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-red-50 border-red-200">

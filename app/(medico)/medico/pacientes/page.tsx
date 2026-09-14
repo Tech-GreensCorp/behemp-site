@@ -19,8 +19,9 @@ import {
   exportarPacientesCSV,
 } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/page-header';
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import {
-  ChevronLeft,
   ChevronRight,
   Download,
   Loader2,
@@ -215,66 +216,61 @@ export default function PacientesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Gestão
-          </p>
-          <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-            <span className="text-accent-italic">Pacientes</span>
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {carregando ? 'Carregando...' : `${total} paciente${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Input oculto para upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={handleImportar}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 rounded-xl"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importando}
-          >
-            {importando ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Upload size={14} />
-            )}
-            {importando ? 'Importando...' : 'Importar CSV / XLSX'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 rounded-xl"
-            onClick={handleExportar}
-            disabled={exportando || total === 0}
-          >
-            {exportando ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Download size={14} />
-            )}
-            {exportando ? 'Exportando...' : 'Exportar CSV'}
-          </Button>
-          <Link href="/medico/pacientes/novo">
-            <Button className="gap-2 rounded-xl" nativeButton={false}>
-              <UserPlus size={16} />
-              Novo paciente
+      <PageHeader
+        eyebrow="Gestão"
+        title="Pacientes"
+        description={
+          carregando
+            ? 'Carregando...'
+            : `${total} paciente${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Input oculto para upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={handleImportar}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-xl"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importando}
+            >
+              {importando ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Upload size={14} />
+              )}
+              {importando ? 'Importando...' : 'Importar CSV / XLSX'}
             </Button>
-          </Link>
-        </div>
-      </div>
-
-      <div className="h-px bg-gradient-to-r from-border/60 via-border to-transparent" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-xl"
+              onClick={handleExportar}
+              disabled={exportando || total === 0}
+            >
+              {exportando ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Download size={14} />
+              )}
+              {exportando ? 'Exportando...' : 'Exportar CSV'}
+            </Button>
+            <Link href="/medico/pacientes/novo">
+              <Button className="gap-2 rounded-xl" nativeButton={false}>
+                <UserPlus size={16} />
+                Novo paciente
+              </Button>
+            </Link>
+          </div>
+        }
+      />
 
       {/* Filtros */}
       <Card className="border-border/40 shadow-sm">
@@ -437,61 +433,16 @@ export default function PacientesPage() {
 
       {/* Paginação */}
       {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-          {/* Info + itens por página */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              {total} paciente{total !== 1 ? 's' : ''}
-            </span>
-            <span className="text-border">·</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">Exibir</span>
-              <Select
-                value={String(porPagina)}
-                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
-              >
-                <SelectTrigger size="sm" className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {POR_PAGINA_OPCOES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs">por página</span>
-            </div>
-          </div>
-
-          {/* Controles de página */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina <= 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              className="gap-1"
-            >
-              <ChevronLeft size={14} />
-              Anterior
-            </Button>
-            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
-              Página {pagina} de {totalPaginas}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina >= totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              className="gap-1"
-            >
-              Próximo
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        </div>
+        <PaginationBar
+          page={pagina}
+          totalPages={totalPaginas}
+          onPageChange={setPagina}
+          totalItems={total}
+          itemLabel="paciente"
+          pageSize={porPagina}
+          onPageSizeChange={setPorPagina}
+          pageSizeOptions={POR_PAGINA_OPCOES}
+        />
       )}
     </div>
   );

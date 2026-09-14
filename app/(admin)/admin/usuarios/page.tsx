@@ -13,11 +13,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
+import { PageHeader } from '@/components/shared/page-header';
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Search,
   Shield,
@@ -130,13 +130,11 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Usuários</h1>
-        <p className="text-sm text-muted-foreground">
-          {stats.total} usuários registrados na plataforma
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Usuários"
+        description={`${stats.total} usuários registrados na plataforma`}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -264,61 +262,15 @@ export default function UsuariosPage() {
 
       {/* Paginação */}
       {totalPaginas > 0 && !carregando && usuarios.length > 0 && (
-        <div className="flex flex-col items-center gap-4 pt-2 sm:flex-row sm:justify-between">
-          {/* Info + itens por página */}
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              {totalFiltrado} resultado{totalFiltrado !== 1 ? 's' : ''}
-            </span>
-            <span className="text-border">·</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">Exibir</span>
-              <Select
-                value={String(porPagina)}
-                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
-              >
-                <SelectTrigger size="sm" className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {POR_PAGINA_OPCOES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs">por página</span>
-            </div>
-          </div>
-
-          {/* Controles de página */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina <= 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              className="gap-1"
-            >
-              <ChevronLeft size={14} />
-              Anterior
-            </Button>
-            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
-              Página {pagina} de {totalPaginas}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina >= totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              className="gap-1"
-            >
-              Próximo
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        </div>
+        <PaginationBar
+          page={pagina}
+          totalPages={totalPaginas}
+          onPageChange={setPagina}
+          totalItems={totalFiltrado}
+          pageSize={porPagina}
+          onPageSizeChange={setPorPagina}
+          pageSizeOptions={POR_PAGINA_OPCOES}
+        />
       )}
     </div>
   );

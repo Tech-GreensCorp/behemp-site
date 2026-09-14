@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 
 import { listarTitulacaoGeral } from '@/app/(medico)/_actions/conduta';
 import { VisaoGeralTitulacao, type LinhaGeral } from '@/components/conduta/VisaoGeralTitulacao';
+import { PageHeader } from '@/components/shared/page-header';
 
 export default function TitulacaoPage() {
   const [linhas, setLinhas] = useState<LinhaGeral[]>([]);
@@ -41,14 +42,12 @@ export default function TitulacaoPage() {
 
   return (
     <div className="space-y-6 p-6 lg:p-8">
-      <header className="animate-fade-up space-y-1">
-        <p className="eyebrow">Acompanhamento</p>
-        <h1 className="font-display text-2xl font-semibold sm:text-3xl">Conduta e titulação</h1>
-        <p className="text-muted-foreground max-w-2xl text-sm">
-          Todos os planos terapêuticos ativos dos seus pacientes. Para ajustar uma dose, abra o
-          prontuário — o ajuste acontece com o histórico do paciente à vista.
-        </p>
-      </header>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Acompanhamento"
+        title="Conduta e titulação"
+        description="Todos os planos terapêuticos ativos dos seus pacientes. Para ajustar uma dose, abra o prontuário — o ajuste acontece com o histórico do paciente à vista."
+      />
 
       {carregando ? (
         <div className="flex justify-center py-16">

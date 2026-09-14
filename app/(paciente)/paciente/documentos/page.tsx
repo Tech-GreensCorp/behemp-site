@@ -21,6 +21,7 @@ import {
 import { uploadDocumentoPaciente, listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 
 const TIPO_LABELS: Record<string, string> = {
   rg: 'RG',
@@ -127,29 +128,23 @@ export default function DocumentosPacientePage() {
         </Link>
       </div>
 
-      {/* ── Header Editorial ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up">
-        <div>
-          <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase">
-            Acolhimento
-          </p>
-          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight text-foreground">
-            Meus <span className="text-accent-italic">Documentos</span>
-          </h1>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
-            Envie e gerencie os documentos necessários para validação e conformidade legal do seu tratamento.
-          </p>
-        </div>
-        {!mostrarForm && (
-          <Button 
-            className="rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0 shrink-0 self-start sm:self-center" 
-            onClick={() => setMostrarForm(true)}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Enviar Documento
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Acolhimento"
+        title="Meus Documentos"
+        description="Envie e gerencie os documentos necessários para validação e conformidade legal do seu tratamento."
+        actions={
+          !mostrarForm && (
+            <Button
+              className="rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0 shrink-0"
+              onClick={() => setMostrarForm(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Enviar Documento
+            </Button>
+          )
+        }
+      />
 
       {/* Formulário inline */}
       {mostrarForm && (

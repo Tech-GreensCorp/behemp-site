@@ -16,6 +16,7 @@ import {
   Shield,
   Trash2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Página de auditoria LGPD — logs de operações sensíveis.
@@ -62,12 +63,11 @@ export default function AuditoriaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Auditoria LGPD</h1>
-        <p className="text-sm text-muted-foreground">
-          Registro de todas as operações sensíveis na plataforma
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Segurança"
+        title="Auditoria LGPD"
+        description="Registro de todas as operações sensíveis na plataforma"
+      />
 
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row">

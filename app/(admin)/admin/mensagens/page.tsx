@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { listarContatos, atualizarStatusContato, responderContato } from '@/app/(public)/_actions/contato';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   Calendar,
   CheckCircle2,
@@ -148,16 +149,11 @@ export default function MensagensAdminPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mensagens</h1>
-          <p className="text-sm text-muted-foreground">
-            {contatos.length} mensagem{contatos.length !== 1 ? 'ns' : ''} recebida{contatos.length !== 1 ? 's' : ''}
-            {naoLidas > 0 && ` · ${naoLidas} não lida${naoLidas > 1 ? 's' : ''}`}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Mensagens"
+        title="Mensagens"
+        description={`${contatos.length} mensagem${contatos.length !== 1 ? 'ns' : ''} recebida${contatos.length !== 1 ? 's' : ''}${naoLidas > 0 ? ` · ${naoLidas} não lida${naoLidas > 1 ? 's' : ''}` : ''}`}
+      />
 
       {/* Lista vazia */}
       {contatos.length === 0 ? (

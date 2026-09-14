@@ -6,6 +6,7 @@ import { InvoiceTypeBadge, InvoiceStatusBadge } from '@/components/admin/invoice
 import { Plus, FileText, Pencil, ExternalLink } from 'lucide-react';
 import { InvoiceFilters } from '@/components/admin/invoices/invoice-filters';
 import { InvoicePagination } from '@/components/admin/invoices/invoice-pagination';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Lista de invoices — Server Component com filtros via searchParams.
@@ -43,21 +44,19 @@ export default async function InvoicesPage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Invoices</h1>
-          <p className="mt-1 text-muted-foreground">
-            {totalInvoices} invoice{totalInvoices !== 1 ? 's' : ''} no sistema
-          </p>
-        </div>
-        <Link href="/admin/invoices/nova">
-          <Button className="gap-2">
-            <Plus size={16} />
-            Nova Invoice
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Financeiro"
+        title="Invoices"
+        description={`${totalInvoices} invoice${totalInvoices !== 1 ? 's' : ''} no sistema`}
+        actions={
+          <Link href="/admin/invoices/nova">
+            <Button className="gap-2">
+              <Plus size={16} />
+              Nova Invoice
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Filtros */}
       <InvoiceFilters

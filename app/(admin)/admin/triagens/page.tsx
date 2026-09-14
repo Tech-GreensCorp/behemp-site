@@ -13,6 +13,7 @@ import {
 } from '@/app/(public)/_actions/triagem';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   AlertTriangle,
   Calendar,
@@ -501,19 +502,21 @@ export default function TriagensAdminPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Triagens</h1>
-        <p className="text-sm text-muted-foreground">
-          {todasTriagens.length} triagem{todasTriagens.length !== 1 ? 'ns' : ''} recebida
-          {todasTriagens.length !== 1 ? 's' : ''}
-          {pendentes > 0 && (
-            <span className="ml-1 font-semibold text-amber-600">
-              · {pendentes} pendente{pendentes > 1 ? 's' : ''}
-            </span>
-          )}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Triagens"
+        description={
+          <>
+            {todasTriagens.length} triagem{todasTriagens.length !== 1 ? 'ns' : ''} recebida
+            {todasTriagens.length !== 1 ? 's' : ''}
+            {pendentes > 0 && (
+              <span className="ml-1 font-semibold text-amber-600">
+                · {pendentes} pendente{pendentes > 1 ? 's' : ''}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {/* ── Barra de filtros ────────────────────────────────── */}
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center">

@@ -6,6 +6,7 @@ import { PagamentoStatusBadge } from '@/components/admin/pagamentos/pagamento-st
 import { PagamentoFunilBadge } from '@/components/admin/pagamentos/pagamento-funil-badge';
 import { PagamentoFilters } from '@/components/admin/pagamentos/pagamento-filters';
 import { Wallet, Pencil, Landmark } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 function formatarValor(v: string): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,24 +44,27 @@ export default async function PagamentosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Pagamentos</h1>
-          <p className="text-muted-foreground mt-1">
+      <PageHeader
+        eyebrow="Financeiro"
+        title="Pagamentos"
+        description={
+          <>
             {total} pagamento{total !== 1 ? 's' : ''} de teleconsulta
-          </p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            O valor vai direto para a conta do médico — este painel é um registro de acompanhamento,
-            a Be4Hope não retém nem intermedeia o valor.
-          </p>
-        </div>
-        <Link href="/admin/pagamentos/medicos">
-          <Button variant="outline" className="w-full gap-2 sm:w-auto">
-            <Landmark size={16} />
-            Meios de pagamento por médico
-          </Button>
-        </Link>
-      </div>
+            <span className="mt-1 block text-xs">
+              O valor vai direto para a conta do médico — este painel é um registro de
+              acompanhamento, a Be4Hope não retém nem intermedeia o valor.
+            </span>
+          </>
+        }
+        actions={
+          <Link href="/admin/pagamentos/medicos">
+            <Button variant="outline" className="w-full gap-2 sm:w-auto">
+              <Landmark size={16} />
+              Meios de pagamento por médico
+            </Button>
+          </Link>
+        }
+      />
 
       <PagamentoFilters statusAtual={status} buscaAtual={busca} atencaoAtual={atencao} />
 

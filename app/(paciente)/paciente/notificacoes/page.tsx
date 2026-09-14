@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { listarNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '@/app/_actions/notificacoes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   Bell,
   Calendar,
@@ -100,33 +101,29 @@ export default function NotificacoesPacientePage() {
   return (
     <div className="space-y-10">
       
-      {/* ── Header Editorial ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up">
-        <div>
-          <p className="text-primary mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-            Área do Paciente
-          </p>
-          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
-            Minhas <span className="text-accent-italic">Notificações</span>
-          </h1>
-          <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-relaxed">
-            {naoLidas > 0
-              ? `Você possui ${naoLidas} notificação${naoLidas > 1 ? 'ões' : ''} não lida${naoLidas > 1 ? 's' : ''} pendente${naoLidas > 1 ? 's' : ''}.`
-              : 'Você está em dia! Todas as notificações foram lidas.'}
-          </p>
-        </div>
-        {naoLidas > 0 && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleMarcarTodasLidas} 
-            className="rounded-full gap-2 text-xs font-semibold border-border/40 hover:bg-accent h-10 px-5 cursor-pointer shrink-0 self-start sm:self-center"
-          >
-            <CheckCircle2 size={14} />
-            Marcar todas como lidas
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Área do Paciente"
+        title="Minhas Notificações"
+        description={
+          naoLidas > 0
+            ? `Você possui ${naoLidas} notificação${naoLidas > 1 ? 'ões' : ''} não lida${naoLidas > 1 ? 's' : ''} pendente${naoLidas > 1 ? 's' : ''}.`
+            : 'Você está em dia! Todas as notificações foram lidas.'
+        }
+        actions={
+          naoLidas > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarcarTodasLidas}
+              className="rounded-full gap-2 text-xs font-semibold border-border/40 hover:bg-accent h-10 px-5 cursor-pointer shrink-0"
+            >
+              <CheckCircle2 size={14} />
+              Marcar todas como lidas
+            </Button>
+          )
+        }
+      />
 
       {/* Lista / Card Vazio */}
       {notificacoes.length === 0 ? (

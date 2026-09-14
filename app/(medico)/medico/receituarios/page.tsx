@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { listarTemplatesMedico, criarTemplate, excluirTemplate } from '@/app/(medico)/_actions/receituario-templates';
 import { LISTA_ICONES } from '@/lib/receituario/icones-medicos';
+import { PageHeader } from '@/components/shared/page-header';
 
 export default function ReceituariosPage() {
   const [templates, setTemplates] = useState<any[]>([]);
@@ -95,55 +96,56 @@ export default function ReceituariosPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight font-heading">Templates de Receituário</h1>
-          <p className="text-muted-foreground mt-1">Gerencie seus modelos de receituário e atestados</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="gap-2"><Plus size={16} /> Novo Template</Button>} />
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Template</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Nome do Template</Label>
-                <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Padrão Clínica" />
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v ?? 'simples' }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="simples">Simples</SelectItem>
-                    <SelectItem value="controle_especial">Controle Especial</SelectItem>
-                    <SelectItem value="personalizado">Personalizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Cor Primária (Hex)</Label>
-                <div className="flex items-center gap-3">
-                  <Input type="color" value={form.corPrimaria} onChange={e => setForm(f => ({ ...f, corPrimaria: e.target.value }))} className="w-16 h-10 p-1" />
-                  <Input value={form.corPrimaria} onChange={e => setForm(f => ({ ...f, corPrimaria: e.target.value }))} className="flex-1" />
+      <PageHeader
+        eyebrow="Atendimento"
+        title="Templates de Receituário"
+        description="Gerencie seus modelos de receituário e atestados"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button className="gap-2"><Plus size={16} /> Novo Template</Button>} />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Template</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Nome do Template</Label>
+                  <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Padrão Clínica" />
                 </div>
-              </div>
-              <div className="flex items-center justify-between mt-2 p-3 border rounded-lg">
-                <div className="space-y-0.5">
-                  <Label>Template Padrão</Label>
-                  <p className="text-xs text-muted-foreground">Usar este modelo por padrão em novas emissões</p>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v ?? 'simples' }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simples">Simples</SelectItem>
+                      <SelectItem value="controle_especial">Controle Especial</SelectItem>
+                      <SelectItem value="personalizado">Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch checked={form.padrao} onCheckedChange={v => setForm(f => ({ ...f, padrao: v }))} />
+                <div className="space-y-2">
+                  <Label>Cor Primária (Hex)</Label>
+                  <div className="flex items-center gap-3">
+                    <Input type="color" value={form.corPrimaria} onChange={e => setForm(f => ({ ...f, corPrimaria: e.target.value }))} className="w-16 h-10 p-1" />
+                    <Input value={form.corPrimaria} onChange={e => setForm(f => ({ ...f, corPrimaria: e.target.value }))} className="flex-1" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2 p-3 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label>Template Padrão</Label>
+                    <p className="text-xs text-muted-foreground">Usar este modelo por padrão em novas emissões</p>
+                  </div>
+                  <Switch checked={form.padrao} onCheckedChange={v => setForm(f => ({ ...f, padrao: v }))} />
+                </div>
+                <Button className="w-full mt-4" onClick={handleSalvar} disabled={salvando}>
+                  {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Criar Template
+                </Button>
               </div>
-              <Button className="w-full mt-4" onClick={handleSalvar} disabled={salvando}>
-                {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Criar Template
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {templates.map((t) => (

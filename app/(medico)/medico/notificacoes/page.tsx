@@ -19,6 +19,7 @@ import {
   MessageSquare,
   Pill,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Página de notificações do médico — dados reais do banco.
@@ -88,27 +89,24 @@ export default function NotificacoesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Notificações</h1>
-          <p className="text-sm text-muted-foreground">
-            {naoLidas > 0
-              ? `${naoLidas} não lida${naoLidas !== 1 ? 's' : ''}`
-              : 'Tudo em dia'}
-          </p>
-        </div>
-        {naoLidas > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={handleMarcarTodasLidas}
-          >
-            <CheckCircle2 size={14} />
-            Marcar todas como lidas
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Mensagens"
+        title="Notificações"
+        description={naoLidas > 0 ? `${naoLidas} não lida${naoLidas !== 1 ? 's' : ''}` : 'Tudo em dia'}
+        actions={
+          naoLidas > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleMarcarTodasLidas}
+            >
+              <CheckCircle2 size={14} />
+              Marcar todas como lidas
+            </Button>
+          )
+        }
+      />
 
       {notifs.length === 0 ? (
         <Card className="border-0 shadow-sm">

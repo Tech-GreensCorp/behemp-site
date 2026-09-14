@@ -19,6 +19,7 @@ import {
 import { listarMeusMedicamentos, type ItemMedicamentoPaciente } from '@/app/_actions/medicamentos-paciente';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 
 // Agrupa itens pelo ajusteId para exibir por data de ajuste
 function agruparPorAjuste(itens: ItemMedicamentoPaciente[]) {
@@ -75,18 +76,12 @@ export default function MedicamentosPage() {
 
   return (
     <div className="space-y-6 sm:space-y-10">
-      {/* ── Header Editorial ── */}
-      <div className="animate-fade-up">
-        <p className="text-primary mb-2 sm:mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-          Área do Paciente
-        </p>
-        <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
-          Meus <span className="text-accent-italic">Medicamentos</span>
-        </h1>
-        <p className="text-muted-foreground mt-2 sm:mt-4 max-w-2xl text-sm sm:text-base leading-relaxed">
-          Acompanhe seus medicamentos prescritos e o histórico de dosagens.
-        </p>
-      </div>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Área do Paciente"
+        title="Meus Medicamentos"
+        description="Acompanhe seus medicamentos prescritos e o histórico de dosagens."
+      />
 
       {carregando ? (
         <div className="flex min-h-[40vh] items-center justify-center">

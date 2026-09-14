@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShieldCheck, FileText, Download, CheckCircle2, Clock, AlertCircle, Send } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 type DocuSignStatus = 'nao_enviado' | 'enviado' | 'visualizado' | 'assinado' | 'concluido' | 'recusado' | 'expirado' | 'erro';
 
@@ -58,12 +59,11 @@ export default async function AdminProcuracoesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Procurações Específicas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie as assinaturas digitais dos pacientes.</p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Procurações Específicas"
+        description="Gerencie as assinaturas digitais dos pacientes."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="bg-secondary/5 border-secondary/20">

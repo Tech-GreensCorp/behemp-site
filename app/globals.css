@@ -447,3 +447,102 @@
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* ═══════════════════════════════════════════════════
+   Âmbar — sistema visual do ambiente interno (logado)
+   Laranja da marca (--primary) como superfície dominante,
+   não só acento. Escopo: (admin)/(medico)/(paciente) — a
+   marketing/pública não usa `.ambar-scope`.
+   ═══════════════════════════════════════════════════ */
+
+.ambar-scope {
+  --font-heading: var(--font-sora);
+  --font-display: var(--font-sora);
+  --font-sans: var(--font-jakarta);
+}
+
+.sidebar-ambar {
+  background: linear-gradient(165deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 90%, black) 100%);
+}
+
+/* Superfícies do conteúdo continuam claras — o laranja saturado fica reservado para a
+   sidebar e para CTA/foco. Cards, inputs e badges ganham profundidade sutil (sombra em
+   camadas, glow no foco, cantos ajustados), não uma pintura laranja nova. */
+.ambar-scope [data-slot="card"] {
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 2px rgba(26, 22, 18, 0.04), 0 8px 24px -12px rgba(26, 22, 18, 0.10);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.ambar-scope a[data-slot="card"]:hover,
+.ambar-scope [data-slot="card"].card-interactive:hover {
+  box-shadow: 0 1px 2px rgba(26, 22, 18, 0.05), 0 16px 36px -14px color-mix(in oklab, var(--primary) 22%, rgba(26, 22, 18, 0.16));
+  transform: translateY(-2px);
+}
+.ambar-scope [data-slot="card-title"] {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.ambar-scope [data-slot="button"] {
+  border-radius: 999px;
+}
+.ambar-scope [data-slot="button"].bg-primary {
+  background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 88%, white 12%), var(--primary));
+  box-shadow: 0 10px 24px -10px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+.ambar-scope [data-slot="button"].bg-primary:hover {
+  box-shadow: 0 14px 30px -10px color-mix(in oklab, var(--primary) 65%, transparent);
+}
+.ambar-scope [data-slot="input"],
+.ambar-scope [data-slot="select-trigger"],
+.ambar-scope textarea {
+  border-radius: var(--radius-md);
+  background: var(--surface, var(--card));
+}
+.ambar-scope [data-slot="input"]:focus-visible,
+.ambar-scope [data-slot="select-trigger"]:focus-visible,
+.ambar-scope textarea:focus-visible {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 16%, transparent);
+}
+.ambar-scope [data-slot="badge"] {
+  font-weight: 700;
+  border-radius: 999px;
+}
+.ambar-scope [data-slot="dialog-content"],
+.ambar-scope [data-slot="sheet-content"],
+.ambar-scope [data-slot="popover-content"] {
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 60px -20px rgba(26, 22, 18, 0.28);
+}
+.ambar-scope [data-slot="skeleton"] {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--primary-soft) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: ambar-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes ambar-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambar-scope [data-slot="skeleton"] { animation: none; }
+}
+
+/* Cabeçalho de página único — ver components/shared/page-header.tsx */
+.ambar-scope .page-header-wash {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+}
+.ambar-scope .page-header-wash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(60% 140% at 100% 0%, var(--primary-soft), transparent 65%),
+    radial-gradient(45% 90% at 0% 100%, color-mix(in oklab, var(--primary-soft) 65%, transparent), transparent 70%);
+}
+.ambar-scope .page-header-wash > * {
+  position: relative;
+  z-index: 1;
+}

@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   CalendarDays as CalendarIcon,
   CheckCircle2,
@@ -182,12 +183,7 @@ export default function AgendaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Operação</p>
-        <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight">
-          Agenda de <span className="text-accent-italic">Consultas</span>
-        </h1>
-      </div>
+      <PageHeader eyebrow="Operação" title="Agenda de Consultas" />
 
       <Tabs defaultValue="consultas">
         <TabsList className="grid w-full grid-cols-4">

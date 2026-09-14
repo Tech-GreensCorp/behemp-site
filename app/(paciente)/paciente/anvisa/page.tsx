@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   ShieldCheck, FileText, Upload, CheckCircle2, Clock, AlertCircle,
   ChevronRight, Loader2, RefreshCw, FileCheck, CircleDot,
@@ -442,16 +443,10 @@ export default function AnvisaPage() {
         não autorizou. Nunca bloqueia: aceite obtido como pedágio é viciado (LGPD art. 8º §3º).
       */}
       <ConsentimentoQueFaltou origem="tela_anvisa" />
-      {/* Header */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-display font-bold text-foreground">Autorização ANVISA</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Guia passo a passo para obter sua autorização de importação de medicamento.
-        </p>
-      </div>
+      <PageHeader
+        title="Autorização ANVISA"
+        description="Guia passo a passo para obter sua autorização de importação de medicamento."
+      />
 
       {/* Progresso */}
       {etapa !== 'inicio' && (

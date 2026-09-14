@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Loader2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 interface LeadEbook {
   id: string;
@@ -84,26 +85,19 @@ export default function LeadsEbooksAdminPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-secondary">Leads</h1>
-          <p className="text-sm text-muted-foreground">
-            {leads.length} lead{leads.length !== 1 ? 's' : ''} capturado{leads.length !== 1 ? 's' : ''} no total
-          </p>
-        </div>
-        
-        {filteredLeads.length > 0 && (
-          <Button
-            onClick={handleCopiarEmails}
-            variant="outline"
-            className="gap-2 border-[#2D4F3C]/40 text-[#2D4F3C] hover:bg-[#2D4F3C] hover:text-white"
-          >
-            <Copy size={16} />
-            Copiar Todos os E-mails
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Mensagens"
+        title="Leads"
+        description={`${leads.length} lead${leads.length !== 1 ? 's' : ''} capturado${leads.length !== 1 ? 's' : ''} no total`}
+        actions={
+          filteredLeads.length > 0 && (
+            <Button onClick={handleCopiarEmails} variant="outline" className="gap-2">
+              <Copy size={16} />
+              Copiar Todos os E-mails
+            </Button>
+          )
+        }
+      />
 
       {/* Busca */}
       <div className="relative max-w-md bg-white border border-border rounded-xl">

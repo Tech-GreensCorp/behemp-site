@@ -33,6 +33,7 @@ import {
   Clock,
   Send,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Página de administração de recompras — Admin.
@@ -243,19 +244,17 @@ export default function AdminRecomprasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Recompras</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie pedidos de recompra e e-mails de notificação
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={carregarRecompras} className="gap-2">
-          <RefreshCw size={14} />
-          Atualizar
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Financeiro"
+        title="Recompras"
+        description="Gerencie pedidos de recompra e e-mails de notificação"
+        actions={
+          <Button variant="outline" size="sm" onClick={carregarRecompras} className="gap-2">
+            <RefreshCw size={14} />
+            Atualizar
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-3">
         {/* ── Pedidos de Recompra ──────────────────────────────── */}

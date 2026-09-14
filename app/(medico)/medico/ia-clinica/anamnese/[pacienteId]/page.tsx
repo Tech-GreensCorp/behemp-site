@@ -13,6 +13,7 @@ import { SerieDeMedidas } from '@/components/ia-clinica/SerieDeMedidas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/page-header';
 import type { GrafoEvidencias } from '@/lib/ia-clinica/contrato';
 
 /**
@@ -114,21 +115,19 @@ export default async function AnamnesePage({
           </Button>
         </Link>
 
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="font-heading text-2xl font-semibold">
-              {primeira ? 'Primeira avaliação' : 'Retorno'}
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {primeira
-                ? 'Marco zero da série. É contra estes valores que a evolução vai ser medida.'
-                : `${medidas.length} ${medidas.length === 1 ? 'medição' : 'medições'} registradas. Preencha só o que remediu hoje.`}
-            </p>
-          </div>
-          <Badge variant={primeira ? 'default' : 'outline'}>
-            {primeira ? 'baseline' : 'acompanhamento'}
-          </Badge>
-        </div>
+        <PageHeader
+          title={primeira ? 'Primeira avaliação' : 'Retorno'}
+          description={
+            primeira
+              ? 'Marco zero da série. É contra estes valores que a evolução vai ser medida.'
+              : `${medidas.length} ${medidas.length === 1 ? 'medição' : 'medições'} registradas. Preencha só o que remediu hoje.`
+          }
+          actions={
+            <Badge variant={primeira ? 'default' : 'outline'}>
+              {primeira ? 'baseline' : 'acompanhamento'}
+            </Badge>
+          }
+        />
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">

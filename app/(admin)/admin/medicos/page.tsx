@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ChevronRight, Stethoscope } from 'lucide-react';
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/shared/page-header';
 
 export const metadata: Metadata = {
   title: 'Médicos — Admin Be4Hope',
@@ -20,13 +21,11 @@ export default async function AdminMedicosPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Médicos</h1>
-        <p className="mt-1 text-muted-foreground">
-          Gerencie os médicos parceiros da plataforma Be4Hope.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Médicos"
+        description="Gerencie os médicos parceiros da plataforma Be4Hope."
+      />
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Lista de médicos cadastrados */}

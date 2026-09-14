@@ -12,6 +12,7 @@ import { listarMinhasPrescricoes, type PrescricaoPaciente } from '@/app/(pacient
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PageHeader } from '@/components/shared/page-header';
 
 export default function PrescricoesPage() {
   const [prescricoes, setPrescricoes] = useState<PrescricaoPaciente[]>([]);
@@ -65,20 +66,16 @@ export default function PrescricoesPage() {
   return (
     <div className="space-y-6 sm:space-y-10">
 
-      {/* ── Header Editorial ── */}
-      <div className="animate-fade-up">
-        <p className="text-primary mb-2 sm:mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-          Área do Paciente
-        </p>
-        <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
-          Minhas <span className="text-accent-italic">Prescrições</span>
-        </h1>
-        <p className="text-muted-foreground mt-2 sm:mt-4 max-w-2xl text-sm sm:text-base leading-relaxed">
-          {prescricoes.length > 0
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Área do Paciente"
+        title="Minhas Prescrições"
+        description={
+          prescricoes.length > 0
             ? `${prescricoes.length} prescrição(ões) registrada(s) — ${totalAtivas} ativa(s)`
-            : 'Aqui aparecerão as prescrições emitidas pelo seu médico.'}
-        </p>
-      </div>
+            : 'Aqui aparecerão as prescrições emitidas pelo seu médico.'
+        }
+      />
 
       {carregando ? (
         <div className="flex min-h-[40vh] items-center justify-center">

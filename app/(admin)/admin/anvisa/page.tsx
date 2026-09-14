@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, AlertCircle, XCircle, FileCheck, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus = 'pendente' | 'documentos_enviados' | 'em_analise' | 'aprovado' | 'pendencia_documental' | 'rejeitado';
@@ -155,20 +156,17 @@ export default function AdminAnvisaPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-display font-bold">Autorizações ANVISA</h1>
-            <p className="text-sm text-muted-foreground">Gerencie os processos de importação dos pacientes.</p>
-          </div>
-        </div>
-        <Button variant="outline" onClick={carregar} disabled={carregando} className="gap-2">
-          <RefreshCw className={cn('h-4 w-4', carregando && 'animate-spin')} />
-          Atualizar
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Autorizações ANVISA"
+        description="Gerencie os processos de importação dos pacientes."
+        actions={
+          <Button variant="outline" onClick={carregar} disabled={carregando} className="gap-2">
+            <RefreshCw className={cn('h-4 w-4', carregando && 'animate-spin')} />
+            Atualizar
+          </Button>
+        }
+      />
 
       {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
