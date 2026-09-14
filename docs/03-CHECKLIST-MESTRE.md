@@ -283,6 +283,22 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **`/intake` e `/start` do ChatPro têm o mesmo defeito de instância, latente** — achado
+      em 14/09/2026 pelo guarda `o-cliente-fala-com-a-instancia-da-conta`, que nasceu vermelho e
+      apontou os dois. O `/bot-link` foi corrigido (o cliente segue a conta), mas
+      `lib/chatpro/solicitacao.ts:429-432` (`intake`) e `:476-479` (`start`) seguem usando
+      `this.cliente` — o do ambiente, sempre a instância da BeHemp.
+      **Hoje não quebra** porque nenhuma das duas rotas identifica a conta:
+      `app/api/chatpro/intake/route.ts:87` e `start/route.ts:41` chamam o serviço sem ela. No
+      dia em que a Greens passar a usar qualquer um dos dois, o `leadId` deles será procurado na
+      instância errada e o fluxo trava do mesmo jeito — `throw` antes do insert, 422, paciente
+      transferido para atendente.
+      **Perigo de mexer: MÉDIO** — exige acrescentar `conta` ao contrato de entrada dos dois
+      métodos e fazer as rotas identificarem a conta pelo segredo, como o `/bot-link` já faz.
+      ⚠️ O guarda recorta o **método** do bot-link de propósito: acusar o arquivo inteiro o
+      deixaria vermelho por um defeito que ninguém autorizou corrigir, e guarda que acusa o que
+      não se pode consertar é guarda que alguém desliga.
+
 - [ ] **A tela da ANVISA lista o documento recebido mas não deixa VER a imagem** — pedido do dono
       em 14/09/2026, ao validar o SOL-000065: _"falta só adicionar uma opção de visualizar a
       imagem enviada para revisão"_. Hoje a tela mostra `✓ nome-do-arquivo.png` e um botão

@@ -33,10 +33,32 @@ export interface ContaDeChatpro {
  * para ficar simétrica com a nova quebraria o painel já configurado em produção, e
  * simetria de nome não vale um incidente.
  */
-const CONTAS: { conta: ContaDeChatpro; variavel: string }[] = [
+const CONTAS: {
+  conta: ContaDeChatpro;
+  variavel: string;
+  /**
+   * 🔴 AS CREDENCIAIS DA INSTÂNCIA DE CHATPRO DESTA CONTA — 14/09/2026.
+   *
+   * Cada conta é uma instância DIFERENTE do ChatPro. O `leadId` e o `sessionId` que chegam
+   * numa chamada só existem na instância de quem chamou: perguntar por um lead da Greens na
+   * instância da BeHemp devolve nada, e `buscarContatoPorId` responde `null`.
+   *
+   * ⚠️ E `null` ali não é "não achei": é `throw ErroDeContatoNaoConfirmado`, ANTES do insert.
+   * A solicitação nunca nasce, o `/bot-link` responde 422, e o painel do ChatPro transfere o
+   * paciente para um atendente. Foi o que travou o Fluxo 2 — dezenas de
+   * `[chatpro] contato não confirmado por findById` no log de produção, com leadIds
+   * diferentes, todos da instância da Greens.
+   *
+   * 🔴 E a medição enganou: `select count(chatpro_lead_id)` devolvia **0**, o que parecia
+   * provar que ninguém mandava `leadId`. Provava o contrário — as que mandavam morriam antes
+   * de virar linha. **Contar o que sobreviveu não mede o que chegou.**
+   */
+  instancia: { id: string; token: string };
+}[] = [
   {
     conta: { id: 'behemp', rotulo: 'BeHemp', urlDeRetorno: null },
     variavel: 'CHATPRO_INTAKE_SECRET',
+    instancia: { id: 'CHATPRO_INSTANCE_ID', token: 'CHATPRO_INSTANCE_TOKEN' },
   },
   {
     conta: {
@@ -47,8 +69,29 @@ const CONTAS: { conta: ContaDeChatpro; variavel: string }[] = [
       urlDeRetorno: null,
     },
     variavel: 'CHATPRO_INTAKE_SECRET_GREENS',
+    instancia: { id: 'CHATPRO_INSTANCE_ID_GREENS', token: 'CHATPRO_INSTANCE_TOKEN_GREENS' },
   },
 ];
+
+/**
+ * As credenciais da instância de ChatPro de uma conta, lidas do ambiente na hora.
+ *
+ * ⚠️ Lidas na CHAMADA, nunca no import: o mesmo motivo pelo qual `urlDeRetorno` é preenchida
+ * na identificação. Ler env no topo do módulo congela o valor de quando o arquivo carregou.
+ *
+ * Devolve `null` quando a conta não tem credencial configurada — e quem chama deve tratar isso
+ * como "não dá para confirmar", não como erro: o segredo do cabeçalho já autenticou a origem.
+ */
+export function instanciaDaConta(
+  id: ContaDeChatpro['id'],
+): { instanceId: string; token: string } | null {
+  const entrada = CONTAS.find((c) => c.conta.id === id);
+  if (!entrada) return null;
+  const instanceId = process.env[entrada.instancia.id]?.trim();
+  const token = process.env[entrada.instancia.token]?.trim();
+  if (!instanceId || !token) return null;
+  return { instanceId, token };
+}
 
 /**
  * Descobre de qual conta veio a chamada, pelo segredo.

@@ -28,6 +28,7 @@ import { solicitacoesCadastro } from '@/db/schema';
 import { solicitacaoCadastroOrigemEnum } from '@/db/schema/enums';
 import { db } from '@/lib/db';
 import { ClienteChatpro, type ContatoChatpro } from './cliente';
+import { instanciaDaConta, type ContaDeChatpro } from './contas';
 import { montarMensagemDoLink, primeiroNomeDe } from './mensagem-do-link';
 import { mascararEmail, mascararTelefone, normalizarTelefoneWhatsapp } from './telefone';
 import { urlDeRetornoPermitida } from '@/lib/parceiros/retorno';
@@ -128,6 +129,24 @@ export function montarLink(token: string): string {
 
 export class ServicoDeSolicitacao {
   constructor(private cliente = new ClienteChatpro()) {}
+
+  /**
+   * O cliente de ChatPro da conta que chamou.
+   *
+   * Sem conta, ou sem credencial configurada para ela, devolve o cliente padrão — que pode não
+   * estar configurado, e aí `estaConfigurado()` é `false` e a confirmação simplesmente não
+   * acontece. **Isso é degradação desejada, não falha:** o segredo do cabeçalho já autenticou
+   * a origem, e o fluxo segue pelo telefone.
+   *
+   * ⚠️ Um cliente injetado no construtor (é o que os testes fazem) tem precedência: trocá-lo
+   * por conta aqui tornaria o dublê inútil.
+   */
+  private clienteDaConta(id: ContaDeChatpro['id'] | null): ClienteChatpro {
+    if (!id) return this.cliente;
+    const credenciais = instanciaDaConta(id);
+    if (!credenciais) return this.cliente;
+    return new ClienteChatpro(credenciais);
+  }
 
   /**
    * Procura uma solicitação ATIVA para a chave: status inicial, link não usado e não
@@ -325,7 +344,12 @@ export class ServicoDeSolicitacao {
      * De qual conta de ChatPro veio (ADR-0018). Identificada pelo SEGREDO, não por
      * parâmetro de URL. Ausente = a conta da BeHemp, que é o caso histórico.
      */
-    conta?: { id: string; urlDeRetorno: string | null } | null;
+    /**
+     * ⚠️ `id` é a união, não `string` — apertado em 14/09/2026. Com `string`, um id inventado
+     * compilava e caía em `instanciaDaConta` sem casar, devolvendo o cliente errado em
+     * silêncio. A união faz o compilador recusar antes de rodar.
+     */
+    conta?: { id: ContaDeChatpro['id']; urlDeRetorno: string | null } | null;
     /** O que o bot declarou que o paciente já tem. Ver `manifesto-da-url.ts`. */
     documentosDeclarados?: string[] | null;
   }): Promise<{ mensagem: string; resultado: ResultadoDoLink }> {
@@ -338,12 +362,29 @@ export class ServicoDeSolicitacao {
     const telefoneDaUrl = entrada.number || entrada.telefone;
     let telefone = telefoneDaUrl ? normalizarTelefoneWhatsapp(telefoneDaUrl) : null;
 
-    if (!leadId && entrada.sessionId && this.cliente.estaConfigurado()) {
-      leadId = await this.cliente.buscarLeadIdPorSessao(entrada.sessionId.trim());
+    /**
+     * 🔴 O CLIENTE FALA COM A INSTÂNCIA DA CONTA QUE CHAMOU — corrigido em 14/09/2026.
+     *
+     * `leadId` e `sessionId` só existem na instância de ChatPro de quem chamou. Perguntar por
+     * um lead da Greens na instância da BeHemp devolve `null`, e `null` aqui vira
+     * `throw ErroDeContatoNaoConfirmado` — ANTES do insert. A solicitação nunca nasce, o
+     * `/bot-link` responde 422, e o painel transfere o paciente para um atendente.
+     *
+     * Foi o que travou o Fluxo 2. O log de produção tem dezenas de
+     * `[chatpro] contato não confirmado por findById`, com leadIds diferentes, todos da
+     * instância da Greens. A Greens diagnosticou primeiro, e tinha razão.
+     *
+     * ⚠️ Isto ESPELHA `urlDeRetornoDaConta`: a conta já decidia para onde o paciente volta;
+     * agora decide também com qual instância a gente conversa. Mesma ideia, mesmo lugar.
+     */
+    const cliente = this.clienteDaConta(entrada.conta?.id ?? null);
+
+    if (!leadId && entrada.sessionId && cliente.estaConfigurado()) {
+      leadId = await cliente.buscarLeadIdPorSessao(entrada.sessionId.trim());
     }
 
-    if (leadId && this.cliente.estaConfigurado()) {
-      const contato = await this.cliente.buscarContatoPorId(leadId);
+    if (leadId && cliente.estaConfigurado()) {
+      const contato = await cliente.buscarContatoPorId(leadId);
       if (!contato) throw new ErroDeContatoNaoConfirmado();
 
       nome = nome ?? contato.nome;
