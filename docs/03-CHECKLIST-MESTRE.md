@@ -283,6 +283,23 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **O `CHATPRO_INSTANCE_TOKEN` da BeHemp está RECUSADO na CHAT API** — medido pela Greens
+      na nossa VPS em 14/09/2026: `/departments/list → 401` e `/endings/list → 401`. Esses dois
+      endpoints **não dependem de lead nenhum** — listam o que é da própria instância. Dar 401
+      neles significa que o token não autentica, ponto.
+      ⚠️ **Não confundir com o defeito da instância por conta** (corrigido em `contas.ts`): são
+      dois, empilhados. O token da Greens resolve a conta `greens`; **o nosso continua morto** e
+      afeta todo caminho da conta `behemp` que dependa de confirmação reversa — `/intake`,
+      `/start`, e a tradução de UUID do diretório (que por isso nunca sincronizou: a tabela
+      `chatpro_diretorio` está vazia).
+      **Hoje degrada em silêncio**, porque o código foi desenhado para isso: `post` devolve
+      `null` em 4xx e a tradução nunca bloqueia o processamento. O custo é diagnóstico, não
+      dado — relatório de funil mostra UUID em vez de nome.
+      **Perigo de mexer: BAIXO** — é renovar a credencial no painel do ChatPro e recadastrar o
+      secret. ⚠️ Mas confirme primeiro que o token novo autentica (`/departments/list → 200`)
+      **antes** de trocar, como a Greens fez com o deles. Trocar um token morto por outro morto
+      gasta uma rodada e não ensina nada.
+
 - [ ] 🔴 **`/intake` e `/start` do ChatPro têm o mesmo defeito de instância, latente** — achado
       em 14/09/2026 pelo guarda `o-cliente-fala-com-a-instancia-da-conta`, que nasceu vermelho e
       apontou os dois. O `/bot-link` foi corrigido (o cliente segue a conta), mas

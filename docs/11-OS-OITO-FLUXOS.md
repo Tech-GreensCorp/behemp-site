@@ -73,6 +73,16 @@ que não tem — a pendência aqui é a **consequência** daquela resposta, não
 Corrigido em 10/09/2026, pela ORIGEM (`greens_handoff`) e não pelo parceiro: o **bot** da
 Greens também grava `parceiro: 'greens'` e não perguntou nada.
 
+> 🔴 **ALINHAMENTO DE NUMERAÇÃO, 14/09/2026.** Na conversa, este fluxo foi chamado de
+> _"Fluxo 3 / teleconsulta"_ — porque é o que termina na consulta. **A numeração que vale é a
+> desta tabela e da ADR-0021**, confirmada pelos dois lados: a ADR-0030 da Greens usa a mesma, e
+> foi só a conversa que divergiu.
+>
+> ⚠️ Fica escrito porque numeração divergente entre duas empresas faz dois times trabalharem em
+> coisas diferentes achando que é a mesma — e ninguém percebe até alguém entregar o fluxo errado.
+>
+> **O "Fluxo 3" do dono é este aqui.** O `Fluxo Greens 3` desta tabela é a **recompra**.
+
 ## Fluxo Greens 2 — paciente **sem receita**, veio do **bot** da Greens
 
 | #   | passo                                                | estado | medido                                          |
