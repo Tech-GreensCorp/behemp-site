@@ -283,9 +283,36 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **O `.env` do servidor diverge do ambiente do processo PM2 nos DOIS segredos do
+      ChatPro** — medido em 14/09/2026, comparando impressão SHA-256 dos 12 primeiros hex:
+
+      | variável                       | processo PM2              | `.next/standalone/.env`   |
+      | ------------------------------ | ------------------------- | ------------------------- |
+      | `CHATPRO_INTAKE_SECRET`        | `31686aa52e50` · 64 chars | `d1fa8e494609` · 68 chars |
+      | `CHATPRO_INTAKE_SECRET_GREENS` | `ed4673dad328` · 64 chars | `03113af79d44` · 68 chars |
+
+      **O processo está certo** — o `_GREENS` bate com a impressão que a Greens conferiu no
+      painel deles. Ele herdou o valor de um `pm2 start` anterior, e é por isso que o
+      `identificarConta` reconhece a conta Greens hoje.
+
+      🔴 **O perigo é o PRÓXIMO deploy.** O `deploy.yml` faz `pm2 delete` + `pm2 start`, e o
+      `preservar-ambiente-do-pm2.mjs` existe justamente para o ambiente não se perder nesse
+      intervalo. Se em algum caminho o `.env` prevalecer, o segredo que **hoje funciona** é
+      substituído pelo de 68 caracteres — e o Fluxo 2 volta a dar 401 sem ninguém ter tocado
+      em nada. Falha silenciosa da mesma família das quatro de 10/09.
+
+      ⚠️ **Os 4 caracteres a mais nos dois não foram explicados.** 64 hex é o que
+      `openssl rand -hex 32` produz; 68 não corresponde a aspas (2) nem a `\r\n` (2). Medir o
+      que são ANTES de sobrescrever qualquer coisa — pode ser um valor legado inteiro, e
+      apagá-lo cega o diagnóstico.
+
+      **Perigo de mexer: MÉDIO.** Tocar em segredo em produção derruba a integração se errar,
+      e a conferência de impressão precisa ser feita com a MESMA fórmula dos dois lados
+      (`tr -d '\n' | sha256sum | cut -c1-12`). Corrigir **depois** do Fluxo 2 funcionar.
+
 - [ ] ⚠️ **Recebemos webhook do ChatPro SEM `sessionId`** — medido em 14/09/2026:
       `[chatpro] webhook sem chave de deduplicação completa { temEvento: true, temSessao: false,
-    temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com conversa nenhuma —
+temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com conversa nenhuma —
       é processado e fica órfão.
       🔴 **E há uma pergunta aberta que vale medir antes de mexer:** a Greens descobriu em
       14/09 que o _Webhook url_ da instância **deles** nunca foi cadastrado (`0 registros` no

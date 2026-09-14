@@ -16,7 +16,7 @@
  *    passa pela mesma lista de origens do handoff: um destino livre é redirecionamento
  *    aberto, venha de handoff assinado ou de configuração de conta.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -34,6 +34,45 @@ const DIRETORIO = 'lib/chatpro/diretorio.ts';
 const SCHEMA_DIR = 'db/schema/chatpro-diretorio.ts';
 const BOT_LINK = 'app/api/chatpro/bot-link/route.ts';
 const SOLICITACAO = 'lib/chatpro/solicitacao.ts';
+
+/**
+ * 🔴 DERIVA AS ROTAS, NÃO AS LISTA — corrigido em 14/09/2026, e a correção nasceu de um
+ * defeito deste próprio arquivo.
+ *
+ * A versão anterior guardava `BOT_LINK` numa constante e conferia **só ela**. `triagem` e
+ * `intake` autenticavam contra `process.env.CHATPRO_INTAKE_SECRET` — o segredo da conta
+ * **BeHemp** — e recusavam a conta Greens com 401 por construção, que o painel traduz em
+ * "transferir para a Recepção". O guarda ficou verde o tempo todo: ele não sabia que as
+ * outras duas existiam.
+ *
+ * Agora a pergunta é feita ao disco: **toda** rota que lê segredo de cabeçalho entra na
+ * varredura, inclusive a que alguém escrever amanhã.
+ */
+function rotasQueAutenticamPorSegredo(): string[] {
+  const base = join(RAIZ, 'app', 'api', 'chatpro');
+  const achadas: string[] = [];
+  const andar = (dir: string) => {
+    for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+      const caminho = join(dir, entrada.name);
+      if (entrada.isDirectory()) andar(caminho);
+      else if (entrada.name === 'route.ts') {
+        /**
+         * ⚠️ Procura a CHAMADA, não o nome. `includes('lerSegredoDoCabecalho')` casava com
+         * `lerSegredoDoCabecalhoX` e com o nome dentro de um comentário — uma sabotagem
+         * mostrou o guarda continuando a "achar" uma rota que já não autenticava nada.
+         */
+        const corpo = readFileSync(caminho, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/.*$/gm, '$1');
+        if (/\blerSegredoDoCabecalho\s*\(/.test(corpo)) {
+          achadas.push(caminho.slice(join(RAIZ, '').length));
+        }
+      }
+    }
+  };
+  andar(base);
+  return achadas.sort();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. O SEGREDO IDENTIFICA A CONTA
@@ -120,6 +159,58 @@ describe('cada conta tem o seu segredo, e é ele que diz quem chama', () => {
      */
     const t = codigo(BOT_LINK).replace(/\s+/g, ' ');
     expect(t, 'a conta é identificada e jogada fora').toMatch(/linkParaOBot\(\{ conta,/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1b. TODA PORTA AUTENTICADA POR SEGREDO IDENTIFICA A CONTA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('nenhuma porta do ChatPro confere UM segredo em vez de identificar a conta', () => {
+  const ROTAS = rotasQueAutenticamPorSegredo();
+
+  it('🔴 a varredura acha rotas — sem isto, os casos abaixo passam sem medir nada', () => {
+    expect(
+      ROTAS.length,
+      'a varredura não achou rota nenhuma: o guarda virou decorativo',
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('🔴 as três portas conhecidas estão entre as varridas', () => {
+    /**
+     * Cobertura: se alguém mover um arquivo e a varredura deixar de vê-lo, este caso fica
+     * vermelho NOMEANDO o que sumiu — em vez de a suíte ficar verde com menos cobertura.
+     */
+    for (const esperada of ['bot-link', 'triagem', 'intake']) {
+      expect(
+        ROTAS.some((r) => r.includes(esperada)),
+        `a rota ${esperada} saiu da varredura`,
+      ).toBe(true);
+    }
+  });
+
+  it.each(ROTAS)('%s identifica a conta pelo segredo', (rota) => {
+    expect(codigo(rota).replace(/\s+/g, ' ')).toMatch(/identificarConta\(/);
+  });
+
+  it.each(ROTAS)('%s NÃO confere um segredo do ambiente direto', (rota) => {
+    /**
+     * `process.env.CHATPRO_INTAKE_SECRET` é o segredo de UMA conta. Conferir contra ele
+     * recusa a outra conta sempre — e o sintoma (transferência para a Recepção) não diz
+     * nada sobre a causa. Foi assim que `triagem` e `intake` passaram meses quebrados para
+     * a Greens.
+     */
+    const t = codigo(rota).replace(/\s+/g, ' ');
+    expect(
+      /process\.env\.CHATPRO_INTAKE_SECRET/.test(t),
+      'voltou a conferir o segredo de uma conta só — a outra é recusada por construção',
+    ).toBe(false);
+  });
+
+  it.each(ROTAS)('%s falha fechada quando nenhuma conta está configurada', (rota) => {
+    // Sem isto, ambiente sem segredo nenhum deixaria `identificarConta` devolver null e a
+    // rota responderia 401 — que diz "segredo errado" para um problema de configuração.
+    expect(codigo(rota).replace(/\s+/g, ' ')).toMatch(/contasConfiguradas\(\)\.length === 0/);
   });
 });
 
