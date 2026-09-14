@@ -246,15 +246,49 @@ describe('a rota se comporta como as outras do ChatPro', () => {
     expect(codigo(ROTA)).toMatch(/'Content-Type': 'text\/plain; charset=utf-8'/);
   });
 
-  it('exige o segredo, em tempo constante', () => {
-    expect(codigo(ROTA)).toMatch(/segredosConferem\(lerSegredoDoCabecalho/);
+  it('exige o segredo do cabeçalho, em tempo constante', () => {
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026. A versão anterior era:
+     *
+     *     expect(codigo(ROTA)).toMatch(/segredosConferem\(lerSegredoDoCabecalho/);
+     *
+     * Ela congelava a FORMA, e a forma era o defeito. `segredosConferem(cabeçalho, X)`
+     * confere contra UM segredo — e o X aqui era `CHATPRO_INTAKE_SECRET`, o da conta
+     * BeHemp. A conta Greens era recusada com 401 por construção, e o painel traduz
+     * qualquer não-2xx em "transferir para a Recepção": o Fluxo 2 batia numa parede muda.
+     *
+     * 🔴 O guarda ficava VERDE com o defeito em produção e VERMELHO com a correção. É a
+     * mesma classe da retratação de `a-revogacao-para-a-fila`.
+     *
+     * A propriedade é: o segredo vem do CABEÇALHO e é comparado em tempo constante — o que
+     * `identificarConta` faz, contra TODAS as contas (ver `duas-contas-de-chatpro-…`).
+     */
+    const t = codigo(ROTA).replace(/\s+/g, ' ');
+    expect(t, 'o segredo deixou de vir do cabeçalho').toMatch(/lerSegredoDoCabecalho\(/);
+    expect(t, 'a conta deixou de ser identificada pelo segredo').toMatch(
+      /identificarConta\(\s*lerSegredoDoCabecalho\(/,
+    );
+    expect(
+      /lerSegredoDoCabecalho\([^)]*\)\s*===|===\s*process\.env\.CHATPRO/.test(t),
+      'voltou a comparação direta — vaza o segredo pelo tempo de resposta',
+    ).toBe(false);
   });
 
   it('🔴 falha com status de ERRO, de propósito', () => {
-    // Não-2xx dispara a "Ação em caso de falha" do painel, que transfere para uma pessoa.
-    // "Falhar" aqui é "um humano assume", não "o paciente fica sem resposta".
+    /**
+     * Não-2xx dispara a "Ação em caso de falha" do painel, que transfere para uma pessoa.
+     * "Falhar" aqui é "um humano assume", não "o paciente fica sem resposta".
+     *
+     * ⚠️ RETIFICADO em 14/09/2026: a versão anterior exigia o literal
+     * `Vou chamar um atendente.', { status: 503 }` — um `{` numa linha própria já a
+     * quebrava, sem nada ter mudado de comportamento. Mede-se o par (corpo, status).
+     */
     const t = codigo(ROTA).replace(/\s+/g, ' ');
-    expect(t).toMatch(/Vou chamar um atendente\.', \{ status: 503 \}/);
+    const chamada = t.slice(t.indexOf('Vou chamar um atendente'));
+    expect(chamada, 'o corpo que promete o atendente sumiu').not.toBe('');
+    expect(chamada.slice(0, 120), 'o status deixou de ser 503 — o painel não transferiria').toMatch(
+      /status:\s*503/,
+    );
   });
 
   it('o telefone sai mascarado no log', () => {

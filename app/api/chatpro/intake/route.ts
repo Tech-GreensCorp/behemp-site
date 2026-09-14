@@ -13,7 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { lerSegredoDoCabecalho, segredosConferem } from '@/lib/chatpro/segredo';
+import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
+import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
 import {
   ErroDeContatoNaoConfirmado,
   ErroDeTelefoneInvalido,
@@ -43,17 +44,28 @@ const entradaSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const esperado = process.env.CHATPRO_INTAKE_SECRET;
-
-  if (!esperado) {
-    console.error('[chatpro] CHATPRO_INTAKE_SECRET ausente — intake indisponível');
+  /**
+   * 🔴 IDENTIFICA A CONTA, NÃO CONFERE UMA SÓ — corrigido em 14/09/2026, junto da `triagem`.
+   *
+   * Lia `process.env.CHATPRO_INTAKE_SECRET` direto, que é o segredo da conta **BeHemp**:
+   * um integrador da Greens era recusado com 401 por construção. Ver a nota da `triagem`
+   * para por que o guarda das duas contas não pegou isto.
+   *
+   * E a conta não serve só para autenticar: ela decide o `parceiro` da solicitação e para
+   * onde o paciente volta no fim. Autenticar pela conta e não repassá-la faria o cadastro
+   * da Greens nascer marcado como BeHemp — que é o defeito que o guarda já proíbe no
+   * `bot-link`.
+   */
+  if (contasConfiguradas().length === 0) {
+    console.error('[chatpro] nenhuma conta configurada — intake indisponível');
     return NextResponse.json(
       { sucesso: false, erro: 'Integração não configurada', codigo: 'CHATPRO_NAO_CONFIGURADO' },
       { status: 503 },
     );
   }
 
-  if (!segredosConferem(lerSegredoDoCabecalho(request.headers), esperado)) {
+  const conta = identificarConta(lerSegredoDoCabecalho(request.headers));
+  if (!conta) {
     console.warn('[chatpro] intake com segredo inválido');
     return NextResponse.json(
       { sucesso: false, erro: 'Não autorizado', codigo: 'CHATPRO_NAO_AUTORIZADO' },
@@ -84,7 +96,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const r = await new ServicoDeSolicitacao().intake(analisado.data);
+    const r = await new ServicoDeSolicitacao().intake({ ...analisado.data, conta });
 
     return NextResponse.json({
       sucesso: true,

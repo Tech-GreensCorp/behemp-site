@@ -1,4 +1,5 @@
-import { lerSegredoDoCabecalho, segredosConferem } from '@/lib/chatpro/segredo';
+import { contasConfiguradas, identificarConta } from '@/lib/chatpro/contas';
+import { lerSegredoDoCabecalho } from '@/lib/chatpro/segredo';
 import { mascararTelefone, removerSufixoWhatsapp } from '@/lib/chatpro/telefone';
 import { situacaoDoContato } from '@/lib/chatpro/triagem';
 import { interpretarResposta } from '@/lib/chatpro/resposta-do-paciente';
@@ -22,14 +23,27 @@ export const dynamic = 'force-dynamic';
  * único motivo nomeado ao paciente é o **vencimento**, que é fato público e verificável.
  */
 export async function GET(request: Request) {
-  const esperado = process.env.CHATPRO_INTAKE_SECRET?.trim();
-  if (!esperado) {
-    console.error('[chatpro] CHATPRO_INTAKE_SECRET ausente — triagem indisponível');
-    return new Response('Não configurado', { status: 503 });
+  /**
+   * 🔴 IDENTIFICA A CONTA, NÃO CONFERE UMA SÓ — corrigido em 14/09/2026.
+   *
+   * Esta rota lia `process.env.CHATPRO_INTAKE_SECRET` direto, que é o segredo da conta
+   * **BeHemp**. O painel da Greens manda o segredo da Greens, a comparação dava `false`, e a
+   * resposta era 401 — que o painel traduz em "transferir para a Recepção". A conta Greens
+   * era recusada por construção, sempre, e o sintoma não dizia nada sobre a causa.
+   *
+   * O `bot-link` já fazia certo desde que as duas contas passaram a existir. A divergência
+   * ficou invisível porque o guarda `duas-contas-de-chatpro-nao-se-misturam` guardava o
+   * caminho do `bot-link` numa CONSTANTE, em vez de derivar quais rotas autenticam painel.
+   */
+  if (contasConfiguradas().length === 0) {
+    console.error('[chatpro] nenhuma conta configurada — triagem indisponível');
+    return new Response('[E-CONFIG] Não configurado', { status: 503 });
   }
-  if (!segredosConferem(lerSegredoDoCabecalho(request.headers), esperado)) {
+
+  const conta = identificarConta(lerSegredoDoCabecalho(request.headers));
+  if (!conta) {
     console.warn('[chatpro] triagem com segredo inválido');
-    return new Response('Não autorizado', { status: 401 });
+    return new Response('[E-SEGREDO] Não autorizado', { status: 401 });
   }
 
   /**
@@ -54,6 +68,7 @@ export async function GET(request: Request) {
     const situacao = await situacaoDoContato({ telefone, resposta });
 
     console.info('[chatpro] triagem', {
+      conta: conta.id,
       motivo: situacao.motivo,
       oferece: situacao.deveOferecerLink,
       achouCandidato: Boolean(situacao.candidato),
@@ -79,6 +94,8 @@ export async function GET(request: Request) {
      * pessoa. "Falhar" aqui significa "um humano assume", não "o paciente fica sem
      * resposta".
      */
-    return new Response('Não consegui verificar agora. Vou chamar um atendente.', { status: 503 });
+    return new Response('[E-CHECAGEM] Não consegui verificar agora. Vou chamar um atendente.', {
+      status: 503,
+    });
   }
 }

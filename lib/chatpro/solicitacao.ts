@@ -420,16 +420,32 @@ export class ServicoDeSolicitacao {
     telefone: string;
     leadId?: string | null;
     sessionId?: string | null;
+    /**
+     * A conta de ChatPro que o SEGREDO do cabeçalho identificou, como no caminho principal.
+     *
+     * Ausente = a conta da BeHemp, que é o caso histórico desta porta.
+     */
+    conta?: { id: ContaDeChatpro['id']; urlDeRetorno: string | null } | null;
   }): Promise<ResultadoDoLink> {
     const telefone = normalizarTelefoneWhatsapp(entrada.telefone);
     if (!telefone) throw new ErroDeTelefoneInvalido();
 
+    /**
+     * 🔴 O CLIENTE É O DA CONTA, NÃO O DO AMBIENTE — corrigido em 14/09/2026.
+     *
+     * Cada conta é uma instância diferente do ChatPro: o `leadId` de uma chamada da Greens
+     * só existe na instância deles. Procurá-lo na instância da BeHemp devolve `null`, que
+     * aqui vira `ErroDeContatoNaoConfirmado` — 400 para o integrador, com o contato existindo.
+     * É o mesmo defeito que travou o `/bot-link`, na porta ao lado.
+     */
+    const cliente = this.clienteDaConta(entrada.conta?.id ?? null);
+
     // Confirmação reversa é opcional aqui: o segredo do cabeçalho já autentica a origem.
     // Quando ligada, garante que o contato existe de fato na instância.
-    if (process.env.CHATPRO_CONFIRMAR_NO_INTAKE === 'true' && this.cliente.estaConfigurado()) {
+    if (process.env.CHATPRO_CONFIRMAR_NO_INTAKE === 'true' && cliente.estaConfigurado()) {
       const contato = entrada.leadId
-        ? await this.cliente.buscarContatoPorId(entrada.leadId)
-        : await this.cliente.buscarContatoPorTelefone(telefone);
+        ? await cliente.buscarContatoPorId(entrada.leadId)
+        : await cliente.buscarContatoPorTelefone(telefone);
       if (!contato) throw new ErroDeContatoNaoConfirmado();
     }
 
@@ -441,6 +457,9 @@ export class ServicoDeSolicitacao {
       sessionId: entrada.sessionId ?? null,
       origem: 'chatpro_bot',
       canalDeEntrega: 'bot_reply',
+      // A conta decide o `parceiro` da ficha e para onde o paciente volta no fim.
+      parceiro: entrada.conta?.id ?? null,
+      urlDeRetorno: entrada.conta?.urlDeRetorno ?? null,
     });
   }
 

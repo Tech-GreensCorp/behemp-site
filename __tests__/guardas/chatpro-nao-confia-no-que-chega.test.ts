@@ -389,9 +389,28 @@ describe('a resposta do bot-link é a mensagem do WhatsApp', () => {
   });
 
   it('erro responde status NÃO-2xx, de propósito', () => {
-    // É isso que dispara a "Ação em caso de falha" do painel e transfere para um humano.
-    const t = codigo(BOT_LINK);
-    expect(t).toMatch(/textoPuro\([^)]*,\s*(422|500)\)/);
+    /**
+     * É isso que dispara a "Ação em caso de falha" do painel e transfere para um humano.
+     *
+     * ⚠️ RETIFICADO em 14/09/2026. A versão anterior era:
+     *
+     *     expect(t).toMatch(/textoPuro\([^)]*,\s*(422|500)\)/);
+     *
+     * Ela exigia o fechamento `422)` COLADO, e bastou o Prettier quebrar a chamada em
+     * várias linhas (`422,` + `)`) para ficar vermelha — sem uma vírgula de comportamento
+     * ter mudado. Guarda que quebra com formatação treina quem o lê a ignorá-lo.
+     *
+     * E ela aceitava UM dos dois caminhos. Agora exige os dois: 422 é o contato não
+     * confirmado, 500 é a exceção inesperada, e perder qualquer um deles faria aquele
+     * caminho responder 2xx — o painel seguiria o fluxo como se tivesse dado certo, e o
+     * paciente receberia a mensagem de erro como se fosse a resposta esperada.
+     */
+    const t = codigo(BOT_LINK).replace(/\s+/g, ' ');
+    for (const status of [422, 500]) {
+      expect(t, `o caminho de erro ${status} deixou de responder não-2xx`).toMatch(
+        new RegExp(`textoPuro\\([^)]*,\\s*${status}\\s*,?\\s*\\)`),
+      );
+    }
   });
 
   it('a mensagem inclui link, protocolo e validade', () => {
