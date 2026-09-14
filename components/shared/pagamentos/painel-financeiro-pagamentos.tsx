@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Wallet,
@@ -10,30 +10,37 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Radio,
+  Activity,
 } from 'lucide-react';
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  RadialBarChart,
+  RadialBar,
   XAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
 /**
- * Visão financeira de `/admin/pagamentos` e `/medico/pagamentos` — composição única
- * (hero com tendência + donut de status), redesenhada para o padrão "Âmbar" do produto
- * em vez do card achatado genérico de biblioteca de gráfico.
+ * Visão financeira de `/admin/pagamentos` e `/medico/pagamentos` — v2, reformulada como
+ * uma grade bento assimétrica em vez de "cards com gráfico dentro": hero em full-bleed
+ * com o número sobreposto à área, comparativo em barras, e status como ANÉIS
+ * concêntricos (`RadialBarChart`) — a metáfora de atividade/saúde, deliberada, não só
+ * "outro tipo de gráfico".
  *
- * Nada aqui é cor nova: todo tom vem de `--chart-1..5`/`--primary-soft`/`--destructive`
- * (`app/globals.css`), e a técnica de wash/glow/glass reaproveita o que já existe em
- * `.page-header-wash` e nos blobs de `app/(medico)/medico/perfil/page.tsx` — só que
- * aplicada aqui pela primeira vez a um card de métrica. ADR-0003 D-02: compor com o
- * que existe, não importar linguagem visual de outro produto.
+ * Zero dependência nova: Recharts já cobre tudo (Tremor, por baixo, também usa
+ * Recharts — a diferença nunca foi a biblioteca). Zero cor nova: tudo vem de
+ * `--chart-1..5`/`--destructive` (`app/globals.css`). ADR-0003 D-02: compor com o que
+ * existe.
+ *
+ * O seletor 3M/6M é interatividade real (`useState`), não decorativo — mas fatia o
+ * MESMO array de 6 meses que a Server Action já entrega; nenhuma query nova, nenhuma
+ * regra de negócio muda.
  */
 
 interface RecebidoMensalPonto {
@@ -58,7 +65,7 @@ interface PainelFinanceiroPagamentosProps {
   resumo: ResumoFinanceiro;
   evolucao: RecebidoMensalPonto[];
   distribuicaoStatus: StatusDistribuicaoItem[];
-  /** Só o admin tem esse card — o médico não vê o funil de confirmação dos outros. */
+  /** Só o admin tem esse segmento — o médico não vê o funil de confirmação dos outros. */
   atencaoHref?: string;
   /** "você" (médico) vs "a plataforma" (admin) — só muda o texto, não a lógica. */
   escopo?: 'medico' | 'plataforma';
@@ -77,6 +84,12 @@ function formatarValor(v: string | number): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function corTendencia(variacao: number): string {
+  if (variacao > 0.5) return 'var(--chart-2)';
+  if (variacao < -0.5) return 'var(--destructive)';
+  return 'var(--muted-foreground)';
+}
+
 /* ── Chip de tendência (↑/↓ vs período anterior) ─────────────────── */
 function ChipTendencia({ atual, anterior }: { atual: number; anterior: number }) {
   if (anterior <= 0) return null;
@@ -84,88 +97,79 @@ function ChipTendencia({ atual, anterior }: { atual: number; anterior: number })
   const positivo = variacao > 0.5;
   const negativo = variacao < -0.5;
   const Icone = positivo ? TrendingUp : negativo ? TrendingDown : Minus;
-  const cor = positivo ? 'var(--chart-2)' : negativo ? 'var(--destructive)' : 'var(--muted-foreground)';
+  const cor = corTendencia(variacao);
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums backdrop-blur-sm"
-      style={{ backgroundColor: `color-mix(in oklab, ${cor} 14%, transparent)`, color: cor }}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums backdrop-blur-sm"
+      style={{ backgroundColor: `color-mix(in oklab, ${cor} 16%, transparent)`, color: cor }}
     >
       <Icone size={12} strokeWidth={2.5} />
-      {Math.abs(variacao).toFixed(0)}% vs mês anterior
+      {Math.abs(variacao).toFixed(0)}%
     </span>
   );
 }
 
-/* ── Tooltip com leve blur, no lugar da caixa branca padrão ──────── */
-function TooltipCustomizado({
+/* ── Tooltip rico — valor do mês + delta vs mês anterior ─────────── */
+function TooltipHero({
   active,
   payload,
   label,
+  serie,
 }: {
   active?: boolean;
   payload?: Array<{ value: number }>;
   label?: string;
+  serie: RecebidoMensalPonto[];
 }) {
   if (!active || !payload?.length) return null;
+  const idx = serie.findIndex((s) => s.mes === label);
+  const anterior = idx > 0 ? serie[idx - 1].total : null;
+  const valor = payload[0].value;
+  const delta = anterior && anterior > 0 ? ((valor - anterior) / anterior) * 100 : null;
+
   return (
-    <div className="bg-card/90 border-border/60 rounded-xl border px-3.5 py-2.5 shadow-lg backdrop-blur-md">
+    <div className="bg-card/95 border-border/60 min-w-[9rem] rounded-xl border px-3.5 py-2.5 shadow-lg backdrop-blur-md">
       <p className="text-muted-foreground text-[11px] font-medium">{label}</p>
       <p className="text-foreground mt-0.5 text-base font-bold tabular-nums">
-        R$ {formatarValor(payload[0].value)}
+        R$ {formatarValor(valor)}
       </p>
+      {delta !== null && (
+        <p
+          className="mt-0.5 text-[11px] font-semibold tabular-nums"
+          style={{ color: corTendencia(delta) }}
+        >
+          {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(0)}% vs {serie[idx - 1].mes}
+        </p>
+      )}
     </div>
   );
 }
 
-/* ── Pílula de métrica secundária — compacta, sem caixa de ícone grande ── */
-function MetricaPill({
-  icone: Icone,
-  cor,
-  label,
+/* ── Seletor de período — interatividade real sobre o array já carregado ── */
+function SeletorPeriodo({
   valor,
-  detalhe,
-  href,
+  aoMudar,
 }: {
-  icone: typeof Wallet;
-  cor: string;
-  label: string;
-  valor: string;
-  detalhe: string;
-  href?: string;
+  valor: 3 | 6;
+  aoMudar: (v: 3 | 6) => void;
 }) {
-  const conteudo = (
-    <div className="flex items-center gap-3 px-1">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-        style={{ backgroundColor: `color-mix(in oklab, ${cor} 14%, transparent)`, color: cor }}
-      >
-        <Icone size={17} strokeWidth={2.25} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-muted-foreground text-[11px] leading-tight font-semibold tracking-wide uppercase">
-          {label}
-        </p>
-        <p className="truncate text-base leading-tight font-bold tabular-nums">{valor}</p>
-        <p className="text-muted-foreground truncate text-[11px] leading-tight">{detalhe}</p>
-      </div>
-    </div>
-  );
-
-  if (href) {
-    return (
-      <Link
-        href={href}
-        className="border-border/60 bg-card hover:border-border block rounded-2xl border py-3 shadow-[var(--shadow-card)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-soft)]"
-      >
-        {conteudo}
-      </Link>
-    );
-  }
-
   return (
-    <div className="border-border/60 bg-card rounded-2xl border py-3 shadow-[var(--shadow-card)]">
-      {conteudo}
+    <div className="bg-card/70 border-border/50 inline-flex items-center gap-0.5 rounded-full border p-0.5 backdrop-blur-sm">
+      {([3, 6] as const).map((opt) => (
+        <button
+          key={opt}
+          onClick={() => aoMudar(opt)}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums transition-all',
+            valor === opt
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {opt}M
+        </button>
+      ))}
     </div>
   );
 }
@@ -178,11 +182,12 @@ export function PainelFinanceiroPagamentos({
   escopo = 'medico',
 }: PainelFinanceiroPagamentosProps) {
   const gradientId = useId();
+  const [periodo, setPeriodo] = useState<3 | 6>(6);
 
-  const pontosComMovimento = evolucao.filter((e) => e.total > 0);
-  const temEvolucao = pontosComMovimento.length > 0;
-  const atual = evolucao.at(-1)?.total ?? 0;
-  const anterior = evolucao.at(-2)?.total ?? 0;
+  const serie = useMemo(() => evolucao.slice(-periodo), [evolucao, periodo]);
+  const temMovimento = serie.some((e) => e.total > 0);
+  const atual = serie.at(-1)?.total ?? 0;
+  const anterior = serie.at(-2)?.total ?? 0;
 
   const ordenados = ORDEM_STATUS.map((s) => distribuicaoStatus.find((d) => d.status === s)).filter(
     (d): d is StatusDistribuicaoItem => Boolean(d && d.quantidade > 0),
@@ -190,100 +195,48 @@ export function PainelFinanceiroPagamentos({
   const totalStatus = ordenados.reduce((s, d) => s + d.quantidade, 0);
 
   const ticketMedio = resumo.quantidadePaga > 0 ? Number(resumo.totalRecebido) / resumo.quantidadePaga : 0;
+  const totalPagoEPendente = resumo.quantidadePaga + resumo.quantidadePendente;
+  const pctPendente = totalPagoEPendente > 0 ? (resumo.quantidadePendente / totalPagoEPendente) * 100 : 0;
   const donoTexto = escopo === 'medico' ? 'você' : 'a plataforma';
 
   return (
     <div className="animate-fade-up space-y-4">
-      {/* ═══ Tira de métricas secundárias — densa, sem caixa de ícone gigante ═══ */}
-      <div
-        className={cn(
-          'grid grid-cols-2 gap-3',
-          atencaoHref ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
-        )}
-      >
-        <MetricaPill
-          icone={Clock3}
-          cor="var(--chart-4)"
-          label="Pendente"
-          valor={`R$ ${formatarValor(resumo.totalPendente)}`}
-          detalhe={`${resumo.quantidadePendente} aguardando`}
-        />
-        <MetricaPill
-          icone={Receipt}
-          cor="var(--chart-3)"
-          label="Ticket médio"
-          valor={`R$ ${formatarValor(ticketMedio)}`}
-          detalhe="por consulta paga"
-        />
-        {atencaoHref && (
-          <MetricaPill
-            icone={AlertTriangle}
-            cor="var(--destructive)"
-            label="Precisa de atenção"
-            valor={String(resumo.quantidadeAtencao ?? 0)}
-            detalhe="pagou, não confirmou"
-            href={atencaoHref}
-          />
-        )}
-      </div>
-
-      {/* ═══ Hero (tendência) + Donut (status) — composição principal ═══ */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        {/* ── Hero: valor recebido + área + comparação ── */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-card shadow-[var(--shadow-soft)] lg:col-span-3">
-          {/* Glow radial no canto — mesma técnica de app/(medico)/medico/perfil/page.tsx */}
+      {/* ═══ Bento principal: hero full-bleed + (comparativo / anéis) ═══ */}
+      <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+        {/* ── Hero: número sobreposto à área, full-bleed ── */}
+        <div className="relative flex min-h-[380px] flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-card shadow-[var(--shadow-soft)] lg:col-span-7">
           <div
-            className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full opacity-70 blur-3xl"
-            style={{ background: 'color-mix(in oklab, var(--chart-1) 20%, transparent)' }}
+            className="pointer-events-none absolute -top-20 -right-16 h-72 w-72 rounded-full opacity-70 blur-3xl"
+            style={{ background: 'color-mix(in oklab, var(--chart-1) 22%, transparent)' }}
           />
           <div
-            className="pointer-events-none absolute -bottom-20 -left-14 h-56 w-56 rounded-full opacity-60 blur-3xl"
+            className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full opacity-50 blur-3xl"
             style={{ background: 'color-mix(in oklab, var(--chart-2) 16%, transparent)' }}
           />
 
-          <div className="relative z-10 flex flex-col gap-1 p-6 pb-2 sm:p-7 sm:pb-2">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="bg-chart-2 absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" />
-                <span className="bg-chart-2 relative inline-flex h-2 w-2 rounded-full" />
-              </span>
-              <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                Recebido · últimos 6 meses
-              </p>
-            </div>
-            <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="font-heading text-4xl font-bold tracking-tight tabular-nums sm:text-5xl">
-                  R$ {formatarValor(resumo.totalRecebido)}
-                </p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {resumo.quantidadePaga} pagamento{resumo.quantidadePaga !== 1 ? 's' : ''} confirmado
-                  {resumo.quantidadePaga !== 1 ? 's' : ''} · {donoTexto}
-                </p>
-              </div>
-              <ChipTendencia atual={atual} anterior={anterior} />
-            </div>
-          </div>
-
-          <div className="relative z-10 h-[180px] w-full px-2 sm:h-[210px]">
-            {temEvolucao ? (
+          {/* Gráfico ocupa o card inteiro, de ponta a ponta — é o fundo, não um bloco à parte */}
+          <div className="absolute inset-0">
+            {temMovimento ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={evolucao} margin={{ top: 12, right: 18, bottom: 0, left: 18 }}>
+                <AreaChart data={serie} margin={{ top: 0, right: 0, bottom: 8, left: 0 }}>
                   <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.32} />
-                      <stop offset="55%" stopColor="var(--chart-1)" stopOpacity={0.08} />
+                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.38} />
+                      <stop offset="50%" stopColor="var(--chart-1)" stopOpacity={0.12} />
                       <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis
                     dataKey="mes"
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    tick={{ fontSize: 10.5, fill: 'var(--muted-foreground)' }}
                     axisLine={false}
                     tickLine={false}
-                    dy={6}
+                    dy={-4}
                   />
-                  <Tooltip content={<TooltipCustomizado />} cursor={{ stroke: 'var(--border)', strokeDasharray: '3 3' }} />
+                  <Tooltip
+                    content={<TooltipHero serie={serie} />}
+                    cursor={{ stroke: 'var(--border)', strokeDasharray: '3 3' }}
+                  />
                   <Area
                     type="monotone"
                     dataKey="total"
@@ -299,95 +252,152 @@ export function PainelFinanceiroPagamentos({
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-1.5 text-center">
-                <Wallet size={22} className="text-muted-foreground/50" />
-                <p className="text-muted-foreground text-xs">
-                  Sem pagamentos confirmados nos últimos 6 meses ainda
-                </p>
+                <Wallet size={22} className="text-muted-foreground/40" />
+                <p className="text-muted-foreground text-xs">Sem pagamentos confirmados ainda</p>
               </div>
             )}
           </div>
+
+          {/* Scrim — só o suficiente pro texto continuar legível sobre a área */}
+          <div className="from-card via-card/75 pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b to-transparent" />
+
+          {/* Conteúdo sobreposto ao gráfico */}
+          <div className="relative z-10 flex flex-1 flex-col justify-between p-6 sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="bg-chart-2 absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" />
+                    <span className="bg-chart-2 relative inline-flex h-1.5 w-1.5 rounded-full" />
+                  </span>
+                  <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                    Recebido · {donoTexto}
+                  </p>
+                </div>
+                <p className="font-heading mt-0.5 text-4xl font-bold tracking-tight tabular-nums sm:text-[2.75rem]">
+                  R$ {formatarValor(resumo.totalRecebido)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ChipTendencia atual={atual} anterior={anterior} />
+                <SeletorPeriodo valor={periodo} aoMudar={setPeriodo} />
+              </div>
+            </div>
+
+            <p className="text-muted-foreground text-xs">
+              {resumo.quantidadePaga} pagamento{resumo.quantidadePaga !== 1 ? 's' : ''} confirmado
+              {resumo.quantidadePaga !== 1 ? 's' : ''} nos últimos {periodo} meses
+            </p>
+          </div>
         </div>
 
-        {/* ── Donut: distribuição por status ── */}
-        <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-card p-6 shadow-[var(--shadow-soft)] sm:p-7 lg:col-span-2">
-          <div
-            className="pointer-events-none absolute -top-10 -left-10 h-48 w-48 rounded-full opacity-60 blur-3xl"
-            style={{ background: 'color-mix(in oklab, var(--chart-3) 18%, transparent)' }}
-          />
-          <div className="relative z-10">
-            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              Por status
+        {/* ── Coluna direita: comparativo em barras + anéis de status ── */}
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          {/* Comparativo mensal — barras, mês atual em destaque */}
+          <div className="border-border/50 bg-card shadow-[var(--shadow-card)] relative flex-1 overflow-hidden rounded-[1.75rem] border p-5">
+            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+              Comparativo mensal
             </p>
-            <p className="font-heading mt-0.5 text-base font-semibold tracking-tight">
-              Todos os pagamentos
+            <div className="mt-1 h-[124px]">
+              {temMovimento ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={serie} margin={{ top: 6, right: 2, bottom: 0, left: 2 }} barCategoryGap="30%">
+                    <XAxis
+                      dataKey="mes"
+                      tick={{ fontSize: 10.5, fill: 'var(--muted-foreground)' }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={4}
+                    />
+                    <Tooltip content={<TooltipHero serie={serie} />} cursor={{ fill: 'var(--muted)', radius: 8 }} />
+                    <Bar dataKey="total" radius={[7, 7, 7, 7]} maxBarSize={20} animationDuration={700}>
+                      {serie.map((_, i) => (
+                        <Cell
+                          key={`bar-${i}`}
+                          fill={
+                            i === serie.length - 1
+                              ? 'var(--chart-1)'
+                              : 'color-mix(in oklab, var(--chart-1) 25%, transparent)'
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <Activity size={18} className="text-muted-foreground/40" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Anéis concêntricos — distribuição por status (metáfora de atividade/saúde) */}
+          <div className="border-border/50 bg-card shadow-[var(--shadow-card)] relative flex-1 overflow-hidden rounded-[1.75rem] border p-5">
+            <div
+              className="pointer-events-none absolute -right-8 -bottom-8 h-32 w-32 rounded-full opacity-50 blur-3xl"
+              style={{ background: 'color-mix(in oklab, var(--chart-3) 20%, transparent)' }}
+            />
+            <p className="text-muted-foreground relative z-10 text-[11px] font-semibold tracking-wide uppercase">
+              Por status
             </p>
 
             {totalStatus === 0 ? (
-              <div className="flex h-[176px] flex-col items-center justify-center gap-1.5 text-center">
-                <Radio size={20} className="text-muted-foreground/50" />
+              <div className="relative z-10 flex h-[124px] items-center justify-center">
                 <p className="text-muted-foreground text-xs">Nenhum registro ainda</p>
               </div>
             ) : (
-              <div className="mt-3 flex items-center gap-4">
-                <div className="relative shrink-0" style={{ width: 132, height: 132 }}>
+              <div className="relative z-10 mt-1 flex items-center gap-3">
+                <div className="relative shrink-0" style={{ width: 108, height: 108 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={ordenados}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={42}
-                        outerRadius={64}
-                        paddingAngle={4}
+                    <RadialBarChart
+                      data={ordenados}
+                      innerRadius="28%"
+                      outerRadius="100%"
+                      startAngle={90}
+                      endAngle={-270}
+                      barSize={7}
+                    >
+                      <RadialBar
                         dataKey="quantidade"
-                        nameKey="status"
+                        background={{ fill: 'var(--muted)' }}
+                        cornerRadius={5}
                         animationDuration={800}
                         animationEasing="ease-out"
                       >
                         {ordenados.map((entry, i) => (
-                          <Cell
-                            key={`slice-${i}`}
-                            fill={STATUS_INFO[entry.status]?.cor ?? 'var(--chart-5)'}
-                            stroke="var(--card)"
-                            strokeWidth={3}
-                          />
+                          <Cell key={`ring-${i}`} fill={STATUS_INFO[entry.status]?.cor ?? 'var(--chart-5)'} />
                         ))}
-                      </Pie>
-                    </PieChart>
+                      </RadialBar>
+                    </RadialBarChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold tabular-nums">{totalStatus}</span>
-                    <span className="text-muted-foreground text-[9px] font-semibold tracking-wide uppercase">
+                    <span className="text-lg font-bold tabular-nums">{totalStatus}</span>
+                    <span className="text-muted-foreground text-[8px] font-semibold tracking-wide uppercase">
                       total
                     </span>
                   </div>
                 </div>
 
-                <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                   {ordenados.map((item) => {
                     const info = STATUS_INFO[item.status];
-                    const pct = totalStatus > 0 ? (item.quantidade / totalStatus) * 100 : 0;
                     return (
-                      <div key={item.status} className="min-w-0">
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full"
-                              style={{ backgroundColor: info?.cor ?? 'var(--chart-5)' }}
-                            />
-                            <span className="truncate font-medium">{info?.label ?? item.status}</span>
-                          </span>
-                          <span className="text-muted-foreground shrink-0 tabular-nums">
-                            {item.quantidade}
-                          </span>
-                        </div>
-                        <div className="bg-muted mt-1 h-1.5 w-full overflow-hidden rounded-full">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${pct}%`, backgroundColor: info?.cor ?? 'var(--chart-5)' }}
-                          />
-                        </div>
-                      </div>
+                      <span
+                        key={item.status}
+                        className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10.5px] font-semibold"
+                        style={{
+                          backgroundColor: `color-mix(in oklab, ${info?.cor ?? 'var(--chart-5)'} 12%, transparent)`,
+                          color: info?.cor ?? 'var(--chart-5)',
+                        }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: info?.cor ?? 'var(--chart-5)' }}
+                        />
+                        {info?.label ?? item.status}
+                        <span className="tabular-nums opacity-70">{item.quantidade}</span>
+                      </span>
                     );
                   })}
                 </div>
@@ -395,6 +405,71 @@ export function PainelFinanceiroPagamentos({
             )}
           </div>
         </div>
+      </div>
+
+      {/* ═══ Tira unificada — sem repetir chrome de card por métrica ═══ */}
+      <div
+        className={cn(
+          'border-border/50 bg-card shadow-[var(--shadow-card)] divide-border/60 grid grid-cols-1 divide-y overflow-hidden rounded-[1.75rem] border sm:divide-x sm:divide-y-0',
+          atencaoHref ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
+        )}
+      >
+        <div className="flex items-center gap-3 p-5">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{ backgroundColor: 'color-mix(in oklab, var(--chart-4) 15%, transparent)', color: 'var(--chart-4)' }}
+          >
+            <Clock3 size={18} strokeWidth={2.25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Pendente</p>
+            <p className="text-xl font-bold tabular-nums">R$ {formatarValor(resumo.totalPendente)}</p>
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <div className="bg-muted h-1 w-14 overflow-hidden rounded-full">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${pctPendente}%`, backgroundColor: 'var(--chart-4)' }}
+                />
+              </div>
+              <p className="text-muted-foreground text-[11px]">{resumo.quantidadePendente} aguardando</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-5">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{ backgroundColor: 'color-mix(in oklab, var(--chart-3) 16%, transparent)', color: 'var(--chart-3)' }}
+          >
+            <Receipt size={18} strokeWidth={2.25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Ticket médio</p>
+            <p className="text-xl font-bold tabular-nums">R$ {formatarValor(ticketMedio)}</p>
+            <p className="text-muted-foreground text-[11px]">por consulta paga</p>
+          </div>
+        </div>
+
+        {atencaoHref && (
+          <Link href={atencaoHref} className="hover:bg-muted/40 flex items-center gap-3 p-5 transition-colors">
+            <div
+              className={cn(
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                (resumo.quantidadeAtencao ?? 0) > 0 && 'animate-gentle-pulse',
+              )}
+              style={{ backgroundColor: 'color-mix(in oklab, var(--destructive) 14%, transparent)', color: 'var(--destructive)' }}
+            >
+              <AlertTriangle size={18} strokeWidth={2.25} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                Precisa de atenção
+              </p>
+              <p className="text-xl font-bold tabular-nums">{resumo.quantidadeAtencao ?? 0}</p>
+              <p className="text-muted-foreground text-[11px]">pagou, não confirmou</p>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   );
