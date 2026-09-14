@@ -11,6 +11,7 @@ import {
   atualizarStatusTriagem,
 } from '@/app/(public)/_actions/triagem';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   Calendar,
   ClipboardList,
@@ -240,18 +241,11 @@ export default function MedicoTriagemPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-          Operação
-        </p>
-        <h1 className="font-display text-3xl font-bold tracking-tight">
-          Triagem de <span className="text-accent-italic">Pacientes</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Registre novas triagens e acompanhe as que você enviou.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Operação"
+        title="Triagem de Pacientes"
+        description="Registre novas triagens e acompanhe as que você enviou."
+      />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1 w-fit">

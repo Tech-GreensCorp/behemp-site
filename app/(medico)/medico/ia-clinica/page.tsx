@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import {
-  Brain,
   ChevronRight,
   ClipboardList,
   FileSearch,
@@ -14,6 +13,7 @@ import { listarPacientes } from '@/app/_actions/pacientes';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GRAFO_SCHEMA_VERSION } from '@/lib/ia-clinica/contrato';
+import { PageHeader } from '@/components/shared/page-header';
 
 /**
  * Entrada do módulo de IA clínica — a "casa" criada na Sprint 2.
@@ -92,19 +92,11 @@ export default async function IaClinicaPage() {
   const pacientes = pacientesResult.sucesso ? (pacientesResult.dados ?? []) : [];
   return (
     <div className="mx-auto max-w-5xl space-y-8">
-      <header className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 flex size-11 items-center justify-center rounded-xl">
-            <Brain className="text-primary size-6" />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-semibold">IA Clínica</h1>
-            <p className="text-muted-foreground text-sm">
-              Inteligência clínica assistida, direcionada ao canabidiol
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Atendimento"
+        title="IA Clínica"
+        description="Inteligência clínica assistida, direcionada ao canabidiol"
+      />
 
       {/* O estado real do módulo, dito sem rodeio. Uma tela que finge estar pronta custa mais
           caro que uma tela que diz o que falta. */}

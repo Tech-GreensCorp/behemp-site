@@ -5,13 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  FileText, Pill, Calendar, CheckCircle2, XCircle, Clock,
+  FileText, Pill, Calendar, CheckCircle2, XCircle,
   AlertCircle, Download, Loader2, Bell, ShieldCheck, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { listarMinhasPrescricoes, type PrescricaoPaciente } from '@/app/(paciente)/_actions/prescricoes';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PageHeader } from '@/components/shared/page-header';
+import { DataEmpty } from '@/components/shared/data-list';
 
 export default function PrescricoesPage() {
   const [prescricoes, setPrescricoes] = useState<PrescricaoPaciente[]>([]);
@@ -65,20 +67,16 @@ export default function PrescricoesPage() {
   return (
     <div className="space-y-6 sm:space-y-10">
 
-      {/* ── Header Editorial ── */}
-      <div className="animate-fade-up">
-        <p className="text-primary mb-2 sm:mb-4 text-xs font-semibold tracking-[0.25em] uppercase">
-          Área do Paciente
-        </p>
-        <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-5xl text-foreground">
-          Minhas <span className="text-accent-italic">Prescrições</span>
-        </h1>
-        <p className="text-muted-foreground mt-2 sm:mt-4 max-w-2xl text-sm sm:text-base leading-relaxed">
-          {prescricoes.length > 0
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Área do Paciente"
+        title="Minhas Prescrições"
+        description={
+          prescricoes.length > 0
             ? `${prescricoes.length} prescrição(ões) registrada(s) — ${totalAtivas} ativa(s)`
-            : 'Aqui aparecerão as prescrições emitidas pelo seu médico.'}
-        </p>
-      </div>
+            : 'Aqui aparecerão as prescrições emitidas pelo seu médico.'
+        }
+      />
 
       {carregando ? (
         <div className="flex min-h-[40vh] items-center justify-center">
@@ -98,20 +96,11 @@ export default function PrescricoesPage() {
 
           {/* ── Empty state ── */}
           {prescricoes.length === 0 ? (
-            <Card className="border border-border/20 bg-white shadow-sm rounded-2xl sm:rounded-3xl grain overflow-hidden animate-fade-up">
-              <CardContent className="flex flex-col items-center justify-center py-16 sm:py-24 text-center px-4">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                  <FileText className="h-8 w-8 text-primary/40" />
-                </div>
-                <h2 className="font-display text-xl font-bold text-foreground">
-                  Nenhuma prescrição emitida
-                </h2>
-                <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
-                  Seu médico irá emitir sua prescrição após a consulta.
-                  Ela ficará disponível aqui para download.
-                </p>
-              </CardContent>
-            </Card>
+            <DataEmpty
+              icon={<FileText size={24} />}
+              title="Nenhuma prescrição emitida"
+              description="Seu médico irá emitir sua prescrição após a consulta. Ela ficará disponível aqui para download."
+            />
           ) : (
             <div className="space-y-4 animate-fade-up delay-75">
               {prescricoes.map((p) => {

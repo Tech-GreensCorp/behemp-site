@@ -5,6 +5,7 @@ import { obterConfigPagamentoMedico } from '@/app/(admin)/_actions/pagamentos-me
 import { FormConfigPagamentoMedico } from '@/components/admin/pagamentos/form-config-pagamento-medico';
 import { ChevronLeft } from 'lucide-react';
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/shared/page-header';
 
 export const metadata: Metadata = {
   title: 'Configurar pagamento do médico — Admin Be4Hope',
@@ -26,19 +27,17 @@ export default async function PagamentoMedicoPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/pagamentos/medicos">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ChevronLeft size={16} />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{config.medicoNome}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {config.especialidade} — meios de pagamento
-          </p>
-        </div>
-      </div>
+      <Link href="/admin/pagamentos/medicos">
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <ChevronLeft size={16} />
+          Médicos
+        </Button>
+      </Link>
+
+      <PageHeader
+        title={config.medicoNome}
+        description={`${config.especialidade} — meios de pagamento`}
+      />
 
       <FormConfigPagamentoMedico configInicial={config} />
     </div>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   CheckCircle2,
   ChevronRight,
@@ -63,21 +64,19 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Visão Geral</h1>
-          <p className="mt-1 text-muted-foreground">
-            Painel administrativo da plataforma Be4Hope
-          </p>
-        </div>
-        <form action="/admin">
-          <Button variant="outline" size="sm" className="gap-2" type="submit">
-            <RefreshCw size={14} />
-            Atualizar
-          </Button>
-        </form>
-      </div>
+      <PageHeader
+        eyebrow="Painel administrativo"
+        title="Visão Geral"
+        description="Painel administrativo da plataforma Be4Hope"
+        actions={
+          <form action="/admin">
+            <Button variant="outline" size="sm" className="gap-2" type="submit">
+              <RefreshCw size={14} />
+              Atualizar
+            </Button>
+          </form>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

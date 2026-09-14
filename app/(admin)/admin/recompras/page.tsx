@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { listarTodasRecompras, atualizarStatusRecompra } from '@/app/_actions/recompras';
 import {
@@ -33,6 +32,8 @@ import {
   Clock,
   Send,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
+import { DataEmpty } from '@/components/shared/data-list';
 
 /**
  * Página de administração de recompras — Admin.
@@ -243,19 +244,17 @@ export default function AdminRecomprasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Recompras</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie pedidos de recompra e e-mails de notificação
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={carregarRecompras} className="gap-2">
-          <RefreshCw size={14} />
-          Atualizar
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Financeiro"
+        title="Recompras"
+        description="Gerencie pedidos de recompra e e-mails de notificação"
+        actions={
+          <Button variant="outline" size="sm" onClick={carregarRecompras} className="gap-2">
+            <RefreshCw size={14} />
+            Atualizar
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-3">
         {/* ── Pedidos de Recompra ──────────────────────────────── */}
@@ -411,20 +410,20 @@ export default function AdminRecomprasPage() {
                   <Loader2 size={24} className="animate-spin text-primary" />
                 </div>
               ) : recomprasFiltradas.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Package size={32} className="mb-3 text-muted-foreground/30" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {filtrosAtivos > 0 ? 'Nenhum pedido para esses filtros.' : 'Nenhum pedido de recompra.'}
-                  </p>
-                  {filtrosAtivos > 0 && (
-                    <button
-                      onClick={limparFiltros}
-                      className="mt-2 text-xs text-primary underline-offset-2 hover:underline"
-                    >
-                      Limpar filtros
-                    </button>
-                  )}
-                </div>
+                <DataEmpty
+                  icon={<Package size={24} />}
+                  title={filtrosAtivos > 0 ? 'Nenhum pedido para esses filtros.' : 'Nenhum pedido de recompra.'}
+                  actions={
+                    filtrosAtivos > 0 && (
+                      <button
+                        onClick={limparFiltros}
+                        className="text-xs text-primary underline-offset-2 hover:underline"
+                      >
+                        Limpar filtros
+                      </button>
+                    )
+                  }
+                />
               ) : (
                 <div className="space-y-3">
                   {recomprasFiltradas.map((r) => {

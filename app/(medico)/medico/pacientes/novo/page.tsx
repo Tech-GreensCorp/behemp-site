@@ -17,6 +17,7 @@ import {
 import { criarPaciente } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   CheckCircle2,
   ChevronLeft,
@@ -105,27 +106,18 @@ export default function NovoPacientePage() {
 
   return (
     <div className="space-y-8">
-      {/* Header editorial */}
-      <div className="flex items-center gap-4">
-        <Link href="/medico/pacientes">
-          <Button variant="ghost" size="icon" nativeButton={false}>
-            <ChevronLeft size={20} />
-          </Button>
-        </Link>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Pacientes
-          </p>
-          <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-            Cadastrar <span className="text-accent-italic">Paciente</span>
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Preencha os dados completos para iniciar o tratamento
-          </p>
-        </div>
-      </div>
+      <Link href="/medico/pacientes">
+        <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false}>
+          <ChevronLeft size={16} />
+          Pacientes
+        </Button>
+      </Link>
 
-      <div className="h-px bg-gradient-to-r from-border/60 via-border to-transparent" />
+      <PageHeader
+        eyebrow="Pacientes"
+        title="Cadastrar Paciente"
+        description="Preencha os dados completos para iniciar o tratamento"
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
