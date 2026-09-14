@@ -260,3 +260,117 @@ export async function atualizarStatusPagamento(
     return { sucesso: false, erro: 'Erro ao atualizar status' };
   }
 }
+
+// ── Resumo e evolução — visão geral da plataforma (todos os médicos) ──
+
+export interface ResumoPagamentosPlataforma {
+  totalRecebido: string;
+  totalPendente: string;
+  quantidadePendente: number;
+  quantidadePaga: number;
+  quantidadeAtencao: number;
+}
+
+/** Totais globais — sempre sobre TODOS os pagamentos, independente dos filtros da lista. */
+export async function obterResumoPagamentos(): Promise<ActionResult<ResumoPagamentosPlataforma>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const [resumo] = await db
+      .select({
+        totalRecebido: sql<string>`coalesce(sum(${pagamentos.valor}) filter (where ${pagamentos.status} = 'pago'), 0)`,
+        totalPendente: sql<string>`coalesce(sum(${pagamentos.valor}) filter (where ${pagamentos.status} = 'pendente'), 0)`,
+        quantidadePendente: sql<number>`count(*) filter (where ${pagamentos.status} = 'pendente')::int`,
+        quantidadePaga: sql<number>`count(*) filter (where ${pagamentos.status} = 'pago')::int`,
+        quantidadeAtencao: sql<number>`count(*) filter (where ${pagamentos.erroConfirmacao} is not null and ${pagamentos.confirmadoEm} is null)::int`,
+      })
+      .from(pagamentos);
+
+    return {
+      sucesso: true,
+      dados:
+        resumo ?? {
+          totalRecebido: '0',
+          totalPendente: '0',
+          quantidadePendente: 0,
+          quantidadePaga: 0,
+          quantidadeAtencao: 0,
+        },
+    };
+  } catch (error) {
+    console.error('[Admin] Erro ao obter resumo de pagamentos:', error);
+    return { sucesso: false, erro: 'Erro ao carregar resumo' };
+  }
+}
+
+export interface RecebidoMensal {
+  mes: string;
+  total: number;
+}
+
+/** Recebido por mês somando TODOS os médicos — mesma lógica de app/(medico)/_actions/pagamentos.ts, sem filtro de medicoId. */
+export async function obterEvolucaoRecebidosPlataforma(): Promise<ActionResult<RecebidoMensal[]>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const linhas = await db
+      .select({
+        chave: sql<string>`to_char(date_trunc('month', ${pagamentos.pagoEm}), 'YYYY-MM')`,
+        total: sql<string>`sum(${pagamentos.valor})`,
+      })
+      .from(pagamentos)
+      .where(
+        and(
+          eq(pagamentos.status, 'pago'),
+          sql`${pagamentos.pagoEm} >= date_trunc('month', now()) - interval '5 months'`,
+        ),
+      )
+      .groupBy(sql`date_trunc('month', ${pagamentos.pagoEm})`);
+
+    const porMes = new Map(linhas.map((l) => [l.chave, Number(l.total)]));
+
+    const hoje = new Date();
+    const serie: RecebidoMensal[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const rotulo = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      serie.push({
+        mes: rotulo.charAt(0).toUpperCase() + rotulo.slice(1),
+        total: porMes.get(chave) ?? 0,
+      });
+    }
+
+    return { sucesso: true, dados: serie };
+  } catch (error) {
+    console.error('[Admin] Erro ao obter evolução de recebidos:', error);
+    return { sucesso: false, erro: 'Erro ao carregar evolução de recebidos' };
+  }
+}
+
+export interface StatusDistribuicaoItem {
+  status: string;
+  quantidade: number;
+}
+
+/** Distribuição por status somando TODOS os médicos — alimenta o donut da visão geral. */
+export async function obterDistribuicaoStatusPlataforma(): Promise<
+  ActionResult<StatusDistribuicaoItem[]>
+> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    const linhas = await db
+      .select({ status: pagamentos.status, quantidade: sql<number>`count(*)::int` })
+      .from(pagamentos)
+      .groupBy(pagamentos.status);
+
+    return { sucesso: true, dados: linhas };
+  } catch (error) {
+    console.error('[Admin] Erro ao obter distribuição por status:', error);
+    return { sucesso: false, erro: 'Erro ao carregar distribuição por status' };
+  }
+}

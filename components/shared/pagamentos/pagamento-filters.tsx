@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Search, X, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 
 /**
- * Filtros de pagamentos — Client Component interativo.
- * Controla status e busca textual via URL searchParams (mesmo padrão de InvoiceFilters).
+ * Filtros de pagamentos — Client Component interativo, compartilhado entre
+ * `/admin/pagamentos` e `/medico/pagamentos`. Controla status e busca textual via URL
+ * searchParams (mesmo padrão de InvoiceFilters); `basePath` diz para onde o push vai,
+ * já que as duas telas vivem em route groups diferentes.
  */
 
 const STATUS_OPTIONS = [
@@ -21,15 +23,19 @@ const STATUS_OPTIONS = [
 ];
 
 interface PagamentoFiltersProps {
+  basePath: string;
   statusAtual?: string;
   buscaAtual?: string;
   atencaoAtual?: boolean;
+  placeholderBusca?: string;
 }
 
 export function PagamentoFilters({
+  basePath,
   statusAtual = '',
   buscaAtual = '',
   atencaoAtual = false,
+  placeholderBusca = 'Buscar por paciente...',
 }: PagamentoFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,7 +61,7 @@ export function PagamentoFilters({
   const aplicarFiltro = (key: string, value: string) => {
     startTransition(() => {
       const qs = createQueryString({ [key]: value });
-      router.push(`/admin/pagamentos${qs ? `?${qs}` : ''}`);
+      router.push(`${basePath}${qs ? `?${qs}` : ''}`);
     });
   };
 
@@ -86,7 +92,7 @@ export function PagamentoFilters({
           />
           <Input
             id="pagamento-search"
-            placeholder="Buscar por paciente, médico..."
+            placeholder={placeholderBusca}
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             onKeyDown={handleBuscaKeyDown}
@@ -148,7 +154,7 @@ export function PagamentoFilters({
           <button
             onClick={() => {
               setBusca('');
-              startTransition(() => router.push('/admin/pagamentos'));
+              startTransition(() => router.push(basePath));
             }}
             className="text-muted-foreground hover:text-destructive flex items-center gap-1 text-xs whitespace-nowrap transition-colors"
           >

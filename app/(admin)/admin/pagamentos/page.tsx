@@ -1,14 +1,20 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { listarPagamentos } from '@/app/(admin)/_actions/pagamentos';
-import { PagamentoStatusBadge } from '@/components/admin/pagamentos/pagamento-status-badge';
-import { PagamentoFunilBadge } from '@/components/admin/pagamentos/pagamento-funil-badge';
-import { PagamentoFilters } from '@/components/admin/pagamentos/pagamento-filters';
+import {
+  listarPagamentos,
+  obterResumoPagamentos,
+  obterEvolucaoRecebidosPlataforma,
+  obterDistribuicaoStatusPlataforma,
+} from '@/app/(admin)/_actions/pagamentos';
+import { PagamentoStatusBadge } from '@/components/shared/pagamentos/pagamento-status-badge';
+import { PagamentoFunilBadge } from '@/components/shared/pagamentos/pagamento-funil-badge';
+import { PagamentoFilters } from '@/components/shared/pagamentos/pagamento-filters';
+import { PainelFinanceiroPagamentos } from '@/components/shared/pagamentos/painel-financeiro-pagamentos';
 import { Wallet, Pencil, Landmark } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
-function formatarValor(v: string): string {
+function formatarValor(v: string | number): string {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -30,17 +36,26 @@ export default async function PagamentosPage({
   const porPagina = 20;
   const offset = (pagina - 1) * porPagina;
 
-  const resultado = await listarPagamentos({
-    status,
-    busca: busca || undefined,
-    atencao,
-    limite: porPagina,
-    offset,
-  });
+  const [resultado, resumoResultado, evolucaoResultado, distribuicaoResultado] = await Promise.all([
+    listarPagamentos({ status, busca: busca || undefined, atencao, limite: porPagina, offset }),
+    obterResumoPagamentos(),
+    obterEvolucaoRecebidosPlataforma(),
+    obterDistribuicaoStatusPlataforma(),
+  ]);
 
   const itens = resultado.dados?.items ?? [];
   const total = resultado.dados?.total ?? 0;
   const totalPaginas = Math.ceil(total / porPagina);
+  const evolucao = evolucaoResultado.dados ?? [];
+  const distribuicaoStatus = distribuicaoResultado.dados ?? [];
+
+  const resumo = resumoResultado.dados ?? {
+    totalRecebido: '0',
+    totalPendente: '0',
+    quantidadePendente: 0,
+    quantidadePaga: 0,
+    quantidadeAtencao: 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -66,7 +81,21 @@ export default async function PagamentosPage({
         }
       />
 
-      <PagamentoFilters statusAtual={status} buscaAtual={busca} atencaoAtual={atencao} />
+      <PainelFinanceiroPagamentos
+        resumo={resumo}
+        evolucao={evolucao}
+        distribuicaoStatus={distribuicaoStatus}
+        atencaoHref="/admin/pagamentos?atencao=1"
+        escopo="plataforma"
+      />
+
+      <PagamentoFilters
+        basePath="/admin/pagamentos"
+        statusAtual={status}
+        buscaAtual={busca}
+        atencaoAtual={atencao}
+        placeholderBusca="Buscar por paciente, médico..."
+      />
 
       {itens.length === 0 ? (
         <DataEmpty

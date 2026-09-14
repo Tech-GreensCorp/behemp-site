@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { obterConfigPagamentoMedico } from '@/app/(admin)/_actions/pagamentos-medicos';
-import { FormConfigPagamentoMedico } from '@/components/admin/pagamentos/form-config-pagamento-medico';
+import {
+  obterConfigPagamentoMedico,
+  salvarConfigPagamentoMedico,
+} from '@/app/(admin)/_actions/pagamentos-medicos';
+import { FormConfigPagamentoMedico } from '@/components/shared/pagamentos/form-config-pagamento-medico';
 import { ChevronLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import { PageHeader } from '@/components/shared/page-header';
@@ -39,7 +42,11 @@ export default async function PagamentoMedicoPage({ params }: Props) {
         description={`${config.especialidade} — meios de pagamento`}
       />
 
-      <FormConfigPagamentoMedico configInicial={config} />
+      <FormConfigPagamentoMedico
+        perfil="admin"
+        configInicial={config}
+        aoSalvar={salvarConfigPagamentoMedico.bind(null, config.medicoId)}
+      />
     </div>
   );
 }

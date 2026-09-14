@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { verificarAdmin } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { revalidatePath } from 'next/cache';
+import {
+  camposConfigPagamentoMedico,
+  validarRegrasConfigPagamento,
+} from '@/lib/pagamentos/validacao-config-pagamento';
 
 interface ActionResult<T = unknown> {
   sucesso: boolean;
@@ -85,7 +89,7 @@ export interface ConfigPagamentoMedico {
   medicoNome: string;
   especialidade: string;
   pixHabilitado: boolean;
-  pixTipoChave: string | null;
+  pixTipoChave: 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria' | null;
   pixChave: string | null;
   boletoHabilitado: boolean;
   cartaoCreditoHabilitado: boolean;
@@ -93,7 +97,7 @@ export interface ConfigPagamentoMedico {
   bancoNome: string | null;
   bancoAgencia: string | null;
   bancoConta: string | null;
-  bancoContaTipo: string | null;
+  bancoContaTipo: 'corrente' | 'poupanca' | null;
   bancoTitularNome: string | null;
   bancoTitularDocumento: string | null;
   observacoes: string | null;
@@ -150,61 +154,34 @@ export async function obterConfigPagamentoMedico(
 }
 
 const salvarConfigPagamentoMedicoSchema = z
-  .object({
-    medicoId: z.string().min(1),
-    pixHabilitado: z.boolean(),
-    pixTipoChave: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']).nullable(),
-    pixChave: z.string().nullable(),
-    boletoHabilitado: z.boolean(),
-    cartaoCreditoHabilitado: z.boolean(),
-    cartaoDebitoHabilitado: z.boolean(),
-    bancoNome: z.string().nullable(),
-    bancoAgencia: z.string().nullable(),
-    bancoConta: z.string().nullable(),
-    bancoContaTipo: z.enum(['corrente', 'poupanca']).nullable(),
-    bancoTitularNome: z.string().nullable(),
-    bancoTitularDocumento: z.string().nullable(),
-    observacoes: z.string().nullable(),
-  })
-  .superRefine((dados, ctx) => {
-    if (dados.pixHabilitado && (!dados.pixTipoChave || !dados.pixChave?.trim())) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Informe o tipo e a chave PIX para habilitar este método',
-        path: ['pixChave'],
-      });
-    }
-    if (
-      dados.boletoHabilitado &&
-      (!dados.bancoNome?.trim() ||
-        !dados.bancoAgencia?.trim() ||
-        !dados.bancoConta?.trim() ||
-        !dados.bancoContaTipo ||
-        !dados.bancoTitularNome?.trim() ||
-        !dados.bancoTitularDocumento?.trim())
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Preencha os dados bancários completos para habilitar boleto',
-        path: ['bancoNome'],
-      });
-    }
-  });
+  .object(camposConfigPagamentoMedico)
+  .superRefine(validarRegrasConfigPagamento);
 
-/** Cria ou atualiza (upsert) a configuração de meios de pagamento de um médico. */
+/**
+ * Cria ou atualiza (upsert) a configuração de meios de pagamento de um médico.
+ *
+ * `medicoId` é o PRIMEIRO parâmetro (não um campo dentro de `dados`) de propósito: a
+ * página o passa via `salvarConfigPagamentoMedico.bind(null, medicoId)`, porque uma
+ * function comum não atravessa a fronteira Server → Client Component (só uma Server
+ * Action, ou o bind de uma, atravessa) — e o bind também impede o client de trocar o
+ * médico afetado, já que o valor fica fixado no fechamento assinado pelo servidor.
+ */
 export async function salvarConfigPagamentoMedico(
+  medicoId: string,
   dados: z.infer<typeof salvarConfigPagamentoMedicoSchema>,
 ): Promise<ActionResult> {
   try {
     const auth = await verificarAdmin();
     if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
 
+    if (!medicoId) return { sucesso: false, erro: 'Médico inválido' };
+
     const parsed = salvarConfigPagamentoMedicoSchema.safeParse(dados);
     if (!parsed.success) {
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const { medicoId, ...valores } = parsed.data;
+    const valores = parsed.data;
 
     const [medicoExiste] = await db
       .select({ id: medicos.id })
