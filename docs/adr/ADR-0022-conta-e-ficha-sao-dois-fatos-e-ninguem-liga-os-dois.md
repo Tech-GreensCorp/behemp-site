@@ -2026,3 +2026,39 @@ no código — estava no ambiente. **É o limite do que teste estático alcança
 - `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` fora do `gravar` do `deploy.yml`
 - O **driver global**: `neon-http` existe para serverless, e produção é EC2 com PM2. Um pool TCP
   provavelmente é melhor em tudo — mas toca toda query e precisa de medição
+
+## §63 — 🟢 E o teste LIMPO, com paciente novo, passou de primeira
+
+**14/09/2026, 01:02 UTC.** Depois do SOL-000046 — que fechou, mas com conta pré-existente —, um
+pedido inteiramente novo foi criado no formulário da Greens: nome, e-mail, CPF e telefone que
+nunca existiram neste banco.
+
+```
+protocolo     status     criado         com_arquivo   na_ficha
+SOL-000065    enviada    14/09 01:02    3             3
+```
+
+⚠️ **Este é o teste que vale, e a diferença importa.** O SOL-000046 exercitava o caminho de quem
+_já tem conta_ — útil, porque era onde o dono travava, mas não é o caminho comum. O SOL-000065
+percorre o que um paciente real percorre: formulário da Greens, handoff, download, store privado,
+criação de conta no Clerk, confirmação por e-mail, transação, ficha.
+
+**Sete portões, primeira tentativa, sem intervenção.**
+
+### O que isso prova que o anterior não provava
+
+|                        | SOL-000046                    | SOL-000065           |
+| ---------------------- | ----------------------------- | -------------------- |
+| conta no Clerk         | já existia                    | **criada agora**     |
+| `users`                | já existia                    | **inserido**         |
+| `pacientes`            | ficha ativa, ramo do `update` | **ramo do `insert`** |
+| confirmação por e-mail | pulada (sessão ativa)         | **percorrida**       |
+
+🔴 **O ramo do `insert` da transação nunca tinha executado.** Era exatamente onde o D-25
+(`neon-http` sem transação) mordia primeiro, e onde as hipóteses 1 e 2 do §61 imaginavam
+colisões. Nenhuma delas existia — e agora está provado pelo caminho, não por consulta.
+
+### O que continua sem prova
+
+**P8 — a procuração da ANVISA.** O cadastro concluiu e o paciente chegou ao destino; o que
+acontece dali em diante ainda não foi exercitado nesta sessão.
