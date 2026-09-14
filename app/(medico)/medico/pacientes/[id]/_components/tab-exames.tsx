@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { listarExames, excluirExame } from '@/app/_actions/exames';
+import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
 import {
   Download,
@@ -159,64 +160,64 @@ export function TabExames({ pacienteId }: TabExamesProps) {
           <p className="text-sm text-muted-foreground">Clique em &quot;Novo Exame&quot; para adicionar</p>
         </CardContent></Card>
       ) : (
-        exames.map((e) => (
-          <Card key={e.id} className="border-border/40 shadow-sm transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center justify-between gap-4 p-4">
-              {/* Info do exame */}
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+        <DataList>
+          {exames.map((e) => (
+            <DataRow
+              key={e.id}
+              icon={
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-blue-500/10">
                   <Microscope size={18} className="text-blue-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{e.nomeExame}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(e.dataExame + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    {e.observacoes && ` · ${e.observacoes}`}
-                  </p>
-                </div>
-              </div>
+              }
+              title={e.nomeExame}
+              subtitle={
+                <>
+                  {new Date(e.dataExame + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  {e.observacoes && ` · ${e.observacoes}`}
+                </>
+              }
+              trailing={
+                <>
+                  {e.urlArquivo ? (
+                    <>
+                      {/* Visualizar */}
+                      <a href={e.urlArquivo} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                          <ExternalLink size={13} />
+                          Ver
+                        </Button>
+                      </a>
 
-              {/* Ações */}
-              <div className="flex shrink-0 items-center gap-2">
-                {e.urlArquivo ? (
-                  <>
-                    {/* Visualizar */}
-                    <a href={e.urlArquivo} target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm" className="gap-1.5">
-                        <ExternalLink size={13} />
-                        Ver
+                      {/* Baixar */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => handleDownload(e.urlArquivo, e.nomeArquivo ?? e.nomeExame)}
+                      >
+                        <Download size={13} />
+                        Baixar
                       </Button>
-                    </a>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sem arquivo</span>
+                  )}
 
-                    {/* Baixar */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => handleDownload(e.urlArquivo, e.nomeArquivo ?? e.nomeExame)}
-                    >
-                      <Download size={13} />
-                      Baixar
-                    </Button>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Sem arquivo</span>
-                )}
-
-                {/* Excluir */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
-                  onClick={() => setExameParaExcluir({ id: e.id, nome: e.nomeExame })}
-                >
-                  <Trash2 size={13} />
-                  Excluir
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))
+                  {/* Excluir */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+                    onClick={() => setExameParaExcluir({ id: e.id, nome: e.nomeExame })}
+                  >
+                    <Trash2 size={13} />
+                    Excluir
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </DataList>
       )}
 
       {/* Diálogo de confirmação de exclusão */}

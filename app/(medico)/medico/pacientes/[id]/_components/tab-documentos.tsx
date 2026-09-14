@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-paciente';
+import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
 import {
   Download,
@@ -192,66 +193,66 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
         Object.entries(agrupados).map(([tipoKey, items]) => (
           <div key={tipoKey} className="space-y-3">
             <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">{TIPO_LABELS[tipoKey] ?? tipoKey}</h3>
-            {items.map((doc: any) => {
-              const vencido = new Date(doc.dataValidade) < new Date();
-              return (
-                <Card key={doc.id} className="border-border/40 shadow-sm transition-shadow hover:shadow-md">
-                  <CardContent className="flex items-center justify-between gap-4 p-4">
-                    {/* Info do arquivo */}
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C08E3A]/10">
+            <DataList>
+              {items.map((doc: any) => {
+                const vencido = new Date(doc.dataValidade) < new Date();
+                return (
+                  <DataRow
+                    key={doc.id}
+                    icon={
+                      <div className="flex h-full w-full items-center justify-center rounded-full bg-[#C08E3A]/10">
                         <FileCheck size={18} className="text-[#C08E3A]" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{doc.nomeArquivo}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
-                          {' · '}
-                          Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
+                    }
+                    title={doc.nomeArquivo}
+                    subtitle={
+                      <>
+                        Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {' · '}
+                        Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </>
+                    }
+                    trailing={
+                      <>
+                        <Badge variant={vencido ? 'destructive' : 'outline'}>
+                          {vencido ? 'Vencido' : 'Válido'}
+                        </Badge>
 
-                    {/* Ações */}
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge variant={vencido ? 'destructive' : 'outline'}>
-                        {vencido ? 'Vencido' : 'Válido'}
-                      </Badge>
+                        {/* Visualizar */}
+                        <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" className="gap-1.5">
+                            <ExternalLink size={13} />
+                            Ver
+                          </Button>
+                        </a>
 
-                      {/* Visualizar */}
-                      <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                          <ExternalLink size={13} />
-                          Ver
+                        {/* Baixar */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
+                        >
+                          <Download size={13} />
+                          Baixar
                         </Button>
-                      </a>
 
-                      {/* Baixar */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
-                      >
-                        <Download size={13} />
-                        Baixar
-                      </Button>
-
-                      {/* Excluir */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
-                        onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
-                      >
-                        <Trash2 size={13} />
-                        Excluir
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        {/* Excluir */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+                          onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
+                        >
+                          <Trash2 size={13} />
+                          Excluir
+                        </Button>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </DataList>
           </div>
         ))
       )}
