@@ -19,7 +19,10 @@ export interface AvisoDeEnderecoPendenteProps {
   onSalvo: () => void;
 }
 
-export function AvisoDeEnderecoPendente({ enderecoPendente, onSalvo }: AvisoDeEnderecoPendenteProps) {
+export function AvisoDeEnderecoPendente({
+  enderecoPendente,
+  onSalvo,
+}: AvisoDeEnderecoPendenteProps) {
   if (!enderecoPendente) return null;
 
   return (
