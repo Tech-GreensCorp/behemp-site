@@ -4,6 +4,17 @@
 > **BeHemp**; o §9 é da **Greens**, e está vazio de propósito para eles preencherem. A revisão
 > é a três, antes de qualquer implementação.
 >
+> 🔴 **O QUE ESTÁ APROVADO E O QUE NÃO ESTÁ — leia isto antes de implementar qualquer coisa
+> desta ADR.** Elas convivem no mesmo arquivo de propósito, para ninguém confundir plano com
+> decisão:
+>
+> | seção      | o quê                                                    | status                                        |
+> | ---------- | -------------------------------------------------------- | --------------------------------------------- |
+> | §1 – §8    | o Fluxo 2 entra pelo handoff assinado, e não pelo painel | ✅ **aprovado** — é o que está sendo feito    |
+> | `DO-57/58` | a regra da receita e os cinco ajustes de tela            | ✅ **aprovado** pelo chefe do dono            |
+> | **§10**    | o **menu de 3 escolhas** antes da tela da ANVISA         | ⛔ **NÃO APROVADO** — aguarda o chefe do dono |
+> | §9         | a parte da Greens                                        | ⏳ a preencher                                |
+>
 > **Decisão do dono, 14/09/2026:** _"nós literalmente imitaremos 99% do que já funciona no
 > fluxo 1 sem ANVISA, só que para receita. A única diferença é que quando é marcado que não
 > tem a receita ele é redirecionado para teleconsulta, não para ANVISA. E quando o paciente
@@ -284,7 +295,66 @@ _(a preencher)_
 
 ---
 
-## §10 — Princípios e fase
+## §10 — ⛔ Ideia registrada e **NÃO APROVADA**: o menu de 3 escolhas
+
+> **Status:** ⛔ **não aprovada.** Ideia do dono em 14/09/2026, registrada para não se perder.
+> _"é apenas a ideia que eu tive, eu tenho que esperar aprovação do meu chefe"_. **Nada aqui
+> foi implementado, e nada aqui deve ser implementado até haver aprovação por escrito.**
+
+### O que é
+
+Hoje o paciente da Greens que precisa da BeHemp preenche **dois formulários**: o da Greens e o
+da BeHemp. A ideia é pôr, **antes da tela da ANVISA**, um menu com três escolhas:
+
+| #   | o paciente diz        | para onde vai                                                   | formulários que ele preenche |
+| --- | --------------------- | --------------------------------------------------------------- | ---------------------------- |
+| 1   | **tenho tudo**        | a tela que já existe na Greens                                  | os de hoje                   |
+| 2   | **falta a ANVISA**    | a tela que já existe na Greens                                  | os de hoje                   |
+| 3   | **não tenho receita** | **redirect** que cria o link da BeHemp, como na procuração hoje | **só o da BeHemp**           |
+
+Palavras do dono: _"nessas 3 opções, 2 levam pra tela já existente; a terceira é um redirect
+que cria o link da BeHemp que nem é feito na procuração da ANVISA, só que em vez de preencher
+2 formulários que nem o que já existe, ele só preenche o da BeHemp."_
+
+### O que a opção 3 manda, e de onde vem
+
+Os mesmos dados do cadastro padrão do formulário da Greens — **nome e telefone** —, e eles já
+existem em duas origens que estão em produção:
+
+- o **ChatPro**, que os colhe na conversa;
+- o **link gerado pelo admin** na tela de solicitações de medicamento, do lado da Greens.
+
+### Por que isto é atraente
+
+🔴 **Elimina um formulário inteiro da vida do paciente.** É a mesma régua que o ADR-0021 §1
+fixou para os webhooks: _"o paciente envia cada documento UMA vez"_. Preencher dois formulários
+com os mesmos campos é a versão desse problema em dado cadastral, e não em documento.
+
+E as opções 1 e 2 **não custam nada**: levam para telas que já existem.
+
+### O que precisa ser respondido antes de virar decisão
+
+| #   | pergunta                                                                                                                  | quem responde      |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | o menu fica no **site da Greens** ou no bot? A conciliação com o formulário deles é pré-requisito                         | Greens + chefe     |
+| 2   | a opção 3 pula o cadastro da Greens — **eles ficam sem a ficha desse paciente?**                                          | chefe do dono      |
+| 3   | o consentimento de travessia é colhido **onde**, se o paciente nunca vê o formulário da Greens?                           | 🔴 jurídico + LGPD |
+| 4   | `DO-57` × `VAL-02`: se a autorização sobrevive à receita, a opção 2 e a 3 podem ser a mesma pessoa em momentos diferentes | chefe do dono      |
+
+⚠️ **A pergunta 3 é bloqueante e não é de TI.** Hoje o consentimento é colhido no cadastro da
+BeHemp e viaja com versão e texto (`o-consentimento-e-colhido-antes-de-sair`, 45 casos). Se o
+paciente entra por um redirect sem passar pelo formulário da Greens, é preciso decidir **quem
+colhe o quê** — e isso é LGPD art. 8º, não preferência de fluxo.
+
+### O que já existe e serviria
+
+Nada precisa ser inventado para a opção 3: é o **mesmo** `POST /api/parceiros/greens/cadastro`
+do §2, com `documentos` vazio ou só com o que o bot apurou. O destino cai em
+`/paciente/agendamento` pela regra do §3, sem código novo.
+
+---
+
+## §11 — Princípios e fase
 
 | eixo                                                          | por quê                                                                  |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -295,7 +365,7 @@ _(a preencher)_
 
 ---
 
-## §11 — Fontes
+## §12 — Fontes
 
 - `docs/adr/ADR-0016` — o cadastro da Greens chega por back-channel; D-06, pendência não bloqueia
 - `docs/adr/ADR-0021` — os oito fluxos; **§2 (E1)** e **D-01** (o destino sai do que falta)
