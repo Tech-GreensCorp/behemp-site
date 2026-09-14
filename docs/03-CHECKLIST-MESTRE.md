@@ -283,6 +283,26 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴🔴 **O default de `CHATPRO_CHAT_API_URL` aponta para o host de OUTRA empresa** — medido
+      em 14/09/2026, e é a causa do 401 que estava sendo atribuído ao token.
+      `lib/env.ts:45` e `lib/chatpro/cliente.ts:78` trazem
+      `.default('https://sparks.chatpro.com.br')`. **`sparks` é o subdomínio da conta da
+      GREENS**, não um host do produto — a Greens descobriu isso e avisou. A variável nunca foi
+      configurada na nossa VPS (medido: `AUSENTE`), então **toda** chamada à CHAT API sempre foi
+      para o servidor deles, que responde `401 "Token inválido"` — corretamente, porque não
+      conhece o nosso token.
+      **Provado**: com o token da BeHemp contra `sparks`, `instance-token` **e** `Authorization`
+      dão 401 com a mesma mensagem. Não é o header, não é o token: é o host.
+      **E explica `chatpro_diretorio` vazia** — a CHAT API nunca funcionou do nosso lado, nem uma
+      vez, desde sempre.
+      🔴 **O perigo do default não é ele estar errado; é ele ser PLAUSÍVEL.** Um host inexistente
+      daria erro de DNS e alguém teria olhado no primeiro dia. Um host real de outra conta
+      responde 401, e 401 se lê como "credencial errada" — foi o que aconteceu, por semanas.
+      **Correção: descobrir o subdomínio da nossa instância no painel do ChatPro** e cadastrar
+      `CHATPRO_CHAT_API_URL`. ⚠️ E trocar o default por algo que **falhe alto**: sem a variável,
+      o cliente devia recusar-se a chamar, não adivinhar um host. Falha silenciosa que aponta
+      para o servidor de outra empresa é pior que falha ruidosa.
+
 - [ ] 🔴 **O `CHATPRO_INSTANCE_TOKEN` da BeHemp está RECUSADO na CHAT API** — medido pela Greens
       na nossa VPS em 14/09/2026: `/departments/list → 401` e `/endings/list → 401`. Esses dois
       endpoints **não dependem de lead nenhum** — listam o que é da própria instância. Dar 401
