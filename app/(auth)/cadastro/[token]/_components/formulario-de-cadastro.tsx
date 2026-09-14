@@ -481,6 +481,19 @@ export function FormularioDeCadastro({
    */
   const ehOpcionalAqui = (doc: { chave: string; opcional: boolean }) =>
     doc.opcional || (fluxoDaTeleconsulta && doc.chave === 'comprovante_residencia');
+
+  /**
+   * 🔴 O LAUDO MÉDICO NÃO É PEDIDO NO FLUXO DA TELECONSULTA — decisão do chefe do dono em
+   * 14/09/2026, trazida pelo dono: _"tire o laudo médico da tela também, meu chefe disse que
+   * não é mais necessário"_.
+   *
+   * ⚠️ E ELE CONTINUA EXISTINDO NO FLUXO DA ANVISA. Não sai de `DOCUMENTOS_DO_FLUXO` nem de
+   * `DOCUMENTOS_OPCIONAIS`: quem vem do parceiro pode tê-lo mandado, e a tela precisa saber
+   * reconhecê-lo em `recebidos`. O que muda é só o que se **pede** aqui.
+   */
+  const anexosDaTela = fluxoDaTeleconsulta
+    ? documentosParaAnexar.filter((d) => d.chave !== 'laudo_medico')
+    : documentosParaAnexar;
   /**
    * 🔴 COMEÇA VAZIO — nenhuma finalidade vem marcada.
    *
@@ -1319,7 +1332,7 @@ export function FormularioDeCadastro({
               Receita e ANVISA têm bloco próprio, com pergunta antes do anexo, porque a resposta
               delas decide para onde o paciente vai. Os outros três são só envio.
             */}
-            {documentosParaAnexar.length > 0 && (
+            {anexosDaTela.length > 0 && (
               <>
                 <Secao
                   titulo={
@@ -1339,15 +1352,16 @@ export function FormularioDeCadastro({
                       <>
                         O{' '}
                         <strong className="text-foreground font-medium">documento com foto</strong>{' '}
-                        é o que precisamos para identificar você. Os outros dois você pode enviar
-                        depois, com calma, pela sua área — e o médico já pode te atender antes.
+                        é o que precisamos para identificar você. O comprovante de residência você
+                        pode enviar depois, com calma, pela sua área — e o médico já pode te atender
+                        antes.
                       </>
                     ) : (
                       'Envie agora ou depois, pela sua área. Nada disso impede você de continuar.'
                     )}
                   </p>
                   <div className="space-y-4">
-                    {documentosParaAnexar.map((doc) => (
+                    {anexosDaTela.map((doc) => (
                       <div key={doc.chave} className="space-y-1.5">
                         <Label htmlFor={`anexo-${doc.chave}`}>
                           {doc.rotulo}
