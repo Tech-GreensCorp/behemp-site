@@ -289,14 +289,13 @@ export async function obterResumoPagamentos(): Promise<ActionResult<ResumoPagame
 
     return {
       sucesso: true,
-      dados:
-        resumo ?? {
-          totalRecebido: '0',
-          totalPendente: '0',
-          quantidadePendente: 0,
-          quantidadePaga: 0,
-          quantidadeAtencao: 0,
-        },
+      dados: resumo ?? {
+        totalRecebido: '0',
+        totalPendente: '0',
+        quantidadePendente: 0,
+        quantidadePaga: 0,
+        quantidadeAtencao: 0,
+      },
     };
   } catch (error) {
     console.error('[Admin] Erro ao obter resumo de pagamentos:', error);
