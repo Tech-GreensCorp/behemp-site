@@ -283,6 +283,21 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] **A tela da ANVISA lista o documento recebido mas não deixa VER a imagem** — pedido do dono
+      em 14/09/2026, ao validar o SOL-000065: _"falta só adicionar uma opção de visualizar a
+      imagem enviada para revisão"_. Hoje a tela mostra `✓ nome-do-arquivo.png` e um botão
+      **Substituir**; não há como abrir o que chegou. O paciente precisa decidir se substitui sem
+      ver o que está lá — e no fluxo da Greens ele **nunca viu** aquele arquivo nesta tela, porque
+      quem enviou foi o parceiro.
+      **Perigo de mexer: BAIXO no código, ALTO se feito errado.** A URL crua do blob NÃO pode ir
+      para a tela: o store é privado justamente para que o arquivo não abra por link
+      (`fetch` sem auth → 403, medido em 13/09). A entrega tem de passar por
+      `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e audita — a mesma
+      rota que o guarda `o-documento-do-paciente-nao-abre-sem-escopo` protege.
+      ⚠️ E há uma decisão de produto junto: abrir em aba nova, modal, ou miniatura? Miniatura
+      significa a imagem renderizada na listagem, e aí o documento aparece na tela sem ato
+      deliberado de quem olha.
+
 - [ ] 🔴 **A tela do cadastro diz "✓ Laudo médico" para um documento que NÃO chegou** — medido em
       13/09/2026 no SOL-000046, com o fluxo real. `recebidosDe` (`lib/parceiros/documentos.ts:111`)
       lista os **nomes** do manifesto via `normalizarManifesto` e nunca pergunta se o item tem

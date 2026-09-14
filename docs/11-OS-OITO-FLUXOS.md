@@ -34,6 +34,40 @@
 | 7   | aprovado/rejeitado → notificação e-mail, celular e sistema | ⏸️     | só o sistema (Pusher) — **Item 29**, adiado               |
 | 8   | se aprovado, a ANVISA vai para a Greens                    | ✅     | `notificarParceiro({ tipo: 'anvisa_aprovada' })`          |
 
+### 🟢 EXECUTADO DE PONTA A PONTA EM 14/09/2026 — e os ✅ acima precisam de retratação
+
+```
+protocolo     status     criado         com_arquivo   na_ficha
+SOL-000065    enviada    14/09 01:02    3             3
+```
+
+Paciente **novo**: nome, e-mail, CPF e telefone que nunca existiram neste banco. Formulário da
+Greens → handoff → download do S3 → store privado → conta no Clerk → código do e-mail →
+transação → ficha → **tela da ANVISA com os três documentos reconhecidos**. Sete portões,
+primeira tentativa, sem intervenção.
+
+🔴 **RETRATAÇÃO — os ✅ da tabela acima estavam errados, e erraram por meses.**
+
+Eles foram escritos a partir do CÓDIGO: a rota existe, a action existe, a query lê a tabela.
+Tudo verdade. E ao mesmo tempo, medido em 13/09/2026: **35 handoffs, ZERO cadastros
+concluídos** — porque `db.transaction()` lançava na primeira linha em produção (ADR-0022 §60).
+
+O passo 3 dizia ✅ apontando para `app/_actions/cadastro-por-link.ts`. O arquivo estava lá, a
+lógica estava certa, e **nenhuma conta nascia por ele**. Os passos 4, 5 e 6 nunca tinham sido
+alcançados por paciente nenhum, porque o 3 não passava.
+
+⚠️ **A regra que sai:** neste documento, ✅ passa a significar **executado e medido**, com
+protocolo e data. Código que existe e nunca rodou é ⏸️, não ✅ — e a diferença entre os dois é
+exatamente o que custou semanas.
+
+| passo | antes           | agora                  | prova                                               |
+| ----- | --------------- | ---------------------- | --------------------------------------------------- |
+| 1–2   | ✅ (estrutural) | 🟢 **medido**          | SOL-000065, `com_arquivo: 3`                        |
+| 3–4   | ✅ (estrutural) | 🟢 **medido**          | `status: enviada`, conta criada no Clerk            |
+| 5–6   | ✅ (estrutural) | 🟢 **medido**          | `na_ficha: 3`, tela da ANVISA reconhece os três     |
+| 7     | ⏸️              | ⏸️                     | segue adiado (Item 29)                              |
+| 8     | ✅ (estrutural) | ⏸️ **nunca executado** | depende de uma ANVISA aprovada, que ainda não houve |
+
 🔴 **A pergunta da ANVISA NÃO aparece neste fluxo.** Ele já declarou no formulário da Greens
 que não tem — a pendência aqui é a **consequência** daquela resposta, não uma dúvida nova.
 Corrigido em 10/09/2026, pela ORIGEM (`greens_handoff`) e não pelo parceiro: o **bot** da
