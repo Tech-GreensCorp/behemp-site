@@ -480,6 +480,36 @@ export function FormularioDeCadastro({
   const textos = textosDoDestino(
     destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave)),
   );
+
+  /**
+   * 🔴 O FLUXO DA TELECONSULTA — pedido do chefe do dono em 14/09/2026, e o escopo é ele.
+   *
+   * A regra de negócio nova: **quem não tem receita não tem ANVISA**, porque a autorização é
+   * pedida com base na receita. Então este paciente não trouxe nada, não tem o que confirmar,
+   * e a receita não é algo que ele envie — é o que a consulta vai produzir.
+   *
+   * ⚠️ POR QUE UM BOOLEANO E NÃO UMA REESCRITA DA TELA. O caminho da ANVISA está provado de
+   * ponta a ponta em produção (`SOL-000065`, três documentos materializados). Mudar a tela
+   * inteira para atender um fluxo colocaria o outro em risco sem necessidade: as quatro
+   * mudanças abaixo são condicionadas, e com `false` a tela é byte a byte a de antes.
+   *
+   * A condição é a PENDÊNCIA da receita, não o destino: `DESTINOS.agendamento` e
+   * `DESTINOS.teleconsulta` são a mesma string, então comparar destino diria "sim" também
+   * para quem não tem pendência nenhuma — que é outro caso.
+   */
+  const fluxoDaTeleconsulta = pendenciasDepoisDasRespostas.some(
+    (p) => p.chave === 'receita_medica',
+  );
+
+  /**
+   * O comprovante de residência é **opcional neste fluxo**, e obrigatório no da ANVISA.
+   *
+   * Não é inconsistência: lá ele é peça da procuração, aqui não. Por isso a exceção mora na
+   * TELA e não em `DOCUMENTOS_OPCIONAIS` — mudar a constante tornaria o comprovante opcional
+   * também para quem vai tirar a autorização, e a procuração não sai sem ele.
+   */
+  const ehOpcionalAqui = (doc: { chave: string; opcional: boolean }) =>
+    doc.opcional || (fluxoDaTeleconsulta && doc.chave === 'comprovante_residencia');
   /**
    * 🔴 COMEÇA VAZIO — nenhuma finalidade vem marcada.
    *
@@ -1269,7 +1299,20 @@ export function FormularioDeCadastro({
 
             {subEtapa === 1 && (
               <>
-            {pendencias.length > 0 && (
+            {/*
+              🔴 AS DUAS LISTAS SOMEM NO FLUXO DA TELECONSULTA (pedidos 1 e 2 do chefe,
+              14/09/2026), e some o `<Separador />` junto — senão sobra um traço no vazio.
+
+              "O que já recebemos" fica vazia por construção: quem não tem receita não tem
+              ANVISA, e não trouxe documento nenhum. "O que ainda vamos precisar" listava
+              exatamente os mesmos três documentos dos campos de envio logo abaixo — dizer
+              duas vezes a mesma coisa é o que tornava a tela confusa.
+
+              ⚠️ Elas continuam existindo para o fluxo da ANVISA, onde a primeira tem
+              conteúdo de verdade (o que o parceiro mandou) e é o que responde a pergunta
+              _"será que perderam meus documentos?"_ — que foi por que ela nasceu, em 10/09.
+            */}
+            {pendencias.length > 0 && !fluxoDaTeleconsulta && (
               <>
                 <Separador />
                 {recebidos.length > 0 && (
@@ -1347,19 +1390,56 @@ export function FormularioDeCadastro({
             */}
             {documentosParaAnexar.length > 0 && (
               <>
-                <Secao titulo="Seus documentos" icone={FileText}>
-                  <p className="text-muted-foreground -mt-1 mb-4 text-xs">
-                    Envie agora ou depois, pela sua área. Nada disso impede você de continuar.
+                <Secao
+                  titulo={
+                    fluxoDaTeleconsulta ? 'Documentos para a sua consulta' : 'Seus documentos'
+                  }
+                  icone={FileText}
+                >
+                  {/*
+                    🔴 UMA FRASE SÓ, E ELA NÃO PODE MENTIR. O dono apontou em 14/09/2026 que a
+                    tela dizia "nada disso impede você de continuar" tendo um campo necessário
+                    logo abaixo. Havia duas frases — esta e outra no rodapé da seção — dizendo
+                    coisas diferentes sobre a mesma lista, e a de cima é a que o olho lê
+                    primeiro. As duas viraram esta.
+                  */}
+                  <p className="text-muted-foreground -mt-1 mb-4 text-xs leading-relaxed">
+                    {fluxoDaTeleconsulta ? (
+                      <>
+                        O{' '}
+                        <strong className="text-foreground font-medium">documento com foto</strong>{' '}
+                        é o que precisamos para identificar você. Os outros dois você pode enviar
+                        depois, com calma, pela sua área — e o médico já pode te atender antes.
+                      </>
+                    ) : (
+                      'Envie agora ou depois, pela sua área. Nada disso impede você de continuar.'
+                    )}
                   </p>
                   <div className="space-y-4">
                     {documentosParaAnexar.map((doc) => (
                       <div key={doc.chave} className="space-y-1.5">
                         <Label htmlFor={`anexo-${doc.chave}`}>
                           {doc.rotulo}
-                          {doc.opcional && (
+                          {ehOpcionalAqui(doc) ? (
                             <span className="text-muted-foreground/70 ml-1.5 text-xs">
                               (opcional)
                             </span>
+                          ) : (
+                            fluxoDaTeleconsulta && (
+                              /*
+                                🔴 "precisamos deste", e NÃO "obrigatório" — decisão do dono em
+                                14/09/2026: _"não trave, apenas deixe esse alerta"_.
+
+                                `podeEnviar` (acima) não exige anexo nenhum, e continua sem
+                                exigir. Um rótulo "obrigatório" com o botão liberado é a tela
+                                prometendo uma trava que não existe — o mesmo defeito, do outro
+                                lado, de dizer "nada disso impede" com um campo necessário.
+                                Pendência informa, não impede (ADR-0016 D-06).
+                              */
+                              <span className="text-primary/80 ml-1.5 text-xs">
+                                (precisamos deste)
+                              </span>
+                            )
                           )}
                         </Label>
                         <Input
@@ -1378,23 +1458,38 @@ export function FormularioDeCadastro({
                     ))}
                   </div>
                   {erroDoAnexo && <p className="text-destructive mt-2 text-xs">{erroDoAnexo}</p>}
+                  {/*
+                    🔴 AVISO, NUNCA BLOQUEIO (ADR-0016 D-06). Este texto vivia na lista que
+                    saiu; sem ele, o paciente do fluxo da teleconsulta leria três campos de
+                    arquivo e nenhuma frase dizendo que pode seguir sem eles.
+                  */}
                 </Secao>
 
                 <Separador />
               </>
             )}
 
-            {perguntarSobreReceita && (
+            {perguntarSobreReceita && !fluxoDaTeleconsulta && (
               <>
                 {/*
                   🔴 A RECEITA VEM ANTES DA ANVISA NA TELA, pelo mesmo motivo que vem antes no
                   destino: sem receita não há o que autorizar. Perguntar pela autorização primeiro
                   sugere uma ordem que a norma não permite.
+
+                  ⚠️ E ELA NÃO APARECE NO FLUXO DA TELECONSULTA (pedido 4 do chefe, 14/09/2026).
+                  Perguntar "você já tem receita?" a quem o bot já encaminhou POR NÃO TER é
+                  repetir uma pergunta respondida — e a resposta "Sim" mandaria para a ANVISA
+                  alguém que a nova regra diz que não pode tê-la.
+
+                  Com as duas condições, este bloco fica inalcançável hoje: `perguntarSobreReceita`
+                  é verdadeiro exatamente quando a receita é pendência, que é o que define o
+                  fluxo. Fica escrito assim, e não apagado, porque a regra de negócio é nova e o
+                  bloco volta inteiro se ela mudar — apagar custaria reescrevê-lo de memória.
                 */}
                 <Secao titulo="Receita médica" icone={FileText}>
                   <fieldset className="space-y-3">
                     <legend className="text-muted-foreground mb-3 text-sm">
-                      Você já tem uma receita médica de cannabis medicinal válida?
+                      Você já tem uma receita médica de fitocanabinoide válida?
                     </legend>
                     <div className="grid grid-cols-2 gap-3">
                       {[
@@ -1457,8 +1552,21 @@ export function FormularioDeCadastro({
               </>
             )}
 
-            {perguntarSobreAnvisa && (
+            {perguntarSobreAnvisa && !fluxoDaTeleconsulta && (
               <>
+                {/*
+                  🔴 A ANVISA NÃO É PERGUNTADA NO FLUXO DA TELECONSULTA — consequência direta
+                  do `DO-57`, e o dono apontou em 14/09/2026: _"se ele não tem receita ele não
+                  tem ANVISA, logo tem que tirar os 2, começando pela tela da teleconsulta"_.
+
+                  Perguntar "você já tem a autorização?" a quem a própria regra diz que não
+                  pode tê-la é pedir que o paciente responda uma pergunta já respondida — e
+                  um "Sim" mandaria para a procuração alguém sem receita para autorizar.
+
+                  ⚠️ E ELA VOLTA DEPOIS, EM OUTRO LUGAR. Terminada a teleconsulta e emitida a
+                  receita, a ANVISA passa a ser a única pendência — e é aí que ela aparece,
+                  na área do paciente. Está registrado como pendente de implementação.
+                */}
                 <Secao titulo="Autorização da ANVISA" icone={FileText}>
                   <fieldset className="space-y-3">
                     <legend className="text-muted-foreground mb-3 text-sm">
@@ -1547,7 +1655,7 @@ export function FormularioDeCadastro({
             <Secao titulo="Sobre o seu tratamento" icone={Sparkles}>
               <fieldset className="space-y-3">
                 <legend className="text-muted-foreground mb-3 text-sm">
-                  Você já faz tratamento com cannabis medicinal?
+                  Você já faz tratamento à base de fitocanabinoide?
                 </legend>
                 <div className="grid grid-cols-2 gap-3">
                   {[

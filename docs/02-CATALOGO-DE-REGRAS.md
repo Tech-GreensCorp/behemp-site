@@ -131,7 +131,26 @@ só depois do aceite.
 | `DO-54` | **Os `GAP-nn` viram UM cartão só** no Trello, não um por GAP. | dev Davi · 25/08/2026 | _"os gaps (que nos vamos englobar em um card so)"_ |
 | `DO-55` | **As transcrições de norma precisam ser pesquisadas E referenciadas no código** — não basta a linha no catálogo; o ID tem de aparecer onde a regra é aplicada. | dev Davi · 25/08/2026 | _"as transcirções que nos temos que pesquisar e referenciar no código"_ |
 | `DO-56` | 🔴 **Texto de cartão do Trello é para HUMANO, não para quem tem o código aberto.** Cada cartão explica: por que foi feito assim, qual decisão foi tomada, **em que tela aparece**, e **como impacta** paciente, médico, admin ou vários. Referência a doc e índice **fica** (ajuda a buscar no código), mas nunca substitui a explicação. | dev Davi · 25/08/2026 | _"os textos não podem ficar em aberto, eles tem que ter a lógica textual das implementações evitando que o meu chef dev (gabriel) e a outra dev (dryelle) peguem textos incompletos com referencias que so dariam para entender olhando o código, tem que estar tudo explicado"_ |
+| `DO-57` | 🔴 **Quem não tem receita não tem ANVISA.** A autorização de importação é pedida **com base na receita**, então o paciente sem receita não pode ter a autorização, e precisa passar pelo processo inteiro: consulta → receita → autorização. É a regra que define o **fluxo da teleconsulta**. | chefe do dono, via dev Davi · 14/09/2026 | _"se o paciente não tem receita logo ele não tem anvisa já que a anvisa é solicitada baseada na receita, então se ele não tem receita não tem anvisa e aí ele precisa passar por todo processo"_ |
+| `DO-58` | **Os cinco ajustes da tela do fluxo da teleconsulta:** (1) tirar "O que já recebemos"; (2) melhorar o desenho de "O que ainda vamos precisar" e **renomear** para ficar entendível; (3) pedir **só** documento com foto, comprovante de residência (opcional) e laudo médico (opcional); (4) tirar a receita médica da tela; (5) trocar "cannabis medicinal" por **"tratamento à base de fitocanabinoide"**. | chefe do dono, via dev Davi · 14/09/2026 | _"TELECONSULTA FLUXO BEHEMP — 1 retirar o que já recebemos · 2 melhora o design do que ainda vamos precisar, além da mudança de nome para ficar mais entendível · 3 enviar somente documento por foto e comprovante de residência(opcional) e o laudo médico(opcional) · 4 retirar receita médica · 5 sobre tratamento trocar cannabis medicinal para tratamento a base de fitocanabinoide"_ |
 | ~~`DO-22`~~ ⛔ substituída por `DO-23` | 🔴 **O consentimento LGPD é BLOQUEANTE e dos DOIS lados** — paciente **e** médico. Sem os dois, a sala não abre. O botão é **grande e destacado**. | dono do produto · 20/08/2026 | _"temos que deixar o botão de consentimento bem grande e com bloqueio na teleconsulta, se nem o médico e o paciente fizerem isso, não terá a teleconsulta, temos que nos proteger da lgpd por completo"_ — **inverte** a D-03 original da [ADR-0007](adr/ADR-0007-consentimento-da-gravacao-de-teleconsulta.md), que fica registrada |
+
+⚠️ **`DO-57` e `VAL-02` puxam em direções diferentes, e as duas ficam registradas.**
+
+`DO-57` diz que sem receita não há ANVISA. `VAL-02` (**RDC 660/2022, Arts. 7º e 8º**, já
+transcrita neste catálogo) diz que, na importação por pessoa física, **o que vale 2 anos é a
+autorização, não a receita** — a norma nem declara prazo para a prescrição. O próprio bot da
+Greens repete isso ao paciente: _"individual e válido por 2 anos, conforme a RDC 660/2022"_.
+
+As duas convivem se `DO-57` for lida como **o primeiro pedido**: a autorização nasce de uma
+receita, mas sobrevive a ela. Um paciente de recompra pode ter autorização válida e receita
+vencida — que é o Fluxo 2 da [ADR-0021](adr/ADR-0021-os-oito-fluxos-e-os-webhooks-entre-as-empresas.md)
+e o caso que a [ADR-0023](adr/ADR-0023-o-fluxo-da-receita-reusa-o-trilho-da-anvisa.md) §5 prevê.
+
+🔴 **Isto está aberto, e a decisão é do chefe do dono, não de TI.** Enquanto não for resolvido,
+o código segue `DO-57` **apenas na tela do fluxo da teleconsulta**, por condição — o caminho da
+ANVISA continua como está, e nada do que já funciona foi tocado. A pergunta a levar a ele é
+uma só: _o paciente que já tem autorização da ANVISA e precisa de receita nova existe?_
 
 ⚠️ `DO-01` é a única base registrada para usar o código do VidAI, e ela **contradiz o aviso de
 copyright do próprio repositório de origem**. Registrada como decisão do dono, com a frase e a
