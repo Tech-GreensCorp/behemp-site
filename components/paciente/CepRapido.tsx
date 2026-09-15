@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 import { atualizarPerfilCompletoPaciente } from '@/app/_actions/perfil-paciente';
 
@@ -35,11 +36,13 @@ function mascararCep(valor: string): string {
 export interface ValoresDeEndereco {
   cep: string;
   numero: string;
-  /** Logradouro + bairro (ViaCEP) já com "nº <numero>" anexado — pronto para gravar em `pacientes.endereco`. */
+  /** Apto, bloco, sala, referência — opcional, nunca exigido para salvar. */
+  complemento: string;
+  /** Logradouro + bairro (ViaCEP) já com "nº <numero>" e o complemento anexados — pronto para gravar em `pacientes.endereco`. */
   endereco: string;
   cidade: string;
   uf: string;
-  /** CEP com 8 dígitos e número preenchido. */
+  /** CEP com 8 dígitos e número preenchido. Complemento não entra na conta — é opcional. */
   completo: boolean;
 }
 
@@ -60,6 +63,13 @@ export interface CepRapidoProps {
   modoControlado?: boolean;
   /** Só em modo controlado: chamado a cada mudança, com o valor já pronto para gravar. */
   aoMudarValores?: (valores: ValoresDeEndereco) => void;
+  /**
+   * `'horizontal'` põe CEP, Número, Complemento e o botão numa linha só (desktop) — para
+   * quando o card que envolve o componente é largo e a pilha vertical padrão deixaria
+   * espaço vazio sobrando. Empilha em telas estreitas do mesmo jeito. Default preserva o
+   * layout de sempre, usado no wizard de cadastro e no `/registrar-se`.
+   */
+  layout?: 'vertical' | 'horizontal';
 }
 
 export function CepRapido({
@@ -68,9 +78,12 @@ export function CepRapido({
   rotuloBotao,
   modoControlado = false,
   aoMudarValores,
+  layout = 'vertical',
 }: CepRapidoProps) {
+  const horizontal = layout === 'horizontal';
   const [cep, setCep] = useState('');
   const [numero, setNumero] = useState('');
+  const [complemento, setComplemento] = useState('');
   const [endereco, setEndereco] = useState('');
   const [cidade, setCidade] = useState('');
   const [uf, setUf] = useState('');
@@ -136,7 +149,11 @@ export function CepRapido({
    * coluna dedicada para número. CEP e logradouro sem número não localizam a casa; por isso
    * ele é exigido junto (ver `podeSalvar`), e vai anexado ao final do texto.
    */
-  const enderecoComNumero = [endereco.trim(), numero.trim() ? `nº ${numero.trim()}` : '']
+  const enderecoComNumero = [
+    endereco.trim(),
+    numero.trim() ? `nº ${numero.trim()}` : '',
+    complemento.trim(),
+  ]
     .filter(Boolean)
     .join(', ');
 
@@ -146,12 +163,23 @@ export function CepRapido({
     aoMudarValores?.({
       cep: cep.trim(),
       numero: numero.trim(),
+      complemento: complemento.trim(),
       endereco: enderecoComNumero,
       cidade: cidade.trim(),
       uf: uf.trim(),
       completo: podeSalvar,
     });
-  }, [modoControlado, cep, numero, enderecoComNumero, cidade, uf, podeSalvar, aoMudarValores]);
+  }, [
+    modoControlado,
+    cep,
+    numero,
+    complemento,
+    enderecoComNumero,
+    cidade,
+    uf,
+    podeSalvar,
+    aoMudarValores,
+  ]);
 
   async function salvar() {
     setSalvando(true);
@@ -171,74 +199,116 @@ export function CepRapido({
     }
   }
 
+  const campoCep = (
+    <div className={cn('space-y-1', horizontal && 'sm:w-40 sm:shrink-0')}>
+      <Label htmlFor="cep-rapido" className="text-muted-foreground text-xs">
+        CEP
+      </Label>
+      <div className="relative">
+        <Input
+          id="cep-rapido"
+          value={cep}
+          onChange={(e) => aoDigitarCep(e.target.value)}
+          placeholder="00000-000"
+          inputMode="numeric"
+          autoComplete="postal-code"
+          className="h-10 rounded-xl pr-9 text-sm"
+        />
+        {buscando && (
+          <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
+        )}
+      </div>
+    </div>
+  );
+
+  /*
+    🔴 SEM NÚMERO, O ENDEREÇO NÃO LOCALIZA NADA. O ViaCEP devolve logradouro e bairro,
+    nunca o número da casa — ele não existe na base de CEPs. Exigido junto do CEP
+    (ver `podeSalvar`), nunca só depois de encontrar o endereço: em CEP de zona rural
+    ou condomínio, `encontrado` pode nem preencher logradouro nenhum.
+  */
+  const campoNumero = (
+    <div className={cn('space-y-1', horizontal && 'sm:w-32 sm:shrink-0')}>
+      <Label htmlFor="numero-rapido" className="text-muted-foreground text-xs">
+        Número
+      </Label>
+      <Input
+        id="numero-rapido"
+        value={numero}
+        onChange={(e) => setNumero(e.target.value)}
+        placeholder="Nº da casa"
+        inputMode="numeric"
+        autoComplete="address-line2"
+        className="h-10 rounded-xl text-sm"
+      />
+    </div>
+  );
+
+  const campoComplemento = (
+    <div className={cn('space-y-1', horizontal && 'sm:flex-1')}>
+      <Label htmlFor="complemento-rapido" className="text-muted-foreground text-xs">
+        Complemento <span className="text-muted-foreground/60">(opcional)</span>
+      </Label>
+      <Input
+        id="complemento-rapido"
+        value={complemento}
+        onChange={(e) => setComplemento(e.target.value)}
+        placeholder="Apto, bloco, referência"
+        autoComplete="address-line3"
+        className="h-10 rounded-xl text-sm"
+      />
+    </div>
+  );
+
+  const botaoSalvar = !modoControlado && (
+    <Button
+      type="button"
+      size="sm"
+      onClick={salvar}
+      disabled={!podeSalvar}
+      className={cn('gap-1.5 rounded-xl', horizontal ? 'h-10 sm:w-auto sm:shrink-0' : 'w-full')}
+    >
+      {salvando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {rotuloBotao ?? 'Salvar endereço'}
+    </Button>
+  );
+
+  const confirmacao = encontrado && (
+    <div className="animate-fade-in border-secondary/30 bg-secondary/5 rounded-xl border px-3 py-2 text-xs">
+      <div className="flex items-start gap-2">
+        <MapPin className="text-secondary mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <p className="text-foreground leading-relaxed">
+          {endereco || 'Endereço não detalhado pelo CEP'}
+          {cidade ? ` — ${cidade}` : ''}
+          {uf ? `/${uf}` : ''}
+        </p>
+      </div>
+    </div>
+  );
+
+  if (horizontal) {
+    return (
+      <div className="space-y-3 text-left">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          {campoCep}
+          {campoNumero}
+          {campoComplemento}
+          {botaoSalvar}
+        </div>
+        {confirmacao}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 text-left">
-      <div className="space-y-1">
-        <Label htmlFor="cep-rapido" className="text-muted-foreground text-xs">
-          CEP
-        </Label>
-        <div className="relative">
-          <Input
-            id="cep-rapido"
-            value={cep}
-            onChange={(e) => aoDigitarCep(e.target.value)}
-            placeholder="00000-000"
-            inputMode="numeric"
-            autoComplete="postal-code"
-            className="h-10 rounded-xl pr-9 text-sm"
-          />
-          {buscando && (
-            <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
-          )}
-        </div>
+      {campoCep}
+      {confirmacao}
+      <div className="grid grid-cols-2 gap-2">
+        {campoNumero}
+        {campoComplemento}
       </div>
-
-      {encontrado && (
-        <div className="animate-fade-in border-secondary/30 bg-secondary/5 rounded-xl border px-3 py-2 text-xs">
-          <div className="flex items-start gap-2">
-            <MapPin className="text-secondary mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p className="text-foreground leading-relaxed">
-              {endereco || 'Endereço não detalhado pelo CEP'}
-              {cidade ? ` — ${cidade}` : ''}
-              {uf ? `/${uf}` : ''}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/*
-        🔴 SEM NÚMERO, O ENDEREÇO NÃO LOCALIZA NADA. O ViaCEP devolve logradouro e bairro,
-        nunca o número da casa — ele não existe na base de CEPs. Exigido junto do CEP
-        (ver `podeSalvar`), nunca só depois de encontrar o endereço: em CEP de zona rural
-        ou condomínio, `encontrado` pode nem preencher logradouro nenhum.
-      */}
-      <div className="space-y-1">
-        <Label htmlFor="numero-rapido" className="text-muted-foreground text-xs">
-          Número
-        </Label>
-        <Input
-          id="numero-rapido"
-          value={numero}
-          onChange={(e) => setNumero(e.target.value)}
-          placeholder="Nº da casa ou apto"
-          inputMode="numeric"
-          autoComplete="address-line2"
-          className="h-10 rounded-xl text-sm"
-        />
-      </div>
-
-      {!modoControlado && (
-        <Button
-          type="button"
-          size="sm"
-          onClick={salvar}
-          disabled={!podeSalvar}
-          className="w-full gap-1.5 rounded-xl"
-        >
-          {salvando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {rotuloBotao ?? 'Salvar endereço'}
-        </Button>
-      )}
+      {botaoSalvar}
     </div>
   );
 }

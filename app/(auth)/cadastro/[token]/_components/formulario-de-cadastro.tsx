@@ -316,6 +316,7 @@ export function FormularioDeCadastro({
   const [endereco, setEndereco] = useState<ValoresDeEndereco>({
     cep: '',
     numero: '',
+    complemento: '',
     endereco: '',
     cidade: '',
     uf: '',
