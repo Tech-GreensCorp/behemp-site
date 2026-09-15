@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsentimentoQueFaltou } from '@/components/paciente/ConsentimentoQueFaltou';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { documentosDoPacienteAtual } from '@/app/_actions/documentos-do-paciente';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus =
@@ -134,10 +136,21 @@ function ChecklistItem({
   doc,
   autorizacaoId,
   onUploaded,
+  documentoId,
 }: {
   doc: DocItem;
   autorizacaoId: string;
   onUploaded: () => void;
+  /**
+   * 🔴 O `id` NÃO VEM DESTE JSON — vem da tabela, resolvido por
+   * `documentosDoPacienteAtual()`. O checklist da autorização guarda `urlBlob` e
+   * `nomeArquivo`, e nunca guardou o id da linha em `documentos`.
+   *
+   * E o `urlBlob` daqui não serve: privado não abre por link direto, e público abriria
+   * sem autenticação nem auditoria. `undefined` quando não há correspondência — e aí o
+   * botão simplesmente não aparece, que é melhor que um botão que erra.
+   */
+  documentoId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -193,6 +206,22 @@ function ChecklistItem({
           <p className="text-xs text-green-600 mt-1 truncate">✓ {doc.nomeArquivo}</p>
         )}
       </div>
+
+      {/*
+        🔴 VER O QUE FOI ENVIADO — pedido do dono em 14/09/2026, e o motivo dele:
+        "é essencial até pra validar o que está chegando entre empresas".
+
+        "✓ rg.jpg" afirma que um arquivo chegou, não que ele É um RG. O nome é escolhido
+        por quem envia, e um handoff da Greens pode trazer o documento errado sem nada
+        acusar aqui.
+      */}
+      {doc.enviado && documentoId && (
+        <VisualizadorDeDocumento
+          documentoId={documentoId}
+          rotulo={config.label}
+          nomeArquivo={doc.nomeArquivo}
+        />
+      )}
 
       <input
         ref={inputRef}
@@ -299,6 +328,19 @@ export default function AnvisaPage() {
   const [verificando, setVerificando] = useState(true);
   const [modalidade, setModalidade] = useState<AnvisaModalidade | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  /**
+   * tipo do documento → `id` na tabela `documentos`.
+   *
+   * Lido da TABELA, não do JSON da autorização: assim o botão funciona igual nas
+   * autorizações que já existem e nas novas, sem migration de dado. Ver a nota em
+   * `app/_actions/documentos-do-paciente.ts`.
+   */
+  const [idsPorTipo, setIdsPorTipo] = useState<Record<string, string>>({});
+
+  const recarregarIdsDosDocumentos = async () => {
+    const lista = await documentosDoPacienteAtual();
+    setIdsPorTipo(Object.fromEntries(lista.map((d) => [d.tipo, d.id])));
+  };
 
   useEffect(() => {
     const verificar = async () => {
@@ -324,6 +366,8 @@ export default function AnvisaPage() {
         setTemPrescricao(null);
       }
       setVerificando(false);
+      // O mapa tipo → id vem da tabela, e é o que faz o botão "Ver" aparecer.
+      await recarregarIdsDosDocumentos();
     };
     verificar();
   }, []);
@@ -342,6 +386,8 @@ export default function AnvisaPage() {
 
   const recarregarAutorizacao = async () => {
     setCarregando(true);
+    // Sem isto o botão "Ver" só apareceria depois de recarregar a página.
+    void recarregarIdsDosDocumentos();
     const res = await listarAutorizacoesAnvisa();
     if (res.sucesso && res.dados && res.dados.length > 0) {
       const ultima = res.dados[res.dados.length - 1] as Autorizacao;
@@ -837,6 +883,7 @@ export default function AnvisaPage() {
                 doc={doc}
                 autorizacaoId={autorizacao.id}
                 onUploaded={recarregarAutorizacao}
+                documentoId={idsPorTipo[doc.tipo]}
               />
             ))}
           </div>

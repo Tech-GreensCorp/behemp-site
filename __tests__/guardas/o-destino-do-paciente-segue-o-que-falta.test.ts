@@ -574,8 +574,26 @@ describe('a pergunta da receita, e o destino que a considera', () => {
  */
 describe('o formulário oferece anexo para o que falta', () => {
   it('a lista de anexos sai das pendências, não de uma lista fixa', () => {
-    expect(codigo).toContain('const documentosParaAnexar = pendencias.filter(');
-    expect(codigo).toContain('documentosParaAnexar.map(');
+    /**
+     * ⚠️ RETIFICADO em 14/09/2026 — quarto e quinto casos do dia com a mesma origem, e esta
+     * versão congelava o NOME DA VARIÁVEL renderizada. Quando o laudo saiu da tela da
+     * teleconsulta (decisão do chefe do dono), a lista renderizada passou a ser uma derivada
+     * (`anexosDaTela`), e o guarda ficou vermelho sem que a propriedade — _a lista vem das
+     * pendências, não de uma lista fixa_ — tivesse mudado.
+     *
+     * O que se mede agora: a origem é `pendencias.filter(`, e o que o JSX renderiza **deriva
+     * dela**. O nome da variável final é detalhe; a procedência não é.
+     */
+    expect(codigo, 'a lista de anexos deixou de sair das pendências').toContain(
+      'const documentosParaAnexar = pendencias.filter(',
+    );
+    const renderizada = codigo.match(/\{\s*([A-Za-z]+)\.map\(\(doc\) =>/)?.[1];
+    expect(renderizada, 'nenhuma lista de anexos é renderizada').toBeTruthy();
+    expect(
+      renderizada === 'documentosParaAnexar' ||
+        new RegExp(`const ${renderizada} =[\\s\\S]{0,300}documentosParaAnexar`).test(codigo),
+      `a lista renderizada (${renderizada}) não deriva das pendências`,
+    ).toBe(true);
   });
 
   it('receita e ANVISA ficam fora dessa lista — têm bloco próprio, com pergunta', () => {
@@ -585,7 +603,12 @@ describe('o formulário oferece anexo para o que falta', () => {
 
   it('o bloco some quando não falta documento nenhum', () => {
     // Um "Seus documentos" vazio afirmaria que algo falta quando nada falta.
-    expect(codigo).toContain('documentosParaAnexar.length > 0');
+    // ⚠️ Mede a MESMA lista que é renderizada, seja qual for o nome dela — ver o caso acima.
+    const renderizada = codigo.match(/\{\s*([A-Za-z]+)\.map\(\(doc\) =>/)?.[1];
+    expect(renderizada, 'nenhuma lista de anexos é renderizada').toBeTruthy();
+    expect(codigo, 'o bloco de anexos deixou de sumir quando a lista está vazia').toContain(
+      `${renderizada}.length > 0`,
+    );
   });
 
   /**
