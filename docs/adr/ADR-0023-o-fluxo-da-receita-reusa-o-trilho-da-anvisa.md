@@ -292,6 +292,49 @@ agendamento é só a primeira tela que abre. Ele navega para onde quiser.
 
 ---
 
+## §8b — 🔴 O QUE JÁ FOI TESTADO E ELIMINADO — não repropor
+
+**Decisão do dono em 15/09/2026:** _"esses testes já fiz antes, deixe documentado para você não
+pedir para eu fazer mais"_.
+
+Esta seção existe porque o Fluxo 2 já consumiu quatro sessões, e o custo maior não foram os
+defeitos — foi **repropor o que já tinha sido descartado**. Cada linha abaixo é uma hipótese
+morta, com a medição que a matou e quem a fez. **Quem propuser qualquer uma delas de novo está
+pedindo trabalho já feito.**
+
+| #   | hipótese                                                          | como foi eliminada                                                                                                                                                                                                                                                          | quem · quando                       |
+| --- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 1   | o segredo do painel está errado                                   | impressão do painel `ed4673dad328` **bate** com a do processo PM2, medida pelas duas partes com a mesma fórmula                                                                                                                                                             | ambos · 14/09                       |
+| 2   | o nosso endpoint recusa a conta Greens                            | `GET bot-link` só com header → **422**; com parâmetros → **200** e link real                                                                                                                                                                                                | Greens, de fora · 14/09             |
+| 3   | o nome do cabeçalho está errado                                   | aceitamos `x-chatpro-intake-secret` **e** `Authorization: Bearer`; as **quatro** combinações (2 contas × 2 cabeçalhos) deram 422                                                                                                                                            | BeHemp, no localhost da VPS · 14/09 |
+| 4   | a URL ou o host do destino estão errados                          | o preview do bloco monta a URL certa, com um `?` só; e o bloco apontado para o **servidor da própria Greens** também não recebeu nada                                                                                                                                       | Greens · 14/09                      |
+| 5   | a forma da chamada do painel não é aceita                         | `?sessionId&name&email`, **sem** `leadId` — a forma exata que o bloco monta — devolveu **200 em 1,13 s**                                                                                                                                                                    | Greens · 14/09                      |
+| 6   | o bloco está com estado corrompido                                | **recriado do zero**; o bloco novo apresenta o mesmo comportamento                                                                                                                                                                                                          | Greens · 14/09                      |
+| 7   | 🔴 **o parâmetro `email` com validação "Email" impede a emissão** | **testado: tirar o `email` e trocar a validação para "sem validação" — NÃO resolveu**                                                                                                                                                                                       | dono · antes de 15/09               |
+| 8   | é o limite de requisição (429)                                    | limite é 60/min por chamador; o dia inteiro não passou de **dez** chamadas                                                                                                                                                                                                  | BeHemp · 14/09                      |
+| 9   | é 404 por caminho errado                                          | o preview do bloco mostra o caminho correto                                                                                                                                                                                                                                 | Greens · 14/09                      |
+| 10  | faltam `CHATPRO_INSTANCE_*_GREENS` no servidor                    | medido no ambiente do **processo PM2**: `INSTANCE_ID_GREENS` e `INSTANCE_TOKEN_GREENS` **presentes**; `CHAT_API_URL_GREENS` ausente **por desenho** — sem ele o cliente cai em `sparks.chatpro.com.br`, que **é** o subdomínio da Greens. Logo `estaConfigurado()` é `true` | BeHemp · 15/09                      |
+| 11  | editar o `.env` da VPS à mão resolve                              | `/home/ubuntu/.env` **não existe** (o arquivo está em `.next/standalone/`), e o `deploy.yml` reescreve uma **lista fixa** a cada subida: o que se põe à mão some no próximo merge. Já aconteceu **três vezes** e virou guarda                                               | BeHemp · 15/09                      |
+
+⚠️ **O item 7 é o mais importante desta tabela**, porque era a hipótese mais forte que restava —
+a única diferença de configuração entre o bloco que emite (`[N02-A]`, um parâmetro) e os que não
+emitem (dois parâmetros, o segundo com validação "Email"). **Ela caiu.**
+
+### O que sobra, depois de eliminar os onze
+
+Duas coisas, e **nenhuma é resolvível do lado da BeHemp**:
+
+1. **Resposta do suporte do ChatPro.** Há um comportamento da plataforma que não se explica pela
+   configuração visível. O chamado está aberto, sem prazo.
+2. **Tirar o bloco do caminho crítico** — o desenho do §1 ao §8 desta ADR, que faz o Fluxo 2
+   entrar pelo handoff assinado, o mesmo trilho que já concluiu ponta a ponta. **Pendente de
+   aprovação.**
+
+🔴 **Não há terceira opção que dependa de código nosso.** O endpoint responde 200 com link real,
+medido de fora, na forma exata que o painel monta.
+
+---
+
 ## §9 — A parte da Greens
 
 > **Esta seção é da Greens.** Escrevam aqui o que muda do lado de vocês: o ramo do menu no
