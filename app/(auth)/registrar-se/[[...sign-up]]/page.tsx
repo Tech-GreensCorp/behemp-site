@@ -127,6 +127,7 @@ export default function SignUpPage() {
   const [endereco, setEndereco] = useState<ValoresDeEndereco>({
     cep: '',
     numero: '',
+    complemento: '',
     endereco: '',
     cidade: '',
     uf: '',
