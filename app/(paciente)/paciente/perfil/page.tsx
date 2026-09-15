@@ -33,7 +33,6 @@ import {
   Clock,
   Heart,
   FileCheck,
-  ExternalLink,
   Bell,
   MapPin,
   Home,
@@ -43,6 +42,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
@@ -744,13 +744,18 @@ export default function PerfilPacientePage() {
                     </span>
                   </div>
 
-                  {/* Ver */}
-                  <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                    aria-label="Visualizar"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                  {/*
+                    🔴 VER ABRE AQUI, não numa aba. Pedido do dono em 14/09/2026 — e o motivo
+                    dele: "é essencial até pra validar o que está chegando entre empresas".
+                    A aba nova continua existindo, dentro do modal, para PDF que o navegador
+                    desenhe melhor sozinho. A rota é a MESMA de antes: o acesso não mudou.
+                  */}
+                  <VisualizadorDeDocumento
+                    documentoId={doc.id}
+                    rotulo={TIPO_LABELS[doc.tipo] ?? doc.tipo}
+                    nomeArquivo={doc.nomeArquivo}
+                    className="opacity-0 transition-opacity group-hover:opacity-100"
+                  />
                 </div>
               );
             })}

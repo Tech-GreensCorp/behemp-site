@@ -220,3 +220,47 @@ describe('o arquivo só é buscado quando alguém de fato abre', () => {
     );
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. O BOTÃO ESTÁ NAS TELAS — e nenhuma delas voltou a linkar o blob
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * As telas que listam documento do paciente. Derivadas? Não: são quatro, nomeadas, e a lista
+ * é o CONTRATO — se alguém criar uma quinta tela de documentos, este guarda **não** vai
+ * acusar, e é por isso que a linha abaixo existe escrita e não inferida. Varrer `app/` por
+ * "tela que mostra documento" daria falso positivo em toda tela que mencione a palavra.
+ */
+const TELAS = [
+  'app/(paciente)/paciente/anvisa/page.tsx',
+  'app/(paciente)/paciente/perfil/page.tsx',
+  'app/(paciente)/paciente/documentos/page.tsx',
+  'app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx',
+];
+
+describe('as quatro telas mostram o documento pelo visualizador', () => {
+  it.each(TELAS)('%s usa o VisualizadorDeDocumento', (tela) => {
+    const t = readFileSync(join(RAIZ, tela), 'utf8');
+    expect(t, 'a tela deixou de importar o visualizador').toContain(
+      '@/components/shared/documentos/visualizador-de-documento',
+    );
+    expect(t, 'o visualizador foi importado e nunca renderizado — componente órfão').toMatch(
+      /<VisualizadorDeDocumento/,
+    );
+  });
+
+  it.each(TELAS)('%s NÃO abre documento por `urlBlob`', (tela) => {
+    /**
+     * ⚠️ `urlBlob` ainda aparece legitimamente nestas telas — o botão "Baixar" usa. O que se
+     * proíbe é ele virar `href`/`src` de um link de VER: aí o navegador abre o blob direto,
+     * fora da rota que autentica e audita.
+     */
+    const t = readFileSync(join(RAIZ, tela), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(
+      /(?:href|src)=\{[^}]*urlBlob/.test(t),
+      'uma tela passou a abrir o documento pela URL do blob',
+    ).toBe(false);
+  });
+});
