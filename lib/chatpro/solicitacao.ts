@@ -1,7 +1,7 @@
 /**
  * O NÚCLEO: cria (ou reaproveita) a solicitação de cadastro e devolve o link único.
  *
- * Três portas de entrada chegam aqui, e todas passam pelo mesmo `resolverOuCriar`:
+ * Quatro portas de entrada chegam aqui, e todas passam pelo mesmo `resolverOuCriar`:
  *
  * - `linkParaOBot` — o bloco "Requisição externa" do chatbot chama e a resposta VIRA a
  *   mensagem do WhatsApp. É o caminho principal.
@@ -9,6 +9,9 @@
  * - `start` — o paciente clica numa URL e é redirecionado ao formulário já preenchido.
  *   Necessário porque o caminho principal só funciona no PRIMEIRO contato: com uma conversa
  *   já aberta, o menu não recomeça e o bloco nunca é alcançado.
+ * - `admin` — a "porta 3" do ADR-0022 §27/D-15: um admin gera o link manualmente, pelo
+ *   painel, sem esperar o ChatPro. Único ponto de entrada com sessão do Clerk (não segredo
+ *   de webhook) — a autorização é responsabilidade de quem chama.
  *
  * 🔴 IDEMPOTÊNCIA — a regra que impede o paciente de receber dois links
  * A chave é o identificador do contato no ChatPro; sem ele, o telefone em E.164. Se já
@@ -529,6 +532,36 @@ export class ServicoDeSolicitacao {
       sessionId: entrada.session ?? null,
       origem: 'chatpro_start_nao_verificado',
       canalDeEntrega: 'start_redirect',
+    });
+  }
+
+  /**
+   * PORTA 3 — o admin gera o link pelo painel (ADR-0022 §27/§34.1, D-15).
+   *
+   * 🔴 Nasce sempre SEM manifesto: `documentosDeclarados` nunca é passado, então as 5
+   * pendências ficam abertas — inclusive a receita, que é o que ativa o
+   * `fluxoDaTeleconsulta` na tela de cadastro (ADR-0023, DO-57/58). É o cenário "chegou
+   * agora, não trouxe nada" — o mesmo que um paciente batendo na porta pela primeira vez.
+   *
+   * Sem ChatPro envolvido: não confirma contato, não resolve `leadId`. A autenticação de
+   * quem pode chamar isto é responsabilidade de quem chama (`verificarAdmin`) — este
+   * método não sabe nada sobre sessão ou role.
+   */
+  async admin(entrada: {
+    nomeCompleto?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+  }): Promise<ResultadoDoLink> {
+    const telefone = entrada.telefone
+      ? normalizarTelefoneWhatsapp(entrada.telefone) ?? entrada.telefone
+      : null;
+
+    return this.resolverOuCriar({
+      nomeCompleto: entrada.nomeCompleto?.trim() || null,
+      email: entrada.email?.trim().toLowerCase() || null,
+      telefone,
+      origem: 'painel_admin',
+      canalDeEntrega: 'manual',
     });
   }
 
