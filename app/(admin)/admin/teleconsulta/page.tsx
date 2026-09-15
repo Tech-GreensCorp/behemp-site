@@ -91,7 +91,7 @@ export default async function TeleconsultaPage({
               <DataRow
                 key={c.id}
                 icon={
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10">
+                  <div className="bg-primary/10 flex h-full w-full items-center justify-center rounded-full">
                     <Video size={18} className="text-primary" />
                   </div>
                 }
@@ -108,7 +108,10 @@ export default async function TeleconsultaPage({
                     </Badge>
                     {c.googleMeetLink && (
                       <Link href={c.googleMeetLink} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink size={14} className="text-muted-foreground hover:text-primary" />
+                        <ExternalLink
+                          size={14}
+                          className="text-muted-foreground hover:text-primary"
+                        />
                       </Link>
                     )}
                   </>

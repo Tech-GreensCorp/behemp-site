@@ -246,7 +246,9 @@ export default function PacienteDashboardPage() {
   const consulta = dados?.proximaConsulta;
   const jornadaLabel = dados ? (LABEL_JORNADA[dados.jornada.fase] ?? dados.jornada.fase) : '';
   const statusLabel = dados ? (LABEL_STATUS[dados.jornada.status] ?? dados.jornada.status) : '';
-  const indiceJornada = dados ? JORNADA_ORDEM.indexOf(dados.jornada.fase as (typeof JORNADA_ORDEM)[number]) : -1;
+  const indiceJornada = dados
+    ? JORNADA_ORDEM.indexOf(dados.jornada.fase as (typeof JORNADA_ORDEM)[number])
+    : -1;
 
   // Resumo dinâmico do hero — preserva a descrição original como estado de carregamento.
   const resumoHero = !dados
@@ -398,7 +400,10 @@ export default function PacienteDashboardPage() {
                   </p>
                 </div>
               </div>
-              <Link href={`/paciente/teleconsulta/${teleconsultaAtiva.roomId}`} className="relative z-10">
+              <Link
+                href={`/paciente/teleconsulta/${teleconsultaAtiva.roomId}`}
+                className="relative z-10"
+              >
                 <Button className="w-full gap-2 rounded-xl bg-red-600 font-bold text-white shadow-md hover:bg-red-700">
                   <Video className="h-4 w-4" />
                   Entrar Agora
@@ -468,7 +473,7 @@ export default function PacienteDashboardPage() {
           />
 
           {/* ═══ Bento principal: consulta em destaque + medicamento/jornada ═══ */}
-          <div className="animate-fade-up delay-75 grid gap-4 lg:grid-cols-12 lg:items-stretch">
+          <div className="animate-fade-up grid gap-4 delay-75 lg:grid-cols-12 lg:items-stretch">
             {/* ── Próxima consulta — painel hero full-bleed ── */}
             <div className="border-border/50 bg-card relative flex min-h-[320px] flex-col justify-between overflow-hidden rounded-[1.75rem] border p-6 shadow-[var(--shadow-soft)] sm:p-7 lg:col-span-7">
               <div
@@ -502,9 +507,7 @@ export default function PacienteDashboardPage() {
                   <div className="bg-muted/50 mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
                     <Calendar className="text-muted-foreground/30 h-8 w-8" />
                   </div>
-                  <p className="text-foreground text-base font-bold">
-                    Nenhuma consulta agendada
-                  </p>
+                  <p className="text-foreground text-base font-bold">Nenhuma consulta agendada</p>
                   <p className="text-muted-foreground mt-1 max-w-xs text-sm">
                     Marque sua primeira consulta e comece o acompanhamento com um especialista.
                   </p>
@@ -696,7 +699,7 @@ export default function PacienteDashboardPage() {
           </div>
 
           {/* ── Tira unificada: médico · documentos · mensagens ── */}
-          <div className="animate-fade-up delay-100 border-border/50 bg-card divide-border/60 grid grid-cols-1 divide-y overflow-hidden rounded-[1.75rem] border shadow-[var(--shadow-card)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="animate-fade-up border-border/50 bg-card divide-border/60 grid grid-cols-1 divide-y overflow-hidden rounded-[1.75rem] border shadow-[var(--shadow-card)] delay-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             <div className="flex items-center gap-3 p-5">
               <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                 <Stethoscope className="text-primary h-4.5 w-4.5" />
@@ -708,7 +711,7 @@ export default function PacienteDashboardPage() {
                 <p
                   className={cn(
                     'mt-0.5 truncate text-sm font-bold',
-                    !dados?.medicoNome && 'text-muted-foreground italic font-normal',
+                    !dados?.medicoNome && 'text-muted-foreground font-normal italic',
                   )}
                 >
                   {dados?.medicoNome ?? 'Não atribuído'}
@@ -786,7 +789,7 @@ export default function PacienteDashboardPage() {
                         {i + 1}
                       </div>
                       {i !== proximosPassos.length - 1 && (
-                        <div className="bg-border mt-1 h-full w-0.5 min-h-[0.75rem]" />
+                        <div className="bg-border mt-1 h-full min-h-[0.75rem] w-0.5" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1 pt-1">

@@ -79,8 +79,8 @@ export function GerarLinkTeleconsultaDialog() {
               <DialogTitle>Gerar link de cadastro</DialogTitle>
               <DialogDescription>
                 Cria uma solicitação de cadastro pelo fluxo da teleconsulta (sem receita nem
-                autorização ANVISA ainda) — para teste ou para agilizar um atendimento manual.
-                Todos os campos são opcionais.
+                autorização ANVISA ainda) — para teste ou para agilizar um atendimento manual. Todos
+                os campos são opcionais.
               </DialogDescription>
             </DialogHeader>
 
@@ -125,11 +125,7 @@ export function GerarLinkTeleconsultaDialog() {
                 Cancelar
               </Button>
               <Button onClick={handleGerar} disabled={gerando} className="gap-1.5">
-                {gerando ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Link2 size={14} />
-                )}
+                {gerando ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
                 {gerando ? 'Gerando...' : 'Gerar link'}
               </Button>
             </DialogFooter>
@@ -139,16 +135,21 @@ export function GerarLinkTeleconsultaDialog() {
             <DialogHeader>
               <DialogTitle>Link gerado</DialogTitle>
               <DialogDescription>
-                Protocolo <strong className="text-foreground">{resultado.protocolo}</strong> —
-                vale por 7 dias. O token só existe em hash no banco: se este link se perder,
-                gere um novo (o anterior para de valer).
+                Protocolo <strong className="text-foreground">{resultado.protocolo}</strong> — vale
+                por 7 dias. O token só existe em hash no banco: se este link se perder, gere um novo
+                (o anterior para de valer).
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2 py-2">
               <Label htmlFor="link-gerado">Link do cadastro</Label>
               <div className="flex gap-2">
-                <Input id="link-gerado" value={resultado.link} readOnly className="font-mono text-xs" />
+                <Input
+                  id="link-gerado"
+                  value={resultado.link}
+                  readOnly
+                  className="font-mono text-xs"
+                />
                 <Button
                   type="button"
                   variant="outline"
@@ -156,11 +157,7 @@ export function GerarLinkTeleconsultaDialog() {
                   className="shrink-0"
                   onClick={handleCopiar}
                 >
-                  {copiado ? (
-                    <Check size={16} className="text-emerald-600" />
-                  ) : (
-                    <Copy size={16} />
-                  )}
+                  {copiado ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
                 </Button>
               </div>
             </div>
