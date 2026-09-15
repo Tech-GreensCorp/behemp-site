@@ -33,6 +33,7 @@ import { ptBR } from 'date-fns/locale';
 import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboard-paciente';
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
+import { AvisoDeEnderecoPendente } from '@/components/paciente/AvisoDeEnderecoPendente';
 import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
 import { PageHeader } from '@/components/shared/page-header';
 
@@ -343,6 +344,11 @@ export default function PacienteDashboardPage() {
           <AvisoDeCadastroPendente cadastro={dados?.cadastroPendente ?? null} />
 
           <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
+
+          <AvisoDeEnderecoPendente
+            enderecoPendente={dados?.enderecoPendente ?? false}
+            onSalvo={carregar}
+          />
 
           {/* ── KPIs principais ── */}
           <div className="animate-fade-up grid grid-cols-2 gap-3 delay-75 lg:grid-cols-4">

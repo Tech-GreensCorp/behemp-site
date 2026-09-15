@@ -38,6 +38,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  MapPin,
   Check,
   Phone,
   ShieldCheck,
@@ -53,6 +54,7 @@ import { cn } from '@/lib/utils';
 import { cpfEhValido, formatarCpf, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
 import { ConsentimentoDoCompartilhamento } from '@/components/paciente/ConsentimentoDoCompartilhamento';
+import { CepRapido, type ValoresDeEndereco } from '@/components/paciente/CepRapido';
 import type { Finalidade } from '@/lib/parceiros/consentimento';
 
 interface Props {
@@ -294,6 +296,33 @@ export function FormularioDeCadastro({
   const [etapa, setEtapa] = useState<'dados' | 'codigo' | 'pronto'>('dados');
 
   /**
+   * 🔴 ETAPA VISUAL DENTRO DE `etapa === 'dados'` — puramente de apresentação.
+   *
+   * Não é um estado novo de submissão: `criarConta` continua lendo os MESMOS campos de
+   * sempre, e `podeEnviar` continua exigindo os mesmos requisitos. Isto só decide qual
+   * bloco de `<Secao>` fica visível, pra trocar um scroll único por passos — nada aqui
+   * muda o schema, a validação ou o que é enviado ao servidor.
+   */
+  const [subEtapa, setSubEtapa] = useState(0);
+
+  /**
+   * 🔴 ENDEREÇO — etapa própria, obrigatória (decisão do dono, 14/09/2026).
+   *
+   * `CepRapido` roda em `modoControlado`: a conta ainda não existe nesta etapa (é
+   * `criarConta`/`gravarFicha` quem cria), então só há estado local aqui. O valor entra
+   * junto do resto na MESMA transação de `concluirCadastroPorLink` — sem o problema de
+   * timing que `/registrar-se` tem (lá o `users` só existe depois do `setActive`).
+   */
+  const [endereco, setEndereco] = useState<ValoresDeEndereco>({
+    cep: '',
+    numero: '',
+    endereco: '',
+    cidade: '',
+    uf: '',
+    completo: false,
+  });
+
+  /**
    * O paciente clicou em "Corrigir meus dados". É escolha dele, e escolha não se desfaz
    * sozinha — sem esta marca, a retomada o traria de volta no render seguinte, e ele ficaria
    * preso sem nunca conseguir corrigir o que estava errado.
@@ -451,6 +480,14 @@ export function FormularioDeCadastro({
   const textos = textosDoDestino(
     destinoDepoisDoCadastro(pendenciasDepoisDasRespostas.map((p) => p.chave)),
   );
+
+  /**
+   * Rótulo do botão enquanto grava — extraído para variável (em vez de ternário inline no
+   * JSX) só para caber numa linha depois que a etapa `subEtapa` aprofundou o aninhamento.
+   * Mesmo texto de sempre; só o lugar onde é montado mudou.
+   */
+  const contaJaExiste = authCarregou && isSignedIn;
+  const textoCarregando = contaJaExiste ? 'Concluindo seu cadastro…' : 'Criando sua conta…';
 
   /**
    * 🔴 O FLUXO DA TELECONSULTA — pedido do chefe do dono em 14/09/2026, e o escopo é ele.
@@ -636,6 +673,18 @@ export function FormularioDeCadastro({
     (jaTemSessaoUtil || (senhaValida && senhasConferem)) &&
     tratamentoRespondido;
 
+  /**
+   * Validade POR PASSO do wizard visual (ver `subEtapa`). Reusa exatamente os mesmos
+   * booleanos de `podeEnviar` — nenhum requisito novo, só fatiado por etapa visível.
+   */
+  const podeAvancarStep0 =
+    nomeValido &&
+    cpfValido &&
+    emailValido &&
+    telefoneValido &&
+    (jaTemSessaoUtil || (senhaValida && senhasConferem));
+  const podeAvancarStep1 = tratamentoRespondido;
+
   /** Força da senha, para dar retorno em vez de só recusar no envio. */
   const forcaDaSenha = useMemo(() => {
     let pontos = 0;
@@ -676,6 +725,10 @@ export function FormularioDeCadastro({
       tratamentoAtual: jaFazTratamento ? tratamentoAtual.trim() : null,
       // Pode ser lista vazia, e vazia é uma resposta: ele leu e não autorizou nada.
       finalidadesConsentidas,
+      cep: endereco.cep || null,
+      endereco: endereco.endereco || null,
+      cidade: endereco.cidade || null,
+      uf: endereco.uf || null,
     });
 
     if (!gravado.sucesso) {
@@ -1067,6 +1120,7 @@ export function FormularioDeCadastro({
                    */
                   setVoltouDeProposito(true);
                   setEtapa('dados');
+                  setSubEtapa(0);
                   setErro('');
                 }}
                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
@@ -1086,95 +1140,104 @@ export function FormularioDeCadastro({
           </form>
         ) : (
           <form onSubmit={criarConta} className="space-y-7">
-            {confirmandoDados ? (
-              /**
-               * 🔴 O PACIENTE QUE VEIO DO PARCEIRO CONFIRMA — NÃO DIGITA.
-               *
-               * Ele acabou de preencher nome, CPF, telefone e e-mail no formulário da Greens.
-               * Repetir os quatro campos aqui é pedir o mesmo trabalho duas vezes, e é o ponto
-               * do funil onde se perde gente.
-               *
-               * ⚠️ Confirmar não é esconder: os dados aparecem, e há "corrigir" ao lado. Se a
-               * Greens mandou um telefone errado, ele precisa poder consertar — senão o erro
-               * vira definitivo justamente no cadastro que deveria facilitar a vida dele.
-               */
-              <Secao titulo="Confirme seus dados" icone={User}>
-                <div className="border-border/60 bg-muted/30 space-y-3 rounded-2xl border p-5">
-                  <LinhaConfirmada rotulo="Nome" valor={nome} />
-                  <LinhaConfirmada rotulo="CPF" valor={formatarCpf(cpf)} />
-                  <LinhaConfirmada rotulo="Telefone" valor={telefone} />
-                  <LinhaConfirmada rotulo="E-mail" valor={email} />
-                  <p className="text-muted-foreground pt-1 text-xs">
-                    Estes dados vieram do formulário que você preencheu. O e-mail acima será o seu
-                    login.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCorrigindo(true)}
-                  className="text-primary text-sm font-medium transition-opacity hover:opacity-70"
-                >
-                  Algo está errado? Corrigir
-                </button>
-              </Secao>
-            ) : (
-              <Secao titulo="Seus dados" icone={User}>
-                <Campo
-                  id="nome"
-                  rotulo="Nome completo"
-                  valor={nome}
-                  aoMudar={setNome}
-                  placeholder="Como está no seu documento"
-                  autoComplete="name"
-                  valido={nomeValido}
-                  dica={nome.length > 0 && !nomeValido ? 'Informe nome e sobrenome' : undefined}
-                />
-                <Campo
-                  id="cpf"
-                  rotulo="CPF"
-                  valor={formatarCpf(cpf) === cpf ? cpf : cpf}
-                  aoMudar={(v) => setCpf(somenteDigitosDoCpf(v).slice(0, 11))}
-                  exibir={cpf.length === 11 ? formatarCpf(cpf) : cpf}
-                  placeholder="000.000.000-00"
-                  inputMode="numeric"
-                  valido={cpfValido}
-                  dica={
-                    cpf.length === 11 && !cpfValido
-                      ? 'Confira os números — este CPF não é válido'
-                      : undefined
-                  }
-                />
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Campo
-                    id="telefone"
-                    rotulo="Telefone (WhatsApp)"
-                    valor={telefone}
-                    aoMudar={(v) => setTelefone(mascararTelefoneDigitado(v))}
-                    placeholder="(00) 00000-0000"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    icone={Phone}
-                    valido={telefoneValido}
-                  />
-                  <Campo
-                    id="email"
-                    rotulo="E-mail"
-                    valor={email}
-                    aoMudar={setEmail}
-                    placeholder="voce@email.com"
-                    type="email"
-                    autoComplete="email"
-                    icone={Mail}
-                    valido={emailValido}
-                    dica="Será o seu login"
-                  />
-                </div>
-              </Secao>
-            )}
-
-            <Separador />
-
             {/*
+              🔴 ETAPAS VISUAIS — puramente apresentação (ver `subEtapa` acima). Nenhum
+              campo muda de nome, nenhuma validação muda: `podeEnviar` e `criarConta`
+              continuam exatamente os mesmos, só o que fica visível em tela muda.
+            */}
+            <EtapasDoCadastro passo={subEtapa} />
+
+            {subEtapa === 0 && (
+              <>
+                {confirmandoDados ? (
+                  /**
+                   * 🔴 O PACIENTE QUE VEIO DO PARCEIRO CONFIRMA — NÃO DIGITA.
+                   *
+                   * Ele acabou de preencher nome, CPF, telefone e e-mail no formulário da Greens.
+                   * Repetir os quatro campos aqui é pedir o mesmo trabalho duas vezes, e é o ponto
+                   * do funil onde se perde gente.
+                   *
+                   * ⚠️ Confirmar não é esconder: os dados aparecem, e há "corrigir" ao lado. Se a
+                   * Greens mandou um telefone errado, ele precisa poder consertar — senão o erro
+                   * vira definitivo justamente no cadastro que deveria facilitar a vida dele.
+                   */
+                  <Secao titulo="Confirme seus dados" icone={User}>
+                    <div className="border-border/60 bg-muted/30 space-y-3 rounded-2xl border p-5">
+                      <LinhaConfirmada rotulo="Nome" valor={nome} />
+                      <LinhaConfirmada rotulo="CPF" valor={formatarCpf(cpf)} />
+                      <LinhaConfirmada rotulo="Telefone" valor={telefone} />
+                      <LinhaConfirmada rotulo="E-mail" valor={email} />
+                      <p className="text-muted-foreground pt-1 text-xs">
+                        Estes dados vieram do formulário que você preencheu. O e-mail acima será o
+                        seu login.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCorrigindo(true)}
+                      className="text-primary text-sm font-medium transition-opacity hover:opacity-70"
+                    >
+                      Algo está errado? Corrigir
+                    </button>
+                  </Secao>
+                ) : (
+                  <Secao titulo="Seus dados" icone={User}>
+                    <Campo
+                      id="nome"
+                      rotulo="Nome completo"
+                      valor={nome}
+                      aoMudar={setNome}
+                      placeholder="Como está no seu documento"
+                      autoComplete="name"
+                      valido={nomeValido}
+                      dica={nome.length > 0 && !nomeValido ? 'Informe nome e sobrenome' : undefined}
+                    />
+                    <Campo
+                      id="cpf"
+                      rotulo="CPF"
+                      valor={formatarCpf(cpf) === cpf ? cpf : cpf}
+                      aoMudar={(v) => setCpf(somenteDigitosDoCpf(v).slice(0, 11))}
+                      exibir={cpf.length === 11 ? formatarCpf(cpf) : cpf}
+                      placeholder="000.000.000-00"
+                      inputMode="numeric"
+                      valido={cpfValido}
+                      dica={
+                        cpf.length === 11 && !cpfValido
+                          ? 'Confira os números — este CPF não é válido'
+                          : undefined
+                      }
+                    />
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <Campo
+                        id="telefone"
+                        rotulo="Telefone (WhatsApp)"
+                        valor={telefone}
+                        aoMudar={(v) => setTelefone(mascararTelefoneDigitado(v))}
+                        placeholder="(00) 00000-0000"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        icone={Phone}
+                        valido={telefoneValido}
+                      />
+                      <Campo
+                        id="email"
+                        rotulo="E-mail"
+                        valor={email}
+                        aoMudar={setEmail}
+                        placeholder="voce@email.com"
+                        type="email"
+                        autoComplete="email"
+                        icone={Mail}
+                        valido={emailValido}
+                        dica="Será o seu login"
+                      />
+                    </div>
+                  </Secao>
+                )}
+
+                <Separador />
+
+                {/*
               🔴 QUEM JÁ ESTÁ LOGADO NÃO VÊ CAMPO DE SENHA.
 
               Com sessão viva, `criarConta` vai direto para `gravarFicha()` — o Clerk não é
@@ -1185,65 +1248,80 @@ export function FormularioDeCadastro({
               ⚠️ Pedir dado que não se usa é pior que pedir dado a mais: quem preenche acredita
               que aquilo teve efeito.
             */}
-            {jaTemSessaoUtil ? (
-              <div className="border-primary/25 bg-primary/5 rounded-xl border px-4 py-4">
-                <p className="text-foreground text-sm leading-relaxed">
-                  Você já está logado como <strong>{emailDaSessao}</strong>, então{' '}
-                  <strong>não precisa criar senha</strong> — vamos apenas concluir o seu cadastro.
-                </p>
-              </div>
-            ) : (
-              <Secao titulo="Crie sua senha" icone={Lock}>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="senha">Senha</Label>
-                    <div className="relative">
-                      <Input
-                        id="senha"
-                        type={verSenha ? 'text' : 'password'}
-                        value={senha}
-                        onChange={(e) => setSenha(e.target.value)}
-                        autoComplete="new-password"
-                        placeholder="Mínimo de 8 caracteres"
-                        className="h-12 rounded-xl pr-11"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setVerSenha((v) => !v)}
-                        aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
-                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-                      >
-                        {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
-                      </button>
-                    </div>
-                    <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
+                {jaTemSessaoUtil ? (
+                  <div className="border-primary/25 bg-primary/5 rounded-xl border px-4 py-4">
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Você já está logado como <strong>{emailDaSessao}</strong>, então{' '}
+                      <strong>não precisa criar senha</strong> — vamos apenas concluir o seu
+                      cadastro.
+                    </p>
                   </div>
+                ) : (
+                  <Secao titulo="Crie sua senha" icone={Lock}>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="senha">Senha</Label>
+                        <div className="relative">
+                          <Input
+                            id="senha"
+                            type={verSenha ? 'text' : 'password'}
+                            value={senha}
+                            onChange={(e) => setSenha(e.target.value)}
+                            autoComplete="new-password"
+                            placeholder="Mínimo de 8 caracteres"
+                            className="h-12 rounded-xl pr-11"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setVerSenha((v) => !v)}
+                            aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+                          >
+                            {verSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+                          </button>
+                        </div>
+                        <MedidorDeSenha nivel={forcaDaSenha} ativo={senha.length > 0} />
+                      </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmar">Repita a senha</Label>
-                    <Input
-                      id="confirmar"
-                      type={verSenha ? 'text' : 'password'}
-                      value={confirmarSenha}
-                      onChange={(e) => setConfirmarSenha(e.target.value)}
-                      autoComplete="new-password"
-                      placeholder="Digite novamente"
-                      className={cn(
-                        'h-12 rounded-xl transition-shadow',
-                        confirmarSenha.length > 0 &&
-                          !senhasConferem &&
-                          'border-destructive/60 focus-visible:ring-destructive/30',
-                      )}
-                    />
-                    {confirmarSenha.length > 0 && !senhasConferem && (
-                      <p className="text-destructive text-xs">As senhas não são iguais</p>
-                    )}
-                  </div>
-                </div>
-              </Secao>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmar">Repita a senha</Label>
+                        <Input
+                          id="confirmar"
+                          type={verSenha ? 'text' : 'password'}
+                          value={confirmarSenha}
+                          onChange={(e) => setConfirmarSenha(e.target.value)}
+                          autoComplete="new-password"
+                          placeholder="Digite novamente"
+                          className={cn(
+                            'h-12 rounded-xl transition-shadow',
+                            confirmarSenha.length > 0 &&
+                              !senhasConferem &&
+                              'border-destructive/60 focus-visible:ring-destructive/30',
+                          )}
+                        />
+                        {confirmarSenha.length > 0 && !senhasConferem && (
+                          <p className="text-destructive text-xs">As senhas não são iguais</p>
+                        )}
+                      </div>
+                    </div>
+                  </Secao>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={() => setSubEtapa(1)}
+                  disabled={!podeAvancarStep0}
+                  className="h-12 w-full rounded-xl text-base"
+                >
+                  Continuar
+                  <ArrowRight size={18} />
+                </Button>
+              </>
             )}
 
-            {/*
+            {subEtapa === 1 && (
+              <>
+                {/*
               🔴 AS DUAS LISTAS SOMEM NO FLUXO DA TELECONSULTA (pedidos 1 e 2 do chefe,
               14/09/2026), e some o `<Separador />` junto — senão sobra um traço no vazio.
 
@@ -1256,73 +1334,73 @@ export function FormularioDeCadastro({
               conteúdo de verdade (o que o parceiro mandou) e é o que responde a pergunta
               _"será que perderam meus documentos?"_ — que foi por que ela nasceu, em 10/09.
             */}
-            {pendencias.length > 0 && !fluxoDaTeleconsulta && (
-              <>
-                <Separador />
-                {recebidos.length > 0 && (
-                  <Secao titulo="O que já recebemos" icone={FileText}>
-                    <div className="border-secondary/30 bg-secondary/5 rounded-xl border px-4 py-3.5">
-                      <ul className="space-y-2">
-                        {recebidos.map((r) => (
-                          <li key={r.chave} className="flex items-start gap-2.5 text-sm">
-                            <Check size={15} className="text-secondary mt-0.5 shrink-0" />
-                            <span className="text-foreground">{r.rotulo}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="text-muted-foreground mt-3 text-xs">
-                        Chegaram junto com o seu cadastro. Você não precisa enviar de novo.
-                      </p>
-                    </div>
-                  </Secao>
-                )}
+                {pendencias.length > 0 && !fluxoDaTeleconsulta && (
+                  <>
+                    <Separador />
+                    {recebidos.length > 0 && (
+                      <Secao titulo="O que já recebemos" icone={FileText}>
+                        <div className="border-secondary/30 bg-secondary/5 rounded-xl border px-4 py-3.5">
+                          <ul className="space-y-2">
+                            {recebidos.map((r) => (
+                              <li key={r.chave} className="flex items-start gap-2.5 text-sm">
+                                <Check size={15} className="text-secondary mt-0.5 shrink-0" />
+                                <span className="text-foreground">{r.rotulo}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-muted-foreground mt-3 text-xs">
+                            Chegaram junto com o seu cadastro. Você não precisa enviar de novo.
+                          </p>
+                        </div>
+                      </Secao>
+                    )}
 
-                <Secao titulo="O que ainda vamos precisar" icone={FileText}>
-                  {/*
+                    <Secao titulo="O que ainda vamos precisar" icone={FileText}>
+                      {/*
                     🔴 AVISO, NUNCA BLOQUEIO (ADR-0016 D-06). Quem chega sem receita é
                     justamente quem mais precisa da teleconsulta; barrá-lo aqui seria
                     recusar quem o produto existe para atender. Aparece para ele saber o
                     que virá, não para impedi-lo de continuar.
                   */}
-                  <div className="border-border bg-muted/40 rounded-xl border px-4 py-3.5">
-                    <ul className="space-y-2">
-                      {pendencias.map((p) => (
-                        <li key={p.chave} className="flex items-start gap-2.5 text-sm">
-                          <span className="bg-primary/50 mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
-                          <span className="text-muted-foreground">
-                            {p.rotulo}
-                            {p.opcional && (
-                              <span className="text-muted-foreground/70 ml-1.5 text-xs">
-                                (opcional)
-                              </span>
-                            )}
-                            {/*
+                      <div className="border-border bg-muted/40 rounded-xl border px-4 py-3.5">
+                        <ul className="space-y-2">
+                          {pendencias.map((p) => (
+                            <li key={p.chave} className="flex items-start gap-2.5 text-sm">
+                              <span className="bg-primary/50 mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
+                              <span className="text-muted-foreground">
+                                {p.rotulo}
+                                {p.opcional && (
+                                  <span className="text-muted-foreground/70 ml-1.5 text-xs">
+                                    (opcional)
+                                  </span>
+                                )}
+                                {/*
                               🔴 NÃO diz "opcional" aqui. A ANVISA e a receita faltam
                               porque são o que ele veio buscar — chamá-las de opcionais
                               diria que são dispensáveis, e não são: nós é que vamos
                               tirá-las com ele.
                             */}
-                            {p.resolvemosAqui && (
-                              <span className="text-secondary/80 ml-1.5 text-xs">
-                                — nós resolvemos com você
+                                {p.resolvemosAqui && (
+                                  <span className="text-secondary/80 ml-1.5 text-xs">
+                                    — nós resolvemos com você
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="border-border/60 text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
-                      Nada disso impede você de continuar agora. Você envia depois, com calma, pela
-                      sua área — e o médico já pode te atender antes.
-                    </p>
-                  </div>
-                </Secao>
-              </>
-            )}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="border-border/60 text-muted-foreground mt-3 border-t pt-3 text-xs leading-relaxed">
+                          Nada disso impede você de continuar agora. Você envia depois, com calma,
+                          pela sua área — e o médico já pode te atender antes.
+                        </p>
+                      </div>
+                    </Secao>
+                  </>
+                )}
 
-            <Separador />
+                <Separador />
 
-            {/*
+                {/*
               🔴 UM ANEXO PARA CADA DOCUMENTO QUE FALTA — a peça P3 da ADR-0021.
             
               Não existem "dois formulários". Existe UM que mostra o que falta: quem veio do
@@ -1332,46 +1410,48 @@ export function FormularioDeCadastro({
               Receita e ANVISA têm bloco próprio, com pergunta antes do anexo, porque a resposta
               delas decide para onde o paciente vai. Os outros três são só envio.
             */}
-            {anexosDaTela.length > 0 && (
-              <>
-                <Secao
-                  titulo={
-                    fluxoDaTeleconsulta ? 'Documentos para a sua consulta' : 'Seus documentos'
-                  }
-                  icone={FileText}
-                >
-                  {/*
+                {anexosDaTela.length > 0 && (
+                  <>
+                    <Secao
+                      titulo={
+                        fluxoDaTeleconsulta ? 'Documentos para a sua consulta' : 'Seus documentos'
+                      }
+                      icone={FileText}
+                    >
+                      {/*
                     🔴 UMA FRASE SÓ, E ELA NÃO PODE MENTIR. O dono apontou em 14/09/2026 que a
                     tela dizia "nada disso impede você de continuar" tendo um campo necessário
                     logo abaixo. Havia duas frases — esta e outra no rodapé da seção — dizendo
                     coisas diferentes sobre a mesma lista, e a de cima é a que o olho lê
                     primeiro. As duas viraram esta.
                   */}
-                  <p className="text-muted-foreground -mt-1 mb-4 text-xs leading-relaxed">
-                    {fluxoDaTeleconsulta ? (
-                      <>
-                        O{' '}
-                        <strong className="text-foreground font-medium">documento com foto</strong>{' '}
-                        é o que precisamos para identificar você. O comprovante de residência você
-                        pode enviar depois, com calma, pela sua área — e o médico já pode te atender
-                        antes.
-                      </>
-                    ) : (
-                      'Envie agora ou depois, pela sua área. Nada disso impede você de continuar.'
-                    )}
-                  </p>
-                  <div className="space-y-4">
-                    {anexosDaTela.map((doc) => (
-                      <div key={doc.chave} className="space-y-1.5">
-                        <Label htmlFor={`anexo-${doc.chave}`}>
-                          {doc.rotulo}
-                          {ehOpcionalAqui(doc) ? (
-                            <span className="text-muted-foreground/70 ml-1.5 text-xs">
-                              (opcional)
-                            </span>
-                          ) : (
-                            fluxoDaTeleconsulta && (
-                              /*
+                      <p className="text-muted-foreground -mt-1 mb-4 text-xs leading-relaxed">
+                        {fluxoDaTeleconsulta ? (
+                          <>
+                            O{' '}
+                            <strong className="text-foreground font-medium">
+                              documento com foto
+                            </strong>{' '}
+                            é o que precisamos para identificar você. O comprovante de residência
+                            você pode enviar depois, com calma, pela sua área — e o médico já pode
+                            te atender antes.
+                          </>
+                        ) : (
+                          'Envie agora ou depois, pela sua área. Nada disso impede você de continuar.'
+                        )}
+                      </p>
+                      <div className="space-y-4">
+                        {anexosDaTela.map((doc) => (
+                          <div key={doc.chave} className="space-y-1.5">
+                            <Label htmlFor={`anexo-${doc.chave}`}>
+                              {doc.rotulo}
+                              {ehOpcionalAqui(doc) ? (
+                                <span className="text-muted-foreground/70 ml-1.5 text-xs">
+                                  (opcional)
+                                </span>
+                              ) : (
+                                fluxoDaTeleconsulta && (
+                                  /*
                                 🔴 "precisamos deste", e NÃO "obrigatório" — decisão do dono em
                                 14/09/2026: _"não trave, apenas deixe esse alerta"_.
 
@@ -1381,42 +1461,46 @@ export function FormularioDeCadastro({
                                 lado, de dizer "nada disso impede" com um campo necessário.
                                 Pendência informa, não impede (ADR-0016 D-06).
                               */
-                              <span className="text-primary/80 ml-1.5 text-xs">
-                                (precisamos deste)
-                              </span>
-                            )
-                          )}
-                        </Label>
-                        <Input
-                          id={`anexo-${doc.chave}`}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,.webp"
-                          onChange={(e) => escolherAnexo(doc.chave, e.target.files?.[0] ?? null)}
-                          className="h-12 rounded-xl"
-                        />
-                        {anexos[doc.chave] && (
-                          <p className="text-secondary flex items-center gap-1.5 text-xs">
-                            <Check size={13} /> {anexos[doc.chave].name}
-                          </p>
-                        )}
+                                  <span className="text-primary/80 ml-1.5 text-xs">
+                                    (precisamos deste)
+                                  </span>
+                                )
+                              )}
+                            </Label>
+                            <Input
+                              id={`anexo-${doc.chave}`}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={(e) =>
+                                escolherAnexo(doc.chave, e.target.files?.[0] ?? null)
+                              }
+                              className="h-12 rounded-xl"
+                            />
+                            {anexos[doc.chave] && (
+                              <p className="text-secondary flex items-center gap-1.5 text-xs">
+                                <Check size={13} /> {anexos[doc.chave].name}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {erroDoAnexo && <p className="text-destructive mt-2 text-xs">{erroDoAnexo}</p>}
-                  {/*
+                      {erroDoAnexo && (
+                        <p className="text-destructive mt-2 text-xs">{erroDoAnexo}</p>
+                      )}
+                      {/*
                     🔴 AVISO, NUNCA BLOQUEIO (ADR-0016 D-06). Este texto vivia na lista que
                     saiu; sem ele, o paciente do fluxo da teleconsulta leria três campos de
                     arquivo e nenhuma frase dizendo que pode seguir sem eles.
                   */}
-                </Secao>
+                    </Secao>
 
-                <Separador />
-              </>
-            )}
+                    <Separador />
+                  </>
+                )}
 
-            {perguntarSobreReceita && !fluxoDaTeleconsulta && (
-              <>
-                {/*
+                {perguntarSobreReceita && !fluxoDaTeleconsulta && (
+                  <>
+                    {/*
                   🔴 A RECEITA VEM ANTES DA ANVISA NA TELA, pelo mesmo motivo que vem antes no
                   destino: sem receita não há o que autorizar. Perguntar pela autorização primeiro
                   sugere uma ordem que a norma não permite.
@@ -1431,75 +1515,76 @@ export function FormularioDeCadastro({
                   fluxo. Fica escrito assim, e não apagado, porque a regra de negócio é nova e o
                   bloco volta inteiro se ela mudar — apagar custaria reescrevê-lo de memória.
                 */}
-                <Secao titulo="Receita médica" icone={FileText}>
-                  <fieldset className="space-y-3">
-                    <legend className="text-muted-foreground mb-3 text-sm">
-                      Você já tem uma receita médica de fitocanabinoide válida?
-                    </legend>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { valor: true, rotulo: 'Sim, já tenho' },
-                        { valor: false, rotulo: 'Ainda não' },
-                      ].map((opcao) => {
-                        const escolhido = temReceita === opcao.valor;
-                        return (
-                          <button
-                            key={String(opcao.valor)}
-                            type="button"
-                            onClick={() => {
-                              setTemReceita(opcao.valor);
-                              if (!opcao.valor) escolherAnexo('receita_medica', null);
-                            }}
-                            aria-pressed={escolhido}
-                            className={cn(
-                              'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
-                              'transition-all duration-300 ease-out',
-                              escolhido
-                                ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
-                                : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                            )}
-                          >
-                            {escolhido && <CheckCircle2 size={15} className="text-primary" />}
-                            {opcao.rotulo}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <Secao titulo="Receita médica" icone={FileText}>
+                      <fieldset className="space-y-3">
+                        <legend className="text-muted-foreground mb-3 text-sm">
+                          Você já tem uma receita médica de fitocanabinoide válida?
+                        </legend>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { valor: true, rotulo: 'Sim, já tenho' },
+                            { valor: false, rotulo: 'Ainda não' },
+                          ].map((opcao) => {
+                            const escolhido = temReceita === opcao.valor;
+                            return (
+                              <button
+                                key={String(opcao.valor)}
+                                type="button"
+                                onClick={() => {
+                                  setTemReceita(opcao.valor);
+                                  if (!opcao.valor) escolherAnexo('receita_medica', null);
+                                }}
+                                aria-pressed={escolhido}
+                                className={cn(
+                                  'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
+                                  'transition-all duration-300 ease-out',
+                                  escolhido
+                                    ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
+                                    : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                )}
+                              >
+                                {escolhido && <CheckCircle2 size={15} className="text-primary" />}
+                                {opcao.rotulo}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                    {temReceita === true && (
-                      <div className="animate-fade-up space-y-2 pt-1">
-                        <Label htmlFor="anexo-receita">Anexe a receita</Label>
-                        <Input
-                          id="anexo-receita"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,.webp"
-                          onChange={(e) =>
-                            escolherAnexo('receita_medica', e.target.files?.[0] ?? null)
-                          }
-                          className="h-12 rounded-xl"
-                        />
-                        <p className="text-muted-foreground text-xs">
-                          PDF ou foto, até 8 MB. O médico confere na consulta.
-                        </p>
-                      </div>
-                    )}
+                        {temReceita === true && (
+                          <div className="animate-fade-up space-y-2 pt-1">
+                            <Label htmlFor="anexo-receita">Anexe a receita</Label>
+                            <Input
+                              id="anexo-receita"
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={(e) =>
+                                escolherAnexo('receita_medica', e.target.files?.[0] ?? null)
+                              }
+                              className="h-12 rounded-xl"
+                            />
+                            <p className="text-muted-foreground text-xs">
+                              PDF ou foto, até 8 MB. O médico confere na consulta.
+                            </p>
+                          </div>
+                        )}
 
-                    {temReceita === false && (
-                      <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
-                        Tudo bem — é justamente para isso que existe a teleconsulta. O médico avalia
-                        o seu caso e, havendo indicação, a receita sai na própria consulta.
-                      </p>
-                    )}
-                  </fieldset>
-                </Secao>
+                        {temReceita === false && (
+                          <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
+                            Tudo bem — é justamente para isso que existe a teleconsulta. O médico
+                            avalia o seu caso e, havendo indicação, a receita sai na própria
+                            consulta.
+                          </p>
+                        )}
+                      </fieldset>
+                    </Secao>
 
-                <Separador />
-              </>
-            )}
+                    <Separador />
+                  </>
+                )}
 
-            {perguntarSobreAnvisa && !fluxoDaTeleconsulta && (
-              <>
-                {/*
+                {perguntarSobreAnvisa && !fluxoDaTeleconsulta && (
+                  <>
+                    {/*
                   🔴 A ANVISA NÃO É PERGUNTADA NO FLUXO DA TELECONSULTA — consequência direta
                   do `DO-57`, e o dono apontou em 14/09/2026: _"se ele não tem receita ele não
                   tem ANVISA, logo tem que tirar os 2, começando pela tela da teleconsulta"_.
@@ -1512,30 +1597,105 @@ export function FormularioDeCadastro({
                   receita, a ANVISA passa a ser a única pendência — e é aí que ela aparece,
                   na área do paciente. Está registrado como pendente de implementação.
                 */}
-                <Secao titulo="Autorização da ANVISA" icone={FileText}>
+                    <Secao titulo="Autorização da ANVISA" icone={FileText}>
+                      <fieldset className="space-y-3">
+                        <legend className="text-muted-foreground mb-3 text-sm">
+                          Você já tem a Autorização de Importação da ANVISA?
+                        </legend>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { valor: true, rotulo: 'Sim, já tenho' },
+                            { valor: false, rotulo: 'Ainda não' },
+                          ].map((opcao) => {
+                            const escolhido = temAnvisa === opcao.valor;
+                            return (
+                              <button
+                                key={String(opcao.valor)}
+                                type="button"
+                                onClick={() => {
+                                  setTemAnvisa(opcao.valor);
+                                  // "Ainda não" descarta o arquivo: mantê-lo gravaria contradição.
+                                  if (!opcao.valor) {
+                                    escolherAnexo('autorizacao_anvisa', null);
+                                  }
+                                }}
+                                aria-pressed={escolhido}
+                                className={cn(
+                                  'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
+                                  'transition-all duration-300 ease-out',
+                                  escolhido
+                                    ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
+                                    : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                )}
+                              >
+                                {escolhido && <CheckCircle2 size={15} className="text-primary" />}
+                                {opcao.rotulo}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/*
+                      O campo de arquivo só nasce depois do "sim" — pelo mesmo motivo da caixa
+                      de texto do tratamento: pedir antes da resposta é ruído, e esconder por
+                      CSS deixa um campo invisível no DOM.
+                    */}
+                        {temAnvisa === true && (
+                          <div className="animate-fade-up space-y-2 pt-1">
+                            <Label htmlFor="anexo-anvisa">Anexe o documento</Label>
+                            <Input
+                              id="anexo-anvisa"
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={(e) =>
+                                escolherAnexo('autorizacao_anvisa', e.target.files?.[0] ?? null)
+                              }
+                              className="h-12 rounded-xl"
+                            />
+                            {erroDoAnexo ? (
+                              <p className="text-destructive text-xs">{erroDoAnexo}</p>
+                            ) : (
+                              <p className="text-muted-foreground text-xs">
+                                PDF ou foto, até 8 MB. Se preferir, pode enviar depois pela sua área
+                                — isso não impede você de continuar.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/*
+                      🔴 O "ainda não" NÃO é um beco: é o começo do caminho da procuração.
+                      Dizer isso aqui evita que ele ache que respondeu errado.
+                    */}
+                        {temAnvisa === false && (
+                          <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
+                            Sem problema — nós resolvemos isso com você. Depois da consulta, a
+                            procuração da ANVISA fica disponível na sua área.
+                          </p>
+                        )}
+                      </fieldset>
+                    </Secao>
+
+                    <Separador />
+                  </>
+                )}
+
+                <Secao titulo="Sobre o seu tratamento" icone={Sparkles}>
                   <fieldset className="space-y-3">
                     <legend className="text-muted-foreground mb-3 text-sm">
-                      Você já tem a Autorização de Importação da ANVISA?
+                      Você já faz tratamento à base de fitocanabinoide?
                     </legend>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { valor: true, rotulo: 'Sim, já tenho' },
+                        { valor: true, rotulo: 'Sim, já faço' },
                         { valor: false, rotulo: 'Ainda não' },
                       ].map((opcao) => {
-                        const escolhido = temAnvisa === opcao.valor;
+                        const escolhido = jaFazTratamento === opcao.valor;
                         return (
                           <button
                             key={String(opcao.valor)}
                             type="button"
-                            onClick={() => {
-                              setTemAnvisa(opcao.valor);
-                              // Trocar para "ainda não" descarta o arquivo escolhido antes:
-                              // enviar documento que ele acabou de dizer que não tem seria
-                              // gravar uma contradição.
-                              if (!opcao.valor) {
-                                escolherAnexo('autorizacao_anvisa', null);
-                              }
-                            }}
+                            onClick={() => setJaFazTratamento(opcao.valor)}
                             aria-pressed={escolhido}
                             className={cn(
                               'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
@@ -1553,123 +1713,114 @@ export function FormularioDeCadastro({
                     </div>
 
                     {/*
-                      O campo de arquivo só nasce depois do "sim" — pelo mesmo motivo da caixa
-                      de texto do tratamento: pedir antes da resposta é ruído, e esconder por
-                      CSS deixa um campo invisível no DOM.
-                    */}
-                    {temAnvisa === true && (
-                      <div className="animate-fade-up space-y-2 pt-1">
-                        <Label htmlFor="anexo-anvisa">Anexe o documento</Label>
-                        <Input
-                          id="anexo-anvisa"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,.webp"
-                          onChange={(e) =>
-                            escolherAnexo('autorizacao_anvisa', e.target.files?.[0] ?? null)
-                          }
-                          className="h-12 rounded-xl"
-                        />
-                        {erroDoAnexo ? (
-                          <p className="text-destructive text-xs">{erroDoAnexo}</p>
-                        ) : (
-                          <p className="text-muted-foreground text-xs">
-                            PDF ou foto, até 8 MB. Se preferir, pode enviar depois pela sua área —
-                            isso não impede você de continuar.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/*
-                      🔴 O "ainda não" NÃO é um beco: é o começo do caminho da procuração.
-                      Dizer isso aqui evita que ele ache que respondeu errado.
-                    */}
-                    {temAnvisa === false && (
-                      <p className="text-muted-foreground animate-fade-up pt-1 text-xs">
-                        Sem problema — nós resolvemos isso com você. Depois da consulta, a
-                        procuração da ANVISA fica disponível na sua área.
-                      </p>
-                    )}
-                  </fieldset>
-                </Secao>
-
-                <Separador />
-              </>
-            )}
-
-            <Secao titulo="Sobre o seu tratamento" icone={Sparkles}>
-              <fieldset className="space-y-3">
-                <legend className="text-muted-foreground mb-3 text-sm">
-                  Você já faz tratamento à base de fitocanabinoide?
-                </legend>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { valor: true, rotulo: 'Sim, já faço' },
-                    { valor: false, rotulo: 'Ainda não' },
-                  ].map((opcao) => {
-                    const escolhido = jaFazTratamento === opcao.valor;
-                    return (
-                      <button
-                        key={String(opcao.valor)}
-                        type="button"
-                        onClick={() => setJaFazTratamento(opcao.valor)}
-                        aria-pressed={escolhido}
-                        className={cn(
-                          'group relative flex h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium',
-                          'transition-all duration-300 ease-out',
-                          escolhido
-                            ? 'border-primary bg-primary/10 text-foreground shadow-[0_0_0_3px_rgba(234,84,41,0.10)]'
-                            : 'border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                        )}
-                      >
-                        {escolhido && <CheckCircle2 size={15} className="text-primary" />}
-                        {opcao.rotulo}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/*
                   A caixa de texto cresce quando ele diz "sim". Renderizar sempre e
                   esconder por CSS deixaria um campo obrigatório invisível no DOM; e
                   perguntar antes da resposta é ruído.
                 */}
-                <div
-                  className={cn(
-                    'grid transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                    jaFazTratamento === true
-                      ? 'grid-rows-[1fr] opacity-100'
-                      : 'grid-rows-[0fr] opacity-0',
-                  )}
-                >
-                  <div className="overflow-hidden">
-                    <div className="space-y-2 pt-3">
-                      <Label htmlFor="tratamento">Conte qual tratamento você faz hoje</Label>
-                      <Textarea
-                        id="tratamento"
-                        value={tratamentoAtual}
-                        onChange={(e) => setTratamentoAtual(e.target.value)}
-                        placeholder="Ex.: uso óleo de CBD 20mg, 3 gotas à noite, há 6 meses. Se souber a marca ou quem prescreveu, ajuda bastante."
-                        rows={4}
-                        maxLength={2000}
-                        className="resize-none rounded-xl leading-relaxed"
-                      />
-                      <p className="text-muted-foreground text-xs">
-                        Essas informações vão direto para o médico que vai te atender.
-                      </p>
+                    <div
+                      className={cn(
+                        'grid transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                        jaFazTratamento === true
+                          ? 'grid-rows-[1fr] opacity-100'
+                          : 'grid-rows-[0fr] opacity-0',
+                      )}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="space-y-2 pt-3">
+                          <Label htmlFor="tratamento">Conte qual tratamento você faz hoje</Label>
+                          <Textarea
+                            id="tratamento"
+                            value={tratamentoAtual}
+                            onChange={(e) => setTratamentoAtual(e.target.value)}
+                            placeholder="Ex.: uso óleo de CBD 20mg, 3 gotas à noite, há 6 meses. Se souber a marca ou quem prescreveu, ajuda bastante."
+                            rows={4}
+                            maxLength={2000}
+                            className="resize-none rounded-xl leading-relaxed"
+                          />
+                          <p className="text-muted-foreground text-xs">
+                            Essas informações vão direto para o médico que vai te atender.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </fieldset>
-            </Secao>
+                  </fieldset>
+                </Secao>
 
-            <ConsentimentoDoCompartilhamento
-              selecionadas={finalidadesConsentidas}
-              onChange={setFinalidadesConsentidas}
-              desabilitado={carregando}
-            />
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSubEtapa(0)}
+                    className="h-12 rounded-xl"
+                  >
+                    <ArrowLeft size={18} />
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setSubEtapa(2)}
+                    disabled={!podeAvancarStep1}
+                    className="h-12 flex-1 rounded-xl text-base"
+                  >
+                    Continuar
+                    <ArrowRight size={18} />
+                  </Button>
+                </div>
+              </>
+            )}
 
             {/*
+              🔴 ENDEREÇO — etapa própria e obrigatória (decisão do dono, 14/09/2026).
+              `modoControlado`: só reporta os valores em `endereco`; quem grava é
+              `gravarFicha`, na mesma transação da ficha inteira.
+            */}
+            {subEtapa === 2 && (
+              <>
+                <Secao titulo="Seu endereço" icone={MapPin}>
+                  <CepRapido modoControlado aoMudarValores={setEndereco} />
+                </Secao>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSubEtapa(1)}
+                    className="h-12 rounded-xl"
+                  >
+                    <ArrowLeft size={18} />
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setSubEtapa(3)}
+                    disabled={!endereco.completo}
+                    className="h-12 flex-1 rounded-xl text-base"
+                  >
+                    Continuar
+                    <ArrowRight size={18} />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {subEtapa === 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSubEtapa(2)}
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium transition-opacity"
+                >
+                  <ArrowLeft size={14} />
+                  Voltar
+                </button>
+
+                <ConsentimentoDoCompartilhamento
+                  selecionadas={finalidadesConsentidas}
+                  onChange={setFinalidadesConsentidas}
+                  desabilitado={carregando}
+                />
+
+                {/*
               🔴 ONDE O CLERK DESENHA O CAPTCHA. Sem este elemento no DOM, o
               `signUp.create` avisa no console que não achou `clerk-captcha` e cai para o
               CAPTCHA invisível — que decide sozinho, sem dar ao paciente nenhuma forma de
@@ -1679,57 +1830,57 @@ export function FormularioDeCadastro({
               Fica ANTES do botão de propósito: quando o desafio aparece, ele precisa estar
               visível na tela, não abaixo da dobra.
             */}
-            <div id="clerk-captcha" className="empty:hidden" />
+                <div id="clerk-captcha" className="empty:hidden" />
 
-            {/*
+                {/*
               🔴 QUEM VOLTA COM SESSÃO ABERTA PRECISA SABER QUE NÃO VAI CRIAR CONTA DE NOVO.
               Sem este aviso, o botão continua dizendo "Criar conta e continuar" para quem já
               tem conta — e o paciente hesita, ou clica achando que vai duplicar alguma coisa.
               É o estado em que o dono ficou em 11/09/2026 (SOL-000046): conta criada, ficha
               não gravada, e o link parecendo inútil.
             */}
-            {/*
+                {/*
               🔴 SESSÃO DE OUTRA PESSOA — e com SAÍDA, não só com o aviso.
               Dizer "este link é de outro e-mail" e parar aí deixa o paciente preso: ele não
               sabe que precisa sair da conta, e muito menos onde. O botão faz o trabalho.
               ⚠️ Vem ANTES do aviso de sessão aberta: os dois são sobre sessão, e este é o
               que impede de continuar.
             */}
-            {sessaoEDeOutraPessoa && (
-              <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
-                <p className="text-foreground text-sm leading-relaxed">
-                  Você está nesta página com a conta <strong>{emailDaSessao}</strong>, e este link
-                  foi enviado para <strong>{emailDoLink}</strong>.
-                </p>
-                {/*
+                {sessaoEDeOutraPessoa && (
+                  <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Você está nesta página com a conta <strong>{emailDaSessao}</strong>, e este
+                      link foi enviado para <strong>{emailDoLink}</strong>.
+                    </p>
+                    {/*
                   🔴 DUAS SAÍDAS, e antes havia UMA — que era a errada para o caso mais comum.
                   Quem trocou o próprio e-mail (porque o parceiro mandou o antigo) não tem para
                   onde ir com "sair desta conta": a conta certa é a que está aberta. Oferecer só
                   a saída que não serve é o que transforma proteção em beco.
                   ⚠️ A escolha é do paciente e fica explícita — o servidor registra a troca.
                 */}
-                <Button
-                  className="h-11 w-full rounded-xl"
-                  onClick={() => {
-                    setContinuarComASessao(true);
-                    setEmail(emailDaSessao);
-                  }}
-                  type="button"
-                >
-                  Continuar com {emailDaSessao}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-11 w-full rounded-xl"
-                  onClick={() => signOut()}
-                  type="button"
-                >
-                  Sair e entrar com outro e-mail
-                </Button>
-              </div>
-            )}
+                    <Button
+                      className="h-11 w-full rounded-xl"
+                      onClick={() => {
+                        setContinuarComASessao(true);
+                        setEmail(emailDaSessao);
+                      }}
+                      type="button"
+                    >
+                      Continuar com {emailDaSessao}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 w-full rounded-xl"
+                      onClick={() => signOut()}
+                      type="button"
+                    >
+                      Sair e entrar com outro e-mail
+                    </Button>
+                  </div>
+                )}
 
-            {/*
+                {/*
               🔴 S8.5 — O CADASTRO PENDENTE SE ANUNCIA, em vez de deixar o paciente concluir
               que perdeu tudo.
 
@@ -1741,36 +1892,36 @@ export function FormularioDeCadastro({
               enviado) e o que não (os documentos anexados). Avisar só a boa notícia faria o
               paciente chegar ao fim sem os arquivos — que é como a ficha casca nasce.
             */}
-            {retomandoSemFormulario && !sessaoEDeOutraPessoa && !jaTemConta && (
-              <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
-                <p className="text-foreground text-sm leading-relaxed">
-                  Você já tinha começado este cadastro e paramos na{' '}
-                  <strong>confirmação do e-mail</strong>. Ele continua guardado — confira os dados
-                  abaixo e continue, que reenviamos o código.
-                </p>
-                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                  Só os documentos precisam ser anexados de novo: arquivo não fica salvo no
-                  navegador.
-                </p>
-              </div>
-            )}
+                {retomandoSemFormulario && !sessaoEDeOutraPessoa && !jaTemConta && (
+                  <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Você já tinha começado este cadastro e paramos na{' '}
+                      <strong>confirmação do e-mail</strong>. Ele continua guardado — confira os
+                      dados abaixo e continue, que reenviamos o código.
+                    </p>
+                    <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                      Só os documentos precisam ser anexados de novo: arquivo não fica salvo no
+                      navegador.
+                    </p>
+                  </div>
+                )}
 
-            {authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta && (
-              <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
-                <p className="text-foreground text-sm leading-relaxed">
-                  Você já está com a sessão aberta. Vamos apenas{' '}
-                  <strong>concluir o seu cadastro</strong> — sua conta não será criada de novo.
-                </p>
-              </div>
-            )}
+                {authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta && (
+                  <div className="animate-fade-in border-secondary/25 bg-secondary/5 rounded-xl border px-4 py-4">
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Você já está com a sessão aberta. Vamos apenas{' '}
+                      <strong>concluir o seu cadastro</strong> — sua conta não será criada de novo.
+                    </p>
+                  </div>
+                )}
 
-            {jaTemConta ? (
-              <div className="animate-fade-in border-secondary/25 bg-secondary/5 space-y-3 rounded-xl border px-4 py-4">
-                <p className="text-foreground text-sm leading-relaxed">
-                  Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
-                  continuar de onde parou.
-                </p>
-                {/*
+                {jaTemConta ? (
+                  <div className="animate-fade-in border-secondary/25 bg-secondary/5 space-y-3 rounded-xl border px-4 py-4">
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
+                      continuar de onde parou.
+                    </p>
+                    {/*
                   🔴 O LINK DO CADASTRO VIAJA JUNTO, e sem isso este botão era um beco.
                   Medido em 12/09/2026: ele mandava para `/entrar` sem `redirect_url`. A tela
                   de login **aceita** esse parâmetro (`entrar/page.tsx:104`) e, sem ele, cai no
@@ -1781,90 +1932,92 @@ export function FormularioDeCadastro({
                   para o cadastro que ele estava preenchendo é perder o fluxo inteiro.
                   Mesma família dos dois becos do Item 35.
                 */}
-                <Button
-                  className="h-11 w-full rounded-xl"
-                  render={
-                    <Link
-                      href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
-                    />
-                  }
-                >
-                  Entrar na minha conta
-                </Button>
-                {/*
+                    <Button
+                      className="h-11 w-full rounded-xl"
+                      render={
+                        <Link
+                          href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
+                        />
+                      }
+                    >
+                      Entrar na minha conta
+                    </Button>
+                    {/*
                   A SAÍDA PARA QUEM NÃO TEM SENHA UTILIZÁVEL. Medido na instância em
                   12/09/2026: para um e-mail nesse estado o Clerk declara TRÊS caminhos —
                   `password`, `email_code` e `reset_password_email_code`. A tela oferecia um.
                   O `redirect_url` leva de volta a ESTE cadastro: sem ele, quem recupera o
                   acesso cai no painel e o fluxo morre aqui.
                 */}
-                <Button
-                  variant="outline"
-                  className="h-11 w-full rounded-xl"
-                  render={
-                    <Link
-                      href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
-                    />
-                  }
-                >
-                  Esqueci minha senha / entrar por código
-                </Button>
-              </div>
-            ) : (
-              erro && <Aviso texto={erro} />
-            )}
-            {demorouParaCarregar && !isLoaded && (
-              <Aviso texto="O serviço de contas não respondeu. Recarregue a página — se continuar assim, fale com a gente pelo WhatsApp." />
-            )}
+                    <Button
+                      variant="outline"
+                      className="h-11 w-full rounded-xl"
+                      render={
+                        <Link
+                          href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
+                        />
+                      }
+                    >
+                      Esqueci minha senha / entrar por código
+                    </Button>
+                  </div>
+                ) : (
+                  erro && <Aviso texto={erro} />
+                )}
+                {demorouParaCarregar && !isLoaded && (
+                  <Aviso texto="O serviço de contas não respondeu. Recarregue a página — se continuar assim, fale com a gente pelo WhatsApp." />
+                )}
 
-            <div className="space-y-4">
-              <Button
-                type="submit"
-                /*
+                <div className="space-y-4">
+                  <Button
+                    type="submit"
+                    /*
                   🔴 `!isLoaded` ENTRA NO DISABLED, e não só no early-return do handler.
                   Sem isto o botão fica clicável enquanto o Clerk não terminou de carregar
                   — o paciente clica, nada acontece, e ele conclui que o site está quebrado.
                   Um clique sem resposta é pior que um botão desabilitado, porque não diz
                   que está esperando.
                 */
-                disabled={!isLoaded || carregando || !podeEnviar}
-                className="h-12 w-full rounded-xl text-base transition-transform duration-200 active:scale-[0.985]"
-              >
-                {!isLoaded ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Preparando…
-                  </>
-                ) : carregando ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    {/*
+                    disabled={!isLoaded || carregando || !podeEnviar}
+                    className="h-12 w-full rounded-xl text-base transition-transform duration-200 active:scale-[0.985]"
+                  >
+                    {!isLoaded ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Preparando…
+                      </>
+                    ) : carregando ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        {/*
                       Com sessão aberta não se cria conta nenhuma — dizer "criando sua conta"
                       seria descrever um passo que não está acontecendo.
                     */}
-                    {authCarregou && isSignedIn ? 'Concluindo seu cadastro…' : 'Criando sua conta…'}
-                  </>
-                ) : (
-                  <>
-                    {/*
+                        {textoCarregando}
+                      </>
+                    ) : (
+                      <>
+                        {/*
                       🔴 O BOTÃO NÃO PROMETE O QUE NÃO VAI FAZER. `textos.botao` diz "Criar
                       conta e …" — certo para quem chega sem conta, e mentira para quem volta
                       com a sessão viva e só precisa da ficha.
                     */}
-                    {authCarregou && isSignedIn ? 'Concluir meu cadastro' : textos.botao}
-                    <ArrowRight size={18} />
-                  </>
-                )}
-              </Button>
+                        {authCarregou && isSignedIn ? 'Concluir meu cadastro' : textos.botao}
+                        <ArrowRight size={18} />
+                      </>
+                    )}
+                  </Button>
 
-              <p className="text-muted-foreground flex items-start justify-center gap-2 text-center text-xs leading-relaxed">
-                <ShieldCheck size={14} className="text-secondary mt-0.5 shrink-0" />
-                <span>
-                  Seus dados de saúde são tratados com sigilo médico e usados apenas no seu
-                  atendimento.
-                </span>
-              </p>
-            </div>
+                  <p className="text-muted-foreground flex items-start justify-center gap-2 text-center text-xs leading-relaxed">
+                    <ShieldCheck size={14} className="text-secondary mt-0.5 shrink-0" />
+                    <span>
+                      Seus dados de saúde são tratados com sigilo médico e usados apenas no seu
+                      atendimento.
+                    </span>
+                  </p>
+                </div>
+              </>
+            )}
           </form>
         )}
       </div>
@@ -1947,6 +2100,41 @@ function Secao({
 function Separador() {
   return (
     <div className="via-border h-px w-full bg-gradient-to-r from-transparent to-transparent" />
+  );
+}
+
+const ROTULOS_DA_ETAPA = ['Seus dados', 'Documentos', 'Endereço', 'Autorização'];
+
+/**
+ * INDICADOR DE PROGRESSO DO WIZARD VISUAL — puramente decorativo/informativo.
+ *
+ * Não controla nada: quem decide o que renderiza é `subEtapa` no componente pai. Existe
+ * só para o paciente saber onde está e quanto falta, em vez do scroll único de antes.
+ */
+function EtapasDoCadastro({ passo }: { passo: number }) {
+  return (
+    <div className="flex items-center gap-2" aria-hidden={false}>
+      {ROTULOS_DA_ETAPA.map((rotulo, i) => (
+        <div key={rotulo} className="flex flex-1 items-center gap-2">
+          <div className="flex flex-1 flex-col items-center gap-1.5">
+            <div
+              className={cn(
+                'h-1.5 w-full rounded-full transition-colors duration-300',
+                i <= passo ? 'bg-primary' : 'bg-border',
+              )}
+            />
+            <span
+              className={cn(
+                'text-[11px] font-medium transition-colors',
+                i === passo ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {rotulo}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -2078,6 +2266,12 @@ function Concluido({ urlDeRetorno }: { urlDeRetorno: string | null }) {
         Estamos abrindo sua agenda para você escolher o horário da teleconsulta.
       </p>
       <Loader2 size={22} className="text-primary mx-auto mt-6 animate-spin" />
+
+      {/*
+        🔴 O CEP JÁ FOI COLETADO — na etapa "Endereço" do formulário, antes da conta ser
+        criada. Pedir de novo aqui seria repetir a mesma pergunta duas vezes; ver
+        `EtapasDoCadastro` e o passo `subEtapa === 2`.
+      */}
 
       {/*
         🔴 D-08 — o caminho de volta. Ele veio de outro site porque quer comprar

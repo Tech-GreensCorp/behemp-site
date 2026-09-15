@@ -8,6 +8,8 @@ import { CalendarDays, HeartPulse, MapPinned, Users, Loader2, Eye, EyeOff } from
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { CepRapido, type ValoresDeEndereco } from '@/components/paciente/CepRapido';
+import { atualizarPerfilCompletoPaciente } from '@/app/_actions/perfil-paciente';
 
 /* ── Dados dos KPIs ───────────────────────────────── */
 const STATS = [
@@ -106,6 +108,42 @@ export default function SignUpPage() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [codigoVerificacao, setCodigoVerificacao] = useState('');
 
+  /**
+   * 🔴 ETAPA VISUAL DO FORMULÁRIO INICIAL — separa "dados pessoais" de "endereço" em duas
+   * telas, em vez de um formulário só. Puramente apresentação: `handleSubmit` continua
+   * validando tudo de novo antes de chamar `signUp.create` — esta etapa só decide o que
+   * fica visível antes disso.
+   */
+  const [etapaCadastro, setEtapaCadastro] = useState<'dados' | 'endereco'>('dados');
+
+  /**
+   * 🔴 ENDEREÇO OBRIGATÓRIO, COLETADO ANTES DE GERAR O CÓDIGO (decisão do dono, 14/09/2026).
+   *
+   * `CepRapido` roda em `modoControlado` aqui: a esta altura a conta ainda NÃO existe (é
+   * exigido ANTES de `signUp.create`), então não há `clerkId` nenhum para
+   * `atualizarPerfilCompletoPaciente` gravar. Os valores só ficam neste estado local e são
+   * gravados depois, em `handleVerify`, quando a sessão já existe.
+   */
+  const [endereco, setEndereco] = useState<ValoresDeEndereco>({
+    cep: '',
+    numero: '',
+    endereco: '',
+    cidade: '',
+    uf: '',
+    completo: false,
+  });
+
+  /**
+   * 🔴 BASE LEGAL PARA COLETAR DADO PESSOAL (LGPD art. 7º) — checkbox NUNCA pré-marcada.
+   *
+   * ⚠️ Isto é diferente do consentimento granular do `/cadastro/[token]`
+   * (`ConsentimentoDoCompartilhamento`), que é sobre COMPARTILHAR dado com a Greens Corp e
+   * não pode travar o cadastro (art. 8º §3º). Aqui é a base legal do PRÓPRIO cadastro nesta
+   * plataforma — o mesmo instrumento que qualquer criação de conta usa ("aceito os termos").
+   * As duas coisas respondem perguntas diferentes; travar esta não repete aquele erro.
+   */
+  const [aceitouTermos, setAceitouTermos] = useState(false);
+
   // Status states
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
@@ -181,33 +219,72 @@ export default function SignUpPage() {
     setTelefone(formatted);
   };
 
+  /**
+   * Valida a etapa "dados" — nome, telefone e senha. Reusado por dois pontos: o "Continuar"
+   * que avança para a etapa de endereço, e o `handleSubmit` final (que confia no próprio
+   * estado, não em o paciente ter passado pela etapa 1 sem pular nada).
+   */
+  function validarDadosPessoais(): string | null {
+    const nameParts = nomeCompleto.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      return 'Por favor, informe seu nome completo (nome e sobrenome).';
+    }
+    const phoneDigits = telefone.replace(/\D/g, '');
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      return 'Por favor, insira um telefone válido com DDD (10 ou 11 dígitos).';
+    }
+    if (!email.trim()) {
+      return 'Informe seu e-mail.';
+    }
+    if (senha.length < 8) {
+      return 'A senha deve conter no mínimo 8 caracteres.';
+    }
+    if (senha !== confirmarSenha) {
+      return 'As senhas não coincidem.';
+    }
+    return null;
+  }
+
+  function avancarParaEndereco() {
+    const erroValidacao = validarDadosPessoais();
+    if (erroValidacao) {
+      setErro(erroValidacao);
+      return;
+    }
+    setErro('');
+    setEtapaCadastro('endereco');
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoaded) return;
 
-    if (senha !== confirmarSenha) {
-      setErro('As senhas não coincidem.');
+    const erroDados = validarDadosPessoais();
+    if (erroDados) {
+      // Confiar só no "Continuar" seria confiar que ninguém edita um campo depois de
+      // avançar — o formulário inteiro continua montado, então dá pra editar e voltar.
+      setErro(erroDados);
+      setEtapaCadastro('dados');
       return;
     }
 
-    const nameParts = nomeCompleto.trim().split(/\s+/);
-    if (nameParts.length < 2) {
-      setErro('Por favor, informe seu nome completo (nome e sobrenome).');
+    if (!endereco.completo) {
+      setErro('Informe seu CEP e o número do endereço para continuar.');
       return;
     }
 
-    const phoneDigits = telefone.replace(/\D/g, '');
-    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-      setErro('Por favor, insira um telefone válido com DDD (10 ou 11 dígitos).');
+    if (!aceitouTermos) {
+      setErro('Você precisa aceitar a Política de Privacidade para criar sua conta.');
       return;
     }
 
     setLoading(true);
     setErro('');
 
+    const nameParts = nomeCompleto.trim().split(/\s+/);
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
-    const cleanPhone = `+55${phoneDigits}`;
+    const cleanPhone = `+55${telefone.replace(/\D/g, '')}`;
 
     try {
       await signUp.create({
@@ -244,6 +321,41 @@ export default function SignUpPage() {
 
       if (completeSignUp.status === 'complete') {
         await setActive({ session: completeSignUp.createdSessionId });
+        /**
+         * 🔴 GARANTE A LINHA EM `users`/`pacientes` ANTES DE GRAVAR O ENDEREÇO.
+         *
+         * `atualizarPerfilCompletoPaciente` só grava se já existir um `users` com este
+         * `clerkId` — e o único lugar que cria essa linha em modo fallback é `/redirect` (o
+         * webhook do Clerk é assíncrono e pode não ter rodado ainda). Reusa a MESMA rota em
+         * vez de duplicar a lógica de criação pela terceira vez: um `fetch` sem seguir o
+         * redirect basta para o efeito colateral rodar.
+         */
+        try {
+          await fetch('/redirect', { redirect: 'manual' });
+        } catch {
+          // Segue mesmo assim — a tentativa de gravar o endereço abaixo é best-effort.
+        }
+
+        /**
+         * 🔴 O ENDEREÇO FOI EXIGIDO NA ETAPA 1 — aqui é só GRAVAR o que já foi coletado, sem
+         * pedir de novo. Se falhar (ex: o fallback acima não rodou a tempo), o aviso do
+         * painel (`AvisoDeEnderecoPendente`) ainda cobre quem escapar sem CEP salvo — não
+         * trava o login por isso.
+         */
+        try {
+          const gravado = await atualizarPerfilCompletoPaciente({
+            cep: endereco.cep || null,
+            endereco: endereco.endereco || null,
+            cidade: endereco.cidade || null,
+            uf: endereco.uf || null,
+          });
+          if (!gravado.sucesso) {
+            console.warn('[registrar-se] endereço não gravado após verificação', gravado.erro);
+          }
+        } catch (enderecoErro) {
+          console.warn('[registrar-se] falha ao gravar endereço', enderecoErro);
+        }
+
         router.push(redirectUrl);
       } else {
         console.error(JSON.stringify(completeSignUp, null, 2));
@@ -569,14 +681,32 @@ export default function SignUpPage() {
           {/* Cabeçalho — contexto de REGISTRO */}
           <div className="mb-6 space-y-1">
             <h2 className="font-display text-2xl font-bold tracking-tight text-gray-900">
-              {pendingVerification ? 'Verifique seu e-mail' : 'Crie sua conta.'}
+              {pendingVerification
+                ? 'Verifique seu e-mail'
+                : etapaCadastro === 'endereco'
+                  ? 'Seu endereço'
+                  : 'Crie sua conta.'}
             </h2>
             <p className="text-sm text-gray-400">
               {pendingVerification
                 ? 'Enviamos um código de verificação para o seu e-mail.'
-                : 'Preencha os dados para começar sua jornada.'}
+                : etapaCadastro === 'endereco'
+                  ? 'Só mais um passo antes de confirmar seu e-mail.'
+                  : 'Preencha os dados para começar sua jornada.'}
             </p>
           </div>
+
+          {/* Indicador de progresso — só antes da verificação por e-mail. */}
+          {!pendingVerification && (
+            <div className="mb-6 flex items-center gap-2">
+              <div className="h-1.5 flex-1 rounded-full bg-[#EA5429] transition-colors" />
+              <div
+                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  etapaCadastro === 'endereco' ? 'bg-[#EA5429]' : 'bg-gray-200'
+                }`}
+              />
+            </div>
+          )}
 
           {/* Elemento requerido pelo Clerk para proteção de Bot (CAPTCHA) */}
           <div id="clerk-captcha" />
@@ -589,156 +719,225 @@ export default function SignUpPage() {
 
           {!pendingVerification ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
-                <div className="space-y-1.5">
-                  <Label htmlFor="nomeCompleto" className="text-xs font-medium text-gray-700">
-                    Nome Completo
-                  </Label>
-                  <Input
-                    id="nomeCompleto"
-                    type="text"
-                    required
-                    placeholder="Nome e sobrenome"
-                    value={nomeCompleto}
-                    onChange={(e) => setNomeCompleto(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="telefone" className="text-xs font-medium text-gray-700">
-                    Telefone
-                  </Label>
-                  <Input
-                    id="telefone"
-                    type="text"
-                    required
-                    placeholder="(DD) 99999-9999"
-                    value={telefone}
-                    onChange={handleTelefoneChange}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium text-gray-700">
-                    E-mail
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="senha" className="text-xs font-medium text-gray-700">
-                    Senha
-                  </Label>
-                  <div className="relative">
+              {etapaCadastro === 'dados' && (
+                <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nomeCompleto" className="text-xs font-medium text-gray-700">
+                      Nome Completo
+                    </Label>
                     <Input
-                      id="senha"
-                      type={showSenha ? 'text' : 'password'}
+                      id="nomeCompleto"
+                      type="text"
                       required
-                      placeholder="Mínimo 8 caracteres"
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      placeholder="Nome e sobrenome"
+                      value={nomeCompleto}
+                      onChange={(e) => setNomeCompleto(e.target.value)}
+                      className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowSenha(!showSenha)}
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    >
-                      {showSenha ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirmarSenha" className="text-xs font-medium text-gray-700">
-                    Confirmar Senha
-                  </Label>
-                  <div className="relative">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="telefone" className="text-xs font-medium text-gray-700">
+                      Telefone
+                    </Label>
                     <Input
-                      id="confirmarSenha"
-                      type={showConfirmarSenha ? 'text' : 'password'}
+                      id="telefone"
+                      type="text"
                       required
-                      placeholder="Confirme sua senha"
-                      value={confirmarSenha}
-                      onChange={(e) => setConfirmarSenha(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      placeholder="(DD) 99999-9999"
+                      value={telefone}
+                      onChange={handleTelefoneChange}
+                      className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    >
-                      {showConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
                   </div>
-                </div>
 
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
-                >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Criar Conta'}
-                </Button>
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs font-medium text-gray-700">
+                      E-mail
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      placeholder="seu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-12 rounded-xl border-gray-200 bg-white transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                    />
+                  </div>
 
-              {/* Botão de cadastro alternativo / Google */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
-                    ou
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="senha" className="text-xs font-medium text-gray-700">
+                      Senha
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="senha"
+                        type={showSenha ? 'text' : 'password'}
+                        required
+                        placeholder="Mínimo 8 caracteres"
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSenha(!showSenha)}
+                        className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      >
+                        {showSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
 
-                <Button
-                  type="button"
-                  onClick={handleGoogleSignUp}
-                  disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
-                >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  Registrar com Google
-                </Button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirmarSenha" className="text-xs font-medium text-gray-700">
+                      Confirmar Senha
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmarSenha"
+                        type={showConfirmarSenha ? 'text' : 'password'}
+                        required
+                        placeholder="Confirme sua senha"
+                        value={confirmarSenha}
+                        onChange={(e) => setConfirmarSenha(e.target.value)}
+                        className="h-12 rounded-xl border-gray-200 bg-white pr-10 transition-colors duration-200 focus-visible:border-[#EA5429] focus-visible:ring-3 focus-visible:ring-[#EA5429]/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
+                        className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      >
+                        {showConfirmarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
 
-                <p className="text-center text-xs text-gray-500">
-                  Já possui uma conta?{' '}
-                  <Link
-                    href="/entrar"
-                    className="font-semibold text-[#EA5429] hover:text-[#D64319] hover:underline"
+                  <Button
+                    type="button"
+                    onClick={avancarParaEndereco}
+                    className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319]"
                   >
-                    Entrar
-                  </Link>
-                </p>
-              </div>
+                    Continuar
+                  </Button>
+                </div>
+              )}
+
+              {etapaCadastro === 'endereco' && (
+                <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErro('');
+                      setEtapaCadastro('dados');
+                    }}
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600"
+                  >
+                    ← Voltar
+                  </button>
+
+                  {/*
+                  🔴 ENDEREÇO OBRIGATÓRIO, ANTES DE GERAR O CÓDIGO. Decisão do dono em
+                  14/09/2026. `modoControlado`: só reporta os valores, quem grava é
+                  `handleVerify`, depois que a conta existir.
+                */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-gray-700">Seu endereço</Label>
+                    <CepRapido modoControlado aoMudarValores={setEndereco} />
+                  </div>
+
+                  <label className="flex items-start gap-2.5 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={aceitouTermos}
+                      onChange={(e) => setAceitouTermos(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-[#EA5429] focus:ring-[#EA5429]/30"
+                    />
+                    <span>
+                      Li e concordo com a{' '}
+                      <Link
+                        href="/politica-de-privacidade"
+                        target="_blank"
+                        className="font-semibold text-[#EA5429] hover:underline"
+                      >
+                        Política de Privacidade
+                      </Link>{' '}
+                      e os{' '}
+                      <Link
+                        href="/termos-de-uso"
+                        target="_blank"
+                        className="font-semibold text-[#EA5429] hover:underline"
+                      >
+                        Termos de Uso
+                      </Link>
+                      .
+                    </span>
+                  </label>
+
+                  <Button
+                    type="submit"
+                    disabled={loading || !endereco.completo || !aceitouTermos}
+                    className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Criar Conta'}
+                  </Button>
+                </div>
+              )}
+
+              {/*
+                Alternativa ao formulário inteiro (Google) e o link pra quem já tem conta —
+                só fazem sentido na etapa 1: no meio do preenchimento (etapa "endereco") eles
+                confundiriam mais do que ajudariam.
+              */}
+              {etapaCadastro === 'dados' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-gray-200" />
+                    <span className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
+                      ou
+                    </span>
+                    <div className="h-px flex-1 bg-gray-200" />
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleGoogleSignUp}
+                    disabled={loading}
+                    className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    Registrar com Google
+                  </Button>
+
+                  <p className="text-center text-xs text-gray-500">
+                    Já possui uma conta?{' '}
+                    <Link
+                      href="/entrar"
+                      className="font-semibold text-[#EA5429] hover:text-[#D64319] hover:underline"
+                    >
+                      Entrar
+                    </Link>
+                  </p>
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={handleVerify} className="space-y-4">
