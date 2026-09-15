@@ -553,7 +553,7 @@ export class ServicoDeSolicitacao {
     telefone?: string | null;
   }): Promise<ResultadoDoLink> {
     const telefone = entrada.telefone
-      ? normalizarTelefoneWhatsapp(entrada.telefone) ?? entrada.telefone
+      ? (normalizarTelefoneWhatsapp(entrada.telefone) ?? entrada.telefone)
       : null;
 
     return this.resolverOuCriar({
