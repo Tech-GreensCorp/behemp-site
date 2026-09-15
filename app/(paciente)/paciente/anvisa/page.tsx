@@ -22,7 +22,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import {
   ShieldCheck, FileText, Upload, CheckCircle2, Clock, AlertCircle,
   ChevronRight, Loader2, RefreshCw, FileCheck, CircleDot,
-  XCircle, Info, ExternalLink, Download, Copy, CheckCheck, Users, Navigation
+  XCircle, Info, ExternalLink, Users, Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsentimentoQueFaltou } from '@/components/paciente/ConsentimentoQueFaltou';
@@ -327,7 +327,6 @@ export default function AnvisaPage() {
   const [temPrescricao, setTemPrescricao] = useState<boolean | null>(null); // null = carregando
   const [verificando, setVerificando] = useState(true);
   const [modalidade, setModalidade] = useState<AnvisaModalidade | null>(null);
-  const [copiado, setCopiado] = useState<string | null>(null);
   /**
    * tipo do documento → `id` na tabela `documentos`.
    *
@@ -400,7 +399,6 @@ export default function AnvisaPage() {
       } else if (!ultima.modalidade) {
         setEtapa('escolha');
       } else {
-        const docs = (ultima.documentos as DocItem[]) ?? [];
         setEtapa(ultima.modalidade === 'guiada' ? 'guiada' : 'checklist');
       }
     }
