@@ -23,6 +23,7 @@ import {
   BookOpen,
   Bell,
   Calculator,
+  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -46,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Usuários', href: '/admin/usuarios', icon: Users },
       { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
       { label: 'Médicos', href: '/admin/medicos', icon: Stethoscope },
+      { label: 'Teleconsulta', href: '/admin/teleconsulta', icon: Video },
       { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
       { label: 'Procurações', href: '/admin/procuracoes', icon: FileCheck },
       { label: 'Alertas', href: '/admin/alertas', icon: Bell },
