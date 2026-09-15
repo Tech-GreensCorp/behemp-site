@@ -188,6 +188,10 @@ describe('a tela fala a língua que o produto decidiu', () => {
       /documento com foto/,
     );
     expect(trecho, 'o texto deixou de oferecer o envio posterior').toMatch(/enviar depois/);
+    // E nomeia QUAL pode vir depois — com o laudo fora, sobrou um só.
+    expect(trecho, 'o texto deixou de nomear o que pode vir depois').toMatch(
+      /comprovante de residência/i,
+    );
   });
 
   it('🔴 o texto NÃO promete que nada é preciso', () => {
@@ -204,6 +208,28 @@ describe('a tela fala a língua que o produto decidiu', () => {
       /Nada disso impede/.test(ramoVerdadeiro),
       'voltou a dizer "nada disso impede" no fluxo que tem documento necessário',
     ).toBe(false);
+  });
+
+  it('🔴 o LAUDO não é pedido neste fluxo, e NÃO sai do vocabulário', () => {
+    /**
+     * Decisão do chefe do dono em 14/09/2026: o laudo não é mais necessário na tela da
+     * teleconsulta.
+     *
+     * ⚠️ A parte que importa é a segunda metade. Ele **continua** em `DOCUMENTOS_DO_FLUXO`:
+     * quem vem do parceiro pode tê-lo mandado, e a tela precisa saber reconhecê-lo em
+     * `recebidos` e no manifesto. Tirá-lo do vocabulário para tirá-lo de UMA tela apagaria
+     * um documento que o parceiro envia — e o paciente veria "0 enviados" para algo que
+     * mandou, que é o defeito que `o-painel-diz-o-que-falta` existe para impedir.
+     */
+    expect(DOCUMENTOS_DO_FLUXO, 'o laudo saiu do vocabulário — o parceiro ainda o envia').toContain(
+      'laudo_medico',
+    );
+    expect(compacto, 'a filtragem do laudo por fluxo sumiu').toMatch(
+      /anexosDaTela = fluxoDaTeleconsulta[\s\S]{0,200}laudo_medico/,
+    );
+    expect(compacto, 'a seção de anexos voltou a renderizar a lista sem filtro').toMatch(
+      /\{anexosDaTela\.map\(/,
+    );
   });
 
   it('🔴 o rótulo AVISA, não promete trava', () => {

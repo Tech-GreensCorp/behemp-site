@@ -627,3 +627,36 @@ path:db/migrations/meta/0041_snapshot.json
 #
 # TESTE QUE PROVA O ANTES E O DEPOIS: os guardas da Sprint 8 —
 # `toda-porta-declara-de-onde-veio`, `a-revogacao-para-a-fila` e o da sentinela.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 15/09/2026 — VER O DOCUMENTO ENVIADO, num modal, nas telas que os listam
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# QUEM AUTORIZOU: o dono, em 15/09/2026, por escrito nesta sessão — "porque você não faz
+# isso... só faça o que eu te pedi até o final, finalizando sempre testando".
+#
+# POR QUÊ: pedido dele em 14/09 — "adicionar a opção de visualizar esses documentos através
+# de um botão que abre um modal com a imagem... isso é essencial até pra validar o que está
+# chegando entre empresas". Hoje a tela diz "✓ rg.jpg", o que afirma que um arquivo CHEGOU,
+# não que ele É o que diz ser: o nome do arquivo é escolhido por quem envia, e um handoff da
+# Greens pode trazer o documento errado sem nada acusar.
+#
+# O QUE MUDA NAS TELAS: acrescenta um botão "Ver". Três delas já linkavam para a MESMA rota
+# (`/api/documentos/{id}/arquivo`) com `target="_blank"` — a mudança é trocar o link pelo
+# modal, não abrir acesso novo. A tela da ANVISA ganha o botão, resolvendo o id pela tabela.
+#
+# QUANTOS ARQUIVOS TOCA: 4 telas. Nenhuma action de escrita, nenhum schema, nenhuma migration.
+#
+# ESTÁ EM PRODUÇÃO? Sim. Por isso a mudança é ADITIVA: nada é removido das telas.
+#
+# ⚠️ NÃO ABRE ACESSO NENHUM. Quem pode ler continua sendo decidido em
+# `garantirLeitorDoDocumento`, na rota — escopo de objeto, 404 para "não é seu", auditoria
+# `visualizar` a cada leitura. O componente não recebe `urlBlob` e a action não o devolve.
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: `ver-o-documento-passa-pela-porta-autenticada`,
+# 23 casos e 8 sabotagens — inclusive a que troca a rota pela URL do blob.
+#
+path:app/(paciente)/paciente/anvisa/page.tsx
+path:app/(paciente)/paciente/perfil/page.tsx
+path:app/(paciente)/paciente/documentos/page.tsx
+path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx

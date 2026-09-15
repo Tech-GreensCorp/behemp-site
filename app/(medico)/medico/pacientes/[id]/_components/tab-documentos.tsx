@@ -20,9 +20,9 @@ import {
 import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-paciente';
 import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import {
   Download,
-  ExternalLink,
   FileCheck,
   Loader2,
   Plus,
@@ -218,13 +218,20 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                           {vencido ? 'Vencido' : 'Válido'}
                         </Badge>
 
-                        {/* Visualizar */}
-                        <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="gap-1.5">
-                            <ExternalLink size={13} />
-                            Ver
-                          </Button>
-                        </a>
+                        {/*
+                          🔴 Ver abre num MODAL — 14/09/2026. Para o médico o ganho é maior que
+                          para o paciente: conferir o documento sem sair da ficha é o que
+                          permite dizer "isto não é um RG" antes de a procuração seguir.
+
+                          A rota é a mesma de antes, e o escopo de objeto continua sendo
+                          decidido nela: `garantirLeitorDoDocumento` exige o vínculo
+                          médico-paciente, não basta ser médico.
+                        */}
+                        <VisualizadorDeDocumento
+                          documentoId={doc.id}
+                          rotulo={TIPO_LABELS[tipoKey] ?? tipoKey}
+                          nomeArquivo={doc.nomeArquivo}
+                        />
 
                         {/* Baixar */}
                         <Button

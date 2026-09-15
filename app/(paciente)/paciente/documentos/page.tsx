@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   Download,
-  ExternalLink,
   FileCheck,
   Loader2,
   Plus,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { uploadDocumentoPaciente, listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
 import Link from 'next/link';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
@@ -264,11 +264,13 @@ export default function DocumentosPacientePage() {
                           )}>
                             {vencido ? 'Vencido' : 'Válido'}
                           </Badge>
-                          <a href={`/api/documentos/${doc.id}/arquivo`} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-full text-xs">
-                              <ExternalLink size={13} /> Ver
-                            </Button>
-                          </a>
+                          {/* Ver abre o documento num modal — 14/09/2026. Mesma rota de antes. */}
+                          <VisualizadorDeDocumento
+                            documentoId={doc.id}
+                            rotulo={TIPO_LABELS[tipoKey] ?? tipoKey}
+                            nomeArquivo={doc.nomeArquivo}
+                            className="h-8 rounded-full text-xs"
+                          />
                           <Button
                             variant="outline"
                             size="sm"

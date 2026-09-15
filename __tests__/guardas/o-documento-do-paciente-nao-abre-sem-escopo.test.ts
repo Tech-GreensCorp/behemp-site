@@ -124,14 +124,37 @@ describe('as telas abrem pela rota autenticada, nunca pela URL do blob', () => {
 
   it.each(TELAS.map((t) => [t] as const))('%s', (tela) => {
     const codigo = ler(tela);
-    expect(codigo).toContain('/api/documentos/${doc.id}/arquivo');
+    /**
+     * ⚠️ RETIFICADO em 15/09/2026. A versão anterior exigia o literal
+     * `/api/documentos/${doc.id}/arquivo` NA TELA — e congelava o formato da entrega, não a
+     * propriedade. Em 15/09 as telas trocaram o link de abrir-em-aba pelo
+     * `<VisualizadorDeDocumento>`, que chama **a mesma rota** por dentro: o guarda ficou
+     * vermelho por uma mudança que não afrouxou nada.
+     *
+     * A propriedade é: **a tela abre o documento por um caminho que autentica**. Isso é
+     * verdade tanto com a URL escrita ali quanto delegando ao componente — e o componente
+     * tem guarda próprio (`ver-o-documento-passa-pela-porta-autenticada`, 31 casos) que
+     * proíbe ele mesmo de usar `urlBlob`.
+     */
+    const pelaRota = codigo.includes('/api/documentos/${doc.id}/arquivo');
+    const peloVisualizador = codigo.includes('<VisualizadorDeDocumento');
+    expect(
+      pelaRota || peloVisualizador,
+      'a tela não abre o documento nem pela rota nem pelo visualizador',
+    ).toBe(true);
+
     /**
      * 🔴 E NÃO PODE SOBRAR O href DIRETO.
      *
      * Um blob privado não abre por link — a tela que ficou para trás mostra um erro para o
-     * paciente no pior momento, e ninguém descobre até alguém reclamar.
+     * paciente no pior momento, e ninguém descobre até alguém reclamar. Com blob antigo é
+     * pior: abre, sem autenticação e sem auditoria.
      */
     expect(codigo).not.toContain('href={doc.urlBlob}');
+    expect(
+      /(?:href|src)=\{[^}]*urlBlob/.test(codigo),
+      'a tela voltou a abrir o documento pela URL do blob',
+    ).toBe(false);
   });
 });
 

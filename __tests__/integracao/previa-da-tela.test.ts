@@ -22,7 +22,7 @@
  *
  * SAÍDA: `previa-da-tela.html` e `previa-da-tela.png` na raiz — os dois no `.gitignore`.
  */
-import { writeFileSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, vi } from 'vitest';
 
@@ -73,15 +73,25 @@ describe('prévia', () => {
       } as never),
     );
 
-    const css = ['0e7jp3l8kmhsg.css', '0hkgxjk3jdlw~.css']
-      .map((f) => {
-        try {
-          return readFileSync(join(RAIZ, '.next/static/chunks', f), 'utf8');
-        } catch {
-          return '';
-        }
-      })
+    /**
+     * 🔴 DESCOBRE OS ARQUIVOS, NÃO OS LISTA. A primeira versão fixava dois nomes — e os
+     * nomes do Next são hasheados por CONTEÚDO: o build seguinte mudou os dois, o `catch`
+     * devolveu string vazia, e a prévia saiu sem estilo nenhum, sem nada acusar.
+     *
+     * O `catch` silencioso era o agravante: ele transformou "o arquivo sumiu" em "não tem
+     * CSS". Agora a ausência de CSS falha alto.
+     */
+    const dirCss = join(RAIZ, '.next/static/chunks');
+    const css = readdirSync(dirCss)
+      .filter((f) => f.endsWith('.css'))
+      .map((f) => readFileSync(join(dirCss, f), 'utf8'))
       .join('\n');
+    if (css.length < 10_000) {
+      throw new Error(
+        `CSS do build não encontrado em ${dirCss} (achei ${css.length} bytes). ` +
+          'Rode `pnpm build` antes da prévia.',
+      );
+    }
 
     const saida = join(RAIZ, 'previa-da-tela.html');
     writeFileSync(
