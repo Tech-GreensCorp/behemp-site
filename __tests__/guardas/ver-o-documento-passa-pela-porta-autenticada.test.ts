@@ -146,7 +146,51 @@ describe('o arquivo vem da rota autenticada, nunca do blob', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3. A AUDITORIA DIZ A VERDADE
+// 3. QUEM DESCOBRE O `id` NÃO ENTREGA O BLOB JUNTO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('a action que lista os documentos devolve metadado, não bytes nem URL', () => {
+  const ACTION = 'app/_actions/documentos-do-paciente.ts';
+  const acao = readFileSync(join(RAIZ, ACTION), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('🔴 `urlBlob` não sai no select nem no retorno', () => {
+    /**
+     * A coluna está na mesma linha e incluí-la é um caractere. Com documento antigo (blob
+     * público) isso entrega RG e procuração assinada a quem ler a resposta da action no
+     * navegador — sem autenticação, sem escopo e sem auditoria.
+     */
+    expect(
+      /urlBlob|url_blob/i.test(acao),
+      'a action passou a carregar a URL do blob — ela fura a rota autenticada',
+    ).toBe(false);
+  });
+
+  it('🔴 o paciente vem da SESSÃO, e não existe parâmetro de paciente', () => {
+    /**
+     * Um `pacienteId` recebido é OWASP API1 por um caminho novo: papel certo, id de outro.
+     * O que não é recebido não pode ser trocado.
+     */
+    expect(acao, 'a action deixou de resolver o paciente pela sessão').toMatch(
+      /obterUsuarioAtual\(\)/,
+    );
+    expect(acao, 'a action deixou de amarrar a consulta ao clerkId da sessão').toMatch(
+      /users\.clerkId/,
+    );
+    expect(
+      /documentosDoPacienteAtual\(\s*[a-zA-Z]/.test(acao),
+      'a action passou a receber parâmetro — e o alvo virou escolha do cliente',
+    ).toBe(false);
+  });
+
+  it('documento apagado não reaparece por uma tela nova', () => {
+    expect(acao, 'o filtro de soft delete sumiu').toMatch(/isNull\(documentos\.deletedAt\)/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. A AUDITORIA DIZ A VERDADE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('o arquivo só é buscado quando alguém de fato abre', () => {
