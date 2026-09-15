@@ -264,3 +264,48 @@ describe('as quatro telas mostram o documento pelo visualizador', () => {
     ).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. O CHECKLIST DO PERFIL CASA PELO VOCABULÁRIO DA COLUNA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('o "Recebido" do perfil deixa ver o que foi recebido', () => {
+  const PERFIL = 'app/(paciente)/paciente/perfil/page.tsx';
+  const perfil = readFileSync(join(RAIZ, PERFIL), 'utf8')
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+    .replace(/\s+/g, ' ');
+
+  it('🔴 o item marcado como recebido tem o botão', () => {
+    /**
+     * "Recebido" sem poder ver é a metade inútil da frase: afirma que algo chegou, não que o
+     * que chegou é o que o rótulo promete. É a mesma lacuna que o botão da ANVISA fechou.
+     */
+    expect(perfil, 'o checklist do perfil perdeu o botão de ver').toMatch(
+      /item\.temNoBanco &&[\s\S]{0,120}<VisualizadorDeDocumento/,
+    );
+  });
+
+  it('🔴 casa por `tipoNaTabela`, NUNCA por `chave`', () => {
+    /**
+     * 🔴 SÃO DOIS VOCABULÁRIOS, e este projeto já foi mordido por isso: o fluxo diz
+     * `documento_identidade`, a coluna `documentos.tipo` guarda `rg`, e um terceiro lugar
+     * dizia `rg_paciente` — valor que nem existe no enum.
+     *
+     * `checklistDosDocumentos` devolve os DOIS campos justamente para não haver dúvida.
+     * Casar pela `chave` devolveria `undefined` **em silêncio**: nenhum erro, nenhum log —
+     * só o botão sumindo do item que diz "Recebido", que é o pior resultado possível.
+     */
+    expect(perfil, 'o botão deixou de casar pelo vocabulário da coluna').toMatch(
+      /idsPorTipo\[item\.tipoNaTabela\]/,
+    );
+    expect(
+      /idsPorTipo\[item\.chave\]/.test(perfil),
+      'passou a casar pela chave do fluxo — devolve undefined em silêncio',
+    ).toBe(false);
+  });
+
+  it('não faz consulta nova: o mapa sai do que a tela já carregou', () => {
+    // Uma chamada a mais por item de checklist seria N requisições para desenhar uma lista.
+    expect(perfil).toMatch(/const idsPorTipo[\s\S]{0,200}docs/);
+  });
+});
