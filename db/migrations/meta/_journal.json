@@ -309,6 +309,13 @@
       "when": 1789271398148,
       "tag": "0043_long_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789588306034,
+      "tag": "0044_fancy_galactus",
+      "breakpoints": true
     }
   ]
 }
