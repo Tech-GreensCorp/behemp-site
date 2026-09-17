@@ -244,12 +244,12 @@ export function PatologiasPicker() {
             </div>
 
             {/* Medicamento */}
-            <div className="absolute -left-24 bottom-0 z-20 hidden lg:block">
+            <div className="absolute -left-28 -bottom-14 z-20 hidden lg:block">
               <Image
-                src="/images/home/medicamento.png"
+                src="/images/home/greens-tarja-preta-removebg.png"
                 alt="Medicamento"
-                width={240}
-                height={240}
+                width={260}
+                height={260}
                 className="drop-shadow-2xl"
               />
             </div>
