@@ -53,13 +53,13 @@ oito fluxos, passo a passo) e `docs/11-OS-OITO-FLUXOS.md`.
 
 ### Branches
 
-| branch | estado | o que é |
-| --- | --- | --- |
-| `main` local | **idêntica a `origin/main`** (`0 0`) — `6d93b5a`, 20/09/2026, Dryelle | a ponta de produção [9, 10] |
-| `docs/organizacao-2026-09` | **8 commits à frente**, sem upstream nenhum | reescreveu os três índices da `docs/` e arquivou 3 documentos mortos — ver [`historico/2026-09-organizacao/README.md`](historico/2026-09-organizacao/README.md) [8, 11, 21, 22] |
-| `docs/adr-0023-o-fluxo-da-receita-reusa-o-trilho` | 8 à frente da main, **18 commits jamais empurrados** | é onde vive `docs/ponte/`, que **não existe em nenhuma outra branch** [8, 12, 13] |
-| `origin/wip/monitoramento-anvisa` (Gabriel) | 1 commit, 16/09 | traz `db/migrations/0044_fancy_galactus.sql` — inclui **UPDATE de dados escrito à mão**, que um `generate` futuro não recria [14] |
-| `feat/o-health-…` · `fix/os-dois-protocolos-…` | 1 commit cada, 11/09 | 1 commit à frente de `origin/main` cada, 11/09; **não avaliadas** [8] |
+| branch                                            | estado                                                                | o que é                                                                                                                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main` local                                      | **idêntica a `origin/main`** (`0 0`) — `6d93b5a`, 20/09/2026, Dryelle | a ponta de produção [9, 10]                                                                                                                                                     |
+| `docs/organizacao-2026-09`                        | **8 commits à frente**, sem upstream nenhum                           | reescreveu os três índices da `docs/` e arquivou 3 documentos mortos — ver [`historico/2026-09-organizacao/README.md`](historico/2026-09-organizacao/README.md) [8, 11, 21, 22] |
+| `docs/adr-0023-o-fluxo-da-receita-reusa-o-trilho` | 8 à frente da main, **18 commits jamais empurrados**                  | é onde vive `docs/ponte/`, que **não existe em nenhuma outra branch** [8, 12, 13]                                                                                               |
+| `origin/wip/monitoramento-anvisa` (Gabriel)       | 1 commit, 16/09                                                       | traz `db/migrations/0044_fancy_galactus.sql` — inclui **UPDATE de dados escrito à mão**, que um `generate` futuro não recria [14]                                               |
+| `feat/o-health-…` · `fix/os-dois-protocolos-…`    | 1 commit cada, 11/09                                                  | 1 commit à frente de `origin/main` cada, 11/09; **não avaliadas** [8]                                                                                                           |
 
 🔴 **Nada do que está à frente de `main` chegou a `origin/main`.** `docs/organizacao-2026-09` não tem remoto; `docs/adr-0023-…` tem 18 commits só locais. [8, 9]
 
