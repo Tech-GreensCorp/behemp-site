@@ -392,6 +392,18 @@ export default function TriagensAdminPage() {
     setPaginaAtual(1);
   }, [busca, filtroStatus, filtroOrigem]);
 
+  // Trava o scroll da página por trás enquanto um modal está aberto — sem isto, o
+  // backdrop fixed tem overflow próprio mas o body por trás também rola, e dá pra
+  // ver a lista se movendo por baixo do modal.
+  useEffect(() => {
+    if (!triagemSelecionada && !triagemParaExcluir) return;
+    const overflowOriginal = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = overflowOriginal;
+    };
+  }, [triagemSelecionada, triagemParaExcluir]);
+
   async function carregarTriagens() {
     setCarregando(true);
     const resultado = await listarTriagens();
@@ -813,7 +825,7 @@ export default function TriagensAdminPage() {
       {/* ══════════════════════════════════════════════════════════ */}
       {triagemSelecionada && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pb-8 pt-8 backdrop-blur-sm sm:items-center sm:pt-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 pb-8 pt-8 backdrop-blur-sm sm:items-center sm:pt-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setTriagemSelecionada(null);
           }}
@@ -890,12 +902,9 @@ export default function TriagensAdminPage() {
                             </span>
                           )}
                           {patologia && (
-                            <span
-                              className="flex min-w-0 max-w-[220px] items-center gap-1.5 sm:max-w-[320px]"
-                              title={patologia}
-                            >
-                              <Stethoscope size={14} className="shrink-0" />
-                              <span className="truncate">{patologia}</span>
+                            <span className="flex items-center gap-1.5">
+                              <Stethoscope size={14} />
+                              {patologia}
                             </span>
                           )}
                           <span className="flex items-center gap-1.5">
