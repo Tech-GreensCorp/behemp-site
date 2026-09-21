@@ -45,34 +45,55 @@ oito fluxos, passo a passo) e `docs/11-OS-OITO-FLUXOS.md`.
 
 ---
 
-## §1 — O que está no ar agora
+## §1 — Onde parou, em 21/09/2026 (medido)
 
-| onde                                    | o quê                                                                                           | desde                |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------- |
-| **produção** (EC2 + PM2, DT-006/DT-008) | o commit `f894821` — _"Merge pull request #34 from Tech-GreensCorp/fix/triagem-cadastro-flow"_  | **18/08/2026 17:35** |
-| **localhost:3000**                      | dev server rodando (PID 205008), HTTP 200, contra **Postgres local na porta 5436**              | 24/08                |
-| **banco local**                         | migrations até `0022_reconciliar_medico_ordem.sql` aplicadas; 3 aplicações registradas em 24/08 | 24/08                |
-| **Neon (produção)**                     | **intocado.** Nenhuma migration desta sessão foi aplicada lá                                    | —                    |
+> ⚠️ O §1 anterior (24/08/2026) dizia "nada commitado, branch = origin/main,
+> banco local até 0022, Neon intocado". Nada disso vale em 21/09. O texto
+> antigo está em `git show 0738d15:docs/05-HANDOFF-SESSAO.md`.
 
-### 🔴 O dado mais importante desta seção: NADA foi commitado
+### Branches
 
-```
-git rev-list --left-right --count origin/main...HEAD  →  0    0
-```
+| branch | estado | o que é |
+| --- | --- | --- |
+| `main` local | **idêntica a `origin/main`** (`0 0`) — `6d93b5a`, 20/09/2026, Dryelle | a ponta de produção [9, 10] |
+| `docs/organizacao-2026-09` | **8 commits à frente**, sem upstream nenhum | reescreveu os três índices da `docs/` e arquivou 3 documentos mortos — ver [`historico/2026-09-organizacao/README.md`](historico/2026-09-organizacao/README.md) [8, 11, 21, 22] |
+| `docs/adr-0023-o-fluxo-da-receita-reusa-o-trilho` | 8 à frente da main, **18 commits jamais empurrados** | é onde vive `docs/ponte/`, que **não existe em nenhuma outra branch** [8, 12, 13] |
+| `origin/wip/monitoramento-anvisa` (Gabriel) | 1 commit, 16/09 | traz `db/migrations/0044_fancy_galactus.sql` — inclui **UPDATE de dados escrito à mão**, que um `generate` futuro não recria [14] |
+| `feat/o-health-…` · `fix/os-dois-protocolos-…` | 1 commit cada, 11/09 | 1 commit à frente de `origin/main` cada, 11/09; **não avaliadas** [8] |
 
-**A branch `feat/flow-representatives` está idêntica a `origin/main` em commits.** Quatro dias de
-trabalho — Sprints 0 a 4 inteiras — existem **apenas como arquivos não versionados**:
+🔴 **Nada do que está à frente de `main` chegou a `origin/main`.** `docs/organizacao-2026-09` não tem remoto; `docs/adr-0023-…` tem 18 commits só locais. [8, 9]
 
-- **60 arquivos novos** (`??`) — todo o módulo de IA clínica, os 8 guardas, as 12 docs, os hooks,
-  o portão de baseline
-- **22 arquivos modificados** (`M`) — incluindo `middleware.ts`, `lib/db/index.ts`, `lib/env.ts`,
-  `CLAUDE.md` e 7 arquivos de teleconsulta
+### Migrations no disco
 
-**Isso é deliberado** (`DO-20`: nada vai sem ordem expressa do dono), **e é risco real**: se a
-máquina morrer, perde-se tudo. Não há cópia em lugar nenhum.
+**45 arquivos `.sql`**, journal com **44 entradas**, última = `0043_long_slipstream`. [15, 16]
+A diferença é `0007_add_medico_ordem.sql`, **fora do journal** de propósito — o número `0007`
+está ocupado por `0007_wet_sharon_ventura.sql`, e o conteúdo dela é coberto, de forma
+idempotente, pela `0022_reconciliar_medico_ordem.sql`. [17]
 
-⚠️ **"Empurrei" não é "subiu".** Nada foi empurrado. `origin/main` não sabe que este trabalho
-existe.
+🔴 **O estado do banco de PRODUÇÃO (Neon) NÃO foi medido; a frente de diagnóstico está pausada
+por decisão do dono. Não assumir que as 44 estão aplicadas.** O mecanismo do migrator
+(`drizzle-orm/pg-core/dialect.js:56-62`) aplica só o que tem `when` maior que o **maior
+`created_at` já registrado**, lido uma vez antes do loop — e `0036`, `0037` e `0038` têm `when`
+menor que o de `0035`. **O diagnóstico disso (0036–0038, 0039, e a 0044 com UPDATE de dados) existe só em relatórios de sessão — não há arquivo no disco. Registrar antes de agir.**
+
+### Produção
+
+O app roda em **EC2 + PM2** (DT-006/DT-008); o banco é **Neon**, por HTTP
+(`lib/db/index.ts:1-12`). [19] O `deploy.yml` dispara em **push na `main`** (`:5-6`), roda
+`DATABASE_URL="…" pnpm db:migrate:prod` (`:291` → `scripts/migrar.mjs`) e só então
+`pm2 start` (`:334`). [18, 20]
+
+🔴 **Merge em `main` = deploy + migrations.**
+
+### Documentação
+
+A frente de 19–21/09 fez os três índices da `docs/` dizerem a verdade e arquivou o estado morto
+em `docs/historico/2026-09-organizacao/`, com `git mv`, banner e README de desfecho. [21, 22]
+
+**Ficou, e está escrito no disco:** este `§1` era o item 1 da lista; `01-REGRA-DE-NEGOCIO.md`
+segue o stub de 20/08; o `CLAUDE.md` tem 787 linhas contra o alvo de 200; existem **duas
+"Sprint 8"**; as ADRs usam **cinco palavras para dois estados**; e há **sete divergências** entre
+a tabela do `CLAUDE.md` e o mapa da `docs/`, listadas dentro do próprio mapa.
 
 ---
 
