@@ -902,9 +902,12 @@ export default function TriagensAdminPage() {
                             </span>
                           )}
                           {patologia && (
-                            <span className="flex items-center gap-1.5">
-                              <Stethoscope size={14} />
-                              {patologia}
+                            <span
+                              className="flex min-w-0 max-w-[220px] items-center gap-1.5 sm:max-w-[320px]"
+                              title={patologia}
+                            >
+                              <Stethoscope size={14} className="shrink-0" />
+                              <span className="truncate">{patologia}</span>
                             </span>
                           )}
                           <span className="flex items-center gap-1.5">
