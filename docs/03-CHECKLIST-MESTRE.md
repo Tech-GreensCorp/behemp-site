@@ -693,6 +693,9 @@ Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
 
 ### ⚪ Achado de 10/09/2026 — o índice de ADRs está 11 entradas atrás
 
+> ✅ **Retificado em 21/09/2026:** o `adr/README.md` passou a listar as 23 ADRs em
+> 19/09/2026 (commit d88d825). O parágrafo abaixo descreve o estado de 10/09 e fica como registro.
+
 `docs/adr/README.md` lista até a **0007**. As ADRs **0008 a 0018** existem em disco e não estão
 lá. Quem consultar o índice para saber se algo já foi decidido vai concluir que não foi.
 
