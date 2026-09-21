@@ -521,7 +521,7 @@ export default function SignUpPage() {
               </span>
               não precisa
               <br />
-              enfrentar isso sozinho(a).
+              enfrentar tudo sozinho(a).
             </h1>
 
             <p className="max-w-xs text-[0.95rem] leading-relaxed text-gray-500">
