@@ -270,7 +270,7 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 - [ ] Sidebar duplicado em 3 arquivos (284 + 221 + 219 linhas). Extrair genérico tocaria 3 áreas
       em produção.
 - [ ] `components/ui/table.tsx` existe e é usado em **0** arquivos.
-- [ ] `docs/integracoes.md` (pré-existente, commit `f49f4bb`) cita três arquivos que **não
+- [ ] `docs/historico/2026-09-organizacao/integracoes.md` (pré-existente, commit `f49f4bb`; arquivado em 21/09/2026) cita três arquivos que **não
       existem**: `lib/integrations/resend/client.ts`, `.../google-calendar/client.ts`,
       `.../blob/client.ts`. E o de Resend contradiz o `AGENTS.md`, que diz que o e-mail é Brevo.
 - [ ] 🔴 **A skill `cavecrew` está quebrada como instalada:** o `README.md` dela referencia

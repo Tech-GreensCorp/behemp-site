@@ -52,7 +52,7 @@ de infraestrutura do motor for escrita, ela toma o próximo número livre, e o p
 nesse mesmo commit.
 
 O histórico de fases **anteriores** deste projeto está em
-[`../progresso.md`](../progresso.md) — fases 0 a 12, concluídas entre maio e agosto de 2026.
+[`../historico/2026-09-organizacao/progresso.md`](../historico/2026-09-organizacao/progresso.md) — fases 0 a 12, concluídas entre maio e agosto de 2026.
 
 ---
 

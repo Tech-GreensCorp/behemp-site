@@ -42,9 +42,10 @@ link morto.
 | — | [decisoes-visuais/](decisoes-visuais/) · 2 arquivos | 🔴 **ANTES DE CADA SPRINT** (`DO-32`) — o `LEIA-ANTES-DE-CADA-SPRINT.md` diz quando abrir o `.html` ao lado |
 | — | [chatpro/](chatpro/) · 3 arquivos | vai mexer na integração do ChatPro — `COMO-CONECTAR-NO-PAINEL`, `CONTRATO-DA-PAGINA-DE-CADASTRO`, `QA-DA-INTEGRACAO` |
 | — | [integracao-greens/](integracao-greens/) · 3 arquivos | vai trocar mensagem com a Greens — a ponte do Fluxo 2, o prompt sobre documentos que não chegam, e a resposta sobre o reenvio |
-| — | [BACKUP_LOG](BACKUP_LOG.md) | histórico — a arquivar em docs/historico/ |
-| — | [progresso](progresso.md) | histórico — a arquivar em docs/historico/ |
-| — | [integracoes](integracoes.md) | histórico — a arquivar em docs/historico/ |
+| — | [historico/](historico/2026-09-organizacao/) | documentos de estado morto, arquivados com README de desfecho — nunca fonte |
+| — | [BACKUP_LOG](historico/2026-09-organizacao/BACKUP_LOG.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
+| — | [progresso](historico/2026-09-organizacao/progresso.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
+| — | [integracoes](historico/2026-09-organizacao/integracoes.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
 
 ⚠️ **Nenhum destes 19 arquivos declara data de atualização nas primeiras linhas** — medido em
 21/09/2026. A coluna acima vem do título e do cabeçalho de cada um, não de interpretação. Quando
