@@ -268,6 +268,21 @@ const CAMPOS_INTERNOS = new Set([
 
 // ── Sub-componentes ────────────────────────────────────────────────────────
 
+/** Idade a partir de `DD/MM/YYYY` (formulário novo) ou string ISO (importação legada). */
+function calcularIdadeDaTriagem(dataNascimento: string | undefined): number | null {
+  if (!dataNascimento) return null;
+  const brMatch = dataNascimento.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const nascimento = brMatch
+    ? new Date(Number(brMatch[3]), Number(brMatch[2]) - 1, Number(brMatch[1]))
+    : new Date(dataNascimento);
+  if (isNaN(nascimento.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
+  return idade >= 0 && idade < 130 ? idade : null;
+}
+
 function CampoDetalhe({ label, valor }: { label: string; valor: string }) {
   if (!valor || valor === 'undefined' || valor === 'on') return null;
   const isLongo = valor.length > 80;
@@ -805,34 +820,25 @@ export default function TriagensAdminPage() {
         >
           <div className="relative w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="overflow-hidden rounded-xl bg-card shadow-2xl">
-              {/* ── Hero Header ─────────────────────────── */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-6 pt-6 pb-4 text-white sm:px-8">
-                <div
-                  className="absolute inset-0 opacity-[0.06]"
-                  style={{
-                    backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-                    backgroundSize: '24px 24px',
-                  }}
-                />
-                <div className="relative flex items-start justify-between">
+              {/* ── Header ──────────────────────────────── */}
+              <div className="relative border-b px-6 pt-6 pb-4 sm:px-8">
+                <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <Badge
                         className={cn(
                           'border-0 px-2.5 py-0.5 text-[11px] font-semibold',
-                          triagemSelecionada.statusVisualizacao === 'pendente' &&
-                            'bg-amber-400/20 text-amber-100',
-                          triagemSelecionada.statusVisualizacao === 'visualizada' &&
-                            'bg-white/20 text-white',
-                          triagemSelecionada.statusVisualizacao === 'respondida' &&
-                            'bg-emerald-400/20 text-emerald-100',
+                          (
+                            STATUS_CONFIG[triagemSelecionada.statusVisualizacao] ||
+                            STATUS_CONFIG.pendente
+                          ).cor,
                         )}
                       >
                         {STATUS_CONFIG[triagemSelecionada.statusVisualizacao]?.label ||
                           'Pendente'}
                       </Badge>
                       {(triagemSelecionada.dados as Record<string, string>)['_formulario'] && (
-                        <Badge className="border-0 bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">
+                        <Badge className="border-0 bg-violet-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-violet-600">
                           Importado · Elementor
                         </Badge>
                       )}
@@ -842,35 +848,71 @@ export default function TriagensAdminPage() {
                       {triagemSelecionada.nomeContato || 'Paciente sem nome'}
                     </h2>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
-                      {triagemSelecionada.emailContato && (
-                        <span className="flex items-center gap-1.5">
-                          <Mail size={14} />
-                          {triagemSelecionada.emailContato}
-                        </span>
-                      )}
-                      {triagemSelecionada.telefoneContato && (
-                        <span className="flex items-center gap-1.5">
-                          <Phone size={14} />
-                          {triagemSelecionada.telefoneContato}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1.5">
-                        <Calendar size={14} />
-                        {new Date(triagemSelecionada.createdAt).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
+                    {(() => {
+                      const dados = triagemSelecionada.dados as Record<string, string>;
+                      const idade = calcularIdadeDaTriagem(
+                        dados.data_nascimento || dados['Data de nascimento:'],
+                      );
+                      const patologia =
+                        dados.diagnostico_principal ||
+                        dados['Diagnóstico principal: '] ||
+                        dados['Patologia do paciente'] ||
+                        dados['Patologia'] ||
+                        '';
+                      return (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                          {triagemSelecionada.emailContato && (
+                            <a
+                              href={`mailto:${triagemSelecionada.emailContato}`}
+                              className="flex items-center gap-1.5 transition-colors hover:text-primary"
+                              title="Enviar e-mail"
+                            >
+                              <Mail size={14} />
+                              {triagemSelecionada.emailContato}
+                            </a>
+                          )}
+                          {triagemSelecionada.telefoneContato && (
+                            <a
+                              href={`https://wa.me/55${triagemSelecionada.telefoneContato.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 transition-colors hover:text-primary"
+                              title="Falar no WhatsApp"
+                            >
+                              <Phone size={14} />
+                              {triagemSelecionada.telefoneContato}
+                            </a>
+                          )}
+                          {idade !== null && (
+                            <span className="flex items-center gap-1.5">
+                              <User size={14} />
+                              {idade} anos
+                            </span>
+                          )}
+                          {patologia && (
+                            <span className="flex items-center gap-1.5">
+                              <Stethoscope size={14} />
+                              {patologia}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={14} />
+                            {new Date(triagemSelecionada.createdAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <button
                     onClick={() => setTriagemSelecionada(null)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <X size={18} />
                   </button>
@@ -900,14 +942,13 @@ export default function TriagensAdminPage() {
                   return (
                     <div className="relative mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {stats.map((stat) => (
-                        <div
-                          key={stat.label}
-                          className="rounded-lg bg-white/10 px-3 py-2.5 backdrop-blur-sm"
-                        >
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60">
+                        <div key={stat.label} className="rounded-lg bg-muted/40 px-3 py-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70">
                             {stat.label}
                           </p>
-                          <p className="mt-0.5 text-sm font-semibold text-white">{stat.valor}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-foreground">
+                            {stat.valor}
+                          </p>
                         </div>
                       ))}
                     </div>
