@@ -8,6 +8,8 @@ import {
 } from '@/app/(medico)/_actions/pagamentos';
 import { FormConfigPagamentoMedico } from '@/components/shared/pagamentos/form-config-pagamento-medico';
 import { PageHeader } from '@/components/shared/page-header';
+import { obterStatusContaMercadoPago } from '@/app/(medico)/_actions/mercadopago';
+import { SecaoMercadoPago } from './_components/secao-mercadopago';
 
 export const metadata: Metadata = {
   title: 'Meus dados de recebimento — Área Médica Be4Hope',
@@ -15,6 +17,7 @@ export const metadata: Metadata = {
 
 export default async function ConfigPagamentoMedicoLogadoPage() {
   const resultado = await obterConfigPagamentoMedicoLogado();
+  const statusMp = await obterStatusContaMercadoPago();
   const config = resultado.dados ?? {
     pixHabilitado: false,
     pixTipoChave: null,
@@ -43,6 +46,19 @@ export default async function ConfigPagamentoMedicoLogadoPage() {
       <PageHeader
         title="Meus dados de recebimento"
         description="Cadastre sua chave PIX e dados bancários. Quem decide o que fica disponível para o paciente na etapa de pagamento é o administrador — aqui você só alimenta o dado."
+      />
+
+      {/* O recebimento pelo Mercado Pago vem ANTES do PIX/boleto de propósito: é ele que
+          libera o agendamento. Sem conta conectada, `reservarConsulta` recusa. */}
+      <SecaoMercadoPago
+        status={
+          statusMp.dados ?? {
+            conectado: false,
+            mpUserId: null,
+            conectadoEm: null,
+            integracaoConfigurada: false,
+          }
+        }
       />
 
       <FormConfigPagamentoMedico

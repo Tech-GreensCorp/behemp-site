@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { estaConectado } from '@/lib/mercadopago/conta';
 import { consultas, medicos, pacientes, pagamentos, users } from '@/db/schema';
 import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
@@ -140,6 +141,23 @@ export async function reservarConsulta(
         sucesso: false,
         erro:
           'Este médico ainda não tem o valor da consulta configurado. Peça para o administrador configurar em Médicos.',
+      };
+    }
+
+    // 🔴 SEM CONTA DO MERCADO PAGO CONECTADA, NÃO HÁ PARA ONDE O DINHEIRO IR.
+    //
+    // O split paga o médico direto na conta dele; sem o vínculo OAuth, a reserva nasceria
+    // com um pagamento que ninguém consegue cobrar — e o paciente só descobriria na etapa
+    // de pagamento, com o horário já bloqueado.
+    //
+    // ⚠️ `estaConectado` NÃO DECIFRA NADA: ela só confere que existe linha sem
+    // `desconectadoEm`. Decifrar aqui seria expor a credencial num fluxo PÚBLICO, onde não
+    // há médico logado para auditar o acesso (ADR-0024 §5).
+    if (!(await estaConectado(medicoId))) {
+      return {
+        sucesso: false,
+        erro:
+          'Este médico ainda não configurou o recebimento de pagamentos. Peça para o administrador entrar em contato com ele.',
       };
     }
 
