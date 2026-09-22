@@ -5,37 +5,6 @@ import { medicos } from './medicos';
 /**
  * A conta do médico no Mercado Pago — o vínculo OAuth, não a cobrança.
  *
- * ⛔ **BRANCH PAUSADA — NÃO RODE `pnpm drizzle-kit generate` AINDA.** (22/09/2026)
- *
- * A migration desta tabela **não existe de propósito**. Ela foi gerada, provada contra um
- * Postgres 16 real e **apagada**, porque a numeração colidiria:
- *
- * | onde | migration | estado |
- * | ---- | --------- | ------ |
- * | `origin/main` | termina em `0043_long_slipstream` | — |
- * | PR **#110** (`wip/monitoramento-anvisa`, ABERTO) | `0044_fancy_galactus` | já no PR |
- * | a mesma árvore da #110, **ainda não commitada** | `0045_idioma_e_cadastro_transferido` | entra quando for commitada |
- * | esta branch, se gerasse hoje | nasceria `0044_calm_silver_fox` | 🔴 **colide** |
- *
- * 🔴 Dois `0044` diferentes alterando a última entrada do `_journal.json` é conflito garantido
- * — e conflito em journal de migration é dos que se resolve errado com facilidade, porque o
- * arquivo é JSON e o merge "funciona" enganosamente.
- *
- * **O que destrava:** o PR #110 entrar em `main` **com a 0045 junto**. Só então esta branch
- * sincroniza com `main` e roda `generate` — a migration nasce `0046`, sem colisão.
- *
- * ⚠️ E a 0045 **ainda não está no PR** (conferido em 22/09/2026: a #110 lista
- * `0044_fancy_galactus` e nenhum 0045). Ela vive não commitada na árvore de trabalho da
- * `wip/monitoramento-anvisa`. Se a #110 for mergeada sem ela, a colisão só muda de lugar.
- *
- * ⚠️ Quando a hora chegar: `db/migrations/` é área protegida pelo hook `escopo-autorizado`, e
- * o padrão do repositório pede a linha de autorização em `.claude/autorizacoes.txt` nomeando
- * os arquivos exatos — como as 0044/0045 da outra árvore têm.
- *
- * O que JÁ foi provado, e não precisa ser refeito: a tabela nasce com as 11 colunas, a FK
- * recusa `medico_id` inexistente, o `.unique()` recusa o segundo vínculo do mesmo médico, os
- * defaults preenchem, e o migrador de produção rodado duas vezes não duplica nada.
- *
  * ## Por que tabela própria, e não colunas em `pagamentos`
  *
  * São conceitos de cardinalidade diferente, e misturá-los é o erro clássico:
