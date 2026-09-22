@@ -286,6 +286,20 @@ jobs:
             # Mercado Pago passa a ser trocar um secret — não reconstruir o bundle.
             gravar MERCADOPAGO_PUBLIC_KEY_TESTE       "${{ secrets.MERCADOPAGO_PUBLIC_KEY_TESTE }}"
             gravar MERCADOPAGO_PUBLIC_KEY_PRODUCAO    "${{ secrets.MERCADOPAGO_PUBLIC_KEY_PRODUCAO }}"
+            # 🔴 A CHAVE QUE CIFRA OS TOKENS DE CONTA DO MÉDICO — e perdê-la é perder os dados.
+            #
+            # `lib/seguranca/cifra.ts` (AES-256-GCM, a primeira cifra em repouso deste
+            # repositório) LANÇA sem ela: nenhum médico consegue conectar a conta do Mercado
+            # Pago, e nada é gravado em claro. Falha fechada, como o BLOB_TOKEN_PRIVADO.
+            #
+            # ⚠️ NÃO EXISTE RECUPERAÇÃO. Trocar esta chave sem recifrar torna ilegível todo
+            # `access_token_cifrado` e `refresh_token_cifrado` já gravado, e cada médico
+            # precisaria reconectar. Rotação é decifrar com a antiga e recifrar com a nova —
+            # é por isso que o formato carrega `v1.` desde o primeiro dia.
+            #
+            # 64 hex = 32 bytes. Gerada com `openssl rand -hex 32`; o `tr -d '\n'` ao cadastrar
+            # não é detalhe — uma quebra de linha a mais e a chave deixa de ter 32 bytes.
+            gravar MERCADOPAGO_TOKEN_ENCRYPTION_KEY   "${{ secrets.MERCADOPAGO_TOKEN_ENCRYPTION_KEY }}"
             # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor
             # nunca bate com o do cliente e TODA navegação vira recarga completa.
             gravar NEXT_DEPLOYMENT_ID              "${{ github.sha }}"
