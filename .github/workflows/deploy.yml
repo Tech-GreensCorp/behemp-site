@@ -300,6 +300,25 @@ jobs:
             # 64 hex = 32 bytes. Gerada com `openssl rand -hex 32`; o `tr -d '\n'` ao cadastrar
             # não é detalhe — uma quebra de linha a mais e a chave deixa de ter 32 bytes.
             gravar MERCADOPAGO_TOKEN_ENCRYPTION_KEY   "${{ secrets.MERCADOPAGO_TOKEN_ENCRYPTION_KEY }}"
+            # 🔴 O INTERRUPTOR DO ROLLOUT — e LIGAR ELE QUEBRA AGENDAMENTO SE FOR CEDO.
+            #
+            # `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago
+            # conectada. É a regra final, e é também mudança visível ao paciente: com a
+            # tabela `medicos_mercadopago_conta` vazia, ligar isto bloqueia TODOS os
+            # agendamentos, com TODOS os médicos, no mesmo segundo.
+            #
+            # ⚠️ ANTES DE CADASTRAR O SECRET COM 'ativo', um passo manual que NENHUM código
+            # confere: verificar que todo médico ativo já conectou a conta. Quem não tiver
+            # conectado deixa de receber agendamento imediatamente, e o sintoma do lado do
+            # paciente é a agenda parecer quebrada. Procedimento em docs/04, Item 38.
+            #
+            # Vazio = `inativo`, que é o padrão que não quebra nada. O log de produção
+            # registra cada médico sem conta mesmo com a flag desligada — é por ali que se
+            # mede quantos faltam antes de ligar.
+            #
+            # Mesmo desenho de PARCEIRO_TRANSFERENCIA_ATIVA: a trava fica no código e o que
+            # muda é o valor. Desligar é um comando, não um revert.
+            gravar MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO "${{ secrets.MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO }}"
             # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor
             # nunca bate com o do cliente e TODA navegação vira recarga completa.
             gravar NEXT_DEPLOYMENT_ID              "${{ github.sha }}"

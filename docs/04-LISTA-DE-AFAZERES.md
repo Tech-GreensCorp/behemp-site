@@ -19,6 +19,62 @@
 
 ---
 
+## ⏳ Item 38 — PENDENTE, 22/09/2026: ligar o bloqueio de agendamento do Mercado Pago
+
+**Status:** o código está pronto e **desligado**. Ligar é trocar um secret — e ligar cedo
+derruba o agendamento da plataforma inteira.
+
+### O que já existe
+
+`reservarConsulta` (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico
+não tem conta do Mercado Pago conectada. A checagem usa `podeAgendarCom`
+(`lib/mercadopago/conta.ts`), que **não decifra nada** — só confere que existe linha sem
+`desconectadoEm`.
+
+### 🔴 Por que está desligado
+
+A tabela `medicos_mercadopago_conta` está **vazia** (medido em produção em 22/09/2026, logo
+depois da migration `0046`). Com o bloqueio ativo e a tabela vazia, **nenhum paciente consegue
+agendar com nenhum médico** — não é degradação parcial, é a agenda inteira parada no mesmo
+segundo.
+
+O interruptor é `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO`, e o padrão é `inativo`.
+
+### O passo manual ANTES de ligar — nenhum código confere isto
+
+| #   | o quê                                                      | como conferir                                                                                                                                                                                     |
+| --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | o `redirect_uri` está cadastrado no painel do Mercado Pago | `https://be4hope.org/api/medico/mercadopago/callback`, idêntico. A doc do MP exige URL estática                                                                                                   |
+| 2   | **todo médico ativo já conectou a conta**                  | `select count(*) from medicos m where not exists (select 1 from medicos_mercadopago_conta c where c.medico_id = m.id and c.desconectado_em is null and c.deleted_at is null)` — precisa dar **0** |
+| 3   | o log de produção parou de acusar médico sem conta         | `grep 'sem conta conectada no agendamento' error.log` na VPS                                                                                                                                      |
+| 4   | só então                                                   | `gh secret set MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO` com o valor `ativo`, e redeploy                                                                                                            |
+
+⚠️ **O passo 3 é o que torna isto mensurável em vez de adivinhado.** Com a flag desligada, o
+agendamento registra `console.warn` a cada reserva de médico sem conta — sem bloquear ninguém.
+É por ali que se sabe quantos faltam, em vez de descobrir pelo paciente.
+
+### O que NÃO fazer
+
+⛔ **Não ligar a flag junto do merge.** Merge e ativação são dois eventos, e é o interruptor
+que permite separá-los — foi para isso que ele existe.
+
+⛔ **Não "resolver" removendo a checagem.** Sem ela, a reserva nasce com um pagamento que
+ninguém consegue cobrar, e o paciente descobre na etapa de pagamento com o horário já
+bloqueado.
+
+### Desligar de volta
+
+Apagar o secret (ou trocar para `inativo`) e redeployar. **Não exige reverter código** — é a
+mesma propriedade de `PARCEIRO_TRANSFERENCIA_ATIVA`, e é de propósito.
+
+### Relacionado
+
+- `docs/adr/ADR-0024` — a cifra dos tokens, e §7 sobre perder a chave
+- `lib/env.ts` — `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO`, com o mesmo aviso
+- `.github/workflows/deploy.yml` — a linha `gravar` e o comentário
+
+---
+
 ## ✅ Item 37 — RESOLVIDO em 12/09/2026: seis defeitos que quebravam o fluxo da Greens de ponta a ponta
 
 **Achados pelo dono testando em produção**, mais três que apareceram ao medir os 4 fluxos

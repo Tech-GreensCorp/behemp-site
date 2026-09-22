@@ -48,6 +48,12 @@ const AREAS = [
   'app/api/parceiros',
   'app/api/chatpro',
   'lib/anvisa',
+  // ⚠️ A LISTA É O PONTO CEGO DESTE GUARDA. Ele deriva as variáveis do CÓDIGO, mas só
+  // dentro dos diretórios listados aqui — então integração nova nasce DESCOBERTA, e a
+  // quarta recorrência da classe passaria verde. Acrescentado em 22/09/2026 junto com o
+  // OAuth do Mercado Pago, que é a primeira integração a entrar depois desta constatação.
+  'lib/mercadopago',
+  'app/api/medico/mercadopago',
 ];
 
 function arquivosDe(dir: string): string[] {
