@@ -59,6 +59,35 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
 
 ## 🔴 Prioridade 1 — risco agora
 
+- [x] **Item 32 — ✅ CORRIGIDO em 21/09/2026** (causa; efeito ainda não confirmado no fluxo
+      real): **o consentimento LGPD não era gravado em produção**, e o cadastro não
+      acusava. A migration `0039_secret_randall` tem entrada no journal e **nunca foi aplicada**:
+      `consentimentos.idioma` **não existia** e o enum `parceiro_evento_tipo` **não tinha**
+      `cadastro_transferido`. `conceder()` (`lib/parceiros/consentimento-registrado.ts:104`)
+      faz `INSERT` com `idioma` → falha sempre; o chamador
+      (`app/_actions/cadastro-por-link.ts:600`) envolve num `try/catch` que só faz
+      `console.error`. **Medido em 21/09/2026: 0 linhas em `consentimentos` para os 7
+      cadastros que chegaram a ter paciente** (das 77 solicitações, 70 pararam antes). É perda de registro de consentimento acontecendo agora, e é
+      também por isso que a transferência S2 para a Greens nunca dispara — o comentário do
+      próprio código (`:593-597`) escreve o desfecho: _"nada é enviado à Greens"_.
+      🔴 **Reescrever a 0039 não resolve:** o migrator seleciona por `max(created_at)`, que já
+      é o da 0043 — ela é pulada em silêncio para sempre. Correção preparada e provada com 5
+      cenários (`db/migrations/0045_idioma_e_cadastro_transferido.sql`), **aplicada em
+      produção em 21/09** com backup conferido pelo dono, por `pnpm db:migrate:prod`. Depois:
+      a coluna existe, o enum tem o valor, o journal foi de 46 para 48 linhas com as entradas
+      44 e 45, e o `INSERT` do `conceder()` passa. ⚠️ **A 0044 veio junto** — o migrator não
+      aplica uma só, e ela era no-op medido. 🔴 **Falta confirmar o EFEITO:** que um cadastro
+      real deixe linha em `consentimentos`. Diagnóstico e a medição antes/depois em
+      [04 — Item 32](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 33** — 🔴 **`erro.name` num `new Error` é sempre `'Error'`**, e foi isso que
+      escondeu o Item 32. `app/_actions/cadastro-por-link.ts:606-609` loga
+      `erro: erroDoConsentimento.name` — em produção, `{ erro: 'Error' }` para qualquer causa.
+      A mensagem real nunca chegou a lugar nenhum. É a mesma classe que o guarda
+      `o-motivo-do-erro-diagnostica-sem-vazar` existe para impedir, voltando por uma porta que
+      ele não olha: ele cobre o helper de formatação, não um `console.error` escrito à mão.
+      Correção proposta e o equilíbrio entre "dizer de menos" e "vazar PII" em
+      [04 — Item 33](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido.**
+
 - [x] **Item 37 — ✅ RESOLVIDO em 12/09/2026:** seis defeitos que quebravam o fluxo da Greens
       de ponta a ponta. O cadastro virava falha **depois** de gravar tudo (conta, ficha e link
       consumido) e a tela negava, sem volta; os **dois** destinos pós-cadastro levavam a 404

@@ -50,6 +50,13 @@ export interface DadosDashboard {
     medicoNome: string;
     temPrescricao: boolean;
   } | null;
+  autorizacaoAnvisa: {
+    id: string;
+    numeroProcesso: string | null;
+    dataValidade: string | null;
+    status: string;
+    temRenovacaoEmAndamento: boolean;
+  } | null;
   userId: string | null;
   /**
    * 🔴 SAI DO ESTADO REAL, não da declaração do cadastro.
@@ -105,8 +112,9 @@ export async function obterDadosDashboard(): Promise<{
       teleconsultaRes,
       consultaRecenteRes,
       userIdRes,
-      anvisaRes,
+      temAnvisaRes,
       cepRes,
+      anvisaAtualRes,
     ] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
@@ -274,6 +282,27 @@ export async function obterDadosDashboard(): Promise<{
         WHERE u.clerk_id = ${auth.clerkId}
         LIMIT 1
       `),
+      // 12. Autorização ANVISA mais recente — alimenta o AnvisaCard
+      db.execute(sql`
+        SELECT
+          a.id,
+          a.numero_processo AS "numeroProcesso",
+          a.data_validade   AS "dataValidade",
+          a.status,
+          EXISTS(
+            SELECT 1 FROM autorizacoes_anvisa ar
+            WHERE ar.autorizacao_anterior_id = a.id
+              AND ar.deleted_at IS NULL
+              AND ar.status NOT IN ('aprovado', 'rejeitado')
+          ) AS "temRenovacaoEmAndamento"
+        FROM autorizacoes_anvisa a
+        INNER JOIN pacientes p ON p.id = a.paciente_id
+        INNER JOIN users u     ON u.id = p.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND a.deleted_at IS NULL
+        ORDER BY a.created_at DESC
+        LIMIT 1
+      `),
     ]);
 
     // Processar médico
@@ -344,7 +373,7 @@ export async function obterDadosDashboard(): Promise<{
 
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
 
-    const precisaDaProcuracao = !anvisaRes.rows[0]?.temAnvisa;
+    const precisaDaProcuracao = !temAnvisaRes.rows[0]?.temAnvisa;
     const enderecoPendente = !(cepRes.rows[0] as { cep?: string | null } | undefined)?.cep;
 
     /**
@@ -362,6 +391,23 @@ export async function obterDadosDashboard(): Promise<{
     /** A sentinela: um lugar só decide em que ponto esta pessoa está (D-05). */
     const situacao = await situacaoDoFluxo(auth.clerkId);
 
+    /**
+     * O shape sai da própria interface: a query 12 seleciona exatamente estes campos, e
+     * declarar o tipo aqui faria a mesma lista existir em dois lugares que podem divergir.
+     */
+    const anvisaRow = anvisaAtualRes.rows[0] as
+      | NonNullable<DadosDashboard['autorizacaoAnvisa']>
+      | undefined;
+    const autorizacaoAnvisa = anvisaRow
+      ? {
+          id: String(anvisaRow.id),
+          numeroProcesso: anvisaRow.numeroProcesso ? String(anvisaRow.numeroProcesso) : null,
+          dataValidade: anvisaRow.dataValidade ? String(anvisaRow.dataValidade) : null,
+          status: String(anvisaRow.status),
+          temRenovacaoEmAndamento: Boolean(anvisaRow.temRenovacaoEmAndamento),
+        }
+      : null;
+
     return {
       sucesso: true,
       dados: {
@@ -373,6 +419,7 @@ export async function obterDadosDashboard(): Promise<{
         mensagensNaoLidas,
         teleconsultaAtiva,
         consultaRecenteRealizada,
+        autorizacaoAnvisa,
         userId,
         precisaDaProcuracao,
         cadastroPendente,

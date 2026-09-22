@@ -119,7 +119,7 @@ export async function coletarAlertasLicencas(): Promise<AlertaLicenca[]> {
   const config = await db.query.alertasConfig.findFirst();
   if (!config) return [];
   
-  const marcos = config.marcosLicencaDias as number[]; // ex: [60, 30]
+  const marcos = config.marcosLicencaDias as number[]; // ex: [90, 60, 30, 7]
   if (!marcos || marcos.length === 0) return [];
 
   const hoje = getHojeSp();
@@ -149,24 +149,58 @@ export async function coletarAlertasLicencas(): Promise<AlertaLicenca[]> {
     const dataValidade = toZonedTime(parseISO(licenca.dataValidade + 'T00:00:00Z'), TZ);
     const diasRestantes = differenceInDays(dataValidade, hoje);
 
-    const marcosCrescente = [...marcos].sort((a, b) => a - b);
-    const marcoAtingido = marcosCrescente.find(m => diasRestantes <= m);
+    if (diasRestantes >= 0) {
+      // Marcos pré-vencimento
+      const marcosCrescente = [...marcos].sort((a, b) => a - b);
+      const marcoAtingido = marcosCrescente.find(m => diasRestantes <= m);
 
-    if (marcoAtingido !== undefined && diasRestantes >= 0) {
-      let prioridade: PrioridadeAlerta = 'atencao';
-      if (marcoAtingido <= 30) prioridade = 'critico';
+      if (marcoAtingido !== undefined) {
+        let prioridade: PrioridadeAlerta = 'atencao';
+        if (marcoAtingido <= 30) prioridade = 'critico';
 
-      alertas.push({
-        tipo: 'licenca_anvisa',
-        referenciaId: licenca.id,
-        pacienteNome: licenca.pacienteNome,
-        pacienteEmail: licenca.pacienteEmail,
-        pacienteTelefone: licenca.pacienteTelefone,
-        diasRestantes: diasRestantes,
-        dataValidade: licenca.dataValidade,
-        prioridade,
-        marcoDisparado: marcoAtingido,
+        alertas.push({
+          tipo: 'licenca_anvisa',
+          referenciaId: licenca.id,
+          pacienteNome: licenca.pacienteNome,
+          pacienteEmail: licenca.pacienteEmail,
+          pacienteTelefone: licenca.pacienteTelefone,
+          diasRestantes: diasRestantes,
+          dataValidade: licenca.dataValidade,
+          prioridade,
+          marcoDisparado: marcoAtingido,
+        });
+      }
+    } else {
+      // Pós-vencimento (diasRestantes < 0)
+      // Verifica se já existe uma renovação em andamento
+      const temRenovacao = await db.query.autorizacoesAnvisa.findFirst({
+        where: eq(autorizacoesAnvisa.autorizacaoAnteriorId, licenca.id),
       });
+
+      if (!temRenovacao) {
+        // Alerta semanal recorrente para admin.
+        // Calculamos qual semana de atraso é (1 semana = -7 dias, 2 semanas = -14 dias, etc)
+        const diasAtraso = Math.abs(diasRestantes);
+        // Ex: se passou 8 dias, floor(8/7) = 1, então o marco é -7. 
+        // Se passou 14 dias, floor(14/7) = 2, marco -14.
+        const semanasAtraso = Math.floor(diasAtraso / 7);
+        
+        if (semanasAtraso > 0) {
+          const marcoSemanal = -(semanasAtraso * 7); // Ex: -7, -14, -21...
+          
+          alertas.push({
+            tipo: 'licenca_anvisa',
+            referenciaId: licenca.id,
+            pacienteNome: licenca.pacienteNome,
+            pacienteEmail: licenca.pacienteEmail,
+            pacienteTelefone: licenca.pacienteTelefone,
+            diasRestantes: diasRestantes,
+            dataValidade: licenca.dataValidade,
+            prioridade: 'critico', // Sempre crítico
+            marcoDisparado: marcoSemanal,
+          });
+        }
+      }
     }
   }
 
