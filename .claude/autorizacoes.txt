@@ -660,3 +660,84 @@ path:app/(paciente)/paciente/anvisa/page.tsx
 path:app/(paciente)/paciente/perfil/page.tsx
 path:app/(paciente)/paciente/documentos/page.tsx
 path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx
+
+# ── Autorizado pelo dono em 21/09/2026, na sincronização e no merge do PR #110 ──
+# Reescrever a migration 0044_fancy_galactus.sql para ser IDEMPOTENTE. Palavras dele:
+# "Reescrever a migration 0044 para ser idempotente: ADD COLUMN IF NOT EXISTS ... 
+# CREATE INDEX IF NOT EXISTS ... A FK: envolver em DO $$ BEGIN ... EXCEPTION WHEN
+# duplicate_object THEN NULL; END $$. Não alterar nada além disso na migration."
+#
+# POR QUÊ: medido em 21/09 contra o banco de produção (leitura apenas) — a coluna
+# `autorizacao_anterior_id`, a constraint FK e o índice `autorizacoes_anterior_idx` JÁ
+# EXISTEM lá, sem nenhuma linha correspondente em `drizzle.__drizzle_migrations`. É a
+# assinatura de `drizzle-kit push`, que sincroniza schema direto e não grava journal.
+# O migrator (`dialect.migrate()`) seleciona pendentes por `max(created_at)`, que é
+# 1789271398148 (a 0043) — menor que o `when` da 0044 (1789588306034). Logo a 0044
+# SERÁ tentada, e o `ADD COLUMN` cru falha com `column already exists`.
+#
+# PERIGO MEDIDO de NÃO mexer (o custo de deixar):
+#   · o deploy do merge falha na migration; a transação inteira faz rollback (isso é
+#     correto e não deixa estado parcial), mas o `set -e` para o script DEPOIS de os
+#     steps "Limpar build antigo" (`rm -rf .next`) e "rsync --delete" já terem rodado
+#   · produção fica com o processo PM2 velho servindo HTML cujos chunks foram apagados
+#     do disco → 404 em CSS/JS, sem recuperação automática
+#   · e TODO deploy seguinte falha na mesma migration, inclusive o que corrigiria
+#
+# PERIGO MEDIDO de mexer: baixo e delimitado. Os três statements passam a ser no-op
+# quando o objeto existe e a criar quando não existe — o resultado final do schema é
+# idêntico nos dois casos. Nada é removido, nada é reordenado, o `ALTER ... SET DEFAULT`
+# e o `UPDATE` de dado escrito à mão ficam intactos. O `hash` do arquivo muda, mas a
+# seleção do migrator é por `folderMillis`, não por hash — sem efeito.
+#
+# ⚠️ NÃO É EDIÇÃO DE MIGRATION JÁ APLICADA. A 0044 nunca rodou em lugar nenhum: não
+# está em origin/main e não tem linha no journal do banco. Editá-la agora é corrigir
+# um arquivo que ainda não teve efeito, não reescrever história.
+#
+# PROVA ANTES/DEPOIS: executada contra o banco real dentro de BEGIN … ROLLBACK, com
+# `lock_timeout`, nos dois estados (objeto existente → no-op; objeto ausente → cria).
+#
+# Granularidade deliberada: o ARQUIVO exato, não `db/migrations/`. Autorizar o
+# diretório liberaria qualquer migration futura sem nova decisão.
+path:db/migrations/0044_fancy_galactus.sql
+
+# ── Autorizado pelo dono em 21/09/2026, depois da medição da 0039 ───────────────
+# Criar a migration 0045 para aplicar em produção o que a 0039 nunca aplicou.
+#
+# POR QUE MIGRATION NOVA, E NÃO REESCREVER A 0039: o migrator seleciona pendentes por
+# `max(created_at)` do banco (`dialect.migrate()`), que em produção é 1789271398148 — a
+# 0043. O `when` da 0039 é 1789142042567, MENOR. Ela nunca mais será selecionada, com
+# qualquer conteúdo que tenha. Reescrevê-la seria escrever num arquivo sem efeito.
+# A 0039 fica INTACTA: num banco reconstruído do zero ela aplica, e a 0045 vira no-op.
+#
+# O QUE A 0045 REPARA (medido em produção em 21/09, leitura apenas):
+#   · `consentimentos.idioma` NÃO EXISTE — colunas reais: id, created_at, updated_at,
+#     paciente_id, finalidade, versao, texto_apresentado, concedido_em, revogado_em, origem
+#   · enum `parceiro_evento_tipo` tem só `receita_emitida, anvisa_aprovada` — falta
+#     `cadastro_transferido`
+#
+# PERIGO MEDIDO de NÃO mexer (falha silenciosa ATIVA, não latente):
+#   · `conceder()` (lib/parceiros/consentimento-registrado.ts:104) faz INSERT com `idioma`
+#     → falha SEMPRE. Medido: `consentimentos` tem 0 linhas com 77 solicitações de cadastro
+#   · o chamador (app/_actions/cadastro-por-link.ts:600) envolve em try/catch que só faz
+#     console.error → o cadastro conclui e o consentimento não é gravado, sem ninguém ver
+#   · consequência escrita no próprio código (:593-597): "nada é enviado à Greens" — o S2
+#     não dispara, e a causa está três camadas abaixo de onde se procuraria
+#   · é perda de registro de consentimento LGPD acontecendo em produção agora
+#
+# PERIGO MEDIDO de mexer: baixo. Os dois statements são aditivos e idempotentes. A tabela
+# `consentimentos` tem 0 linhas, então o `NOT NULL DEFAULT 'pt'` não reescreve nada. O
+# `ALTER TYPE ... ADD VALUE` é permitido dentro de transação em PG >= 12 e produção roda
+# PostgreSQL 17.11 (medido) — e o valor novo não é USADO na mesma transação, que é a
+# única restrição que a documentação impõe.
+#
+# SNAPSHOT: o `0044_snapshot.json` JÁ declara `consentimentos.idioma` e o valor de enum.
+# O `0045_snapshot.json` é cópia dele com `id`/`prevId` novos — o estado de schema não
+# muda, muda o banco. Assim um `drizzle-kit generate` futuro não vê diferença pendente.
+#
+# PROVA ANTES/DEPOIS: cenário limpo, cenário repetido, cenário contra o estado real de
+# produção em BEGIN … ROLLBACK, e o cenário VERMELHO que reproduz o INSERT falhando hoje.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0045_idioma_e_cadastro_transferido.sql
+path:db/migrations/meta/0045_snapshot.json
+path:db/migrations/meta/_journal.json
