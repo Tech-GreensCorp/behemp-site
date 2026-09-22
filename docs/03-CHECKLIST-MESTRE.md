@@ -79,6 +79,23 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       aplica uma só, e ela era no-op medido. 🔴 **Falta confirmar o EFEITO:** que um cadastro
       real deixe linha em `consentimentos`. Diagnóstico e a medição antes/depois em
       [04 — Item 32](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 38** — ⏳ **o bloqueio de agendamento do Mercado Pago está PRONTO e DESLIGADO**,
+      e ligar cedo para a plataforma inteira. `reservarConsulta`
+      (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico não tem conta
+      do Mercado Pago conectada — é a regra final, e é também mudança visível ao paciente.
+      🔴 **A tabela `medicos_mercadopago_conta` está VAZIA** (medido em produção em 22/09/2026,
+      logo depois da migration `0046`): com o bloqueio ativo, **nenhum paciente agenda com
+      nenhum médico**, no mesmo segundo. Por isso a checagem passa por
+      `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO`, cujo padrão é `inativo` — mesmo desenho de
+      `PARCEIRO_TRANSFERENCIA_ATIVA`: a trava fica no código e o que muda é o valor.
+      ⚠️ **Antes de ligar há um passo manual que NENHUM código confere:** todo médico ativo
+      precisa ter conectado a conta. Com a flag desligada, o agendamento grava `console.warn`
+      a cada reserva de médico sem conta **sem bloquear ninguém** — é por ali que se mede
+      quantos faltam, em vez de descobrir pelo paciente. ⛔ **Não ligar junto do merge:** merge
+      e ativação são dois eventos, e o interruptor existe para separá-los. Procedimento, a
+      query de conferência e o que não fazer em [04 — Item 38](04-LISTA-DE-AFAZERES.md).
+      ⚠️ **Falta guarda:** nada impede alguém de trocar `podeAgendarCom` por `estaConectado` e
+      ressuscitar o bloqueio incondicional.
 - [ ] **Item 33** — 🔴 **`erro.name` num `new Error` é sempre `'Error'`**, e foi isso que
       escondeu o Item 32. `app/_actions/cadastro-por-link.ts:606-609` loga
       `erro: erroDoConsentimento.name` — em produção, `{ erro: 'Error' }` para qualquer causa.

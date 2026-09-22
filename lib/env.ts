@@ -139,6 +139,23 @@ const envSchema = z.object({
    * cifra, no ponto de uso, não o boot do app inteiro.
    */
   MERCADOPAGO_TOKEN_ENCRYPTION_KEY: z.string().optional(),
+  /**
+   * 🔴 O INTERRUPTOR DO ROLLOUT — e o padrão é `inativo` porque ligar QUEBRA agendamento.
+   *
+   * `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago conectada. Isso
+   * é o comportamento final desejado, e é também uma **mudança visível ao paciente**: hoje
+   * a tabela `medicos_mercadopago_conta` está VAZIA, então ligar isto agora bloquearia
+   * TODOS os agendamentos, com TODOS os médicos, no mesmo instante.
+   *
+   * ⚠️ ANTES DE LIGAR, um passo manual que nenhum código confere: verificar que todo médico
+   * ativo já conectou a conta. Quem não tiver conectado deixa de receber agendamento no
+   * segundo em que a flag virar — e o sintoma, do lado do paciente, é a agenda parecer
+   * quebrada. Ver `docs/04-LISTA-DE-AFAZERES.md`, Item 38.
+   *
+   * Mesmo desenho de `PARCEIRO_TRANSFERENCIA_ATIVA` e `MERCADOPAGO_AMBIENTE`: a trava fica
+   * no código e o que muda é o valor. Desligar é um comando, não um revert.
+   */
+  MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO: z.enum(['ativo', 'inativo']).default('inativo'),
 
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),

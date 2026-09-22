@@ -70,6 +70,49 @@ export async function estaConectado(medicoId: string): Promise<boolean> {
   return Boolean(linha);
 }
 
+/**
+ * 🔴 O INTERRUPTOR DO ROLLOUT — só `'ativo'` bloqueia agendamento.
+ *
+ * Mora aqui, e não em `app/(public)/_actions/agendamento.ts`, por dois motivos:
+ *
+ *   1. **cobertura de guarda.** `o-segredo-cadastrado-chega-ao-servidor` deriva as
+ *      variáveis do código, mas só dentro das áreas que ele varre — e `app/(public)` não é
+ *      uma delas. Lida daqui, a variável nasce coberta, e a falha de "cadastrei o secret e
+ *      ele nunca chegou ao processo" — três vezes neste repositório — não se repete;
+ *   2. quem decide sobre a conta do Mercado Pago é este módulo.
+ *
+ * Lida a cada chamada, de propósito: virar a flag é trocar o secret e reiniciar, sem um
+ * módulo segurando o valor antigo numa constante de topo.
+ */
+export function bloqueioDeAgendamentoAtivo(): boolean {
+  return process.env.MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO?.trim() === 'ativo';
+}
+
+export interface PermissaoDeAgendamento {
+  /** `false` só quando o bloqueio está ATIVO e o médico não conectou. */
+  permitido: boolean;
+  /** O fato, independente da flag — é o que o log precisa para o rollout ser medido. */
+  conectado: boolean;
+  bloqueioAtivo: boolean;
+}
+
+/**
+ * O paciente pode agendar com este médico?
+ *
+ * ⚠️ SEPARA O FATO DA DECISÃO de propósito. `conectado` diz o que É; `permitido` diz o que
+ * FAZEMOS com isso hoje. Com a flag inativa, os dois divergem — e é essa divergência que
+ * permite medir quantos médicos ainda faltam ANTES de ligar o bloqueio, em vez de
+ * descobrir pelo paciente.
+ *
+ * 🛑 NÃO DECIFRA NADA. Chamada de fluxo público, onde não há médico logado para auditar o
+ * acesso (ADR-0024 §5).
+ */
+export async function podeAgendarCom(medicoId: string): Promise<PermissaoDeAgendamento> {
+  const conectado = await estaConectado(medicoId);
+  const bloqueioAtivo = bloqueioDeAgendamentoAtivo();
+  return { permitido: conectado || !bloqueioAtivo, conectado, bloqueioAtivo };
+}
+
 /** O status para a tela. Também não decifra — só metadado. */
 export async function obterStatus(medicoId: string): Promise<StatusDaConta> {
   const [linha] = await db
