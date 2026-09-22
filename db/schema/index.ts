@@ -38,6 +38,7 @@ export * from './alertas-config';
 export * from './alertas-enviados';
 export * from './pagamentos';
 export * from './medicos-pagamento-config';
+export * from './medicos-mercadopago-conta';
 
 // Relations
 export * from './relations';

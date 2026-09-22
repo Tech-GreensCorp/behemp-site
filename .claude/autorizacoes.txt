@@ -741,3 +741,37 @@ path:db/migrations/0044_fancy_galactus.sql
 path:db/migrations/0045_idioma_e_cadastro_transferido.sql
 path:db/migrations/meta/0045_snapshot.json
 path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 22/09/2026 ──────────────────────────────────────────
+# A migration da tabela `medicos_mercadopago_conta` (ADR-0024): a conta do médico no
+# Mercado Pago, primeira credencial de terceiro POR MÉDICO e primeira cifra em repouso
+# do repositório (AES-256-GCM, `lib/seguranca/cifra.ts`).
+#
+# PERIGO MEDIDO de mexer: BAIXO, e é o menor possível para uma migration.
+#   · é `CREATE TABLE` de tabela que NÃO EXISTE — nenhuma linha, nenhum consumidor,
+#     nenhuma tela. Puramente aditiva: não altera, não renomeia, não apaga nada
+#   · o único toque em objeto existente é a FK para `medicos(id)`, que só LÊ
+#   · zero código lê ou escreve a tabela hoje — o OAuth e o endpoint de cobrança
+#     ainda não existem (ADR-0024 §9)
+#
+# PERIGO MEDIDO de NÃO mexer: nenhum hoje. A tabela é pré-requisito da integração de
+# pagamento, não correção de falha ativa — ao contrário da 0045, que era.
+#
+# NUMERAÇÃO: nasceu `0046` DE PROPÓSITO. Gerada primeiro como `0044_calm_silver_fox`,
+# ela colidiria com a `0044_fancy_galactus` da ANVISA; foi APAGADA e regerada só depois
+# do merge do PR #110, que levou a 0044 e a 0045 para `main`. Dois arquivos disputando
+# a última entrada do `_journal.json` é conflito que o merge "resolve" enganosamente,
+# porque o arquivo é JSON.
+#
+# PROVA ANTES/DEPOIS: container Postgres 16 descartável — schema real montado com
+# `drizzle-kit push`, a tabela derrubada, a migration aplicada, e conferidos por
+# execução: as 11 colunas, a FK recusando `medico_id` inexistente, o `.unique()`
+# recusando o segundo vínculo do mesmo médico, os defaults, e o migrador de produção
+# rodado DUAS VEZES sem duplicar.
+#
+# ⚠️ A idempotência aqui é do MIGRADOR (o livro-caixa `drizzle.__drizzle_migrations`),
+# não do SQL: o `CREATE TABLE` é cru, sem `IF NOT EXISTS`, como o drizzle-kit gera.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0046_panoramic_chimera.sql
+path:db/migrations/meta/0046_snapshot.json
