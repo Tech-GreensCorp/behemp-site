@@ -323,6 +323,13 @@
       "when": 1790014838175,
       "tag": "0045_idioma_e_cadastro_transferido",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1790104361903,
+      "tag": "0046_panoramic_chimera",
+      "breakpoints": true
     }
   ]
 }
