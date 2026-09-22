@@ -63,18 +63,70 @@ oito fluxos, passo a passo) e `docs/11-OS-OITO-FLUXOS.md`.
 
 🔴 **Nada do que está à frente de `main` chegou a `origin/main`.** `docs/organizacao-2026-09` não tem remoto; `docs/adr-0023-…` tem 18 commits só locais. [8, 9]
 
-### Migrations no disco
+### Migrations — retificado em 22/09/2026
 
-**45 arquivos `.sql`**, journal com **44 entradas**, última = `0043_long_slipstream`. [15, 16]
-A diferença é `0007_add_medico_ordem.sql`, **fora do journal** de propósito — o número `0007`
-está ocupado por `0007_wet_sharon_ventura.sql`, e o conteúdo dela é coberto, de forma
-idempotente, pela `0022_reconciliar_medico_ordem.sql`. [17]
+**Neste branch:** 45 arquivos `.sql`, journal com **44 entradas**, última `0043_long_slipstream`.
+**Na `origin/main` de 22/09 (`26d00f7`, PR #113):** 48 arquivos, journal com **47 entradas**,
+última `0046_panoramic_chimera`. Entraram `0044_fancy_galactus`, `0045_idioma_e_cadastro_transferido`
+e `0046_panoramic_chimera`. Medido com `python3 -c "json.load(open('db/migrations/meta/_journal.json'))"`
+nas duas árvores.
 
-🔴 **O estado do banco de PRODUÇÃO (Neon) NÃO foi medido; a frente de diagnóstico está pausada
-por decisão do dono. Não assumir que as 44 estão aplicadas.** O mecanismo do migrator
-(`drizzle-orm/pg-core/dialect.js:56-62`) aplica só o que tem `when` maior que o **maior
-`created_at` já registrado**, lido uma vez antes do loop — e `0036`, `0037` e `0038` têm `when`
-menor que o de `0035`. **O diagnóstico disso (0036–0038, 0039, e a 0044 com UPDATE de dados) existe só em relatórios de sessão — não há arquivo no disco. Registrar antes de agir.**
+A diferença entre arquivos e entradas é `0007_add_medico_ordem.sql`, **fora do journal** de
+propósito — o número `0007` está ocupado por `0007_wet_sharon_ventura.sql`, e o conteúdo dela é
+coberto, de forma idempotente, pela `0022_reconciliar_medico_ordem.sql`. [17]
+
+🔴 **A `0039` NUNCA FOI APLICADA EM PRODUÇÃO, e isto foi medido — não inferido.** O cabeçalho da
+`db/migrations/0045_idioma_e_cadastro_transferido.sql` registra a medição de 21/09/2026:
+`consentimentos.idioma` **não existia**, e o enum `parceiro_evento_tipo` tinha apenas
+`receita_emitida` e `anvisa_aprovada`. O `when` da `0039` é **1789142042567**, menor que o marco
+de produção **1789271398148** (a `0043`) — e o migrator (`drizzle-orm/pg-core/dialect.js:56-62`)
+escolhe as pendentes comparando com o **maior `created_at` já gravado**, lido uma vez antes do
+loop. Ela nunca mais seria selecionada, tivesse o conteúdo que tivesse. A `0045` é a migration de
+reparo, com `when` novo; a `0039` fica intacta para o caso de um banco reconstruído do zero.
+
+⚠️ **RETIFICAÇÃO EXPRESSA — 22/09/2026.** Em 21/09, o Desktop e este Code concluíram que a `0039`
+**estava** aplicada. A inferência foi: _"`app/_actions/cadastro-por-link.ts:600` chama `conceder()`,
+que insere `consentimentos.idioma`; o cadastro por link funciona em produção; logo a coluna
+existe."_ **A inferência estava errada.** A análise mecânica do migrator — o `when` menor que o
+marco — estava certa, e foi ela que a `0045` confirmou.
+
+🔴 **A lição de método, e ela é a mais cara desta semana: sintoma funcionando não prova estado de
+schema.** Foi essa inferência que reduziu a urgência da frente de migrations, e ela sobreviveu
+porque parecia uma dedução e era um palpite bem escrito.
+
+**O diagnóstico agora está no disco**, e não só em relatório de sessão: o cabeçalho da
+`db/migrations/0045_idioma_e_cadastro_transferido.sql` é onde ele vive.
+
+### Documentos do paciente — medido em 22/09/2026
+
+🔴 **O fluxo da procuração assinada FUNCIONA de ponta a ponta.** Medido no banco de produção em
+22/09/2026, por leitura:
+
+| medição                                                       | número              |
+| ------------------------------------------------------------- | ------------------- |
+| `procuracoes_especificas` com `docusign_status = 'concluido'` | **25** (25 com PDF) |
+| `docusign_status = 'enviado'`                                 | 2 (0 com PDF)       |
+| `docusign_status = 'nao_enviado'`                             | 4 (0 com PDF)       |
+| `documentos` com `tipo = 'procuracao_especifica'`             | **5**               |
+| pacientes distintos com procuração concluída                  | **4**               |
+| 🔴 assinadas **sem** documento correspondente                 | **0**               |
+
+Três documentos foram criados no dia (18:35, 19:02 e 19:03 UTC) — o teste do dono passou.
+
+**A cadeia íntegra:** `app/api/webhooks/docusign/route.ts:111` baixa o PDF → `:114` grava o blob →
+`:137-143` insere em `documentos` com `tipo: 'procuracao_especifica'` (tipo válido em
+`db/schema/enums.ts:31`) → `app/_actions/documentos-paciente-self.ts:165-190` lista **sem filtro de
+tipo** → `app/(paciente)/paciente/documentos/page.tsx:34` rotula → `:268`
+`<VisualizadorDeDocumento>` abre pela rota autenticada.
+
+⚠️ **A suspeita de que o `.catch()` de `docusign/route.ts:144` engolia inserts foi MEDIDA E
+DESCARTADA.** Ele continua engolindo por construção — mas não comeu nenhum insert até aqui: o
+cruzamento "assinada sem documento" deu **0**.
+
+⚠️ **O handoff da Greens NÃO envia e-mail nenhum.** Medido: zero ocorrências de envio em
+`lib/parceiros/handoff.ts`. O paciente que vem da Greens recebe o link **pelo WhatsApp**. O
+formulário de contato público usa Brevo e funciona — são caminhos diferentes, e confundi-los faz
+procurar defeito onde não há código.
 
 ### Produção
 
@@ -168,6 +220,25 @@ Consequências práticas para quem lê isto:
 ---
 
 ## §5 — 🔴 O que NÃO fazer nesta sessão
+
+### 🔴 NÃO acrescentar `procuracao_especifica` a `DOCUMENTOS_DO_FLUXO` — 22/09/2026
+
+`lib/parceiros/documentos.ts:10` é o vocabulário do **manifesto da Greens**, não da tela do
+paciente. São dois dicionários diferentes, e cruzá-los quebra os dois lados:
+
+|             | `DOCUMENTOS_DO_FLUXO`                                  | a tabela `documentos`                  |
+| ----------- | ------------------------------------------------------ | -------------------------------------- |
+| o que é     | o que a **Greens** declara ter                         | o que **nós** temos em arquivo         |
+| quem lê     | `pendenciasDe()`, `recebidosDe()`, o painel do ChatPro | a tela do paciente, o perfil, a ANVISA |
+| vocabulário | `documento_identidade`                                 | `rg`                                   |
+
+**O que aconteceria:** o sistema passaria a **cobrar do paciente** um documento que é produzido
+aqui — ele não tem como enviá-lo — e a **dizer à Greens** que esperamos um arquivo que eles nunca
+terão. É a classe de erro que o guarda `a-tela-da-teleconsulta-nao-pede-o-que-a-consulta-produz`
+existe para impedir.
+
+**E não é preciso:** a tela do paciente lê a tabela direto
+(`app/_actions/documentos-paciente-self.ts:165-190`, sem filtro de tipo) e já mostra a procuração.
 
 ### Coisas que parecem boa ideia e custaram caro
 
