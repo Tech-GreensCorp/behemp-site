@@ -132,3 +132,55 @@ export function gerarHtmlAlertaPaciente({ nome, medicamento, dataTermino, recomp
     </html>
   `;
 }
+
+interface TemplateAnvisaPacienteProps {
+  nome: string;
+  dataValidade: string;
+  diasRestantes: number;
+  renovacaoUrl: string;
+}
+
+export function gerarHtmlAlertaAnvisaPaciente({ nome, dataValidade, diasRestantes, renovacaoUrl }: TemplateAnvisaPacienteProps): string {
+  const dataFormatada = format(new Date(dataValidade), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  const expirada = diasRestantes < 0;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Renovação ANVISA - Be4Hope</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #2D4F3C; color: white; padding: 25px; text-align: center; border-radius: 8px 8px 0 0;">
+                <h1 style="margin: 0; font-size: 24px;">Be4Hope</h1>
+            </div>
+            <div style="background: #fff; padding: 30px; border: 1px solid #ddd; min-height: 200px;">
+                <p>Olá, <strong>${nome}</strong>.</p>
+                <p>Este é um aviso importante sobre a sua autorização de importação da ANVISA.</p>
+                
+                ${expirada ? 
+                  `<p style="color: #E41B1C; font-weight: bold;">A sua autorização expirou no dia ${dataFormatada}.</p>
+                   <p>É obrigatório renová-la imediatamente para que seu tratamento não seja interrompido.</p>`
+                  : 
+                  `<p>A sua autorização atual vence em <strong>${diasRestantes} dias</strong> (no dia ${dataFormatada}).</p>
+                   <p>O processo de renovação pode ser demorado. Recomendamos que você inicie a renovação o quanto antes.</p>`
+                }
+                
+                <div style='text-align: center; margin-top: 30px; margin-bottom: 30px;'>
+                    <a href='${renovacaoUrl}' style="display: inline-block; background: #C16E56; color: white; padding: 14px 28px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">Iniciar Renovação</a>
+                </div>
+                
+                <p>Se tiver qualquer dúvida, a nossa equipe está à disposição no chat da plataforma.</p>
+                <p>Com carinho,<br><strong>Equipe Be4Hope</strong></p>
+            </div>
+            <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 14px; color: #666; border-radius: 0 0 8px 8px; border: 1px solid #ddd; border-top: none;">
+                <p>Acesse o nosso portal: <a href="https://be4hope.org" style="color: #2D4F3C;">be4hope.org</a></p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+}

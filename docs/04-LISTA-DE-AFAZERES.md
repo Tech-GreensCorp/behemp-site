@@ -2237,3 +2237,182 @@ Contra o **OWASP API Security Top 10 (2023)**, medido em 10/09/2026:
 | **API4 — consumo irrestrito**   | 🔴 **era o único sem defesa nenhuma** → corrigido aqui |
 | replay                          | ✅ janela de 300 s com `Math.abs`                      |
 | enumeração de identificador     | ✅ `cuid2`, não sequencial                             |
+
+## Item 32 — ✅ CORRIGIDO em 21/09/2026: a migration `0039` nunca foi aplicada, e o consentimento LGPD **não era gravado em produção desde então**
+
+**Medido em 21/09/2026** contra o banco de produção (leitura apenas), ao preparar o merge do
+PR #110. Não é achado de leitura de código: é estado do banco.
+
+### O que está faltando no banco
+
+```
+colunas reais de consentimentos:
+  id, created_at, updated_at, paciente_id, finalidade,
+  versao, texto_apresentado, concedido_em, revogado_em, origem
+                                            ↑ sem `idioma`
+
+enum parceiro_evento_tipo em produção: receita_emitida, anvisa_aprovada
+                                       ↑ sem `cadastro_transferido`
+```
+
+Os dois objetos são exatamente o conteúdo de `db/migrations/0039_secret_randall.sql`. A
+entrada dela **existe** no journal (`db/migrations/meta/_journal.json`, idx 39) e **não existe**
+linha correspondente em `drizzle.__drizzle_migrations`. O mesmo vale para a `0038` — mas os
+objetos da 0038 estão lá, aplicados por fora.
+
+### 🔴 Por que ela nunca mais seria aplicada sozinha
+
+`node_modules/drizzle-orm/pg-core/dialect.js` → `migrate()` escolhe as pendentes assim:
+
+```js
+const lastDbMigration = dbMigrations[0];          // ORDER BY created_at DESC LIMIT 1
+if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) { … }
+```
+
+Compara com o **máximo já gravado**, não com o conjunto do que rodou. Em produção o máximo é
+`1789271398148` (a 0043). O `when` da 0039 é `1789142042567`, **menor**. Ela é pulada **em
+silêncio**, para sempre, com qualquer conteúdo que tenha.
+
+⚠️ **Portanto reescrever a 0039 não conserta nada.** A correção precisa ser uma migration com
+`when` maior que o máximo do banco.
+
+### O efeito, e é ativo — não é código não alcançado
+
+| #   | caminho:linha                                   | o que acontece                                                                                                                 |
+| --- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `lib/parceiros/consentimento-registrado.ts:104` | `conceder()` faz `INSERT` com `idioma: IDIOMA_DO_CONSENTIMENTO`. Sem a coluna, **falha sempre**                                |
+| 2   | `lib/parceiros/consentimento-registrado.ts:53`  | `consentimentosVigentes()` faz `SELECT consentimentos.idioma` — mesma falha                                                    |
+| 3   | `app/_actions/cadastro-por-link.ts:600`         | chama `conceder()` dentro de `try/catch` que só faz `console.error` → **o cadastro conclui e o consentimento não é gravado**   |
+| 4   | `app/(paciente)/_actions/consentimento.ts:96`   | o mesmo `conceder()` pelo painel do paciente                                                                                   |
+| 5   | `lib/parceiros/enfileirar-transferencia.ts:54`  | grava `tipo: 'cadastro_transferido'` — valor que não existe no enum. **Latente**: fica atrás do consentimento, que nunca grava |
+
+🔴 **A prova de que é executado e falha, não de que não foi alcançado:**
+
+```
+consentimentos        : 0 linhas
+solicitacoes_cadastro : 77  — das quais 7 com `status='enviada'` e `paciente_id` preenchido
+```
+
+⚠️ **O denominador honesto é 7, não 77.** `conceder()` só é chamado depois de a conta e a ficha
+existirem (`cadastro-por-link.ts:600`), então as 70 solicitações que pararam em `link_gerado`
+ou `link_acessado` nunca chegaram ao ponto de consentir — contá-las infla o número sem
+acrescentar prova. **Zero em 7 é o que mede:** sete cadastros passaram pelo ponto onde a linha
+seria gravada, e nenhuma linha existe. Se fosse código não alcançado, não haveria tentativa;
+há tentativa, e ela falha todas as vezes, engolida pelo `catch`.
+
+### E a consequência que ninguém ligaria a isto
+
+O comentário do próprio código, em `app/_actions/cadastro-por-link.ts:593-597`, escreve o
+desfecho: _"se esta gravação falhar, o que acontece é que **nada é enviado à Greens** (a P5 lê
+daqui antes de montar qualquer envio)"_. Ou seja, **a transferência S2 nunca dispara**, e a
+causa está três camadas abaixo de onde ela seria procurada. Ver [Item 33](#item-33) para o
+motivo de o log não ter ajudado.
+
+### Correção — preparada, provada e APLICADA em 21/09/2026
+
+`db/migrations/0045_idioma_e_cadastro_transferido.sql`, idempotente nos dois statements, com
+`when` maior que o da 0044. A 0039 fica **intacta** — num banco reconstruído do zero ela aplica
+e a 0045 vira no-op. Autorização e perigo medido em `.claude/autorizacoes.txt` (21/09/2026).
+
+**Provada com 5 cenários** em Postgres 16 descartável + `BEGIN … ROLLBACK` contra o schema real
+de produção: cenário vermelho (o `INSERT` do `conceder()` falhando hoje com
+`column "idioma" of relation "consentimentos" does not exist`), cenário verde (o mesmo `INSERT`
+passando depois), idempotência (duas execuções seguidas, `enum_total` continua 3), no-op num
+banco onde a 0039 rodou, e o valor de enum utilizável depois do `COMMIT`.
+
+### ✅ Aplicada em produção em 21/09/2026
+
+Autorizada pelo dono depois de backup conferido por ele (`pg_dump` na EC2,
+`behemp-prod-20260921-184137.dump`, 40 MB, 424 objetos confirmados via `pg_restore --list`).
+
+⚠️ **Foram aplicadas as DUAS, 0044 e 0045, e isso foi decisão explícita.** O migrator não
+consegue aplicar uma só: ele seleciona por `max(created_at)` e pega tudo acima disso. Medido
+antes de rodar, a 0044 era **no-op completo** em produção — os três objetos de schema já
+existiam, o `UPDATE` de dado atingia **0 linhas** (`alertas_config` tem 1 linha e não era
+`[60,30]`), e só o `SET DEFAULT` tinha efeito.
+
+🔴 **O caminho que foi descartado, e o motivo:** aplicar a DDL da 0045 e gravar só a linha de
+journal dela faria `max(created_at)` virar `1790014838175`, e a **0044 passaria a ser pulada
+para sempre** — recriando exatamente o defeito que este item descreve.
+
+**Comando, pelo caminho documentado:** `pnpm db:migrate:prod` → `[migrar] ✓ concluído`.
+
+#### A medição, antes e depois
+
+| o quê                                    | antes (21/09, manhã)                                          | depois (21/09, 18h41)                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `consentimentos.idioma`                  | **não existia**                                               | `text`, `NOT NULL`, default `'pt'::text`                                                        |
+| enum `parceiro_evento_tipo`              | `receita_emitida, anvisa_aprovada`                            | **+ `cadastro_transferido`**                                                                    |
+| linhas em `drizzle.__drizzle_migrations` | 46, com a 0039 ausente e `max` na 0043                        | **48**, com as entradas 44 e 45                                                                 |
+| o `INSERT` do `conceder()`               | `column "idioma" of relation "consentimentos" does not exist` | **passou** — devolveu `{finalidade:'retorno_ao_parceiro', idioma:'pt', versao:'2026-09-10.v1'}` |
+| linhas em `consentimentos`               | **0**, para os 7 cadastros que chegaram lá                    | 0 — mas agora por **ausência de cadastro novo**, não por falha                                  |
+
+⚠️ **O teste do `INSERT` não invocou a função `conceder()`.** O `tsx` é devDependency e não
+está instalado, então o módulo TS não pôde ser importado. O que rodou foi o **mesmo statement**
+que ela monta (`consentimento-registrado.ts:98-107`), com as constantes reais e contra um
+**paciente real** — a FK precisava ser exercida, porque um `paciente_id` inventado mascarou uma
+primeira tentativa. Rodou dentro de `BEGIN … ROLLBACK`: nenhum consentimento falso persistiu.
+
+🔴 **O QUE AINDA NÃO ESTÁ PROVADO.** O que se provou é que **o banco aceita** o `INSERT`. Que
+a perda de consentimento parou **no fluxo real** só se prova com um cadastro de verdade
+passando pelo `cadastro-por-link` e deixando linha em `consentimentos`. Até lá, este item está
+corrigido na causa e **não confirmado no efeito**.
+
+### Relacionado
+
+Este é o segundo caso da família descrita em [03 — as migrations NÃO RODAM DO ZERO](03-CHECKLIST-MESTRE.md).
+Lá o sintoma é "banco novo não nasce"; aqui é "banco existente diverge do journal **e ninguém
+vê**". A causa comum é a seleção por `max(created_at)`, que trata o histórico como uma régua
+e não como um conjunto.
+
+---
+
+## Item 33 — 🔴 `erro.name` num `new Error` é sempre `'Error'`, e foi isso que escondeu o Item 32
+
+**Medido em 21/09/2026.** O `catch` que engole a falha do consentimento registra assim:
+
+`app/_actions/cadastro-por-link.ts:606-609`
+
+```ts
+console.error('[cadastro] consentimento não gravado', {
+  protocolo: solicitacao.protocolo,
+  erro: erroDoConsentimento instanceof Error ? erroDoConsentimento.name : 'desconhecida',
+});
+```
+
+`erro.name` de qualquer `new Error(...)` é a string `'Error'`. O log de produção, portanto,
+diz literalmente `{ protocolo: 'SOL-000xxx', erro: 'Error' }` — **em todas as falhas, qualquer
+que seja a causa**. A mensagem real (`column "idioma" of relation "consentimentos" does not
+exist`) nunca chegou a lugar nenhum.
+
+### Por que isto já era classe conhecida, e escapou assim mesmo
+
+É exatamente o defeito que o guarda `o-motivo-do-erro-diagnostica-sem-vazar` existe para
+impedir — ele nasceu de `o-cadastro-feito-nao-vira-falha`, onde o mesmo `erro.name` escondeu
+por quatro dias a falha que impedia **todo** documento de paciente de ser gravado.
+
+⚠️ **O guarda cobre a função de formatação de erro; não cobre um `console.error` escrito à mão
+em outro arquivo.** A classe voltou por uma porta que o guarda não olha.
+
+### O que a correção precisa equilibrar
+
+As duas pontas puxam em direções opostas, e já estão resolvidas no helper existente:
+
+- **dizer de menos** → `'Error'`, que não diagnostica nada
+- **dizer demais** → o Drizzle monta a mensagem com a query inteira e os valores inline:
+  `Failed query: insert into pacientes values ('529.982.247-25', …)` — PII no log
+
+A forma já decidida no repositório é `code:constraint:table` para erro de banco, que diagnostica
+melhor que a mensagem **e** não carrega valor nenhum.
+
+### Correção proposta (não implementada)
+
+Trocar o `erro.name` do `catch` pelo helper que já existe, e **acrescentar ao guarda** o caso
+que pega `console.error` com `.name` cru fora do helper — derivado do código, não listado, para
+que o próximo `catch` escrito à mão nasça coberto.
+
+**Perigo de mexer:** baixo — é uma linha de log, sem efeito em fluxo. **Custo de deixar:** alto
+e já cobrado uma vez: a próxima falha silenciosa também levará semanas para aparecer, e a
+única pista será `'Error'`.
+
+**Fora do escopo de 21/09** — catalogado, não corrigido, conforme a regra de escopo.

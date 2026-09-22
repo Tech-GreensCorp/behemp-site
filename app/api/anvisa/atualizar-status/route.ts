@@ -7,6 +7,7 @@ import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPusherServer } from '@/lib/integrations/pusher/server';
+import { addYears, format } from 'date-fns';
 
 const schema = z
   .object({
@@ -14,6 +15,7 @@ const schema = z
     status: z.enum(['em_analise', 'aprovado', 'pendencia_documental', 'rejeitado']),
     numeroProcesso: z.string().optional(),
     observacoes: z.string().optional(),
+    dataValidade: z.string().optional(), // YYYY-MM-DD
   })
   .strict();
 
@@ -35,12 +37,28 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
 
-  const { autorizacaoId, status, numeroProcesso, observacoes } = parsed.data;
+  const {
+    autorizacaoId,
+    status,
+    numeroProcesso,
+    observacoes,
+    dataValidade: manualDataValidade,
+  } = parsed.data;
 
   const dadosUpdate: Record<string, unknown> = { status };
   if (numeroProcesso) dadosUpdate.numeroProcesso = numeroProcesso;
   if (observacoes) dadosUpdate.observacoesAnvisa = observacoes;
-  if (status === 'aprovado') dadosUpdate.dataAprovacao = new Date();
+
+  if (status === 'aprovado') {
+    const dataAprovacao = new Date();
+    dadosUpdate.dataAprovacao = dataAprovacao;
+    if (manualDataValidade) {
+      dadosUpdate.dataValidade = manualDataValidade;
+    } else {
+      // Cálculo automático: +2 anos
+      dadosUpdate.dataValidade = format(addYears(dataAprovacao, 2), 'yyyy-MM-dd');
+    }
+  }
 
   const [atualizado] = await db
     .update(autorizacoesAnvisa)
