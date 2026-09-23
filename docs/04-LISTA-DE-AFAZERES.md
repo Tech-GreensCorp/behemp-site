@@ -19,6 +19,89 @@
 
 ---
 
+## ✅ Item 41 — CORRIGIDO em 23/09/2026: o processador do Mercado Pago exigia login em produção
+
+**Branch:** `fix/mercadopago-processar-publico`. Defeito **meu** (Claude), introduzido no PR
+#122 (Item 39).
+
+### O que aconteceu
+
+Medido em produção logo depois do deploy do PR #122:
+
+```
+curl https://be4hope.org/api/mercadopago/processar
+→ 307  https://be4hope.org/entrar?redirect_url=…%2Fapi%2Fmercadopago%2Fprocessar
+```
+
+`middleware.ts` libera `/api/webhooks(.*)` (o webhook funcionava), mas não havia entrada para
+`/api/mercadopago/processar`. O Clerk exige sessão **antes** de a rota rodar. O cron do
+`filas.yml` (`.github/workflows/filas.yml:80`) não tem sessão, exige 200, e marcaria vermelho
+a cada execução. **A conciliação dos pagamentos nunca rodaria.**
+
+**Impacto real, medido:** nenhum pagamento afetado. Nenhuma tela chama a cobrança, e o
+`MERCADOPAGO_WEBHOOK_SECRET` não está cadastrado (o log do deploy mostra `gravar … ""`). O cron
+não chegou a rodar entre o deploy e a correção: o `schedule` do GitHub estava disparando a
+cada ~4 h.
+
+### Por que nenhum teste pegou
+
+A integração (`o-webhook-do-mercado-pago-confirma-o-que-a-api-diz`) chama o handler **direto**,
+sem o middleware. Era verde e continuava verdadeira, **sobre a camada que exercitava**. É o
+limite _"guarda lê o código, não executa o caminho"_, aqui entre duas camadas. E eu **não**
+subi o `server.js` com `curl` na rota antes do deploy, o nível 2 da regra "Deploy CUSTA". Esse
+passo teria mostrado o 307 em segundos.
+
+**Segunda vez desta classe:** o Item 21 (09/09) foi o mesmo defeito com as rotas do ChatPro.
+
+### A correção
+
+- `middleware.ts`: uma entrada, o caminho **exato** `'/api/mercadopago/processar'`, nunca o
+  prefixo. Autorização do dono registrada em `.claude/autorizacoes.txt`. A rota continua
+  autenticada pelo `CRON_SECRET`
+- guarda novo `o-cron-chama-rota-que-o-middleware-deixa-passar`: **deriva as URLs do
+  `filas.yml` e os padrões do `middleware.ts`**, e casa os dois com o `createRouteMatcher` do
+  próprio Clerk. O próximo passo novo do cron nasce coberto. 11 casos, **8 sabotagens**,
+  incluindo "prefixo em vez do exato", "catch-all" e "extrator cego". Nasceu vermelho
+  apontando só o processador; ChatPro e parceiros verdes
+
+### Prova local (build standalone, `NODE_ENV=production`, Clerk configurado, Postgres local)
+
+| estado                                                                                         | resposta                                          |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **antes** da correção, segredo certo                                                           | `307 → /entrar` (o defeito reproduzido)           |
+| depois, `CRON_SECRET` vazio no servidor                                                        | `503` "Processador não configurado"               |
+| depois, segredo errado / sem cabeçalho                                                         | `401`                                             |
+| depois, segredo certo                                                                          | `200`, `{"reenfileirados":0,"reivindicados":0,…}` |
+| controles: `/api/mercadopago/outra-rota`, `/api/medico/mercadopago/conectar`, `/medico/agenda` | `307`, continuam exigindo sessão                  |
+
+⚠️ **Dois artefatos do ambiente local, para quem repetir:**
+
+1. `HOSTNAME=127.0.0.1` fez a rota pública responder **500**: o log diz `Failed to proxy`
+   para `localhost:3999`, com `EADDRNOTAVAIL` e `ECONNREFUSED ::1`. O proxy interno do Next
+   chama `localhost`. Suba com `HOSTNAME=0.0.0.0`, que é o padrão da VPS
+2. `unset CRON_SECRET` **não** testa a ausência. `pnpm build` copia o `.env` para
+   `.next/standalone/`, e o `server.js` o recarrega. Para a ausência, exporte a variável
+   **vazia**: o `@next/env` não sobrescreve variável já definida
+
+### O que ficou
+
+- as rotas `processar` do ChatPro e dos parceiros seguem sem limite de requisição (Item 39)
+- confirmar em produção depois do deploy: `curl …/api/mercadopago/processar` deve dar `401`,
+  não `307`
+- ⚠️ **LIMITE CONHECIDO DO GUARDA, não implementado:** ele deriva as URLs **do `filas.yml`**.
+  Rota chamada por **serviço externo** (o servidor do ChatPro, o da Greens, o Mercado Pago, a
+  nuvem do Inngest em `/api/inngest`) não aparece no `filas.yml` e **não é coberta**. Hoje
+  essas rotas são públicas por outras entradas do `middleware.ts` (`/api/chatpro(.*)`,
+  `/api/parceiros(.*)`, `/api/webhooks(.*)`, `/api/inngest(.*)`). Duas delas têm caso por nome
+  (`/api/chatpro` em `cadastro-por-link-abre-sem-conta`, `/api/parceiros` em
+  `handoff-do-parceiro-e-assinado-e-idempotente`). **`/api/webhooks` e `/api/inngest` não têm
+  nenhum**, e é por `/api/webhooks(.*)` que o webhook do Mercado Pago passa. Uma rota nova de
+  máquina fora desses prefixos nasceria descoberta. Cobrir
+  exigiria outra fonte de verdade, como uma lista declarada das rotas de máquina, e isso fica
+  para decisão própria
+
+---
+
 ## 🔴 Item 40 — CATALOGADO, 23/09/2026: o job `liberarReservasExpiradas` do Inngest nunca rodou em produção
 
 **Status:** catalogado, **não corrigido**. Achado ao desenhar a Fase 3 do Mercado Pago, não é
@@ -42,15 +125,37 @@ número precisa ser remedido antes de qualquer decisão.
 
 ### Causa — HIPÓTESE, não medida
 
-- `INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` existem em `lib/env.ts:228-229` e **não estão**
+- ~~`INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` existem em `lib/env.ts:228-229` e **não estão**
   em nenhuma linha `gravar` do `.github/workflows/deploy.yml`, então não chegam ao processo
   (mesma classe de `o-segredo-cadastrado-chega-ao-servidor`, que não varre
-  `lib/integrations/inngest`)
+  `lib/integrations/inngest`)~~ — 🔴 **RETRATADO em 23/09/2026, ver abaixo**
 - o comentário de `app/api/inngest/route.ts` diz _"Em prod: configurar URL no painel Inngest"_:
   não há registro de que isso tenha sido feito
 
 A confirmar **antes** de corrigir: o painel do Inngest tem o app sincronizado? `/api/inngest`
 responde em produção? Sem essas duas respostas, não se sabe se falta chave, registro, ou os dois.
+
+#### 🔴 RETRATAÇÃO, 23/09/2026 — as chaves `INNGEST_*` EXISTEM em produção
+
+A primeira hipótese acima estava errada. O log do deploy do PR #122 (run `35917760262`, passo
+"Reiniciar Servidor (PM2)") lista o que `preservar-ambiente-do-pm2.mjs` recuperou do processo
+em produção, e as duas estão lá:
+
+```
+INNGEST_EVENT_KEY  ← ambiente do processo
+INNGEST_SIGNING_KEY  ← ambiente do processo
+```
+
+**O erro de raciocínio:** tratei "não está na lista `gravar`" como "não chega ao processo". O
+`deploy.yml` escreve a lista `gravar` **e** preserva o ambiente que o PM2 já tinha. Uma
+variável fora da lista pode existir, herdada de um `pm2 start` antigo. É a mesma classe do
+achado de 22/09 (_"sintoma funcionando não prova schema"_), invertida: ler o `deploy.yml` diz o
+que ele ESCREVE, e só o processo diz o que EXISTE.
+
+**O que vale agora:** a causa real **não foi medida**. Sobra a segunda hipótese (o app nunca
+foi sincronizado no painel do Inngest) e outras ainda não levantadas, como chave de outro
+ambiente ou `/api/inngest` recusando a assinatura. As duas perguntas do parágrafo acima
+continuam sendo o próximo passo, agora sem a pista falsa.
 
 ### 🔴 Os modos de erro — por que NÃO basta "ligar"
 
@@ -91,7 +196,10 @@ pulando `em_processamento`, e primeiro remedir as 7 e o volume das outras 4 fun�
 
 ## ✅ Item 39 — ENTREGUE em 23/09/2026: webhook do Mercado Pago, fila, conciliação (Parte 2, Fase 3)
 
-**Branch:** `feat/mercadopago-cobranca-fase2`. **Ainda não commitado nem em produção.**
+**Em produção desde 23/09/2026:** PR #122, merge `d5464fd`, deploy `35917760262` (portão final:
+_"produção está servindo ESTE build, e a home responde 200"_). ~~Ainda não commitado nem em
+produção.~~ 🔴 **O processador saiu exigindo login** e ficou fora do ar até a correção do
+[Item 41](#-item-41--corrigido-em-23092026-o-processador-do-mercado-pago-exigia-login-em-produção).
 
 ### O que existe
 
