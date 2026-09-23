@@ -29,7 +29,13 @@ import { useTeleconsulta } from '@/components/teleconsulta/TeleconsultaContext';
 
 interface NavGroup {
   title: string;
-  items: { label: string; href: string; icon: LucideIcon }[];
+  items: {
+    label: string;
+    href: string;
+    icon: LucideIcon;
+    /** Selo "Em breve" ao lado do label. Só aviso visual: o link continua navegável. */
+    emBreve?: boolean;
+  }[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -47,7 +53,9 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Teleconsulta', href: '/medico/teleconsulta', icon: Video },
       // Sprint 2 (20/08/2026) — a casa do módulo de IA clínica. Fica em Atendimento porque é
       // onde o médico decide, não em ferramenta separada. `DO-11` + nome escolhido pelo dono.
-      { label: 'IA Clínica', href: '/medico/ia-clinica', icon: Brain },
+      // `emBreve`: o motor ainda não está ligado em produção (ADR-0001/0002). O link segue
+      // ativo porque a própria página diz o que falta — o selo só avisa antes do clique.
+      { label: 'IA Clínica', href: '/medico/ia-clinica', icon: Brain, emBreve: true },
       // Sprint 5 (24/08/2026) — a visão GERAL da conduta e titulação. É o *filtro* do `DO-44`
       // (c); a visão padrão continua sendo a do paciente, na aba do prontuário.
       { label: 'Titulação', href: '/medico/titulacao', icon: Pill },
@@ -185,6 +193,13 @@ export function MedicoSidebar() {
                     >
                       <Icon size={20} className={cn('shrink-0', item.label === 'Teleconsulta' && emChamada && 'text-red-200')} />
                       {!collapsed && <span>{item.label}</span>}
+                      {/* Mesma pílula da contagem do Chat (altura, raio, corpo 10px), em versão
+                          discreta: aviso de estado não deve competir com contagem que pede ação. */}
+                      {!collapsed && item.emBreve && (
+                        <span className="ml-auto flex h-5 items-center rounded-full border border-white/25 bg-white/10 px-1.5 text-[10px] font-semibold text-white/85">
+                          Em breve
+                        </span>
+                      )}
                       {item.label === 'Chat' && chatNaoLidas > 0 && (
                         <span className={cn(
                           'absolute flex items-center justify-center rounded-full bg-white font-bold text-primary shadow-sm transition-all',
