@@ -87,6 +87,30 @@ jobs:
           NEXT_PUBLIC_WHATSAPP_BEHEMP: ${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}
           NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: ${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}
           NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED: ${{ secrets.NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED }}
+          # ── Mercado Pago — só o SELETOR entra no bundle (22/09/2026) ──────────────
+          #
+          # 🔴 AS PUBLIC KEYS NÃO ESTÃO AQUI, E ISSO É A DECISÃO, NÃO UM ESQUECIMENTO.
+          #
+          # Elas seguem o desenho do Clerk: o servidor as lê do `.env` em runtime e entrega
+          # a escolhida ao componente do Brick POR PROP. O que se ganha é que trocar de
+          # conta deixa de exigir rebuild — `NEXT_PUBLIC_*` é substituída no `next build` e
+          # congela dentro do bundle, uma variável de servidor não.
+          #
+          # O precedente está medido em `next-public-existe-no-build.test.ts:31-41`: a
+          # `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` é exceção do guarda justamente porque o
+          # ClerkProvider é Server Component e a entrega ao client por prop.
+          #
+          # ⚠️ Quem acrescentar `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_*` aqui está desfazendo
+          # esta decisão — leia o comentário da lista `gravar` antes.
+          #
+          # O QUE FICA: só o seletor, que o navegador precisa conhecer para saber que
+          # comportamento adotar. Ele não carrega segredo nenhum — é a palavra `teste` ou
+          # `producao` — e vem do MESMO secret que o servidor recebe abaixo, pelo motivo do
+          # NEXT_DEPLOYMENT_ID: em um lado só, as duas pontas discordariam de qual conta
+          # está ativa, e nenhum type-check acusa isso.
+          #
+          # Vazio = `teste`. O padrão seguro é o que não cobra.
+          NEXT_PUBLIC_MERCADOPAGO_AMBIENTE: ${{ secrets.MERCADOPAGO_AMBIENTE }}
         run: pnpm build
 
       - name: Limpar .next antigo no servidor antes do deploy
@@ -224,6 +248,77 @@ jobs:
             gravar BLOB_TOKEN_PRIVADO              "${{ secrets.BLOB_TOKEN_PRIVADO }}"
             gravar CRON_SECRET                     "${{ secrets.CRON_SECRET }}"
             gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
+            # ── Mercado Pago (22/09/2026) — o pipeline nasce antes da integração ───
+            #
+            # 🔴 POR QUE ANTES: cadastrar o secret no GitHub NÃO o faz chegar ao processo.
+            # Esta lista é fixa, e o que fica de fora nunca vira ambiente. Já aconteceu três
+            # vezes — PARCEIRO_ORIGENS_DE_DOCUMENTO, PARCEIRO_TRANSFERENCIA_ATIVA e
+            # PARCEIRO_GREENS_SEGREDO_CADASTRO —, sempre com o mesmo sintoma: o
+            # comportamento não acontece, e quem investiga vê a variável cadastrada.
+            #
+            # `gravar` com valor vazio não sobrescreve, então listar aqui não muda nada
+            # enquanto o código não ler. O que muda é que a integração nasce configurável.
+            #
+            # ⚠️ QUAL PAR COBRA É `MERCADOPAGO_AMBIENTE`, E NÃO `NODE_ENV`.
+            #
+            # Produção roda `NODE_ENV=production` e deve usar, HOJE, o par de TESTE — ainda
+            # não se processa pagamento real. Derivar do `NODE_ENV` entregaria a credencial
+            # de produção exatamente onde não se quer, sem ninguém ter pedido. É a mesma
+            # confusão que `lib/auth/instancia-do-clerk.ts` existe para DENUNCIAR: lá o
+            # `NODE_ENV` serve para avisar que o ambiente e a credencial divergiram, nunca
+            # para escolher a credencial.
+            #
+            # Vazia = `teste`. Passar a cobrar de verdade é mudar um secret e redeployar,
+            # não reverter código — o mesmo desenho de PARCEIRO_TRANSFERENCIA_ATIVA.
+            gravar MERCADOPAGO_AMBIENTE               "${{ secrets.MERCADOPAGO_AMBIENTE }}"
+            gravar MERCADOPAGO_ACCESS_TOKEN_TESTE     "${{ secrets.MERCADOPAGO_ACCESS_TOKEN_TESTE }}"
+            gravar MERCADOPAGO_ACCESS_TOKEN_PRODUCAO  "${{ secrets.MERCADOPAGO_ACCESS_TOKEN_PRODUCAO }}"
+            gravar MERCADOPAGO_CLIENT_ID              "${{ secrets.MERCADOPAGO_CLIENT_ID }}"
+            gravar MERCADOPAGO_CLIENT_SECRET          "${{ secrets.MERCADOPAGO_CLIENT_SECRET }}"
+            # 🔴 AS PUBLIC KEYS SÃO VARIÁVEIS DE SERVIDOR — sem `NEXT_PUBLIC_`, de propósito.
+            #
+            # Elas são públicas por natureza (viajam ao navegador em toda página de checkout
+            # e identificam a conta; quem autoriza cobrança é o access token acima). Estarem
+            # aqui não é sigilo: é para que a chave chegue ao navegador POR PROP, do servidor,
+            # em vez de congelada no bundle pelo `next build`.
+            #
+            # É o desenho do ClerkProvider, e o efeito prático é que virar a conta do
+            # Mercado Pago passa a ser trocar um secret — não reconstruir o bundle.
+            gravar MERCADOPAGO_PUBLIC_KEY_TESTE       "${{ secrets.MERCADOPAGO_PUBLIC_KEY_TESTE }}"
+            gravar MERCADOPAGO_PUBLIC_KEY_PRODUCAO    "${{ secrets.MERCADOPAGO_PUBLIC_KEY_PRODUCAO }}"
+            # 🔴 A CHAVE QUE CIFRA OS TOKENS DE CONTA DO MÉDICO — e perdê-la é perder os dados.
+            #
+            # `lib/seguranca/cifra.ts` (AES-256-GCM, a primeira cifra em repouso deste
+            # repositório) LANÇA sem ela: nenhum médico consegue conectar a conta do Mercado
+            # Pago, e nada é gravado em claro. Falha fechada, como o BLOB_TOKEN_PRIVADO.
+            #
+            # ⚠️ NÃO EXISTE RECUPERAÇÃO. Trocar esta chave sem recifrar torna ilegível todo
+            # `access_token_cifrado` e `refresh_token_cifrado` já gravado, e cada médico
+            # precisaria reconectar. Rotação é decifrar com a antiga e recifrar com a nova —
+            # é por isso que o formato carrega `v1.` desde o primeiro dia.
+            #
+            # 64 hex = 32 bytes. Gerada com `openssl rand -hex 32`; o `tr -d '\n'` ao cadastrar
+            # não é detalhe — uma quebra de linha a mais e a chave deixa de ter 32 bytes.
+            gravar MERCADOPAGO_TOKEN_ENCRYPTION_KEY   "${{ secrets.MERCADOPAGO_TOKEN_ENCRYPTION_KEY }}"
+            # 🔴 O INTERRUPTOR DO ROLLOUT — e LIGAR ELE QUEBRA AGENDAMENTO SE FOR CEDO.
+            #
+            # `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago
+            # conectada. É a regra final, e é também mudança visível ao paciente: com a
+            # tabela `medicos_mercadopago_conta` vazia, ligar isto bloqueia TODOS os
+            # agendamentos, com TODOS os médicos, no mesmo segundo.
+            #
+            # ⚠️ ANTES DE CADASTRAR O SECRET COM 'ativo', um passo manual que NENHUM código
+            # confere: verificar que todo médico ativo já conectou a conta. Quem não tiver
+            # conectado deixa de receber agendamento imediatamente, e o sintoma do lado do
+            # paciente é a agenda parecer quebrada. Procedimento em docs/04, Item 38.
+            #
+            # Vazio = `inativo`, que é o padrão que não quebra nada. O log de produção
+            # registra cada médico sem conta mesmo com a flag desligada — é por ali que se
+            # mede quantos faltam antes de ligar.
+            #
+            # Mesmo desenho de PARCEIRO_TRANSFERENCIA_ATIVA: a trava fica no código e o que
+            # muda é o valor. Desligar é um comando, não um revert.
+            gravar MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO "${{ secrets.MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO }}"
             # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor
             # nunca bate com o do cliente e TODA navegação vira recarga completa.
             gravar NEXT_DEPLOYMENT_ID              "${{ github.sha }}"
