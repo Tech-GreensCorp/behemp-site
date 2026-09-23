@@ -92,6 +92,71 @@ const envSchema = z.object({
    */
   PARCEIRO_GREENS_CAMINHO_RETORNO: z.string().optional(),
 
+  // ── Mercado Pago — split de pagamento do médico (ADR-0024) ────────────────
+  /**
+   * 🔴 QUAL PAR DE CREDENCIAIS ESTÁ ATIVO — e NÃO se deriva do `NODE_ENV`.
+   *
+   * Produção roda `NODE_ENV=production` e deve usar, hoje, o par de TESTE: ainda não se
+   * processa pagamento real. Derivar do ambiente entregaria a credencial de produção
+   * exatamente onde não se quer. É a mesma confusão que `lib/auth/instancia-do-clerk.ts`
+   * existe para DENUNCIAR — lá o `NODE_ENV` serve para avisar que ambiente e credencial
+   * divergiram, nunca para escolher a credencial.
+   *
+   * Vazio = `teste`, que é o padrão que não cobra ninguém.
+   */
+  MERCADOPAGO_AMBIENTE: z.enum(['teste', 'producao']).default('teste'),
+  /** O número da aplicação no painel do Mercado Pago. Vai no `client_id` do OAuth. */
+  MERCADOPAGO_CLIENT_ID: z.string().optional(),
+  /** Segredo da aplicação. Só o servidor o vê — nunca chega ao navegador. */
+  MERCADOPAGO_CLIENT_SECRET: z.string().optional(),
+  /**
+   * 🔴 O QUE COBRA DINHEIRO. Dois pares, e `MERCADOPAGO_AMBIENTE` decide qual vale.
+   *
+   * ⚠️ Estes são da conta da PLATAFORMA. O token que cobra em nome do médico é outro:
+   * vem do OAuth, é por médico, e vive CIFRADO em `medicos_mercadopago_conta`.
+   */
+  MERCADOPAGO_ACCESS_TOKEN_TESTE: z.string().optional(),
+  MERCADOPAGO_ACCESS_TOKEN_PRODUCAO: z.string().optional(),
+  /**
+   * As public keys do Checkout Bricks. São públicas por natureza — identificam a conta,
+   * não autorizam cobrança —, mas ficam SEM `NEXT_PUBLIC_` de propósito: o servidor as lê
+   * em runtime e entrega a escolhida ao componente por prop, como o ClerkProvider faz.
+   * Assim trocar de conta não exige rebuild. Ver o comentário do `deploy.yml`.
+   */
+  MERCADOPAGO_PUBLIC_KEY_TESTE: z.string().optional(),
+  MERCADOPAGO_PUBLIC_KEY_PRODUCAO: z.string().optional(),
+  /**
+   * 🔴 A CHAVE QUE CIFRA OS TOKENS DE CONTA DO MÉDICO — 64 hexadecimais (32 bytes).
+   *
+   * `lib/seguranca/cifra.ts` LANÇA sem ela, e é falha fechada de propósito: credencial de
+   * terceiro não é gravada em claro porque faltou configuração.
+   *
+   * ⚠️ PERDÊ-LA É PERDER OS DADOS. Todo `access_token_cifrado` e `refresh_token_cifrado`
+   * já gravado vira ilegível, e cada médico precisa reconectar. ADR-0024 §7.
+   *
+   * ⚠️ `.optional()` aqui NÃO é descuido: o schema é avaliado na importação, e exigi-la
+   * derrubaria toda máquina sem ela — inclusive o build do CI. Quem falha fechado é a
+   * cifra, no ponto de uso, não o boot do app inteiro.
+   */
+  MERCADOPAGO_TOKEN_ENCRYPTION_KEY: z.string().optional(),
+  /**
+   * 🔴 O INTERRUPTOR DO ROLLOUT — e o padrão é `inativo` porque ligar QUEBRA agendamento.
+   *
+   * `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago conectada. Isso
+   * é o comportamento final desejado, e é também uma **mudança visível ao paciente**: hoje
+   * a tabela `medicos_mercadopago_conta` está VAZIA, então ligar isto agora bloquearia
+   * TODOS os agendamentos, com TODOS os médicos, no mesmo instante.
+   *
+   * ⚠️ ANTES DE LIGAR, um passo manual que nenhum código confere: verificar que todo médico
+   * ativo já conectou a conta. Quem não tiver conectado deixa de receber agendamento no
+   * segundo em que a flag virar — e o sintoma, do lado do paciente, é a agenda parecer
+   * quebrada. Ver `docs/04-LISTA-DE-AFAZERES.md`, Item 38.
+   *
+   * Mesmo desenho de `PARCEIRO_TRANSFERENCIA_ATIVA` e `MERCADOPAGO_AMBIENTE`: a trava fica
+   * no código e o que muda é o valor. Desligar é um comando, não um revert.
+   */
+  MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO: z.enum(['ativo', 'inativo']).default('inativo'),
+
   // ── Autenticação (Clerk) ──────────────────────────────────────
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string().optional(),

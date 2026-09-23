@@ -50,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Teleconsulta', href: '/admin/teleconsulta', icon: Video },
       { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
       { label: 'Procurações', href: '/admin/procuracoes', icon: FileCheck },
+      { label: 'ANVISA', href: '/admin/anvisa', icon: Shield },
       { label: 'Alertas', href: '/admin/alertas', icon: Bell },
       { label: 'Calculadora', href: '/admin/calculadora', icon: Calculator },
     ],

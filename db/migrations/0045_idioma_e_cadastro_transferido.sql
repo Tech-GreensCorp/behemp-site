@@ -1,0 +1,25 @@
+-- 🔴 MIGRATION DE REPARO, ESCRITA A MAO — o drizzle-kit NAO geraria isto.
+--
+-- O QUE ELA CONSERTA: a 0039_secret_randall tem entrada no journal mas NUNCA foi aplicada
+-- em producao. Medido em 21/09/2026 (leitura apenas): `consentimentos.idioma` nao existe, e
+-- o enum `parceiro_evento_tipo` tem so `receita_emitida, anvisa_aprovada`.
+--
+-- POR QUE NAO BASTA CORRIGIR A 0039: o migrator (`dialect.migrate()`) escolhe as pendentes
+-- comparando o `folderMillis` de cada uma com o `max(created_at)` JA GRAVADO no banco — que
+-- em producao e 1789271398148, a 0043. O `when` da 0039 e 1789142042567, MENOR. Ela nunca
+-- mais sera selecionada, tenha o conteudo que tiver. A 0039 fica intacta para o caso de um
+-- banco reconstruido do zero; esta aqui e a que alcanca producao.
+--
+-- 🔴 O QUE ESTAVA QUEBRANDO, e e' o motivo da urgencia: `conceder()` faz INSERT com a coluna
+-- `idioma` (lib/parceiros/consentimento-registrado.ts:104). Sem a coluna, o INSERT falha
+-- SEMPRE — e o chamador (app/_actions/cadastro-por-link.ts:600) o envolve num try/catch que
+-- so faz console.error. O cadastro conclui, o consentimento nao e gravado, e ninguem ve.
+-- Medido: 0 linhas em `consentimentos` para 77 solicitacoes de cadastro.
+--
+-- IDEMPOTENTE dos dois lados, mesmo padrao da 0044: num banco onde a 0039 ja rodou, os dois
+-- statements viram no-op. Um `generate` futuro NAO vai recriar estas guardas.
+ALTER TABLE "consentimentos" ADD COLUMN IF NOT EXISTS "idioma" text DEFAULT 'pt' NOT NULL;--> statement-breakpoint
+-- `ADD VALUE` e permitido dentro de transacao desde o PG 12 (producao roda 17.11, medido).
+-- A unica restricao da documentacao e que o valor novo nao seja USADO na mesma transacao —
+-- e nenhuma migration deste lote o usa.
+ALTER TYPE "public"."parceiro_evento_tipo" ADD VALUE IF NOT EXISTS 'cadastro_transferido';

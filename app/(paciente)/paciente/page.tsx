@@ -37,6 +37,7 @@ import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
 import { AvisoDeEnderecoPendente } from '@/components/paciente/AvisoDeEnderecoPendente';
 import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
+import { AnvisaCard } from './_components/anvisa-card';
 
 // ── Dicas de saúde (conteúdo estático informativo) ───────────
 
@@ -630,6 +631,9 @@ export default function PacienteDashboardPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* ── Minha Autorização ANVISA (Monitoramento) ────────── */}
+              {dados?.autorizacaoAnvisa && <AnvisaCard autorizacao={dados.autorizacaoAnvisa} />}
 
               {/* Jornada — stepper horizontal compacto */}
               <Card className="border-border/20 grain flex-1 overflow-hidden rounded-[1.75rem] border bg-white shadow-sm">
