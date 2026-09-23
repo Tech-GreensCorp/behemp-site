@@ -6,7 +6,7 @@
 🔴 **Toda ADR nova entra nesta tabela NO MESMO COMMIT que a cria. Índice atrasado é defeito,
 não atraso.**
 
-**Atualizado em 23/09/2026 — 24 ADRs, medidas em `docs/adr/`.**
+**Atualizado em 23/09/2026 — 25 ADRs, medidas em `docs/adr/`.**
 
 ⚠️ **Retificação, 19/09/2026.** O cabeçalho anterior dizia _"as 7 ADRs abaixo"_ e a tabela
 listava 10; hoje existem **23**. A nota _"quatro estão como proposta"_ contradizia a própria
@@ -49,9 +49,10 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0022](ADR-0022-conta-e-ficha-sao-dois-fatos-e-ninguem-liga-os-dois.md)            | Conta e ficha são dois fatos, e ninguém liga os dois                                                            | aceita · revisada 13/09/2026 | 12/09/2026 |
 | [0023](ADR-0023-o-fluxo-da-receita-reusa-o-trilho-da-anvisa.md)                    | O fluxo da receita reusa o trilho da ANVISA, e não encosta nele                                                 | 📋 proposta                  | 14/09/2026 |
 | [0024](ADR-0024-a-credencial-do-medico-e-cifrada-na-aplicacao.md)                  | A credencial do médico no Mercado Pago é cifrada na aplicação, não no banco                                     | 📋 proposta                  | 22/09/2026 |
+| [0025](ADR-0025-o-perfil-do-medico-e-editavel-apagar-medico-nao.md)                | O admin edita o perfil do médico; apagar médico fica de fora, e por quê                                         | 📋 proposta                  | 23/09/2026 |
 
-**Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 12 · ✅ decidida pelo
-dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **24**.
+**Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 13 · ✅ decidida pelo
+dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **25**.
 
 ⚠️ **Cinco palavras para dois estados.** _aprovada_, _aceita_, _decidida pelo dono_ e _aceita e
 implementada_ significam todas "vale"; só _proposta_ significa "ainda não". A tabela reproduz o
