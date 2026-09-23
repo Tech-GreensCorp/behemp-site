@@ -1,4 +1,13 @@
-import { pgTable, text, boolean, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  date,
+  boolean,
+  jsonb,
+  timestamp,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { solicitacaoCadastroOrigemEnum, solicitacaoCadastroStatusEnum } from './enums';
@@ -94,6 +103,27 @@ export const solicitacoesCadastro = pgTable(
      * CPF sintaticamente impossível não entra, porque ele vai parar na prescrição.
      */
     cpf: text('cpf'),
+    /**
+     * 🔴 OS TRÊS DADOS QUE O PACIENTE JÁ DIGITOU NO PARCEIRO — 23/09/2026.
+     *
+     * A Greens os manda no corpo do handoff desde 15/09/2026, e o nosso schema Zod não os
+     * declarava: o Zod faz *strip* por padrão, então eles eram descartados **em silêncio**.
+     * O efeito visível era a PROCURAÇÃO da ANVISA sair com o RG em branco
+     * (`app/api/anvisa/procuracao/route.ts:96` lê `pacientes.rg ?? ''`), ou o paciente ter
+     * de digitar de novo o que já digitou lá.
+     *
+     * ⚠️ Moram aqui, e não só em `pacientes`, porque a solicitação existe ANTES da ficha:
+     * o handoff chega, a solicitação nasce, e a ficha só é criada quando o paciente conclui
+     * o cadastro — dias depois, pelo link do WhatsApp. Sem estas colunas o dado teria de
+     * esperar em lugar nenhum.
+     *
+     * O vocabulário de `genero` é o daqui (`masculino | feminino | outro | nao_informado`),
+     * traduzido em `lib/parceiros/dados-do-paciente.ts`. `null` = não informado ou valor
+     * que não reconhecemos — nunca um palpite.
+     */
+    rg: text('rg'),
+    dataNascimento: date('data_nascimento'),
+    genero: text('genero'),
     /**
      * O paciente já faz tratamento com cannabis?
      *

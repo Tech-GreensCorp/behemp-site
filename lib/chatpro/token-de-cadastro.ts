@@ -27,6 +27,16 @@ export interface SolicitacaoValidada {
   /** Só existe quando veio do parceiro — o bot do WhatsApp não pede CPF. */
   cpf: string | null;
   /**
+   * 🔴 O que o paciente já digitou no parceiro — 23/09/2026.
+   *
+   * O RG é o que a PROCURAÇÃO da ANVISA lê (`app/api/anvisa/procuracao/route.ts:96`), e por
+   * isso ele precisa atravessar até a ficha. `genero` já vem no vocabulário daqui: a
+   * tradução acontece no handoff, não na leitura.
+   */
+  rg: string | null;
+  dataNascimento: string | null;
+  genero: string | null;
+  /**
    * Qual parceiro encaminhou, ou `null` quando o paciente veio direto pelo nosso WhatsApp.
    *
    * 🔴 É o que decide se a tela PEDE os dados ou apenas os CONFIRMA: quem preencheu o
@@ -141,6 +151,9 @@ export async function validarTokenDeCadastro(
     email: linha.email,
     telefone: linha.telefone,
     cpf: linha.cpf,
+    rg: linha.rg ?? null,
+    dataNascimento: linha.dataNascimento ?? null,
+    genero: linha.genero ?? null,
     parceiro: linha.parceiro,
     origem: linha.origem as (typeof solicitacaoCadastroOrigemEnum.enumValues)[number],
     expiraEm: linha.expiraEm,

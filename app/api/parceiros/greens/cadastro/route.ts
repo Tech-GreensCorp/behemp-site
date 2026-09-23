@@ -43,6 +43,25 @@ const esquema = z.object({
   email: z.string().trim().toLowerCase().email().optional().nullable(),
   telefone: z.string().trim().max(40).optional().nullable(),
   cpf: z.string().trim().max(20).optional().nullable(),
+  /**
+   * 🔴 OS TRÊS QUE O ZOD DESCARTAVA EM SILÊNCIO — declarados em 23/09/2026.
+   *
+   * A Greens os manda desde 15/09/2026 (`HandoffService.ts:387-393` lá). Este `z.object` é
+   * puro, e o padrão do Zod é *strip*: chave não declarada some sem erro e sem log. O RG
+   * é o que a PROCURAÇÃO da ANVISA lê (`app/api/anvisa/procuracao/route.ts:96`,
+   * `pacientes.rg ?? ''`), então o documento saía com o campo **em branco**.
+   *
+   * ⚠️ Largos aqui, traduzidos depois. A forma se confere neste schema; o VALOR é
+   * normalizado em `lib/parceiros/dados-do-paciente.ts`, que devolve `null` para o que não
+   * reconhece. Recusar a chamada por um gênero novo do lado deles derrubaria o cadastro de
+   * um paciente por causa de um valor de enum.
+   *
+   * ⚠️ O `genero` NÃO é `z.enum` de propósito: um valor novo lá viraria 422 aqui, e o
+   * handoff inteiro morreria por um campo acessório.
+   */
+  rg: z.string().trim().max(30).optional().nullable(),
+  dataNascimento: z.string().trim().max(10).optional().nullable(),
+  genero: z.string().trim().max(40).optional().nullable(),
   pedidoDoParceiro: z.string().trim().max(64).optional().nullable(),
   /** Quais dos 5 documentos o parceiro JÁ tem. O que faltar vira pendência não bloqueante. */
   /**
@@ -158,6 +177,9 @@ export async function POST(request: Request) {
       email: analise.data.email,
       telefone: analise.data.telefone,
       cpf: analise.data.cpf,
+      rg: analise.data.rg,
+      dataNascimento: analise.data.dataNascimento,
+      genero: analise.data.genero,
       pedidoDoParceiro: analise.data.pedidoDoParceiro,
       documentos: analise.data.documentos,
       urlDeRetorno: analise.data.urlDeRetorno,

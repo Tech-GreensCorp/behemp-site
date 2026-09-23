@@ -337,6 +337,13 @@
       "when": 1790191412776,
       "tag": "0047_adorable_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790192565802,
+      "tag": "0048_dados_do_parceiro_na_solicitacao",
+      "breakpoints": true
     }
   ]
 }
