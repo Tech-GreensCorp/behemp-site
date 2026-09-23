@@ -821,3 +821,20 @@ path:db/migrations/meta/0046_snapshot.json
 path:db/migrations/0047_adorable_lily_hollister.sql
 path:db/migrations/meta/0047_snapshot.json
 path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 23/09/2026, Fase 3 da cobrança do Mercado Pago ─────
+# PEDIDO (verbatim, item 3 da lista da Fase 3): "filas.yml: acrescentar o passo que chama
+# /api/mercadopago/processar".
+#
+# O QUE MUDA: um passo NOVO, independente (`if: always()`), no fim do job — os dois passos
+# existentes (ChatPro e parceiros) não são tocados.
+#
+# PERIGO MEDIDO de mexer: BAIXO. É um `curl` a mais no mesmo cron de 5 min. A rota falha
+# fechada (503 sem CRON_SECRET, 401 com segredo errado) e o passo sai vermelho nesses casos
+# — o mesmo contrato dos outros dois. Não há deploy envolvido: o workflow só chama a URL.
+#
+# PERIGO de NÃO mexer: sem este passo, pagamento cuja notificação se perdeu (webhook mal
+# configurado, `after()` que falhou) nunca se confirma — o paciente paga e fica sem consulta.
+#
+# Granularidade deliberada: o arquivo exato, não `.github/workflows/`.
+path:.github/workflows/filas.yml

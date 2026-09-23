@@ -39,6 +39,15 @@ export interface ResultadoConfirmacao<T = unknown> {
 export interface OpcoesConfirmacao {
   /** `users.id` de quem disparou — o paciente, no fluxo autenticado. `null` no webhook. */
   atorUserId?: string | null;
+  /**
+   * SÓ o webhook, e SÓ com o pagamento APROVADO na API: não cancela por prazo vencido.
+   *
+   * O prazo existe para devolver o horário a outro paciente. Se a consulta continua
+   * 'reservada', ninguém o pegou — o índice único de horários garante — e o paciente PAGOU.
+   * Cancelar aqui seria cobrar e não entregar. (Com o job de expiração parado em produção,
+   * medido em 23/09/2026, reserva 'reservada' e vencida é o caso comum, não o raro.)
+   */
+  ignorarPrazo?: boolean;
 }
 
 /**
@@ -90,7 +99,7 @@ export async function confirmarConsultaPaga(
       };
     }
 
-    if (reserva.expiraEm && reserva.expiraEm.getTime() < Date.now()) {
+    if (!opcoes.ignorarPrazo && reserva.expiraEm && reserva.expiraEm.getTime() < Date.now()) {
       // Expirou mas o job de limpeza ainda não passou — libera agora mesmo.
       await db
         .update(consultas)

@@ -140,6 +140,16 @@ const envSchema = z.object({
    */
   MERCADOPAGO_TOKEN_ENCRYPTION_KEY: z.string().optional(),
   /**
+   * 🔴 A ASSINATURA SECRETA DO WEBHOOK — confere o `x-signature` de cada notificação.
+   *
+   * Gerada no painel (Suas integrações → Webhooks). NÃO é o `MERCADOPAGO_CLIENT_SECRET`.
+   * `lib/mercadopago/assinatura-webhook.ts` recusa TODA notificação sem ela; a conciliação de
+   * `/api/mercadopago/processar` continua confirmando, com até 5 min de atraso.
+   *
+   * `.optional()` pelo mesmo motivo da chave acima: quem falha fechado é o ponto de uso.
+   */
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  /**
    * 🔴 O INTERRUPTOR DO ROLLOUT — e o padrão é `inativo` porque ligar QUEBRA agendamento.
    *
    * `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago conectada. Isso
