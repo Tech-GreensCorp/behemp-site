@@ -83,16 +83,27 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       **7 reservas `reservada` e vencidas desde 10/09/2026** seguem travando esses horários
       (medido em 23/09 pela sessão da Fase 2/3, **não remedido**). O job existe
       (`lib/integrations/inngest/functions.ts:440`, cron de 5 min) e está registrado em
-      `app/api/inngest/route.ts`. **Causa ainda não medida:** as chaves `INNGEST_*` não estão
-      no `deploy.yml`, e não há registro de o app ter sido sincronizado no painel.
+      `app/api/inngest/route.ts`. **Causa ainda não medida.** 🔴 **Retratado em 23/09:** eu
+      tinha escrito que as chaves `INNGEST_*` não chegavam ao processo. O log do deploy do PR
+      #122 mostra as duas **no ambiente do processo** em produção. Sobra a hipótese de o app
+      nunca ter sido sincronizado no painel.
       ⛔ **Não "ligar" o Inngest:** o mesmo endpoint liga outras 4 funções que também nunca
       rodaram, e a primeira execução dispararia de uma vez o e-mail acumulado de semanas (o
       aviso de 10/09, por outro caminho). E o job ainda não respeita `pix_valido_ate` nem
       `em_processamento` (Fase 4): rodando hoje, cancelaria reserva com pagamento em curso.
       Diagnóstico, os modos de erro e o perigo de mexer em
       [04 — Item 40](04-LISTA-DE-AFAZERES.md). **Decisão do dono.**
-- [x] **Item 39 — ✅ ENTREGUE em 23/09/2026** · `feat/mercadopago-cobranca-fase2`, **não
-      commitado nem em produção**: a Fase 3 da cobrança do Mercado Pago. **Rota nova**
+- [x] **Item 41 — ✅ CORRIGIDO em 23/09/2026** · `fix/mercadopago-processar-publico`: o
+      processador do Mercado Pago **exigia login em produção** (`307 → /entrar`, medido logo
+      depois do deploy do PR #122). O cron do `filas.yml` receberia 307 a cada execução e a
+      conciliação nunca rodaria. Defeito meu: a integração chama o handler sem o middleware, e
+      eu não subi o `server.js` antes do deploy. Correção: o caminho **exato** no
+      `middleware.ts` (autorizado), e o guarda `o-cron-chama-rota-que-o-middleware-deixa-passar`,
+      que deriva as URLs do `filas.yml` e casa com o matcher do próprio Clerk (11 casos, 8
+      sabotagens). Provado local: 307 antes; 503/401/200 depois. **Segunda vez desta classe**
+      (Item 21). Detalhe em [04 — Item 41](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 39 — ✅ ENTREGUE em 23/09/2026** · PR #122, **em produção** (`d5464fd`); o
+      processador exigia login até o Item 41: a Fase 3 da cobrança do Mercado Pago. **Rota nova**
       `POST /api/webhooks/mercadopago` (assinatura `x-signature` conferida com o `data.id` da
       URL, fila, processamento em `after()`) e `GET /api/mercadopago/processar` (fila +
       conciliação, chamada pelo `filas.yml`). **Variável nova** `MERCADOPAGO_WEBHOOK_SECRET`

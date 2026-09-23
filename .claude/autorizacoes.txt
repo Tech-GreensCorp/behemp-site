@@ -838,3 +838,23 @@ path:db/migrations/meta/_journal.json
 #
 # Granularidade deliberada: o arquivo exato, não `.github/workflows/`.
 path:.github/workflows/filas.yml
+
+# ── Autorizado pelo dono em 23/09/2026 — middleware.ts, caminho EXATO ─────────────
+# PEDIDO (verbatim): "Autorizado explicitamente a editar middleware.ts, só para liberar o
+# caminho exato /api/mercadopago/processar (nunca o prefixo)."
+#
+# O QUE MOTIVOU: medido em produção logo depois do deploy do PR #122 (`d5464fd`):
+# `GET /api/mercadopago/processar` → `307 /entrar`. O Clerk exige sessão antes da rota
+# rodar; o cron do `filas.yml` não tem sessão e exige 200. Reproduzido localmente com o
+# build standalone, com o CRON_SECRET certo: 307.
+#
+# O QUE MUDA: UMA entrada no `isPublicRoute`, o caminho exato. A rota continua autenticada
+# pelo CRON_SECRET (503 sem ele, 401 com o errado, comparação em tempo constante).
+#
+# PERIGO MEDIDO: BAIXO. `'/api/mercadopago/processar'` sem `(.*)` não casa com nenhuma outra
+# rota — provado pelo `createRouteMatcher` do Clerk no guarda
+# `o-cron-chama-rota-que-o-middleware-deixa-passar` (4 controles de prefixo).
+# `/api/medico/mercadopago/*` (OAuth do médico) continua exigindo sessão.
+#
+# Granularidade deliberada: `middleware.ts` NÃO está na lista do hook `escopo-autorizado`;
+# este registro documenta a autorização, não destrava nada.

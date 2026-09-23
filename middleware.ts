@@ -88,6 +88,14 @@ const isPublicRoute = createRouteMatcher([
    * aplicação não mostraria nada: foi exatamente o que aconteceu com o ChatPro (Item 21).
    */
   '/api/parceiros(.*)',
+  /**
+   * 🔴 O PROCESSADOR DO MERCADO PAGO — pelo caminho EXATO, nunca o prefixo.
+   * Quem chama é o cron do `filas.yml`, sem sessão; a autenticação é o `CRON_SECRET` (503 sem
+   * ele, 401 com o errado). Sem esta linha o cron recebia 307 para o login — medido em
+   * produção em 23/09/2026, depois do PR #122. `'/api/mercadopago(.*)'` tiraria o login de
+   * toda rota futura com esse prefixo: guarda `o-cron-chama-rota-que-o-middleware-deixa-passar`.
+   */
+  '/api/mercadopago/processar',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',
