@@ -29,6 +29,13 @@ export const consultas = pgTable(
     status: consultaStatusEnum('status').notNull().default('reservada'),
     /** Só preenchido enquanto status = 'reservada'. Limpo ao confirmar. */
     expiraEm: timestamp('expira_em', { withTimezone: true }),
+    /**
+     * Validade real do PIX gerado, usada pelo job de expiração para não cancelar reserva com
+     * PIX ainda pagável. É independente de `expiraEm`: a reserva vence em 30 min, mas um PIX
+     * gerado no minuto 29 continua pagável depois disso (Parte 2, Decisão 3 — a corrida entre
+     * expiração e pagamento). Nulo quando nenhum PIX foi gerado.
+     */
+    pixValidoAte: timestamp('pix_valido_ate', { withTimezone: true }),
     googleEventId: text('google_event_id'),
     googleMeetLink: text('google_meet_link'),
     observacoes: text('observacoes'),

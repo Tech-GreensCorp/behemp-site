@@ -1,6 +1,6 @@
 {
-  "id": "4828a4f3-4669-45e5-a6bd-12141209f913",
-  "prevId": "d5f29cac-cb28-4e15-9b26-b76567976fc2",
+  "id": "ea0b53d6-4246-471a-9a62-d7d2a5badc67",
+  "prevId": "4828a4f3-4669-45e5-a6bd-12141209f913",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7077,6 +7077,24 @@
         },
         "cpf": {
           "name": "cpf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rg": {
+          "name": "rg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_nascimento": {
+          "name": "data_nascimento",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genero": {
+          "name": "genero",
           "type": "text",
           "primaryKey": false,
           "notNull": false

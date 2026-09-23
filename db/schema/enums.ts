@@ -197,6 +197,10 @@ export const alertaDestinatarioEnum = pgEnum('alerta_destinatario', ['admin', 'p
  * Status do pagamento de teleconsulta.
  * Preparatório: pagamento não bloqueia o agendamento (nasce 'pendente' e assim fica
  * até a integração real com o gateway existir).
+ *
+ * `em_processamento` e `recusado` entram com a cobrança real do Mercado Pago (Parte 2,
+ * 23/09/2026): o primeiro cobre PIX gerado aguardando transferência e cartão em análise; o
+ * segundo, cartão recusado — distinto de `cancelado`, que é desistência ou prazo vencido.
  */
 export const pagamentoStatusEnum = pgEnum('pagamento_status', [
   'pendente',
@@ -204,6 +208,8 @@ export const pagamentoStatusEnum = pgEnum('pagamento_status', [
   'isento',
   'cancelado',
   'estornado',
+  'em_processamento',
+  'recusado',
 ]);
 
 /** Tipo da chave PIX cadastrada pelo médico em `medicosPagamentoConfig`. */

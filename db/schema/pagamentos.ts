@@ -40,7 +40,15 @@ export const pagamentos = pgTable(
     moeda: text('moeda').notNull().default('BRL'),
     status: pagamentoStatusEnum('status').notNull().default('pendente'),
     gatewayProvider: text('gateway_provider'),
-    gatewayReferenciaId: text('gateway_referencia_id'),
+    /**
+     * O id do pagamento no gateway (no Mercado Pago, o `id` de `/v1/payments`). ÚNICO: é por
+     * ele que o webhook acha a linha, e duas linhas com a mesma referência fariam uma
+     * notificação confirmar a consulta errada. Nulo enquanto não há cobrança — o Postgres
+     * permite vários nulos numa constraint UNIQUE.
+     */
+    gatewayReferenciaId: text('gateway_referencia_id').unique(
+      'pagamentos_gateway_referencia_unique',
+    ),
     gatewayCheckoutUrl: text('gateway_checkout_url'),
     pagoEm: timestamp('pago_em', { withTimezone: true }),
     observacoes: text('observacoes'),
