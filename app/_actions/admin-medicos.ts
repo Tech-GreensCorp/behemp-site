@@ -8,6 +8,7 @@ import { medicos, users } from '@/db/schema';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { clerkClient } from '@clerk/nextjs/server';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
  * Server Actions para visualização de médicos pelo admin.
@@ -28,6 +29,14 @@ export interface MedicoResumo {
   email: string;
   crm: string;
   especialidade: string;
+  /**
+   * 🔴 `bio` e `ordem` entram em 23/09/2026 porque a tela passou a EDITAR daqui.
+   * `atualizarDadosMedico` grava o formulário inteiro: campo que não chega vira `null`.
+   * Sem estes dois na listagem, abrir a edição e salvar apagaria a biografia do médico
+   * e a posição dele na home — sem erro, sem aviso.
+   */
+  bio: string | null;
+  ordem: number | null;
   avatarUrl: string | null;
   valorConsulta: number | null;
   totalPacientes: number;
@@ -85,6 +94,21 @@ export interface MedicoDetalhe {
 }
 
 /**
+ * `verificarAdmin()` devolve `clerkId`, nunca `userId` — o campo existe em
+ * `PermissaoResult` e `verificarRole` não o preenche (`lib/auth/permissions.ts:41-44`).
+ * A coluna `logs_auditoria.user_id` é FK para `users.id`, então o id interno se resolve
+ * aqui. Mesmo padrão de `app/(admin)/_actions/pagamentos-medicos.ts:21`.
+ */
+async function obterUserIdInterno(clerkId: string): Promise<string | null> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return user?.id ?? null;
+}
+
+/**
  * Lista todos os médicos cadastrados com contagem de pacientes.
  */
 export async function listarMedicosAdmin(): Promise<ActionResult<MedicoResumo[]>> {
@@ -100,13 +124,15 @@ export async function listarMedicosAdmin(): Promise<ActionResult<MedicoResumo[]>
         u.avatar_url      AS "avatarUrl",
         m.crm,
         m.especialidade,
+        m.bio,
+        m.ordem,
         m.valor_consulta  AS "valorConsulta",
         COUNT(p.id) FILTER (WHERE p.deleted_at IS NULL)::int AS "totalPacientes"
       FROM medicos m
       INNER JOIN users u ON u.id = m.user_id
       LEFT JOIN pacientes p ON p.medico_id = m.id
       WHERE u.deleted_at IS NULL
-      GROUP BY m.id, u.nome, u.email, u.avatar_url, m.crm, m.especialidade, m.valor_consulta
+      GROUP BY m.id, u.nome, u.email, u.avatar_url, m.crm, m.especialidade, m.bio, m.ordem, m.valor_consulta
       ORDER BY u.nome
     `);
 
@@ -116,6 +142,8 @@ export async function listarMedicosAdmin(): Promise<ActionResult<MedicoResumo[]>
       email: row.email,
       crm: row.crm,
       especialidade: row.especialidade,
+      bio: row.bio ?? null,
+      ordem: row.ordem ?? null,
       avatarUrl: row.avatarUrl ?? null,
       valorConsulta: row.valorConsulta !== null ? Number(row.valorConsulta) : null,
       totalPacientes: row.totalPacientes ?? 0,
@@ -392,6 +420,44 @@ export async function atualizarConfigAgenda(medicoId: string, configAgenda: any)
 
 // ── Schema de validação ────────────────────────────────────────
 
+/**
+ * 🔴 O VALOR DA CONSULTA, VALIDADO — e antes disto não era.
+ *
+ * Até 23/09/2026 o campo era `z.string().optional()` nos dois caminhos: aceitava `"abc"`,
+ * `"-5"` e `"10.999"` sem reclamar. A coluna é `numeric(10,2)`, então `"abc"` estourava no
+ * banco e um valor negativo entrava inteiro — e `app/(public)/_actions/agendamento.ts:219`
+ * o usa para cobrar do paciente.
+ *
+ * ⚠️ CONTINUA `.optional()` DE PROPÓSITO. Médico sem valor definido é estado legítimo: o
+ * agendamento já recusa com mensagem própria (`agendamento.ts:139`). Tornar obrigatório aqui
+ * quebraria a edição de todo médico cadastrado antes deste commit.
+ *
+ * ⚠️ As actions recebem `z.input<…>`, não `z.infer<…>`: com um `.transform()` no schema
+ * as duas deixam de ser a mesma coisa, e `z.infer` é a SAÍDA. Tipar a entrada com ela
+ * faria o formulário ter de mandar `number` num campo que o navegador entrega string.
+ */
+const valorDaConsulta = z
+  .union([z.string(), z.number()])
+  .optional()
+  .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
+  .refine((v) => v === undefined || Number.isFinite(v), 'Valor da consulta inválido')
+  .refine((v) => v === undefined || v > 0, 'O valor da consulta deve ser positivo')
+  .refine(
+    (v) => v === undefined || Number.isInteger(Math.round(v * 100)) === true,
+    'Valor inválido',
+  )
+  .refine(
+    (v) => v === undefined || Math.abs(v * 100 - Math.round(v * 100)) < 1e-9,
+    'Use no máximo duas casas decimais',
+  )
+  // `numeric(10,2)` = 10 dígitos no total, 2 deles decimais → 99.999.999,99 é o teto da
+  // COLUNA. Medido em 23/09/2026: sem este limite, `1e9` passava no Zod e o Postgres
+  // respondia `numeric field overflow`, que chega ao admin como "Erro interno".
+  .refine(
+    (v) => v === undefined || v <= 99999999.99,
+    'Valor acima do máximo permitido (99.999.999,99)',
+  );
+
 const criarMedicoSchema = z.object({
   email: z.string().email('E-mail inválido'),
   nome: z.string().min(2, 'Nome é obrigatório para novos usuários').optional(),
@@ -406,7 +472,8 @@ const criarMedicoSchema = z.object({
   crm: z.string().optional(),
   bio: z.string().optional(),
   ordem: z.number().int().optional(),
-  valorConsulta: z.string().optional(),
+  // Mesma regra da edição — ver o bloco de `valorDaConsulta` abaixo.
+  valorConsulta: valorDaConsulta,
   avatarUrl: z.string().url().optional(),
 });
 
@@ -416,6 +483,7 @@ const atualizarMedicoSchema = z.object({
   crm: z.string().optional(),
   bio: z.string().optional(),
   ordem: z.number().int().optional(),
+  valorConsulta: valorDaConsulta,
 });
 
 /**
@@ -424,7 +492,7 @@ const atualizarMedicoSchema = z.object({
  * Se já existe, vincula o perfil médico ao user existente.
  */
 export async function criarMedico(
-  dados: z.infer<typeof criarMedicoSchema>,
+  dados: z.input<typeof criarMedicoSchema>,
 ): Promise<ActionResult<{ medicoId: string }>> {
   try {
     const auth = await verificarAdmin();
@@ -575,7 +643,10 @@ export async function criarMedico(
         crm: crm || null,
         bio: bio || null,
         ordem: ordem ?? null,
-        valorConsulta: valorConsulta || null,
+        // `numeric` sem `mode` tem tipo de inserção STRING no Drizzle 0.44 — e o schema
+        // agora entrega `number`. `toFixed(2)` casa com `numeric(10,2)` sem arredondar
+        // por acidente: o Zod já recusou mais de duas casas.
+        valorConsulta: valorConsulta !== undefined ? valorConsulta.toFixed(2) : null,
       })
       .returning({ id: medicos.id });
 
@@ -592,32 +663,73 @@ export async function criarMedico(
 
 /**
  * Atualiza dados do perfil profissional de um médico.
+ *
+ * 🔴 O `valorConsulta` entra aqui em 23/09/2026. Antes disto ele só era gravável no
+ * `criarMedico`: um valor errado no cadastro só se corrigia por `UPDATE` manual no banco,
+ * e é o número que `app/(public)/_actions/agendamento.ts:219` cobra do paciente.
+ *
+ * ⚠️ Campo ausente APAGA o valor, como já acontece com `crm`, `bio` e `ordem` — a action
+ * grava o formulário inteiro, não um patch. Quem a chamar precisa mandar todos os campos.
  */
 export async function atualizarDadosMedico(
-  dados: z.infer<typeof atualizarMedicoSchema>,
+  dados: z.input<typeof atualizarMedicoSchema>,
 ): Promise<ActionResult> {
   try {
     const auth = await verificarAdmin();
-    if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+    if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
 
     const parsed = atualizarMedicoSchema.safeParse(dados);
     if (!parsed.success) {
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const { medicoId, especialidade, crm, bio, ordem } = parsed.data;
+    const { medicoId, especialidade, crm, bio, ordem, valorConsulta } = parsed.data;
 
-    await db
-      .update(medicos)
-      .set({
-        especialidade,
-        crm: crm || null,
-        bio: bio || null,
-        ordem: ordem ?? null,
+    // O snapshot do ANTES sai daqui, não do que o cliente mandou: o cliente manda o
+    // depois. Se a linha não existe, o update não teria o que fazer e dizer "sucesso"
+    // seria mentira — o admin veria a tela confirmar uma alteração que não aconteceu.
+    const [antes] = await db
+      .select({
+        especialidade: medicos.especialidade,
+        crm: medicos.crm,
+        bio: medicos.bio,
+        ordem: medicos.ordem,
+        valorConsulta: medicos.valorConsulta,
       })
-      .where(eq(medicos.id, medicoId));
+      .from(medicos)
+      .where(eq(medicos.id, medicoId))
+      .limit(1);
+
+    if (!antes) {
+      return { sucesso: false, erro: 'Médico não encontrado' };
+    }
+
+    const depois = {
+      especialidade,
+      crm: crm || null,
+      bio: bio || null,
+      ordem: ordem ?? null,
+      // Ver a nota em `criarMedico`: `numeric` recebe string.
+      valorConsulta: valorConsulta !== undefined ? valorConsulta.toFixed(2) : null,
+    };
+
+    await db.update(medicos).set(depois).where(eq(medicos.id, medicoId));
+
+    const userIdInterno = await obterUserIdInterno(auth.clerkId);
+    await registrarAuditoria({
+      userId: userIdInterno,
+      acao: 'atualizar',
+      entidade: 'medicos',
+      entidadeId: medicoId,
+      dadosAntes: antes,
+      // Quando o id interno não resolve, `userId` fica nulo — e quem agiu tem de sobrar
+      // em algum lugar, senão o registro diz que ninguém fez. É o que o contrato do
+      // helper manda (`lib/utils/audit.ts:22-26`).
+      dadosDepois: userIdInterno ? depois : { ...depois, _clerkId: auth.clerkId },
+    });
 
     revalidatePath('/admin');
+    revalidatePath('/admin/medicos');
     revalidatePath(`/admin/medicos/${medicoId}`);
     revalidatePath('/');
 
