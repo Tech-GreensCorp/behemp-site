@@ -713,6 +713,7 @@ export default function PerfilPacientePage() {
                 autorizacao_anvisa: 'Autorização Anvisa',
                 oficio_anvisa: 'Ofício da Anvisa',
                 documento_pessoal: 'Documento Pessoal',
+                laudo_medico: 'Laudo Médico',
               };
               return (
                 <div key={doc.id} className="group flex items-center gap-4 rounded-3xl border border-border/40 bg-card px-5 py-4 transition-all hover:border-primary/20 hover:shadow-md">

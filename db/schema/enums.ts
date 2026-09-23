@@ -29,6 +29,17 @@ export const documentoTipoEnum = pgEnum('documento_tipo', [
   'documento_pessoal',
   'oficio_anvisa',
   'procuracao_especifica',
+  /**
+   * 🔴 ENTROU EM 23/09/2026 — ADR-0026.
+   *
+   * Desde 15/09 a Greens manda o laudo como ARQUIVO, e nós o baixávamos, guardávamos no blob
+   * privado e o descartávamos na hora de gravar, porque este enum não tinha o valor. Medido em
+   * produção: 3 laudos no blob, 0 linhas em `documentos`.
+   *
+   * ⚠️ O valor entra no FIM da lista de propósito: `ALTER TYPE ... ADD VALUE` sem `BEFORE`/
+   * `AFTER` acrescenta ao final, e é a forma que não reordena o enum existente.
+   */
+  'laudo_medico',
 ]);
 
 /**

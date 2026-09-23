@@ -33,6 +33,8 @@ const TIPO_LABELS: Record<string, string> = {
   documento_pessoal: 'Documento Pessoal', comprovante_residencia: 'Comprovante de Residência',
   oficio_anvisa: 'Ofício da Anvisa', receita_medica: 'Receita Médica',
   rg: 'RG', rg_responsavel: 'RG Responsável', autorizacao_anvisa: 'Autorização Anvisa',
+  // Entrou no enum em 23/09/2026 — ADR-0026.
+  laudo_medico: 'Laudo Médico',
 };
 
 interface TabDocumentosProps { pacienteId: string }
