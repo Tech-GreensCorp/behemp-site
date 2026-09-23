@@ -330,6 +330,13 @@
       "when": 1790104361903,
       "tag": "0046_panoramic_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790191319564,
+      "tag": "0047_dados_do_parceiro_na_solicitacao",
+      "breakpoints": true
     }
   ]
 }

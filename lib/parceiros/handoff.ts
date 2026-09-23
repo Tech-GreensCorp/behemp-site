@@ -10,6 +10,7 @@ import {
 } from '@/lib/chatpro/solicitacao';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { somenteDigitosDoCpf } from '@/lib/validacao/cpf';
+import { generoDoParceiro, rgDoParceiro, dataDeNascimentoDoParceiro } from './dados-do-paciente';
 import { normalizarManifesto } from './documentos';
 import {
   materializarArquivos,
@@ -126,6 +127,15 @@ export interface EntradaDoHandoff {
   email?: string | null;
   telefone?: string | null;
   cpf?: string | null;
+  /**
+   * O que o paciente já digitou no parceiro. O RG é o que a procuração da ANVISA lê, e por
+   * isso ele não é acessório: sem ele, o documento sai com o campo em branco.
+   */
+  rg?: string | null;
+  /** `YYYY-MM-DD`. É como a Greens manda, e é o que a coluna `date` espera. */
+  dataNascimento?: string | null;
+  /** O valor do parceiro; a tradução para o vocabulário daqui é `generoDoParceiro`. */
+  genero?: string | null;
   /** O id do pedido no sistema do parceiro, quando houver. */
   pedidoDoParceiro?: string | null;
   /**
@@ -260,6 +270,16 @@ export class ServicoDeHandoff {
           ...(telefone ? { telefone } : {}),
           ...(entrada.nomeCompleto?.trim() ? { nomeCompleto: entrada.nomeCompleto.trim() } : {}),
           ...(entrada.cpf ? { cpf: somenteDigitosDoCpf(entrada.cpf) } : {}),
+          /**
+           * Mesma regra dos demais: só sobrescreve o que veio PREENCHIDO. A Greens manda
+           * `(patientRg ?? '').trim()` — string vazia quando não tem, não `null` —, e sem o
+           * `if` um reenvio mais pobre apagaria um RG bom.
+           */
+          ...(rgDoParceiro(entrada.rg) ? { rg: rgDoParceiro(entrada.rg) } : {}),
+          ...(dataDeNascimentoDoParceiro(entrada.dataNascimento)
+            ? { dataNascimento: dataDeNascimentoDoParceiro(entrada.dataNascimento) }
+            : {}),
+          ...(generoDoParceiro(entrada.genero) ? { genero: generoDoParceiro(entrada.genero) } : {}),
           ...(entrada.pedidoDoParceiro ? { pedidoDoParceiro: entrada.pedidoDoParceiro } : {}),
           ...(entrada.documentos
             ? { documentosDoParceiro: await manifestoComArquivos(entrada.documentos, existente.id) }
@@ -285,6 +305,9 @@ export class ServicoDeHandoff {
         email,
         telefone,
         cpf: entrada.cpf ? somenteDigitosDoCpf(entrada.cpf) : null,
+        rg: rgDoParceiro(entrada.rg),
+        dataNascimento: dataDeNascimentoDoParceiro(entrada.dataNascimento),
+        genero: generoDoParceiro(entrada.genero),
         tokenHash: hash,
         expiraEm,
         origem: 'greens_handoff',
@@ -363,6 +386,13 @@ export class ServicoDeHandoff {
           ? { nomeCompleto: novo.entrada.nomeCompleto.trim() }
           : {}),
         ...(novo?.entrada.cpf ? { cpf: somenteDigitosDoCpf(novo.entrada.cpf) } : {}),
+        ...(rgDoParceiro(novo?.entrada.rg) ? { rg: rgDoParceiro(novo?.entrada.rg) } : {}),
+        ...(dataDeNascimentoDoParceiro(novo?.entrada.dataNascimento)
+          ? { dataNascimento: dataDeNascimentoDoParceiro(novo?.entrada.dataNascimento) }
+          : {}),
+        ...(generoDoParceiro(novo?.entrada.genero)
+          ? { genero: generoDoParceiro(novo?.entrada.genero) }
+          : {}),
         ...(novo?.entrada.pedidoDoParceiro
           ? { pedidoDoParceiro: novo.entrada.pedidoDoParceiro }
           : {}),

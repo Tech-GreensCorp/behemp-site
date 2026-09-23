@@ -20,7 +20,7 @@
  * renderização é confiar no cliente.
  */
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { auth, currentUser } from '@clerk/nextjs/server';
@@ -495,6 +495,39 @@ export async function concluirCadastroPorLink(
 
     // Daqui para a frente, falhar é acessório: a conta e a ficha existem.
     cadastroGravado = true;
+
+    /**
+     * 🔴 O QUE O PACIENTE JÁ DIGITOU NO PARCEIRO CHEGA À FICHA — 23/09/2026.
+     *
+     * O RG é o que a procuração da ANVISA lê (`app/api/anvisa/procuracao/route.ts:96`:
+     * `paciente.rg ?? ''`). Sem ele o documento sai com o campo **em branco** — não falha,
+     * não avisa, e quem descobre é o paciente ao ler a própria procuração.
+     *
+     * ⚠️ AQUI, E NÃO NO `insert` ACIMA, porque há TRÊS caminhos até a ficha e o `insert` é
+     * só um deles: ela pode já existir (a casca do `/redirect`), ou ter sido criada pelo
+     * webhook do Clerk no meio da corrida — e nesse terceiro caso o `onConflictDoNothing`
+     * não grava nada. Um ponto depois da transação cobre os três.
+     *
+     * 🔴 `COALESCE` E NÃO ATRIBUIÇÃO: o valor do parceiro só entra onde a ficha está VAZIA.
+     * Quem já preencheu o RG no próprio perfil não tem o dele sobrescrito por um payload
+     * mais velho — o mais recente é do paciente, e é dele. É a mesma decisão que a
+     * procedência toma logo acima, com `isNull(pacientes.origem)`.
+     *
+     * ⚠️ Falhar aqui não derruba o cadastro: a conta e a ficha já existem, e o paciente
+     * pode digitar o RG no perfil. Perder o cadastro inteiro por um campo seria pior.
+     */
+    etapa = 'dados-do-parceiro-na-ficha';
+
+    if (solicitacao.rg || solicitacao.dataNascimento || solicitacao.genero) {
+      await db
+        .update(pacientes)
+        .set({
+          rg: sql`COALESCE(${pacientes.rg}, ${solicitacao.rg ?? null})`,
+          dataNascimento: sql`COALESCE(${pacientes.dataNascimento}, ${solicitacao.dataNascimento ?? null})`,
+          genero: sql`COALESCE(${pacientes.genero}, ${solicitacao.genero ?? null})`,
+        })
+        .where(eq(pacientes.id, pacienteId));
+    }
 
     /**
      * 🔴 O VÍNCULO VEM ANTES DE QUEIMAR O LINK — invertido em 13/09/2026 (ADR-0022, G10).
