@@ -39,6 +39,7 @@ export * from './alertas-enviados';
 export * from './pagamentos';
 export * from './medicos-pagamento-config';
 export * from './medicos-mercadopago-conta';
+export * from './mercadopago-eventos-webhook';
 
 // Relations
 export * from './relations';

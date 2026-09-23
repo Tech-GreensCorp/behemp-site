@@ -775,3 +775,49 @@ path:db/migrations/meta/_journal.json
 # Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
 path:db/migrations/0046_panoramic_chimera.sql
 path:db/migrations/meta/0046_snapshot.json
+
+# ── Autorizado pelo dono em 23/09/2026 ──────────────────────────────────────────
+# A migration preparatória da cobrança real do Mercado Pago (Parte 2, Fase 1 do
+# PLANO_PARTE2_PAGAMENTO_2026-09-23): cartão + PIX, boleto fora desta entrega.
+#
+# O QUE ELA FAZ — tudo aditivo, nada renomeia nem apaga:
+#   · `pagamento_status` ganha 'em_processamento' e 'recusado'
+#   · `pagamentos.gateway_referencia_id` ganha UNIQUE (é por ele que o webhook acha a linha)
+#   · `consultas.pix_valido_ate` (nulo) — a trava da corrida expiração × pagamento: o job
+#     de expiração não pode liberar horário com PIX ainda pagável (Decisão 3)
+#   · `medicos_mercadopago_conta.public_key` (nulo) — guardada, não lida nesta entrega
+#   · tabela nova `mercadopago_eventos_webhook` (fila do webhook, `mp_payment_id` UNIQUE)
+#
+# PERIGO MEDIDO de mexer: BAIXO.
+#   · medido em produção (leitura, BEGIN READ ONLY … ROLLBACK): as 18 linhas de
+#     `pagamentos` têm `gateway_referencia_id` NULO — a UNIQUE nasce sem conflito; o enum
+#     tem só os 5 valores antigos — os `ADD VALUE` crus não colidem
+#   · `ADD VALUE` roda dentro da transação do migrador (permitido desde o PG 12; produção
+#     roda 17.11) e nenhum statement do lote USA o valor novo
+#   · zero código lê ou escreve as colunas/tabela novas hoje — Fases 2 a 5 vêm depois
+#
+# PERIGO MEDIDO de NÃO mexer: nenhum hoje — é pré-requisito, não correção de falha ativa.
+#
+# ⚠️ Para a Fase 3: o MP manda mais de uma notificação por pagamento (created → updated).
+# O conflito em `mp_payment_id` tem de REENFILEIRAR (zerar `processado_em`), nunca
+# `onConflictDoNothing` — senão a notificação da aprovação é descartada.
+#
+# NUMERAÇÃO: `0047`, conferida contra todos os branches remotos e locais em 23/09/2026 —
+# nenhuma outra migration pendente além da `feature/product-catalog-v2` (0018–0020, parada
+# desde 13/08, sem relação).
+#
+# PROVA ANTES/DEPOIS: container Postgres 16 descartável — schema de `origin/main` (SEM a
+# mudança) montado com `drizzle-kit push`, livro-caixa preenchido com 0000–0046 como em
+# produção, e o migrador de produção (`scripts/migrar.mjs`) rodado DUAS VEZES: a 1ª
+# aplica só a 0047 (47 → 48 entradas), a 2ª é no-op. Conferidos por execução, em BEGIN …
+# ROLLBACK: os dois valores novos aceitos em linha, dois NULLs convivendo na UNIQUE de
+# `gateway_referencia_id`, valor repetido recusado nas duas UNIQUE, e o upsert que
+# reenfileira (`on conflict do update set processado_em = null`).
+#
+# ⚠️ A idempotência é do MIGRADOR (`drizzle.__drizzle_migrations`), não do SQL: os
+# statements são crus, como o drizzle-kit gera, sem `IF NOT EXISTS`.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0047_adorable_lily_hollister.sql
+path:db/migrations/meta/0047_snapshot.json
+path:db/migrations/meta/_journal.json
