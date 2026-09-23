@@ -69,6 +69,12 @@ export const medicosMercadopagoConta = pgTable(
 
     /** O `user_id` da conta no Mercado Pago. Público por natureza — identifica, não autoriza. */
     mpUserId: text('mp_user_id'),
+    /**
+     * Public key do vendedor, devolvida pelo OAuth — não é sensível como os tokens, não precisa
+     * cifrar (viaja ao navegador por natureza). Guardada para uso futuro, não lida nesta
+     * entrega: o Brick usa a public key do integrador (Parte 2, Decisão 1).
+     */
+    publicKey: text('public_key'),
 
     /**
      * 🔴 CIFRADO. Autoriza cobrar em nome do médico — é o campo de maior poder desta tabela.
