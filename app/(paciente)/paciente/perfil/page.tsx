@@ -127,6 +127,22 @@ export default function PerfilPacientePage() {
    * (e ela nunca lança, por decisão), o manifesto continua afirmando que o documento veio.
    */
   const checklist = checklistDosDocumentos(docs.map((d) => String(d.tipo)));
+
+  /**
+   * tipo na tabela → o documento correspondente, para o botão "Ver" do checklist.
+   *
+   * Sai de `docs`, que a tela já carrega — nenhuma consulta nova. Quando há mais de um
+   * documento do mesmo tipo, fica o ÚLTIMO da lista: é o que o paciente enviou por último, e é
+   * o que ele espera ver ao clicar num item que diz "Recebido".
+   */
+  const idsPorTipo: Record<string, { id: string; nomeArquivo: string | null }> = Object.fromEntries(
+    docs
+      .filter((d) => d?.id)
+      .map((d) => [
+        String(d.tipo),
+        { id: String(d.id), nomeArquivo: (d.nomeArquivo as string | null) ?? null },
+      ]),
+  );
   const faltam = checklist.filter((i) => !i.temNoBanco && !i.opcional);
 
   const carregarDocs = useCallback(async () => {
@@ -679,6 +695,27 @@ export default function PerfilPacientePage() {
                           : 'Ainda não recebemos'}
                     </p>
                   </div>
+
+                  {/*
+                    🔴 "RECEBIDO" SEM PODER VER É A METADE INÚTIL DA FRASE — pedido do dono em
+                    15/09/2026, apontando que o botão existia na tela da ANVISA e não aqui.
+
+                    Este checklist é por TIPO, e diz "Recebido": afirma que algo chegou, não que
+                    o que chegou é o que o rótulo promete. É a mesma lacuna que o botão da ANVISA
+                    fechou, e ela vale ainda mais aqui — o perfil é onde o paciente confere o
+                    próprio cadastro.
+
+                    ⚠️ O casamento é por `tipoNaTabela`, NUNCA por `chave`: o fluxo diz
+                    `documento_identidade` e a coluna guarda `rg`. Usar a chave errada devolveria
+                    `undefined` em silêncio, e o botão sumiria do item que diz "Recebido".
+                  */}
+                  {item.temNoBanco && idsPorTipo[item.tipoNaTabela] && (
+                    <VisualizadorDeDocumento
+                      documentoId={idsPorTipo[item.tipoNaTabela].id}
+                      rotulo={item.rotulo}
+                      nomeArquivo={idsPorTipo[item.tipoNaTabela].nomeArquivo}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

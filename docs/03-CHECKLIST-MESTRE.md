@@ -329,6 +329,22 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🔴 **FLUXO 2 — onze hipóteses já eliminadas. Antes de propor qualquer coisa, leia
+      `docs/adr/ADR-0023…` §8b.** Decisão do dono em 15/09/2026: _"esses testes já fiz antes,
+      deixe documentado para você não pedir para eu fazer mais"_.
+
+      O Fluxo 2 já consumiu quatro sessões, e o custo maior não foram os defeitos — foi
+      **repropor o que já tinha sido descartado**. Em 15/09 o Claude Desktop propôs cadastrar
+      `CHATPRO_INSTANCE_*_GREENS` no servidor; a medição mostrou **duas já presentes** e a
+      terceira **opcional por desenho**. A proposta anterior — tirar o parâmetro `email` do
+      bloco — o dono **já tinha testado, e não resolveu**.
+
+      **O que sobra, e nenhuma é do lado da BeHemp:** resposta do suporte do ChatPro, ou
+      aprovar o desenho que tira o bloco do caminho crítico (ADR-0023 §1–§8).
+
+      🔴 **O endpoint responde 200 com link real**, medido de fora pela Greens, na forma exata
+      que o painel monta. Não há defeito nosso a corrigir neste fluxo.
+
 - [ ] ⏳ **PENDENTE DE APROVAÇÃO — depois da teleconsulta, a ANVISA vira a única pendência, e a
       tela precisa dizer isso.** Descrito pelo dono em 14/09/2026: _"depois que ele termina a
       teleconsulta que ele agendou com médico, fica o status de ANVISA tanto na tela quanto no
