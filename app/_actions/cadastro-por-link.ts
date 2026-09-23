@@ -516,6 +516,50 @@ export async function concluirCadastroPorLink(
      * ⚠️ Falhar aqui não derruba o cadastro: a conta e a ficha já existem, e o paciente
      * pode digitar o RG no perfil. Perder o cadastro inteiro por um campo seria pior.
      */
+    /**
+     * 🔴 O ENDEREÇO DO FORMULÁRIO CHEGA À FICHA PELOS TRÊS CAMINHOS — 23/09/2026.
+     *
+     * O que aconteceu: o chefe do dono relatou que _"até de manhã chegava o CEP e o endereço"_,
+     * e à tarde a procuração saiu com `residente à [endereço completo], CEP [________]` — os
+     * placeholders de `lib/receituario/procuracao-pdf.tsx:160`, que aparecem quando
+     * `pacientes.endereco` e `pacientes.cep` estão vazios.
+     *
+     * ⚠️ A CAUSA: `cep`/`endereco`/`cidade`/`uf` eram gravados **só no `insert`** acima, e há
+     * TRÊS caminhos até a ficha. Quando ela já existia — a casca que o `/redirect` cria
+     * (ADR-0022 G2), ou a linha que o webhook do Clerk criou na corrida —, o que o paciente
+     * digitou era **descartado em silêncio**: o cadastro dizia "pronto", e a procuração saía
+     * sem endereço semanas depois.
+     *
+     * ⚠️ E a evidência que fechou o diagnóstico foi o contraste: no MESMO cadastro **o RG
+     * chegou e o endereço não**. O RG é gravado logo abaixo, num ponto que cobre os três
+     * caminhos; o endereço só existia no `insert`. Um funcionar e o outro não é a prova de que
+     * a ficha já existia.
+     *
+     * 🔴 `COALESCE(<novo>, <atual>)`, nesta ordem — o INVERSO do bloco do parceiro abaixo. Aqui
+     * o valor vem do formulário que o paciente **acabou de preencher**: é o mais recente, e é
+     * dele. Campo vazio preserva o que já estava; campo preenchido vence.
+     */
+    etapa = 'endereco-do-formulario-na-ficha';
+
+    const enderecoDoFormulario = {
+      cep: dados.cep?.trim() || null,
+      endereco: dados.endereco?.trim() || null,
+      cidade: dados.cidade?.trim() || null,
+      uf: dados.uf?.trim() || null,
+    };
+
+    if (Object.values(enderecoDoFormulario).some(Boolean)) {
+      await db
+        .update(pacientes)
+        .set({
+          cep: sql`COALESCE(${enderecoDoFormulario.cep}, ${pacientes.cep})`,
+          endereco: sql`COALESCE(${enderecoDoFormulario.endereco}, ${pacientes.endereco})`,
+          cidade: sql`COALESCE(${enderecoDoFormulario.cidade}, ${pacientes.cidade})`,
+          uf: sql`COALESCE(${enderecoDoFormulario.uf}, ${pacientes.uf})`,
+        })
+        .where(eq(pacientes.id, pacienteId));
+    }
+
     etapa = 'dados-do-parceiro-na-ficha';
 
     if (solicitacao.rg || solicitacao.dataNascimento || solicitacao.genero) {
