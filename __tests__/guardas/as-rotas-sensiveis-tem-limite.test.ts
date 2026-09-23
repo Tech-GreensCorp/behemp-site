@@ -31,6 +31,11 @@ const ROTAS_QUE_PRECISAM = [
   'app/api/documentos/[id]/arquivo/route.ts',
   'app/api/parceiros/greens/cadastro/route.ts',
   'app/api/chatpro/bot-link/route.ts',
+  // O webhook do Mercado Pago confere assinatura HMAC e, se aceita, custa uma consulta à API
+  // do MP por notificação — e o processador compara o CRON_SECRET e dispara um lote delas.
+  // As duas são porta de consumo e de tentativa de segredo. Acrescentadas em 23/09/2026.
+  'app/api/webhooks/mercadopago/route.ts',
+  'app/api/mercadopago/processar/route.ts',
 ];
 
 describe('o limitador conta e corta', () => {
@@ -100,7 +105,7 @@ describe('a chave do limite não vira registro de quem acessou o quê', () => {
   });
 });
 
-describe('as três rotas sensíveis aplicam o limite', () => {
+describe('as rotas sensíveis aplicam o limite', () => {
   it.each(ROTAS_QUE_PRECISAM.map((r) => [r] as const))('%s', (rota) => {
     const codigo = ler(rota);
     expect(codigo).toContain('consumir(');
@@ -140,6 +145,22 @@ describe('as três rotas sensíveis aplicam o limite', () => {
     const assinatura = handoff.indexOf('verificarAssinatura(');
     expect(limite).toBeGreaterThan(-1);
     expect(limite).toBeLessThan(assinatura);
+  });
+
+  it('o webhook do Mercado Pago limita antes de conferir a assinatura', () => {
+    const webhook = ler('app/api/webhooks/mercadopago/route.ts');
+    const limite = webhook.indexOf('consumir(');
+    const assinatura = webhook.indexOf('verificarAssinaturaWebhook(');
+    expect(limite).toBeGreaterThan(-1);
+    expect(limite).toBeLessThan(assinatura);
+  });
+
+  it('o processador do Mercado Pago limita antes de comparar o CRON_SECRET', () => {
+    const processar = ler('app/api/mercadopago/processar/route.ts');
+    const limite = processar.indexOf('consumir(');
+    const segredo = processar.indexOf('segredosConferem(');
+    expect(limite).toBeGreaterThan(-1);
+    expect(limite).toBeLessThan(segredo);
   });
 
   it('a resposta 429 diz quando tentar de novo', () => {

@@ -19,6 +19,117 @@
 
 ---
 
+## 🔴 Item 40 — CATALOGADO, 23/09/2026: o job `liberarReservasExpiradas` do Inngest nunca rodou em produção
+
+**Status:** catalogado, **não corrigido**. Achado ao desenhar a Fase 3 do Mercado Pago, não é
+consequência dela.
+
+### O que o código promete
+
+`lib/integrations/inngest/functions.ts:440` declara `liberarReservasExpiradas` com
+`triggers: [{ cron: '*/5 * * * *' }]` (`:444`). A cada 5 min ele deveria buscar consultas
+`reservada` com `expiraEm` vencido (`:467`), cancelá-las (`:479`, `status: 'cancelada'`) e
+avisar o paciente por e-mail. É registrado em `app/api/inngest/route.ts:25`.
+
+### O que produção mostra
+
+**7 reservas `reservada` e vencidas desde 10/09/2026**, travando esses horários: o índice único
+de horários trata `reservada` como ativa, então nenhum outro paciente consegue pegá-los.
+⚠️ **Esta medição é da sessão da Fase 2/3 em 23/09/2026** (registrada em
+`lib/mercadopago/notificacoes.ts:26-27` e no comentário de `ignorarPrazo`,
+`lib/agendamento/confirmar-consulta-paga.ts:42-50`). **Não foi refeita nesta sessão**, e o
+número precisa ser remedido antes de qualquer decisão.
+
+### Causa — HIPÓTESE, não medida
+
+- `INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` existem em `lib/env.ts:228-229` e **não estão**
+  em nenhuma linha `gravar` do `.github/workflows/deploy.yml`, então não chegam ao processo
+  (mesma classe de `o-segredo-cadastrado-chega-ao-servidor`, que não varre
+  `lib/integrations/inngest`)
+- o comentário de `app/api/inngest/route.ts` diz _"Em prod: configurar URL no painel Inngest"_:
+  não há registro de que isso tenha sido feito
+
+A confirmar **antes** de corrigir: o painel do Inngest tem o app sincronizado? `/api/inngest`
+responde em produção? Sem essas duas respostas, não se sabe se falta chave, registro, ou os dois.
+
+### 🔴 Os modos de erro — por que NÃO basta "ligar"
+
+1. **O mesmo endpoint serve outras 4 funções** (`verificarValidadeDocumentos`,
+   `verificarRecompraMedicamentos`, `enviarEmailRecompraAgendado`, `digestDiarioAdmin`). Elas
+   também nunca rodaram. Ligar o Inngest liga **as cinco**, e a primeira execução dispara de
+   uma vez o acúmulo de semanas, com e-mail para pessoas reais. É o aviso do achado de 10/09
+   (_"NÃO LIGAR os 3 crons antigos sem medir antes"_, `docs/03`) por outro caminho.
+2. **A corrida com o pagamento.** Com o job rodando, uma reserva com PIX ainda pagável ou cartão
+   `em_processamento` seria cancelada e o horário iria para outro paciente, e aí o pagamento
+   aprovado cai em `pago_sem_horario` (`lib/mercadopago/notificacoes.ts:288`). A trava
+   `consultas.pix_valido_ate` existe desde a migration `0047`; **o job ainda não a lê**, e
+   também não pula `em_processamento`. Esse é o pendente da Fase 4 registrado no commit
+   `2214e76`.
+3. As 7 reservas vencidas receberiam agora o e-mail de "sua reserva expirou", **duas semanas
+   depois**.
+
+### O que já contorna, sem corrigir
+
+- o webhook do Mercado Pago confirma reserva vencida quando a API diz `approved`
+  (`ignorarPrazo`, `lib/agendamento/confirmar-consulta-paga.ts:102`). Se continua `reservada`,
+  ninguém pegou o horário, e o paciente pagou
+- a conciliação da Fase 3 roda pelo `filas.yml` (GitHub Actions), **não** pelo Inngest
+
+### Perigo de mexer — medido pela leitura do código
+
+- **em produção:** sim. Qualquer correção muda comportamento visível (cancelamentos + e-mails)
+- **pontos tocados:** `deploy.yml` (chaves), painel do Inngest, `functions.ts` (a trava do
+  pagamento, Fase 4), mais uma decisão sobre as outras 4 funções
+- **teste antes/depois:** não existe teste de integração do job
+- **custo de deixar:** horários travados continuam indisponíveis, e cada reserva abandonada
+  nova soma mais um
+
+**Decisão do dono**, a pedir: corrigir junto da Fase 4, com o job lendo `pix_valido_ate` e
+pulando `em_processamento`, e primeiro remedir as 7 e o volume das outras 4 funções.
+
+---
+
+## ✅ Item 39 — ENTREGUE em 23/09/2026: webhook do Mercado Pago, fila, conciliação (Parte 2, Fase 3)
+
+**Branch:** `feat/mercadopago-cobranca-fase2`. **Ainda não commitado nem em produção.**
+
+### O que existe
+
+| peça                                       | onde                                                                                | o que faz                                                                                                                                                      |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| rota nova `POST /api/webhooks/mercadopago` | `app/api/webhooks/mercadopago/route.ts:38`                                          | limita (`:39`), confere a assinatura com o `data.id` **da URL** (`:63`), ignora corpo divergente, enfileira (`:86`), responde, e processa em `after()` (`:96`) |
+| rota nova `GET /api/mercadopago/processar` | `app/api/mercadopago/processar/route.ts:38`                                         | limite de 10/min (`:36`), 503 sem `CRON_SECRET`, 401 com o errado (`:62`), conciliação + lote de 25                                                            |
+| assinatura                                 | `lib/mercadopago/assinatura-webhook.ts:84`                                          | HMAC-SHA256 de `id:…;request-id:…;ts:…;`, `timingSafeEqual` (`:108`), recusa tudo sem segredo                                                                  |
+| fila e processamento                       | `lib/mercadopago/notificacoes.ts`                                                   | enfileirar **reenfileira** (`:74`), reserva atômica `FOR UPDATE SKIP LOCKED` (`:123`), relê a API e confere id/referência/valor (`:259`)                       |
+| variável nova `MERCADOPAGO_WEBHOOK_SECRET` | `lib/env.ts:151`, `deploy.yml:313`                                                  | a assinatura secreta do painel de Webhooks, que **não é** o `client_secret`                                                                                    |
+| passo novo no cron                         | `.github/workflows/filas.yml:80`                                                    | chama o processador a cada 5 min, com `if: always()`                                                                                                           |
+| ajustes                                    | `lib/mercadopago/conta.ts:166`, `lib/agendamento/confirmar-consulta-paga.ts:50,102` | `userId: null` quando não há ator; `ignorarPrazo` só para o webhook com pagamento aprovado                                                                     |
+
+### Provas
+
+- **guarda novo** `o-webhook-do-mercado-pago-nao-e-forjavel`: 36 casos, 14 sabotagens
+- **guardas estendidos:** `as-rotas-sensiveis-tem-limite` (19 casos, com as duas rotas) e
+  `o-segredo-cadastrado-chega-ao-servidor` (33 casos, com as duas pastas de rota). O de limite
+  achou que o `processar` não tinha limite, e ele ganhou um
+- **integração** `__tests__/integracao/o-webhook-do-mercado-pago-confirma-o-que-a-api-diz.test.ts`:
+  13 casos contra Postgres real, 12 sabotagens. Duas notificações do mesmo pagamento, reenvio
+  idêntico, assinatura forjada (3 variantes + manifesto sem id), corpo adulterado, divergência
+  de valor/referência, conciliação. Uma sabotagem achou um caso descoberto: corpo **sem**
+  `data.id` + assinatura de manifesto sem id
+- `pnpm test` 1478/1478 · integração 72/72 · `tsc` 0 · baseline verde
+
+### O que ficou
+
+- 🔴 **antes do deploy:** cadastrar o secret `MERCADOPAGO_WEBHOOK_SECRET` e a URL do webhook no
+  painel do MP. Sem o secret, o webhook recusa tudo e só a conciliação confirma (até 5 min)
+- a janela da conciliação é de 2 min a 24 h: PIX pago depois de 24 h só se confirma por
+  notificação
+- o limite do `processar` é por processo (Item 31)
+- as rotas `processar` do ChatPro e dos parceiros continuam **sem** limite (fora do escopo)
+- a Fase 4 (job de expiração respeitar `pix_valido_ate` e `em_processamento`) depende do Item 40
+
+---
+
 ## ⏳ Item 38 — PENDENTE, 22/09/2026: ligar o bloqueio de agendamento do Mercado Pago
 
 **Status:** o código está pronto e **desligado**. Ligar é trocar um secret — e ligar cedo

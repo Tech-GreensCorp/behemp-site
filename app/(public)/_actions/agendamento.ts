@@ -7,15 +7,13 @@ import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarPaciente } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  confirmarConsultaPaga,
+  marcarErroConfirmacao,
+} from '@/lib/agendamento/confirmar-consulta-paga';
 import { revalidatePath } from 'next/cache';
+import { atualizarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import {
-  criarConsultaGoogleCalendar,
-  cancelarEventoGoogleCalendar,
-  atualizarEventoGoogleCalendar,
-} from '@/lib/integrations/google-calendar';
-import {
-  enviarEmailConsultaAgendada,
-  enviarEmailConsultaMedico,
   enviarEmailReservaAguardandoPagamento,
   enviarEmailConsultaCancelada,
   enviarEmailConsultaRemarcada,
@@ -63,21 +61,6 @@ interface ActionResult<T = unknown> {
   sucesso: boolean;
   dados?: T;
   erro?: string;
-}
-
-/**
- * Registra o motivo pelo qual a confirmação falhou no pagamento vinculado à consulta —
- * best-effort, nunca deixa a falha de escrita mascarar o erro original.
- */
-async function marcarErroConfirmacao(consultaId: string, mensagem: string): Promise<void> {
-  try {
-    await db
-      .update(pagamentos)
-      .set({ erroConfirmacao: mensagem })
-      .where(eq(pagamentos.consultaId, consultaId));
-  } catch (erro) {
-    console.error('[Action] Falha ao registrar erro de confirmação no pagamento:', erro);
-  }
 }
 
 /**
@@ -245,11 +228,11 @@ export async function reservarConsulta(
 }
 
 /**
- * Confirma uma reserva dentro do prazo.
- * 1. Valida dono e prazo da reserva
- * 2. Tenta criar evento no Google Calendar com Meet — falha não bloqueia
- * 3. Atualiza a consulta para 'confirmada'/'agendada' e limpa o prazo
- * 4. Envia e-mail de confirmação
+ * Confirma uma reserva dentro do prazo — a CASCA AUTENTICADA.
+ *
+ * Confere a sessão do paciente e que a consulta é dele; a confirmação em si (prazo, Google
+ * Calendar, status final, pagamento pago, e-mails) é `confirmarConsultaPaga`, a mesma função
+ * que o webhook do Mercado Pago chama sem sessão (Parte 2, 23/09/2026).
  */
 export async function confirmarAgendamento(
   dados: z.infer<typeof confirmarAgendamentoSchema>,
@@ -304,173 +287,10 @@ export async function confirmarAgendamento(
       return { sucesso: false, erro: 'Reserva não encontrada.' };
     }
 
-    if (reserva.status !== 'reservada') {
-      return {
-        sucesso: false,
-        erro: reserva.status === 'cancelada'
-          ? 'Sua reserva expirou ou foi cancelada. Escolha um novo horário.'
-          : 'Este agendamento já foi confirmado anteriormente.',
-      };
-    }
-
-    if (reserva.expiraEm && reserva.expiraEm.getTime() < Date.now()) {
-      // Expirou mas o job de limpeza ainda não passou — libera agora mesmo.
-      await db
-        .update(consultas)
-        .set({ status: 'cancelada', expiraEm: null })
-        .where(eq(consultas.id, consultaId));
-      const mensagem = 'O prazo da reserva expirou antes da confirmação.';
-      await marcarErroConfirmacao(consultaId, mensagem);
-      return { sucesso: false, erro: `${mensagem} Escolha um novo horário.` };
-    }
-
-    const medicoId = reserva.medicoId;
-    const observacoes = reserva.observacoes ?? undefined;
-
-    const [medico] = await db
-      .select()
-      .from(medicos)
-      .innerJoin(users, eq(medicos.userId, users.id))
-      .where(eq(medicos.id, medicoId))
-      .limit(1);
-
-    if (!medico) {
-      await marcarErroConfirmacao(consultaId, 'Médico não encontrado');
-      return { sucesso: false, erro: 'Médico não encontrado' };
-    }
-
-    const [paciente] = await db
-      .select()
-      .from(pacientes)
-      .innerJoin(users, eq(pacientes.userId, users.id))
-      .where(eq(pacientes.id, pacienteId))
-      .limit(1);
-
-    if (!paciente) {
-      await marcarErroConfirmacao(consultaId, 'Paciente não encontrado');
-      return { sucesso: false, erro: 'Paciente não encontrado' };
-    }
-
-    const dataConsulta = reserva.dataHora;
-    const dataFim = new Date(dataConsulta.getTime() + 60 * 60 * 1000); // +1 hora
-
-    // Tentar criar evento no Google Calendar. Falha aqui NÃO bloqueia a confirmação —
-    // o token do médico pode ter expirado ou sido revogado (ex.: "invalid_grant"), e
-    // travar todo mundo por causa da agenda quebrada de um médico é pior do que a
-    // consulta nascer sem Meet. O motivo fica em consultas.googleCalendarErro.
-    let googleEventId: string | null = null;
-    let meetLink: string | null = null;
-    let googleCalendarErro: string | null = null;
-
-    if (medico.medicos.googleRefreshToken) {
-      const resultadoGoogle = await criarConsultaGoogleCalendar({
-        titulo: `Consulta Be4Hope — ${paciente.users.nome}`,
-        descricao: observacoes || 'Consulta de medicina endocanabinóide',
-        dataInicio: dataConsulta,
-        dataFim,
-        emailPaciente: paciente.users.email,
-        emailMedico: medico.users.email,
-        refreshToken: medico.medicos.googleRefreshToken,
-        calendarId: medico.medicos.googleCalendarId || undefined,
-      });
-
-      if (resultadoGoogle.sucesso) {
-        googleEventId = resultadoGoogle.dados?.eventId || null;
-        meetLink = resultadoGoogle.dados?.meetLink || null;
-      } else {
-        googleCalendarErro = resultadoGoogle.erro || 'Erro desconhecido';
-        console.error(
-          '[Action] Falha ao criar evento no Google Calendar — agendamento prossegue sem Meet:',
-          googleCalendarErro,
-        );
-      }
-    }
-
-    const statusConsulta = googleEventId ? 'confirmada' : 'agendada';
-
-    try {
-      await db
-        .update(consultas)
-        .set({
-          status: statusConsulta,
-          expiraEm: null,
-          googleEventId,
-          googleMeetLink: meetLink,
-          googleCalendarErro,
-        })
-        .where(eq(consultas.id, consultaId));
-    } catch (dbError) {
-      if (googleEventId && medico.medicos.googleRefreshToken) {
-        await cancelarEventoGoogleCalendar({
-          eventId: googleEventId,
-          refreshToken: medico.medicos.googleRefreshToken,
-          calendarId: medico.medicos.googleCalendarId || undefined,
-        }).catch((cancelError) =>
-          console.error('[Action] Falha ao compensar evento órfão do Calendar:', cancelError),
-        );
-      }
-      await marcarErroConfirmacao(consultaId, 'Erro ao confirmar o agendamento.');
-      throw dbError;
-    }
-
-    await db
-      .update(pagamentos)
-      .set({ confirmadoEm: new Date(), erroConfirmacao: null })
-      .where(eq(pagamentos.consultaId, consultaId));
-
-    await registrarAuditoria({
-      userId: userInterno.id,
-      acao: 'atualizar',
-      entidade: 'consultas',
-      entidadeId: consultaId,
-      dadosAntes: { status: 'reservada' },
-      dadosDepois: { status: statusConsulta },
-    });
-
-    revalidatePath('/medico/agenda');
-    revalidatePath('/admin/pagamentos');
-
-    // Enviar e-mail de confirmação ao paciente via Brevo
-    try {
-      await enviarEmailConsultaAgendada({
-        pacienteNome: paciente.users.nome,
-        pacienteEmail: paciente.users.email,
-        medicoNome: medico.users.nome,
-        dataHora: dataConsulta,
-        meetLink,
-      });
-      await db
-        .update(consultas)
-        .set({ emailPacienteEnviadoEm: new Date() })
-        .where(eq(consultas.id, consultaId));
-    } catch (emailError) {
-      console.error('[Action] Erro ao enviar e-mail de confirmação ao paciente:', emailError);
-      // Não falha a action — consulta já foi criada. Coluna fica null: falha fica visível.
-    }
-
-    // Enviar e-mail de notificação ao médico via Brevo
-    try {
-      await enviarEmailConsultaMedico({
-        medicoNome: medico.users.nome,
-        medicoEmail: medico.users.email,
-        pacienteNome: paciente.users.nome,
-        pacienteEmail: paciente.users.email,
-        dataHora: dataConsulta,
-        meetLink,
-      });
-      await db
-        .update(consultas)
-        .set({ emailMedicoEnviadoEm: new Date() })
-        .where(eq(consultas.id, consultaId));
-    } catch (emailMedicoError) {
-      console.error('[Action] Erro ao enviar e-mail de notificação ao médico:', emailMedicoError);
-      // Não falha a action — consulta já foi criada
-    }
-
-    return {
-      sucesso: true,
-      dados: { consultaId, meetLink: meetLink || '' },
-    };
+    // A partir daqui é a confirmação em si — a mesma que o webhook do Mercado Pago dispara.
+    // Esta action só respondeu "quem é você e a consulta é sua?"; o resto mora num módulo SEM
+    // `'use server'` de propósito (ver o cabeçalho de lib/agendamento/confirmar-consulta-paga.ts).
+    return await confirmarConsultaPaga(consultaId, { atorUserId: userInterno.id });
   } catch (error) {
     console.error('[Action] Erro ao confirmar agendamento:', error);
     if (typeof dados?.consultaId === 'string' && dados.consultaId) {

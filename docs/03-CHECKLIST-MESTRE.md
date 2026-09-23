@@ -79,6 +79,29 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       aplica uma só, e ela era no-op medido. 🔴 **Falta confirmar o EFEITO:** que um cadastro
       real deixe linha em `consentimentos`. Diagnóstico e a medição antes/depois em
       [04 — Item 32](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 40** — 🔴 **o job `liberarReservasExpiradas` do Inngest nunca rodou em produção**:
+      **7 reservas `reservada` e vencidas desde 10/09/2026** seguem travando esses horários
+      (medido em 23/09 pela sessão da Fase 2/3, **não remedido**). O job existe
+      (`lib/integrations/inngest/functions.ts:440`, cron de 5 min) e está registrado em
+      `app/api/inngest/route.ts`. **Causa ainda não medida:** as chaves `INNGEST_*` não estão
+      no `deploy.yml`, e não há registro de o app ter sido sincronizado no painel.
+      ⛔ **Não "ligar" o Inngest:** o mesmo endpoint liga outras 4 funções que também nunca
+      rodaram, e a primeira execução dispararia de uma vez o e-mail acumulado de semanas (o
+      aviso de 10/09, por outro caminho). E o job ainda não respeita `pix_valido_ate` nem
+      `em_processamento` (Fase 4): rodando hoje, cancelaria reserva com pagamento em curso.
+      Diagnóstico, os modos de erro e o perigo de mexer em
+      [04 — Item 40](04-LISTA-DE-AFAZERES.md). **Decisão do dono.**
+- [x] **Item 39 — ✅ ENTREGUE em 23/09/2026** · `feat/mercadopago-cobranca-fase2`, **não
+      commitado nem em produção**: a Fase 3 da cobrança do Mercado Pago. **Rota nova**
+      `POST /api/webhooks/mercadopago` (assinatura `x-signature` conferida com o `data.id` da
+      URL, fila, processamento em `after()`) e `GET /api/mercadopago/processar` (fila +
+      conciliação, chamada pelo `filas.yml`). **Variável nova** `MERCADOPAGO_WEBHOOK_SECRET`
+      (`lib/env.ts`, `deploy.yml`). **Guarda novo** `o-webhook-do-mercado-pago-nao-e-forjavel`
+      (36 casos, 14 sabotagens). **Guardas estendidos:** `as-rotas-sensiveis-tem-limite` (19;
+      achou o `processar` sem limite) e `o-segredo-cadastrado-chega-ao-servidor` (33).
+      Integração contra Postgres real: 13 casos, 12 sabotagens. **1478 casos em 64 arquivos.**
+      🔴 **Antes do deploy:** cadastrar o secret e a URL do webhook no painel do MP. Detalhe em
+      [04 — Item 39](04-LISTA-DE-AFAZERES.md).
 - [ ] **Item 38** — ⏳ **o bloqueio de agendamento do Mercado Pago está PRONTO e DESLIGADO**,
       e ligar cedo para a plataforma inteira. `reservarConsulta`
       (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico não tem conta

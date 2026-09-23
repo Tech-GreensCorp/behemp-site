@@ -157,11 +157,13 @@ export interface CredenciaisDoMedico {
  * ⚠️ O retorno tem o token EM CLARO. Ele existe só dentro da chamada de servidor que fala
  * com o Mercado Pago: não vai para client component, log, tela ou mensagem de erro.
  *
- * @param userId o `users.id` de quem está acessando — é o que a auditoria registra.
+ * @param userId o `users.id` de quem está acessando — é o que a auditoria registra. `null`
+ *   quando NÃO há pessoa: o webhook do Mercado Pago confirmando um pagamento (Decisão 6 da
+ *   Parte 2). O `motivo` diz quem agiu; inventar um id faria o registro mentir.
  */
 export async function obterContaConectada(
   medicoId: string,
-  userId: string,
+  userId: string | null,
   motivo: string,
 ): Promise<CredenciaisDoMedico | null> {
   const [linha] = await db
