@@ -6,7 +6,7 @@
 🔴 **Toda ADR nova entra nesta tabela NO MESMO COMMIT que a cria. Índice atrasado é defeito,
 não atraso.**
 
-**Atualizado em 19/09/2026 — 23 ADRs, medidas em `docs/adr/`.**
+**Atualizado em 23/09/2026 — 24 ADRs, medidas em `docs/adr/`.**
 
 ⚠️ **Retificação, 19/09/2026.** O cabeçalho anterior dizia _"as 7 ADRs abaixo"_ e a tabela
 listava 10; hoje existem **23**. A nota _"quatro estão como proposta"_ contradizia a própria
@@ -14,6 +14,9 @@ tabela, que já mostrava sete. E o status da **0004** estava escrito aqui como `
 enquanto o arquivo dela diz `✅ aprovada em 20/08/2026` — um índice que erra o status é pior
 que um índice incompleto, porque quem lê acredita que a decisão ainda está aberta. As
 afirmações antigas ficam registradas nesta nota; a tabela abaixo é derivada dos arquivos.
+
+⚠️ **Acréscimo, 23/09/2026.** A ADR-0024 entrou pela `main` enquanto este
+índice estava em revisão; foi somada no merge, não no commit que a criou.
 
 ⚠️ E a retificação anterior fica, como foi escrita: este cabeçalho já dissera _"vazia de
 propósito"_ — verdade antes de as primeiras ADRs existirem, falsa no mesmo dia. Uma ADR anterior
@@ -45,9 +48,10 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0021](ADR-0021-os-oito-fluxos-e-os-webhooks-entre-as-empresas.md)                 | Os oito fluxos, e os webhooks que ligam as duas empresas                                                        | 📋 proposta                  | 10/09/2026 |
 | [0022](ADR-0022-conta-e-ficha-sao-dois-fatos-e-ninguem-liga-os-dois.md)            | Conta e ficha são dois fatos, e ninguém liga os dois                                                            | aceita · revisada 13/09/2026 | 12/09/2026 |
 | [0023](ADR-0023-o-fluxo-da-receita-reusa-o-trilho-da-anvisa.md)                    | O fluxo da receita reusa o trilho da ANVISA, e não encosta nele                                                 | 📋 proposta                  | 14/09/2026 |
+| [0024](ADR-0024-a-credencial-do-medico-e-cifrada-na-aplicacao.md)                  | A credencial do médico no Mercado Pago é cifrada na aplicação, não no banco                                     | 📋 proposta                  | 22/09/2026 |
 
-**Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 11 · ✅ decidida pelo
-dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **23**.
+**Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 12 · ✅ decidida pelo
+dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **24**.
 
 ⚠️ **Cinco palavras para dois estados.** _aprovada_, _aceita_, _decidida pelo dono_ e _aceita e
 implementada_ significam todas "vale"; só _proposta_ significa "ainda não". A tabela reproduz o
