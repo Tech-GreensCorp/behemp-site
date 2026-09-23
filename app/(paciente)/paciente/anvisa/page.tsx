@@ -95,7 +95,15 @@ const STATUS_CONFIG: Record<AnvisaStatus, { label: string; cor: string; icon: Re
   },
 };
 
-const DOC_LABELS: Record<string, { label: string; dica: string }> = {
+/**
+ * 🔴 `opcional` ENTROU EM 23/09/2026. Decisão do dono: _"o laudo médico não é obrigatório"_.
+ *
+ * Ele já era declarado opcional no vocabulário do parceiro — `lib/parceiros/documentos.ts:26`:
+ * _"laudo_medico — opcional de verdade: pode nunca existir, e ninguém vai cobrar"_. Esta tela
+ * não sabia disso, e fazia duas coisas erradas: mostrava o item sem marcação, como os
+ * obrigatórios, e **travava o envio** até ele chegar (ver `todosEnviados` abaixo).
+ */
+const DOC_LABELS: Record<string, { label: string; dica: string; opcional?: boolean }> = {
   receita_medica: {
     label: 'Receita Médica',
     dica: 'A receita emitida pelo seu médico na plataforma Be4Hope.',
@@ -128,6 +136,7 @@ const DOC_LABELS: Record<string, { label: string; dica: string }> = {
   laudo_medico: {
     label: 'Laudo Médico',
     dica: 'Laudo com CID, diagnóstico e justificativa para uso de produto não registrado no Brasil.',
+    opcional: true,
   },
 };
 
@@ -200,7 +209,9 @@ function ChecklistItem({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm text-foreground">{config.label}</p>
+        <p className="font-semibold text-sm text-foreground">{config.label}{config.opcional && (
+          <span className="ml-1.5 font-normal text-muted-foreground/60">(opcional)</span>
+        )}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{config.dica}</p>
         {doc.enviado && doc.nomeArquivo && (
           <p className="text-xs text-green-600 mt-1 truncate">✓ {doc.nomeArquivo}</p>
@@ -255,7 +266,12 @@ function ChecklistItem({
 function Timeline({ autorizacao }: { autorizacao: Autorizacao }) {
   const etapas: { key: AnvisaStatus | '_inicio'; label: string; descricao: string }[] = [
     { key: '_inicio', label: 'Processo iniciado', descricao: 'Processo de autorização criado na plataforma.' },
-    { key: 'documentos_enviados', label: 'Documentos enviados', descricao: 'Checklist completo. Pronto para análise.' },
+    {
+      key: 'documentos_enviados',
+      label: 'Documentos enviados',
+      // Quem age aqui é a Be4Hope, não a ANVISA — e o paciente precisa saber de quem espera.
+      descricao: 'Checklist completo. A equipe Be4Hope confere e protocola na ANVISA.',
+    },
     { key: 'em_analise', label: 'Em análise — ANVISA', descricao: `Prazo estimado: ${autorizacao.prazoEstimado ?? '—'}` },
     { key: 'aprovado', label: 'Autorização concedida', descricao: 'Seu medicamento está autorizado para importação.' },
   ];
@@ -381,7 +397,17 @@ export default function AnvisaPage() {
   });
 
   const documentos = (autorizacao?.documentos as DocItem[] | undefined) ?? [];
-  const todosEnviados = documentos.length > 0 && documentos.every((d) => d.enviado);
+  /**
+   * 🔴 O QUE FALTA É O QUE É EXIGIDO — 23/09/2026.
+   *
+   * Era `documentos.every((d) => d.enviado)`, e isso desabilitava o botão de enviar a
+   * documentação enquanto o LAUDO não chegasse. O laudo pode nunca existir: travar o processo
+   * da ANVISA por ele deixa o paciente esperando por um papel que ninguém vai cobrar dele.
+   *
+   * ⚠️ A tela continua MOSTRANDO o laudo e aceitando o upload — ele é útil quando existe. O
+   * que muda é que ele avisa em vez de bloquear.
+   */
+  const todosEnviados = documentos.length > 0 && documentos.every((d) => d.enviado || DOC_LABELS[d.tipo]?.opcional === true);
 
   const recarregarAutorizacao = async () => {
     setCarregando(true);
@@ -434,7 +460,15 @@ export default function AnvisaPage() {
     startTransition(async () => {
       const res = await confirmarEnvioAnvisa(autorizacao.id);
       if (res.sucesso) {
-        toast.success('Documentos confirmados! Iniciando análise ANVISA.');
+        /**
+         * 🔴 A MENSAGEM DIZIA O QUE NÃO ACONTECEU — 23/09/2026.
+         *
+         * Era _"Iniciando análise ANVISA"_, e nada é enviado à ANVISA aqui: o status vai para
+         * `documentos_enviados` e o processo fica esperando um ADMIN conferir e protocolar
+         * (`/admin/anvisa`, seletor de status → `em_analise`). Dizer que a análise começou faz
+         * o paciente contar os 10 dias úteis a partir de agora e cobrar no dia errado.
+         */
+        toast.success('Documentos confirmados. Nossa equipe vai conferir e protocolar na ANVISA.');
         await recarregarAutorizacao();
       } else {
         toast.error('Erro ao confirmar envio.');
