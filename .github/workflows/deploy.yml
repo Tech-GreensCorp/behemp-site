@@ -300,6 +300,17 @@ jobs:
             # 64 hex = 32 bytes. Gerada com `openssl rand -hex 32`; o `tr -d '\n'` ao cadastrar
             # não é detalhe — uma quebra de linha a mais e a chave deixa de ter 32 bytes.
             gravar MERCADOPAGO_TOKEN_ENCRYPTION_KEY   "${{ secrets.MERCADOPAGO_TOKEN_ENCRYPTION_KEY }}"
+            # 🔴 A ASSINATURA SECRETA DO WEBHOOK — sem ela, NENHUM pagamento se confirma sozinho.
+            #
+            # `lib/mercadopago/assinatura-webhook.ts` confere o `x-signature` de cada
+            # notificação com esta chave e recusa TUDO quando ela falta (falha fechada: um
+            # webhook que aceita sem conferir é um webhook aberto). O sintoma de esquecê-la é
+            # silencioso: o MP recebe 200, e a consulta paga só se confirma pela conciliação
+            # do `filas.yml`.
+            #
+            # ⚠️ NÃO é o MERCADOPAGO_CLIENT_SECRET. É gerada em Suas integrações → Webhooks →
+            # Configurar notificação, e é uma por aplicação.
+            gravar MERCADOPAGO_WEBHOOK_SECRET         "${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}"
             # 🔴 O INTERRUPTOR DO ROLLOUT — e LIGAR ELE QUEBRA AGENDAMENTO SE FOR CEDO.
             #
             # `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago

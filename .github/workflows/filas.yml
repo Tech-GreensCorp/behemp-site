@@ -68,3 +68,20 @@ jobs:
             echo "::error::enviador de parceiros respondeu $CODIGO"
             exit 1
           fi
+
+      - name: Processar os pagamentos do Mercado Pago
+        # `if: always()` pelo mesmo motivo: é fila independente. Aqui ela é também a
+        # CONCILIAÇÃO — reenfileira pagamentos em trânsito cuja notificação nunca chegou —,
+        # então um passo anterior vermelho não pode deixar consulta paga sem confirmação.
+        if: always()
+        run: |
+          CODIGO=$(curl -s -o /tmp/mercadopago.json -w "%{http_code}" --max-time 90 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://be4hope.org/api/mercadopago/processar")
+          echo "HTTP $CODIGO"
+          cat /tmp/mercadopago.json
+          echo
+          if [ "$CODIGO" != "200" ]; then
+            echo "::error::processador do Mercado Pago respondeu $CODIGO"
+            exit 1
+          fi

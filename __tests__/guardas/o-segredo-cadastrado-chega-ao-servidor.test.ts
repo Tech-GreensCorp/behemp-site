@@ -54,6 +54,10 @@ const AREAS = [
   // OAuth do Mercado Pago, que é a primeira integração a entrar depois desta constatação.
   'lib/mercadopago',
   'app/api/medico/mercadopago',
+  // Fase 3 (23/09/2026): o webhook e o processador da fila. Rotas novas nascem DESCOBERTAS
+  // se não entrarem aqui — é o ponto cego descrito acima.
+  'app/api/webhooks/mercadopago',
+  'app/api/mercadopago',
 ];
 
 function arquivosDe(dir: string): string[] {
@@ -159,6 +163,15 @@ describe('toda variável de integração chega ao servidor', () => {
 
   it('o segredo do cadastro (S2) está lá', () => {
     expect(deploy).toMatch(/gravar PARCEIRO_GREENS_SEGREDO_CADASTRO\s+"\$\{\{ secrets\./);
+  });
+
+  /**
+   * 🔴 A ASSINATURA DO WEBHOOK DO MERCADO PAGO, nomeada. Sem ela o webhook recusa TODA
+   * notificação (falha fechada) e o MP recebe 200 mesmo assim — o sintoma é só "a consulta
+   * demora 5 min para confirmar", que ninguém investiga.
+   */
+  it('a assinatura secreta do webhook do Mercado Pago está lá', () => {
+    expect(deploy).toMatch(/gravar MERCADOPAGO_WEBHOOK_SECRET\s+"\$\{\{ secrets\./);
   });
 
   it('e o segredo do aviso (S1) continua — um não substitui o outro', () => {
