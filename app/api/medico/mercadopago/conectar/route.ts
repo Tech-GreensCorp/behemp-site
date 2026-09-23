@@ -1,10 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { medicos, users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { verificarMedico } from '@/lib/auth';
 import { gerarUrlAutorizacao, oauthConfigurado } from '@/lib/mercadopago/oauth';
+import { urlAbsoluta } from '@/lib/url';
 
 /**
  * INÍCIO DO OAUTH — manda o médico autorizar a conta dele no Mercado Pago.
@@ -17,11 +18,9 @@ import { gerarUrlAutorizacao, oauthConfigurado } from '@/lib/mercadopago/oauth';
  * A rota vive sob `/api/medico/`, que o middleware já protege; o `verificarMedico` aqui é
  * a segunda camada, e é ela que dá o `clerkId` para resolver o médico.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const erro = (motivo: string) =>
-    NextResponse.redirect(
-      new URL(`/medico/pagamentos/config?mp=erro&motivo=${motivo}`, request.url),
-    );
+    NextResponse.redirect(urlAbsoluta(`/medico/pagamentos/config?mp=erro&motivo=${motivo}`));
 
   try {
     const auth = await verificarMedico();
