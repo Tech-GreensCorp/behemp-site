@@ -175,6 +175,18 @@ _"tentar novamente"_, e tentar não resolve: só recarregar. Corrigido com `depl
 
 ## 🔴 Item 36 — CATALOGADO em 11/09/2026: produção autentica por uma instância de DESENVOLVIMENTO do Clerk
 
+> ⚠️ **REMEDIÇÃO, 22/09/2026 — continua valendo, e agora com o efeito isolado.**
+>
+> O `.env` de produção tem **`pk_test_` / `sk_test_`**, e **zero** ocorrência de `live`. O código
+> de verificação sai de `notifications@accounts.dev` com **`[Development]`** no assunto.
+>
+> 🔴 **Os logs do Clerk mostram que TODOS os códigos foram enviados** — o defeito não é de envio,
+> é de **entrega**: o domínio `accounts.dev` é compartilhado, e a reputação dele não é nossa.
+>
+> **O que isso simplifica:** os usuários dessa instância são **todos de teste**; não há paciente
+> real. Migrar para instância de produção com domínio próprio **não exige migração de conta** —
+> é configuração, não mudança de dado.
+
 **Achado pela Greens**, testando o handoff em produção. Ao clicar em "Criar conta e continuar",
 a tela diz _"Não conseguimos concluir agora"_ e o devtools mostra:
 
@@ -619,6 +631,22 @@ desliga.
 ---
 
 ## Item 6 — 🔴 Todo documento clínico está em store público do Vercel Blob, e a doc afirma o contrário
+
+> 🔴 **ACRÉSCIMO, 22/09/2026 — a procuração assinada é um caso vivo deste item, e NÃO foi corrigida.**
+>
+> `app/api/webhooks/docusign/route.ts:114` grava o PDF assinado com **`access: 'public'`**, e o
+> botão **"Baixar"** da tela usa a coluna direto:
+> `app/(paciente)/paciente/documentos/page.tsx:276` → `handleDownload(doc.urlBlob, …)`.
+>
+> **O que está exposto:** uma procuração com nome e dados do paciente, **legível por quem tiver a
+> URL, sem login, sem escopo e sem auditoria**. Medido em 22/09: há **25** procurações concluídas
+> com PDF e **5** linhas em `documentos` do tipo `procuracao_especifica`.
+>
+> ⚠️ **O botão "Ver" ao lado é seguro** (`page.tsx:268` → `<VisualizadorDeDocumento>` →
+> `GET /api/documentos/{id}/arquivo`, autenticada, com escopo de objeto, auditoria e 404
+> universal). Os dois botões vivem na mesma linha da tela: um passa pela porta, o outro não.
+>
+> **Pendência, não bug resolvido.** Nada foi mudado em 22/09.
 
 > 🔴 **RETIFICAÇÃO, 13/09/2026 — o Item 6 tinha um segundo andar, e ele era pior.**
 >

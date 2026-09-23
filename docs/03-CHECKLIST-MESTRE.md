@@ -647,6 +647,35 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### 🔴 Achado de 22/09/2026 — a lição mais cara da semana: sintoma funcionando não prova schema
+
+Em 21/09, o Desktop e este Code concluíram que a `0039` **estava aplicada** em produção. O
+raciocínio: _"`app/_actions/cadastro-por-link.ts:600` chama `conceder()`, que insere
+`consentimentos.idioma`; o cadastro por link funciona em produção; logo a coluna existe."_
+
+**Estava errado.** O cabeçalho de `db/migrations/0045_idioma_e_cadastro_transferido.sql` registra
+a medição: `consentimentos.idioma` **não existia**, e o enum `parceiro_evento_tipo` tinha só
+`receita_emitida` e `anvisa_aprovada`.
+
+🔴 **O que essa inferência custou:** ela foi usada para **reduzir a urgência** da frente de
+migrations, quando o dono perguntou se o diagnóstico era necessário. A análise **mecânica** — o
+`when` da `0039` (1789142042567) é menor que o marco de produção (1789271398148), e o migrator
+escolhe pelo `max(created_at)` lido uma vez antes do loop — estava correta desde o começo.
+
+**A regra que sai daí:** _o código diz o que ele FAZ com o dado; só o banco diz que COLUNA existe_.
+Um fluxo que completa não prova que toda escrita dele foi aceita — pode haver `catch` no caminho,
+ou o trecho pode não ter sido exercitado. **Estado de schema se mede com `SELECT`, nunca com
+"o sintoma não aparece".**
+
+### ⚪ Achado de 22/09/2026 — um paciente tem 23 procurações, os outros quatro têm 3, 1, 1 e 1
+
+Medido no banco de produção em 22/09: `procuracoes_especificas` tem **25** com
+`docusign_status = 'concluido'`, distribuídas entre **4** pacientes distintos — e a distribuição é
+23 / 1 / 1 / ... contra 3 / 1 / 1 / 1 nos demais.
+
+**Se cada procuração dispara um envelope DocuSign, há custo por envelope e e-mail repetido para a
+mesma pessoa.** ⚠️ **A confirmar com o dono** se esse paciente é o de teste — não presumir.
+
 ### 🔴 Achado de 13/09/2026 — o Clerk roda com instância de DESENVOLVIMENTO
 
 Medido no `.env` da VPS: `pk_test_` / `sk_test_`. E no painel: a aplicação **Be4hope** tem
