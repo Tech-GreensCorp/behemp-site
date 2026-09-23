@@ -29,6 +29,8 @@ const TIPO_LABELS: Record<string, string> = {
   receita_medica: 'Receita Médica',
   comprovante_residencia: 'Comprovante de Residência',
   autorizacao_anvisa: 'Autorização ANVISA',
+  // Entrou no enum em 23/09/2026 — ADR-0026.
+  laudo_medico: 'Laudo Médico',
   oficio_anvisa: 'Ofício da ANVISA',
   documento_pessoal: 'Documento Pessoal',
   procuracao_especifica: 'Procuração Específica',

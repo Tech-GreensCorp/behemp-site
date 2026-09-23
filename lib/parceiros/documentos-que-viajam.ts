@@ -29,12 +29,29 @@ export const MIMES_QUE_VIAJAM = [
 ] as const;
 
 /**
- * 🔴 `laudo_medico` NÃO VIAJA — decisão deles, e a nossa parte é respeitá-la.
+ * 🔴 VAZIO DESDE 23/09/2026 — e o vazio é a decisão, não um esquecimento. ADR-0026 D-03.
  *
- * Eles não têm tipo equivalente, e forçá-lo em "documento pessoal" classificaria um documento
- * clínico como pessoal. Quem lesse a ficha depois acreditaria na classificação errada.
+ * Até aqui a lista tinha `laudo_medico`, com o comentário _"decisão deles, e a nossa parte é
+ * respeitá-la"_. Duas coisas estavam erradas nisso:
+ *
+ * 1. **A decisão deles não existe mais.** A Greens removeu o `NAO_VIAJAM` dela em 15/09/2026
+ *    (commit `4e9cfac`), e desde então manda o laudo como arquivo. Espelhávamos um espelho.
+ * 2. **O ramo era inalcançável.** `d.tipo` vem da coluna `documentos.tipo`, e o enum não tinha
+ *    `laudo_medico` — nenhuma linha jamais casou. A entrada só passaria a valer agora, com o
+ *    valor no enum, e aí excluiria o laudo sem que ninguém lembrasse por quê.
+ *
+ * ⚠️ E ela NÃO é o que impede dado de saúde de atravessar. Quem impede é o interruptor:
+ * `transferencia-de-cadastro.ts:105` devolve `motivo: 'desligada'` antes de olhar documento
+ * nenhum, enquanto `PARCEIRO_TRANSFERENCIA_ATIVA` não for `1` (`pode-transferir.ts:29`) — e
+ * `podeTransferir` ainda exige consentimento com a finalidade **específica**
+ * `retorno_ao_parceiro` (LGPD art. 11, I). Decisão do dono em 23/09/2026: a ida _"só será
+ * bloqueada após pronta e funcional"_ — o GATE-JUR-01 governa **ligar** o interruptor, não
+ * escrever o código.
+ *
+ * 🔴 O MECANISMO FICA, vazio. É aqui que um tipo que realmente não deva viajar se declara;
+ * apagar o `Set` faria a próxima exclusão nascer como um `if` solto no meio do plano.
  */
-export const NAO_VIAJAM = new Set<string>(['laudo_medico']);
+export const NAO_VIAJAM = new Set<string>();
 
 export type MotivoSemArquivo = 'tipo_nao_suportado_la' | 'grande_demais' | 'mime_nao_aceito';
 

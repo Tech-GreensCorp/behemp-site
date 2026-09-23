@@ -137,10 +137,31 @@ describe('a data de um documento não se inventa', () => {
     expect(codigo).toContain('data de emissão não informada pelo parceiro');
   });
 
-  it('laudo_medico não é forçado em outro tipo — não há equivalente na tabela', () => {
+  /**
+   * 🔴 RETIFICADO EM 23/09/2026 — ADR-0026 D-01. A versão anterior era:
+   *
+   *     expect(bloco).not.toMatch(/laudo_medico:\s*'/);
+   *
+   * Ela congelava a **ausência**, e não a classe. O nome do caso sempre foi o certo — _"não é
+   * forçado em outro tipo"_ —, mas a asserção protegia o estado, não a regra: quando o enum
+   * ganhou `laudo_medico` (migration 0049), o guarda passou a acusar a **correção**.
+   *
+   * A regra que vale continua sendo a mesma: nenhum documento do fluxo pode ser classificado
+   * como `documento_pessoal`. Forçar um documento CLÍNICO ali faria quem lesse a ficha depois
+   * acreditar na classificação errada — e num prontuário isso é um médico decidindo sobre
+   * algo que não é o que a tela diz.
+   */
+  it('nenhum documento do fluxo é forçado em documento_pessoal', () => {
     const i = codigo.indexOf('const TRADUCAO');
-    const bloco = codigo.slice(i, i + 400);
-    expect(bloco).not.toMatch(/laudo_medico:\s*'/);
+    const bloco = codigo.slice(i, codigo.indexOf('};', i));
+
+    // O laudo tem destino próprio desde a 0049 — nunca um tipo emprestado.
+    expect(bloco).toMatch(/laudo_medico:\s*'laudo_medico'/);
+
+    // E a classe, derivada do bloco: nenhum destino é `documento_pessoal`.
+    const destinos = [...bloco.matchAll(/^\s*\w+:\s*'([a-z_]+)'/gm)].map((m) => m[1]);
+    expect(destinos.length).toBeGreaterThanOrEqual(5);
+    expect(destinos).not.toContain('documento_pessoal');
   });
 
   it('documento_identidade é traduzido para o vocabulário da tabela', () => {

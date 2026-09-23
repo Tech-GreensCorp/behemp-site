@@ -48,6 +48,9 @@ const NA_TABELA: Partial<Record<DocumentoDoFluxo, string>> = {
   comprovante_residencia: 'comprovante_residencia',
   autorizacao_anvisa: 'autorizacao_anvisa',
   documento_identidade: 'rg',
+  // Entrou no enum em 23/09/2026 — ADR-0026. Tem de andar junto com a TRADUCAO de
+  // `materializar-documentos.ts`: divergir faz o paciente ver pendente o que já mandou.
+  laudo_medico: 'laudo_medico',
 };
 
 export interface ItemDoChecklist {

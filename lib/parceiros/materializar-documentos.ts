@@ -67,28 +67,31 @@ const HOJE = () => new Date().toISOString().split('T')[0];
  * A tabela `documentos` deste projeto tem outro vocabulário, mais antigo e mais granular:
  * `rg`, `rg_responsavel`, `documento_pessoal`, `oficio_anvisa`, `procuracao_especifica`.
  *
- * Três nomes coincidem. Um precisa de tradução. E um NÃO TEM PARA ONDE IR:
+ * Quatro nomes coincidem. Um precisa de tradução:
  *
  *   receita_medica         → receita_medica          (igual)
  *   comprovante_residencia → comprovante_residencia  (igual)
  *   autorizacao_anvisa     → autorizacao_anvisa      (igual)
+ *   laudo_medico           → laudo_medico            (igual, desde 23/09/2026)
  *   documento_identidade   → rg                      (traduzido)
- *   laudo_medico           → ✗ NÃO EXISTE NA TABELA
  *
- * ⚠️ `laudo_medico` fica de fora de propósito. Não há tipo equivalente, e forçá-lo em
- * `documento_pessoal` seria classificar um documento CLÍNICO como documento pessoal — quem
- * lesse a ficha depois acreditaria na classificação errada. O laudo continua registrado no
- * manifesto da solicitação (o parceiro tem), só não vira linha em `documentos`.
+ * 🔴 `laudo_medico` ENTROU EM 23/09/2026 — ADR-0026, migration 0049.
  *
- * Achado catalogado: criar o tipo `laudo_medico` no enum exige migration, e migration não
- * entra de passagem numa tarefa de integração.
+ * Até aqui ele não tinha para onde ir: o enum `documento_tipo` não tinha o valor, e este
+ * bloco registrava a ausência como decisão (_"forçá-lo em `documento_pessoal` classificaria
+ * um documento clínico como pessoal"_ — o que continua verdadeiro, e é o rejeitado da ADR).
+ *
+ * ⚠️ O efeito do que havia antes, medido em produção em 23/09/2026: **3 laudos baixados e
+ * guardados no nosso blob, 0 linhas em `documentos`.** O descarte acontecia DEPOIS do
+ * download — `materializarArquivos` roda no handoff —, então existia documento clínico
+ * guardado que nenhuma linha apontava.
  */
 const TRADUCAO: Partial<Record<DocumentoDoFluxo, string>> = {
   receita_medica: 'receita_medica',
   comprovante_residencia: 'comprovante_residencia',
   autorizacao_anvisa: 'autorizacao_anvisa',
   documento_identidade: 'rg',
-  // laudo_medico: sem destino — ver o bloco acima.
+  laudo_medico: 'laudo_medico',
 };
 
 export async function materializarDocumentosDoParceiro(params: {

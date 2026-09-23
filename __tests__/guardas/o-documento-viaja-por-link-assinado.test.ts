@@ -254,11 +254,40 @@ describe('o que viaja, e a simetria com a Greens', () => {
     expect(VALIDADE_DO_LINK_EM_SEGUNDOS).toBe(3600);
   });
 
-  it('🔴 laudo_medico não viaja — decisão deles, respeitada aqui', () => {
-    expect(NAO_VIAJAM.has('laudo_medico')).toBe(true);
+  /**
+   * 🔴 RETIFICADO EM 23/09/2026 — ADR-0026 D-03. A versão anterior exigia o CONTRÁRIO:
+   *
+   *     expect(NAO_VIAJAM.has('laudo_medico')).toBe(true);
+   *     expect(e.motivoSemArquivo).toBe('tipo_nao_suportado_la');
+   *
+   * Ela congelava uma decisão que era **espelho da Greens** — e a Greens removeu o
+   * `NAO_VIAJAM` dela em 15/09/2026 (commit `4e9cfac`), passando a mandar o laudo como
+   * arquivo. Espelhávamos um espelho que já não existia, e o ramo sequer era alcançável,
+   * porque o enum não tinha o valor.
+   *
+   * Decisão do dono em 23/09/2026: _"não é para estar bloqueada… ela só será bloqueada após
+   * pronta e funcional"_. O que impede dado de saúde de atravessar **não é esta lista** — é
+   * `PARCEIRO_TRANSFERENCIA_ATIVA` mais o consentimento de finalidade específica, os dois
+   * conferidos em `transferencia-de-cadastro.ts:105` antes de olhar documento nenhum.
+   */
+  it('🔴 o laudo VIAJA — o que segura a ida é o interruptor, não uma lista', () => {
+    expect(NAO_VIAJAM.has('laudo_medico')).toBe(false);
     const [e] = planoDoEnvio([{ id: 'd1', tipo: 'laudo_medico', nomeArquivo: 'x.pdf' }]);
-    expect(e.motivoSemArquivo).toBe('tipo_nao_suportado_la');
-    expect(e.nomeArquivo).toBeNull();
+    expect(e.motivoSemArquivo).toBeNull();
+    expect(e.nomeArquivo).toBe('x.pdf');
+  });
+
+  it('o mecanismo de exclusão continua existindo — vazio é a lista, não o código', () => {
+    // Sem isto, alguém apagaria o ramo inteiro junto com o valor, e a próxima exclusão
+    // nasceria como um `if` solto no meio do plano.
+    NAO_VIAJAM.add('rg');
+    try {
+      const [e] = planoDoEnvio([{ id: 'd1', tipo: 'rg', nomeArquivo: 'x.jpg' }]);
+      expect(e.motivoSemArquivo).toBe('tipo_nao_suportado_la');
+      expect(e.nomeArquivo).toBeNull();
+    } finally {
+      NAO_VIAJAM.delete('rg');
+    }
   });
 
   it('arquivo grande demais não viaja', () => {
