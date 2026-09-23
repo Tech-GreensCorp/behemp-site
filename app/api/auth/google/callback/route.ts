@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { urlAbsoluta } from '@/lib/url';
 import { trocarCodigoPorTokens } from '@/lib/integrations/google-calendar';
 import { db } from '@/lib/db';
 import { medicos } from '@/db/schema';
@@ -22,14 +23,12 @@ export async function GET(request: NextRequest) {
 
   // Se o usuário negou a autorização
   if (error) {
-    return NextResponse.redirect(
-      new URL('/medico/configuracoes?google=erro&motivo=negado', request.url),
-    );
+    return NextResponse.redirect(urlAbsoluta('/medico/configuracoes?google=erro&motivo=negado'));
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL('/medico/configuracoes?google=erro&motivo=parametros', request.url),
+      urlAbsoluta('/medico/configuracoes?google=erro&motivo=parametros'),
     );
   }
 
@@ -38,19 +37,12 @@ export async function GET(request: NextRequest) {
     const { refreshToken } = await trocarCodigoPorTokens(code);
 
     // Salvar o refresh_token no registro do médico
-    await db
-      .update(medicos)
-      .set({ googleRefreshToken: refreshToken })
-      .where(eq(medicos.id, state));
+    await db.update(medicos).set({ googleRefreshToken: refreshToken }).where(eq(medicos.id, state));
 
     // Redirecionar com sucesso
-    return NextResponse.redirect(
-      new URL('/medico/configuracoes?google=sucesso', request.url),
-    );
+    return NextResponse.redirect(urlAbsoluta('/medico/configuracoes?google=sucesso'));
   } catch (err) {
     console.error('[Google OAuth] Erro no callback:', err);
-    return NextResponse.redirect(
-      new URL('/medico/configuracoes?google=erro&motivo=token', request.url),
-    );
+    return NextResponse.redirect(urlAbsoluta('/medico/configuracoes?google=erro&motivo=token'));
   }
 }

@@ -7,6 +7,7 @@ import { verificarMedico } from '@/lib/auth';
 import { conectar } from '@/lib/mercadopago/conta';
 import { trocarCodigoPorTokens } from '@/lib/mercadopago/oauth';
 import { verificarState } from '@/lib/mercadopago/state';
+import { urlAbsoluta } from '@/lib/url';
 
 /**
  * VOLTA DO OAUTH DO MERCADO PAGO.
@@ -39,7 +40,7 @@ import { verificarState } from '@/lib/mercadopago/state';
  */
 export async function GET(request: NextRequest) {
   const destino = (qs: string) =>
-    NextResponse.redirect(new URL(`/medico/pagamentos/config?${qs}`, request.url));
+    NextResponse.redirect(urlAbsoluta(`/medico/pagamentos/config?${qs}`));
   const erro = (motivo: string) => destino(`mp=erro&motivo=${motivo}`);
 
   const params = request.nextUrl.searchParams;
