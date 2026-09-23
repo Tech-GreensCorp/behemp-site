@@ -316,7 +316,7 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 - [ ] Sidebar duplicado em 3 arquivos (284 + 221 + 219 linhas). Extrair genérico tocaria 3 áreas
       em produção.
 - [ ] `components/ui/table.tsx` existe e é usado em **0** arquivos.
-- [ ] `docs/integracoes.md` (pré-existente, commit `f49f4bb`) cita três arquivos que **não
+- [ ] `docs/historico/2026-09-organizacao/integracoes.md` (pré-existente, commit `f49f4bb`; arquivado em 21/09/2026) cita três arquivos que **não
       existem**: `lib/integrations/resend/client.ts`, `.../google-calendar/client.ts`,
       `.../blob/client.ts`. E o de Resend contradiz o `AGENTS.md`, que diz que o e-mail é Brevo.
 - [ ] 🔴 **A skill `cavecrew` está quebrada como instalada:** o `README.md` dela referencia
@@ -738,6 +738,9 @@ Diagnóstico completo, risco medido e o que ficou de fora: `docs/04-LISTA-DE-AFA
 Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
 
 ### ⚪ Achado de 10/09/2026 — o índice de ADRs está 11 entradas atrás
+
+> ✅ **Retificado em 21/09/2026:** o `adr/README.md` passou a listar as 23 ADRs em
+> 19/09/2026 (commit d88d825). O parágrafo abaixo descreve o estado de 10/09 e fica como registro.
 
 `docs/adr/README.md` lista até a **0007**. As ADRs **0008 a 0018** existem em disco e não estão
 lá. Quem consultar o índice para saber se algo já foi decidido vai concluir que não foi.

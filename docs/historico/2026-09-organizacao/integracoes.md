@@ -1,3 +1,7 @@
+> ⛔ **ESTADO MORTO — arquivado em 21/09/2026.** Este documento descreve um estado
+> que não existe mais e foi movido para `docs/historico/` sem alteração de conteúdo.
+> O que o sucedeu está indicado no [README desta pasta](README.md). Não usar como fonte.
+
 # Documentação de Integrações — Be4Hope
 
 ## 1. Clerk (Autenticação)

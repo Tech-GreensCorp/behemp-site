@@ -63,6 +63,11 @@ Siga primeiro `AGENTS.md`. Este arquivo define apenas o modo operacional do Clau
 | 🔴 **vai escrever ou revisar cartão do Trello** — anatomia obrigatória e o formato que o Trello aceita             | `docs/10-PADRAO-DO-KANBAN.md`                                                               |
 | o mapa completo das docs                                                                                           | `docs/00-LEIA-PRIMEIRO.md`                                                                  |
 
+🔴 **Regra da docs/ (21/09/2026):** todo arquivo ou pasta novo em `docs/` entra em
+`docs/00-LEIA-PRIMEIRO.md` — e toda ADR em `docs/adr/README.md`, toda sprint em
+`docs/sprints/README.md` — **no mesmo commit que o cria**. A tabela acima espelha o mapa
+da `docs/`; se divergirem, o mapa é a fonte e esta tabela é o defeito.
+
 ### Cinco proibições
 
 1. 🔴 **Segurança e LGPD são requisito, não etapa final.** Todo item novo responde, **antes** de
