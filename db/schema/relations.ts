@@ -20,6 +20,7 @@ import { autorizacoesAnvisa } from './autorizacoes-anvisa';
 import { procuracoesEspecificas } from './procuracoes-especificas';
 import { pagamentos } from './pagamentos';
 import { medicosPagamentoConfig } from './medicos-pagamento-config';
+import { medicosMercadopagoConta } from './medicos-mercadopago-conta';
 
 /**
  * Declaração centralizada de todas as relations do Drizzle ORM.
@@ -57,6 +58,10 @@ export const medicosRelations = relations(medicos, ({ one, many }) => ({
   configPagamento: one(medicosPagamentoConfig, {
     fields: [medicos.id],
     references: [medicosPagamentoConfig.medicoId],
+  }),
+  contaMercadopago: one(medicosMercadopagoConta, {
+    fields: [medicos.id],
+    references: [medicosMercadopagoConta.medicoId],
   }),
 }));
 
@@ -125,6 +130,14 @@ export const pagamentosRelations = relations(pagamentos, ({ one }) => ({
 export const medicosPagamentoConfigRelations = relations(medicosPagamentoConfig, ({ one }) => ({
   medico: one(medicos, {
     fields: [medicosPagamentoConfig.medicoId],
+    references: [medicos.id],
+  }),
+}));
+
+// ── Conta do Mercado Pago por médico (ADR pendente) ──────────
+export const medicosMercadopagoContaRelations = relations(medicosMercadopagoConta, ({ one }) => ({
+  medico: one(medicos, {
+    fields: [medicosMercadopagoConta.medicoId],
     references: [medicos.id],
   }),
 }));

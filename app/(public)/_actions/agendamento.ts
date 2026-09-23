@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { podeAgendarCom } from '@/lib/mercadopago/conta';
 import { consultas, medicos, pacientes, pagamentos, users } from '@/db/schema';
 import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
@@ -140,6 +141,40 @@ export async function reservarConsulta(
         sucesso: false,
         erro:
           'Este médico ainda não tem o valor da consulta configurado. Peça para o administrador configurar em Médicos.',
+      };
+    }
+
+    // 🔴 SEM CONTA DO MERCADO PAGO CONECTADA, NÃO HÁ PARA ONDE O DINHEIRO IR.
+    //
+    // O split paga o médico direto na conta dele; sem o vínculo OAuth, a reserva nasceria
+    // com um pagamento que ninguém consegue cobrar — e o paciente só descobriria na etapa
+    // de pagamento, com o horário já bloqueado.
+    //
+    // ⚠️ `podeAgendarCom` NÃO DECIFRA NADA: só confere que existe linha sem
+    // `desconectadoEm`. Decifrar aqui seria expor a credencial num fluxo PÚBLICO, onde não
+    // há médico logado para auditar o acesso (ADR-0024 §5).
+    //
+    // ⚠️ MAS ISTO SÓ BLOQUEIA COM `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO='ativo'`, e o
+    // padrão é INATIVO. Hoje a tabela `medicos_mercadopago_conta` está vazia: bloquear no
+    // merge derrubaria o agendamento de TODOS os médicos ao mesmo tempo, sem que nenhum
+    // deles tivesse tido a chance de conectar. O interruptor existe para que a regra entre
+    // em vigor DEPOIS de os médicos conectarem, e não antes. Ver docs/04, Item 38.
+    const permissao = await podeAgendarCom(medicoId);
+
+    // O fato vai para o log MESMO quando não bloqueia — é assim que se mede quantos médicos
+    // ainda faltam antes de ligar a flag, em vez de descobrir pelo paciente. Só o id do
+    // médico, que é interno: nada do paciente entra aqui.
+    if (!permissao.conectado) {
+      console.warn(
+        `[mercadopago] médico sem conta conectada no agendamento (medicoId=${medicoId}, bloqueio=${permissao.bloqueioAtivo ? 'ativo' : 'inativo'})`,
+      );
+    }
+
+    if (!permissao.permitido) {
+      return {
+        sucesso: false,
+        erro:
+          'Este médico ainda não configurou o recebimento de pagamentos. Peça para o administrador entrar em contato com ele.',
       };
     }
 
