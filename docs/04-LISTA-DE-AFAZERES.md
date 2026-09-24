@@ -19,6 +19,79 @@
 
 ---
 
+## ⏳ Item 44 — IMPLEMENTADO, 24/09/2026: o worker das filas no PM2 (ADR-0027), aguardando o primeiro deploy
+
+**Status:** implementado e provado **localmente**, branch `feat/worker-filas-pm2`. **Não está em
+produção.** Decisão em
+[ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md), agora aceita;
+o que a implementação mediu está na §6 dela.
+
+### O problema que ele resolve (medido em 24/09/2026, ADR-0027 §1)
+
+O `filas.yml` declara `*/5 * * * *` e roda **uma vez a cada ~3,5 a 4 h** em produção. O
+paciente do WhatsApp espera horas pelo link, e a expiração de reserva e de PIX da Fase 4 não
+pode chegar quatro horas depois (Item 40).
+
+### O que foi feito
+
+| arquivo                                                           | o quê                                                                                       |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `scripts/worker-filas-nucleo.mjs`                                 | a lógica, importável sem agendar nada                                                       |
+| `scripts/worker-filas.mjs`                                        | o ponto de entrada que o PM2 sobe                                                           |
+| `.github/workflows/deploy.yml:447-481`                            | `pm2 delete` + `env -i … pm2 start` do `behemp-filas`, depois do site e antes do `pm2 save` |
+| `__tests__/guardas/o-worker-das-filas-nao-para-numa-rota.test.ts` | 27 casos, 17 sabotagens                                                                     |
+| `.claude/autorizacoes.txt`                                        | o registro desta mudança no `deploy.yml` (o caminho já estava liberado desde 20/08)         |
+
+**Como o worker se comporta:** chama `/api/chatpro/processar`, `/api/parceiros/enviar` e
+`/api/mercadopago/processar` em **sequência**, em `http://127.0.0.1:${PORT||3000}`, com
+`Bearer $CRON_SECRET`. A próxima rodada é agendada 60 s depois do **fim** da anterior
+(`setTimeout` encadeado, D-03). Uma rota falhar (rede, timeout de 90 s, 5xx) não impede as
+outras. **Não segue redirect:** o 307 do middleware (Item 41) seria um 200 da página de login.
+Sucesso é 200 **com** `sucesso: true`. O log leva só número e booleano, com horário ISO. No
+SIGINT/SIGTERM, cancela o agendamento e aborta a chamada em curso.
+
+### O ambiente do worker é mínimo — decisão da revisão
+
+O deploy sobe o worker com `env -i PATH HOME PORT CRON_SECRET` (e `PM2_HOME` só se definido).
+Herdar o shell, que carregou o `.env` inteiro, duplicaria no `dump.pm2` todos os segredos do
+site: a exposição do [Item 43](#-item-43--catalogado-24092026-a-senha-da-database_url-de-produção-apareceu-em-texto-puro-no-terminal).
+**Medido com PM2 7.0.4:** herdando, o processo recebeu o segredo falso do shell; com `env -i`,
+só as quatro. O daemon não mistura o próprio ambiente. Detalhe na ADR-0027 §6.
+
+### Provado local (24/09/2026)
+
+- standalone **isolado** (sem o `.env`, que aponta para Neon remoto; banco inexistente;
+  nenhuma credencial de terceiro): duas rodadas a 60 s, 500/200/500 registrados, SIGINT → exit 0,
+  segredo **0** vezes nos logs;
+- segredo errado ou ausente → 401; site fora → `ECONNREFUSED` nas três, sem travar;
+- sob PM2: `pm2 kill` + `pm2 resurrect` sem `PORT`/`CRON_SECRET` no ambiente religou o worker
+  pelo dump, funcional;
+- o bloco do `deploy.yml` com `pm2` falso: se o `start` do worker falhar, o `save` roda e o
+  passo sai com exit 1 — o dump nunca fica com o caminho antigo do site.
+
+### Perigo de mexer — medido
+
+- **em produção:** sim, no primeiro deploy depois do merge. É o **primeiro processo novo** no
+  PM2 da EC2
+- **o site:** o worker sobe **depois** dele, e sua falha não impede o `pm2 save`. O pior caso é
+  o deploy vermelho com o site no ar e as filas no ritmo de hoje (`filas.yml`)
+- **dobro de chamadas:** worker e GitHub chamam as mesmas rotas; as três reivindicam com
+  `FOR UPDATE SKIP LOCKED` (ADR-0027 D-02)
+- **limite do Mercado Pago (R-05):** o worker chama sem `x-forwarded-for` e cai no balde
+  `desconhecido`, 1/min contra 10/min
+- **desfazer:** `pm2 stop behemp-filas` (ou `pm2 delete behemp-filas && pm2 save`); o
+  `filas.yml` segue como rede (D-06)
+
+### O que fica para depois do primeiro deploy
+
+1. **a versão do PM2 na EC2** (`pm2 --version`) — o comportamento acima foi medido na 7.0.4;
+2. `pm2 ls` com `behemp-site` e `behemp-filas` `online` (R-02);
+3. `pm2 logs behemp-filas` com rodadas a ~60 s e `200` nas três rotas (R-04);
+4. um evento de ChatPro de teste saindo de `pendente` em menos de 2 min, sem `workflow_dispatch`;
+5. `free -m` antes, logo depois e após 24 h (R-01), registrado na ADR-0027 §6.
+
+---
+
 ## 🔴 Item 43 — CATALOGADO, 24/09/2026: a senha da `DATABASE_URL` de produção apareceu em texto puro no terminal
 
 **Status:** catalogado, **não corrigido**. **Sem urgência**, por decisão do Diniz em 24/09/2026:
