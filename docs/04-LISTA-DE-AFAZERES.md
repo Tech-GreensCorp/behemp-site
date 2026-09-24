@@ -19,6 +19,84 @@
 
 ---
 
+## 🔴 Item 42 — CATALOGADO, 24/09/2026: o `pm2 startup` nunca foi configurado na EC2, e um reboot derruba produção inteira
+
+**Status:** catalogado, **não corrigido**. **Prioridade alta.** Achado ao medir os valores
+pendentes da [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md)
+(R-03). É um defeito próprio e **anterior** a ela: não depende do worker e não se resolve com ele.
+
+### O que foi medido (24/09/2026, na EC2 de produção, pelo dono)
+
+| pergunta                                  | comando                                                         | resultado                          |
+| ----------------------------------------- | --------------------------------------------------------------- | ---------------------------------- |
+| existe unit systemd do PM2?               | `systemctl list-unit-files \| grep -i pm2`                      | **nenhuma**                        |
+| a unit do usuário está habilitada/ativa?  | `systemctl is-enabled pm2-ubuntu` · `systemctl is-active pm2-ubuntu` | **`not-found`** · **`inactive`** |
+| há quanto tempo a máquina está de pé?     | `uptime -s`                                                     | desde **07/08/2026**, **49 dias**  |
+
+⚠️ **O que NÃO foi relatado nesta medição:** o conteúdo do `~/.pm2/dump.pm2`. Sem a unit
+systemd, isso não muda o diagnóstico: nada lê o dump no boot. Mas vai importar na correção
+(ver abaixo).
+
+### O que isso significa
+
+O site está no ar há 49 dias **só porque a EC2 não reiniciou nesse período**. Se ela reiniciar
+por qualquer motivo, **nada volta sozinho**: nem o `behemp-site`, nem qualquer processo que
+venha depois, como o `behemp-filas` da ADR-0027. Motivos possíveis incluem manutenção agendada
+da AWS, retirement de hardware, kernel panic, `sudo reboot` manual e atualização automática do
+Ubuntu que pede reinício.
+
+**O `pm2 save` do deploy dá uma falsa sensação de segurança.** O `.github/workflows/deploy.yml:443`
+roda `pm2 save` a cada deploy, e isso grava o `dump.pm2`. Mas quem **lê** o dump no boot é a
+unit que o `pm2 startup` cria, e ela não existe. O dump é gravado a cada deploy e nunca é lido.
+
+**Varredura do repositório:** `pm2 startup`, `pm2 resurrect` e `systemctl` aparecem em
+**0** arquivos de `.github/`, `scripts/`, `docs/*.md` e `CLAUDE.md`. Nunca houve um passo
+versionado para isso. É a mesma classe do Item 28: estado de servidor que ninguém sabia que
+faltava.
+
+### Perigo de mexer — medido
+
+- **em produção:** sim. A correção roda na EC2, com `sudo`
+- **pontos tocados:** 1 unit systemd nova (`pm2-ubuntu.service`) e o `dump.pm2`. **Nenhum**
+  arquivo do repositório precisa mudar para corrigir
+- **derruba o site?** não. `pm2 startup` só cria e habilita a unit; `pm2 save` só grava a lista
+  que está rodando. Nenhum dos dois reinicia processo
+- **teste antes/depois:** `systemctl is-enabled pm2-ubuntu` → `enabled`. A prova completa é um
+  reboot controlado, que **derruba o site por alguns minutos** e precisa de janela própria
+- **custo de deixar:** o primeiro reboot não planejado tira produção do ar até alguém entrar
+  por SSH e subir o processo à mão, com o `.env` e o caminho do `server.js` certos. Foi
+  exatamente o que o Item 28 mostrou ser difícil
+
+### A correção, quando autorizada
+
+🔴 **Não aplicada.** É escrita na EC2 e precisa de **autorização explícita separada**, mesmo
+sendo simples.
+
+```bash
+pm2 startup systemd -u ubuntu --hp /home/ubuntu   # imprime um comando sudo; rodar o que ele imprimir
+pm2 save                                          # grava a lista que está rodando AGORA
+systemctl is-enabled pm2-ubuntu                   # → enabled
+```
+
+⚠️ **Antes do `pm2 save`, conferir que `pm2 ls` mostra o `behemp-site` com o `script path`
+do checkout atual.** É o dump desta hora que o boot vai restaurar. Um `behemp-site` apontando
+para um `server.js` velho seria ressuscitado no caminho errado (Unitech/pm2#3054, registrado no
+`deploy.yml:405-411`).
+
+**Rejeitado: pôr `pm2 startup` dentro do `deploy.yml`.** O comando precisa de `sudo`, e cada
+deploy passaria a mexer em unit systemd. A configuração é feita uma vez só. O que cabe no
+repositório é **registrar** que ela existe (este item) e, se valer a pena, um passo de
+**verificação** no deploy que só lê `systemctl is-enabled pm2-ubuntu` e avisa, sem corrigir.
+
+### Relação com a ADR-0027
+
+A ADR-0027 R-03 dependia deste valor. O worker sobrevive a **deploy** pelo passo `delete` +
+`start` + `pm2 save`, mas só sobrevive a **reboot** depois que este item for corrigido. E isso
+vale igual para o site principal. A ADR não fica bloqueada por este item: ela não piora nada que
+já não esteja quebrado.
+
+---
+
 ## ✅ Item 41 — CORRIGIDO em 23/09/2026: o processador do Mercado Pago exigia login em produção
 
 **Branch:** `fix/mercadopago-processar-publico`. Defeito **meu** (Claude), introduzido no PR

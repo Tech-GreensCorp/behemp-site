@@ -6,7 +6,7 @@
 🔴 **Toda ADR nova entra nesta tabela NO MESMO COMMIT que a cria. Índice atrasado é defeito,
 não atraso.**
 
-**Atualizado em 23/09/2026 — 26 ADRs, medidas em `docs/adr/`.**
+**Atualizado em 24/09/2026 — 27 ADRs, medidas em `docs/adr/`.**
 
 ⚠️ **Retificação, 19/09/2026.** O cabeçalho anterior dizia _"as 7 ADRs abaixo"_ e a tabela
 listava 10; hoje existem **23**. A nota _"quatro estão como proposta"_ contradizia a própria
@@ -51,6 +51,7 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0024](ADR-0024-a-credencial-do-medico-e-cifrada-na-aplicacao.md)                  | A credencial do médico no Mercado Pago é cifrada na aplicação, não no banco                                     | 📋 proposta                  | 22/09/2026 |
 | [0025](ADR-0025-o-perfil-do-medico-e-editavel-apagar-medico-nao.md)                | O admin edita o perfil do médico; apagar médico fica de fora, e por quê                                         | 📋 proposta                  | 23/09/2026 |
 | [0026](ADR-0026-o-laudo-medico-e-documento-da-be4hope.md)                          | O laudo médico é documento da Be4Hope, e continua sem viajar de volta                                           | 📋 proposta                  | 23/09/2026 |
+| [0027](ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md)            | O worker das filas roda no PM2, e o cron do GitHub vira rede de segurança                                       | 📋 proposta                  | 24/09/2026 |
 
 **Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 14 · ✅ decidida pelo
 dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **26**.
