@@ -412,6 +412,10 @@ jobs:
             # antes. Todo deploy passava verde. Nenhuma rota nova aparecia.
             CAMINHO_ATUAL="$(node scripts/pm2-do-app.mjs --caminho || true)"
 
+            # A raiz do checkout, antes do `cd`: o worker das filas mora em `scripts/`, fora
+            # do standalone, e sobe por caminho absoluto lá embaixo.
+            RAIZ_DO_DEPLOY="$(pwd)"
+
             cd .next/standalone
 
             # 1) Nada destrutivo antes de o arquivo novo existir de fato.
@@ -440,7 +444,41 @@ jobs:
               pm2 start server.js --name "behemp-site" --update-env
             fi
 
+            # ── O WORKER DAS FILAS, `behemp-filas` (ADR-0027 D-04) ─────────────────
+            #
+            # Chama as três rotas do `filas.yml` a cada 60 s em `127.0.0.1:3000`. O cron do
+            # GitHub continua como rede de segurança (D-06).
+            #
+            # SEMPRE `delete` + `start`, pelo mesmo motivo do behemp-site acima: `restart`
+            # reusaria o caminho gravado no primeiro start (Unitech/pm2#3054). O worker é só
+            # um temporizador — recriá-lo custa nada.
+            #
+            # 🔴 O AMBIENTE É MÍNIMO, com `env -i`: só PATH (achar `pm2` e `node`), HOME (o
+            # `pm2` acha o daemon em `~/.pm2`), PORT e CRON_SECRET. Este shell carregou o
+            # `.env` inteiro com `set -a`, e o PM2 dá ao processo o ambiente de QUEM CHAMOU o
+            # `pm2 start` — e grava esse ambiente no `dump.pm2`. Sem o `env -i`, o worker
+            # levaria todos os segredos do site e duplicaria no dump a exposição do Item 43.
+            # Medido em 24/09/2026 com PM2 7.0.4: herdando, o processo recebeu o segredo falso
+            # do shell; com `env -i`, só as quatro. O daemon não mistura o dele. O
+            # `--update-env` aqui só confirma que o ambiente é o desta chamada (o mínimo).
+            # `PM2_HOME` passa só se estiver definido, para nunca falar com outro daemon.
+            #
+            # 🔴 A falha do worker NÃO pula o `pm2 save`. Com `set -e`, um start que falhasse
+            # abortaria aqui, e o dump ficaria com o caminho ANTIGO do behemp-site: o próximo
+            # reboot o ressuscitaria no build velho. Então: marca, salva, e só depois denuncia.
+            WORKER_FALHOU=""
+            pm2 delete behemp-filas 2>/dev/null || true
+            env -i PATH="$PATH" HOME="$HOME" ${PM2_HOME:+PM2_HOME="$PM2_HOME"} PORT="${PORT:-3000}" CRON_SECRET="${CRON_SECRET:-}" pm2 start "$RAIZ_DO_DEPLOY/scripts/worker-filas.mjs" --name "behemp-filas" --cwd "$RAIZ_DO_DEPLOY" --update-env || WORKER_FALHOU=1
+
             pm2 save
+
+            if [ -n "$WORKER_FALHOU" ]; then
+              echo "[pm2] ✗ o behemp-filas não subiu. O site está no ar e foi salvo no dump;"
+              echo "[pm2]   as filas seguem só pelo filas.yml, na cadência de horas."
+              exit 1
+            fi
+            pm2 describe behemp-filas 2>/dev/null | grep -E "script path|exec cwd|status" \
+              || echo "[diag] behemp-filas não aparece no PM2"
 
       # ── ⛔ O PORTÃO QUE IMPEDE "DEPLOY VERDE COM PRODUÇÃO PARADA" ──────────────
       #

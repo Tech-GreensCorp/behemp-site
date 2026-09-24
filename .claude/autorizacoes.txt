@@ -858,3 +858,23 @@ path:.github/workflows/filas.yml
 #
 # Granularidade deliberada: `middleware.ts` NÃO está na lista do hook `escopo-autorizado`;
 # este registro documenta a autorização, não destrava nada.
+
+# ── Autorizado pelo dono em 24/09/2026 — worker das filas no deploy (ADR-0027) ─────
+# PEDIDO (verbatim): "Ajustar deploy.yml para também subir/reiniciar esse segundo processo a
+# cada deploy — sem duplicar o build (o worker usa o Node direto, não precisa do build do
+# Next)". E, na revisão: "No deploy.yml, subir o worker com env -i, passando explicitamente só
+# PATH, HOME (se o Node precisar), PORT e CRON_SECRET — não herdar o ambiente inteiro do .env."
+# E o pedido deste registro: "quero o rastro específico desta mudança."
+#
+# O QUE MUDA: no passo "Reiniciar Servidor (PM2)", depois do behemp-site e antes do
+# `pm2 save`: `pm2 delete behemp-filas` + `env -i … pm2 start scripts/worker-filas.mjs`. A
+# falha do worker é marcada e denunciada DEPOIS do save, para o dump nunca ficar com o
+# caminho antigo do site. Nenhum step existente é removido ou reordenado.
+#
+# PERIGO MEDIDO: BAIXO para o site — o worker sobe depois dele, e sua falha não impede o
+# save. O worker só chama rotas que o filas.yml já chama (FOR UPDATE SKIP LOCKED), e recebe
+# só PATH, HOME, PORT e CRON_SECRET (o resto do ambiente não duplica no dump — Item 43).
+# Guarda: `o-worker-das-filas-nao-para-numa-rota`.
+#
+# (O caminho já estava autorizado desde 20/08; este registro documenta a mudança.)
+path:.github/workflows/deploy.yml

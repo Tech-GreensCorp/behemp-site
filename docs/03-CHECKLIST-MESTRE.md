@@ -93,6 +93,19 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       `em_processamento` (Fase 4): rodando hoje, cancelaria reserva com pagamento em curso.
       Diagnóstico, os modos de erro e o perigo de mexer em
       [04 — Item 40](04-LISTA-DE-AFAZERES.md). **Decisão do dono.**
+- [ ] **Item 44 — ⏳ IMPLEMENTADO em 24/09/2026, aguardando o primeiro deploy** ·
+      `feat/worker-filas-pm2`: o **worker das filas no PM2** (`behemp-filas`,
+      [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md), agora
+      aceita). O `filas.yml` roda a cada ~4 h em vez de 5 min; o worker chama as mesmas três
+      rotas a cada 60 s em `127.0.0.1:3000`, e o cron fica como rede. **Sobe com `env -i`** —
+      só `CRON_SECRET/HOME/PATH/PORT` —, para não duplicar no `dump.pm2` os segredos do site
+      (Item 43): medido com PM2 7.0.4, herdando vazava, com `env -i` não. **Não segue
+      redirect**, para o 307 do Item 41 não virar "sucesso". Provado local contra o standalone
+      isolado e sob PM2, com `pm2 resurrect` religando pelo dump. Guarda
+      `o-worker-das-filas-nao-para-numa-rota` (27 casos, 17 sabotagens). **1525 casos em 67
+      arquivos.** 🔴 **Antes do merge:** confirmar `pm2 --version` na EC2. **Depois do deploy:**
+      os dois `online`, `200` nas três rotas e memória (R-01). Detalhe em
+      [04 — Item 44](04-LISTA-DE-AFAZERES.md).
 - [x] **Item 42 — ✅ CORRIGIDO em 24/09/2026, com prova real**: o `pm2 startup` **nunca tinha
       sido configurado** na EC2 (unit `pm2-ubuntu` `not-found`, máquina de pé havia 49 dias), e
       um reboot derrubaria produção sem religar. O `pm2 save` de cada deploy gravava um dump que

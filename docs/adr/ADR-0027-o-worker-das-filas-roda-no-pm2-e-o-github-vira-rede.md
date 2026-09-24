@@ -1,6 +1,10 @@
 # ADR-0027 — O worker das filas roda no PM2, e o cron do GitHub vira rede de segurança
 
-> **Status:** 📋 **proposta** — 24/09/2026. Escrita **antes** do código, como a ADR-0020 §4
+> **Status:** ✅ **aceita** — 24/09/2026, implementada no mesmo dia (branch
+> `feat/worker-filas-pm2`, [Item 44](../04-LISTA-DE-AFAZERES.md)). **Ainda não em produção.**
+> O que a implementação mudou ou acrescentou está na §6, e as versões anteriores ficam.
+>
+> **Status ao ser escrita:** 📋 **proposta** — 24/09/2026. Escrita **antes** do código, como a ADR-0020 §4
 > pediu: _"é decisão própria, com ADR própria"_. **Nenhuma linha do worker existe.** O dono
 > revisa este texto antes da implementação.
 >
@@ -207,7 +211,65 @@ erro 3). Isso é escopo da Fase 4, não deste worker.
 
 ## §6 — O que a implementação ensinou
 
-{escrita DEPOIS da implementação: a memória medida (R-01) e o que o primeiro deploy mostrou}
+### Medido na implementação (24/09/2026, local, NÃO em produção)
+
+⚠️ **Tudo abaixo foi medido na máquina de desenvolvimento**, com PM2 **7.0.4** instalado à parte
+e o `server.js` standalone rodando **isolado**: cópia sem o `.env` (que aponta para um Neon
+remoto), banco inexistente, `CRON_SECRET` de teste, nenhuma credencial de ChatPro, Greens ou
+Mercado Pago. A memória (R-01) e o primeiro deploy continuam pendentes (ver abaixo).
+
+**1. O ambiente do worker é mínimo — `env -i`. Decisão nova, não estava na D-04.**
+O pedido de revisão recusou o `--update-env` herdando o shell: o deploy carrega o `.env`
+inteiro com `set -a`, e o PM2 dá ao processo o ambiente de **quem chamou** o `pm2 start` e o
+grava no `dump.pm2`. Herdar duplicaria no dump todos os segredos do site (a exposição do
+Item 43). Medido com uma sonda sob PM2, que imprimiu os **nomes** das variáveis recebidas, com
+um segredo falso no daemon e outro no shell:
+
+| método                              | o processo recebeu                                       | segredo do shell      | segredo do daemon |
+| ----------------------------------- | -------------------------------------------------------- | --------------------- | ----------------- |
+| herdando (`--update-env` sem mais)  | todo o shell, 50+ variáveis                              | **vazou** (e no dump) | não               |
+| `env -i PATH HOME PORT CRON_SECRET` | `CRON_SECRET HOME PATH PORT` (+ `PWD` e internas do PM2) | não                   | não               |
+
+O daemon **não** mistura o próprio ambiente. O valor do `CRON_SECRET` fica no dump nos dois
+casos, e isso é inevitável: é dele que o `pm2 resurrect` religa o worker.
+
+**2. Reboot simulado.** `pm2 kill` e depois `pm2 resurrect`, este **sem** `PORT` nem
+`CRON_SECRET` no ambiente: o worker voltou pelo dump, com o destino e o segredo certos (as rotas
+responderam 500/200/500, nenhum 401). O `pm2 stop` registra `encerrando (SIGINT)`.
+
+**3. Nenhuma variável além das quatro.** O worker sob PM2 só com `CRON_SECRET/HOME/PATH/PORT`
+chamou as três rotas e registrou cada uma. `NODE_ENV` não é lido.
+
+**4. Os modos de erro, contra o servidor real.** Rota com 500 vai para o `error.log` e a
+próxima roda; segredo errado ou ausente → 401; site fora → `falha:ECONNREFUSED` nas três,
+sem travar. Duas rodadas espaçadas por 60 s contados do **fim** da anterior.
+
+**5. Três coisas que a implementação acrescentou à D-03:**
+
+- **o `fetch` não segue redirect** (`redirect: 'manual'`). O padrão do `fetch` transformaria
+  o 307 → `/entrar` do middleware (a classe do Item 41) num 200 da página de login, e o worker
+  registraria sucesso com a fila parada. Sucesso é HTTP 200 **com** `sucesso: true`;
+- **a primeira rodada espera 15 s**: o deploy reinicia o site no mesmo passo, logo antes;
+- **o log leva só número e booleano** de `dados`, com horário ISO (o `error.log` do PM2 não
+  tem horário).
+
+**6. A falha do worker não pula o `pm2 save`.** Com `set -e`, um `start` que falhasse
+abortaria antes do save, e o dump ficaria com o caminho **antigo** do `behemp-site`. O deploy
+marca, salva e só então sai vermelho. Provado com um `pm2` falso nos dois cenários.
+
+**7. Um tropeço local que não é defeito.** O PM2 embrulha em `bash -c` qualquer caminho de
+script com espaço (`lib/Common.js:744` do PM2 7). "Projetos Behemp" tem; o caminho da EC2 não.
+
+**Guarda:** `o-worker-das-filas-nao-para-numa-rota`, **27 casos**, provado por **17
+sabotagens**. Duas passaram verdes na primeira rodada porque a **sabotagem** estava mal escrita,
+e foram refeitas.
+
+### Pendente — só o primeiro deploy responde
+
+- **a versão do PM2 na EC2.** O comportamento acima foi medido na 7.0.4;
+- **R-01, memória:** `free -m` e `pm2 describe behemp-filas` antes, logo depois e após 24 h;
+- **R-02 e R-04:** `pm2 ls` com os dois `online`, e o log com `200` nas três rotas;
+- o critério de pronto 3: um evento do ChatPro sai de `pendente` em menos de 2 min.
 
 **Medido antes da implementação (24/09/2026):** a porta é 3000, sem `PORT` configurada (D-02).
 O `pm2 startup` nunca foi configurado, então nada sobrevive a reboot (R-03, Item 42).
