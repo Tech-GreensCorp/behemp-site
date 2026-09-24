@@ -122,7 +122,8 @@ que isso fez o site servir um build antigo. O worker é só um temporizador: rec
 nada e elimina essa classe de erro inteira. O `pm2 save` que já existe grava os dois processos no
 `dump.pm2`. 🔴 **Mas um reboot NÃO traz nenhum dos dois de volta hoje:** o `pm2 startup` nunca foi
 configurado nesta EC2 ([Item 42](../04-LISTA-DE-AFAZERES.md)). Sobreviver a deploy e sobreviver a
-reboot são coisas diferentes, e esta ADR só resolve a primeira.
+reboot são coisas diferentes, e esta ADR só resolve a primeira. ✅ **Retificado em 24/09/2026:**
+a segunda foi resolvida à parte pelo Item 42, com prova por reboot real (ver R-03).
 
 O worker precisa do `CRON_SECRET` e da `PORT` no próprio ambiente. Ele tem de receber o mesmo
 ambiente que `scripts/preservar-ambiente-do-pm2.mjs` monta para o site, e isso se prova na
@@ -174,7 +175,7 @@ do QA.
 | ---- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R-01 | **memória do processo novo** na `t2.small`    | 🔴 **não estimar agora.** Medir depois de implementado: `free -m` e `pm2 describe behemp-filas` antes, logo depois do start e **após 24 h** (para pegar vazamento). Um `--max-memory-restart` só entra com número derivado dessa medida                                                     |
 | R-02 | **não sobreviver ao deploy**                  | o passo `delete` + `start` do D-04 e o `pm2 save`. Prova: depois do primeiro deploy com o worker, `pm2 ls` mostra `behemp-filas` `online`, com uptime menor que o do deploy e o caminho de script deste checkout                                                                            |
-| R-03 | **não sobreviver a reboot da EC2**            | 🔴 **medido em 24/09/2026: não sobrevive, e o site principal também não.** A unit `pm2-ubuntu` não existe (`not-found`/`inactive`), e a máquina está de pé desde 07/08 (49 dias). Catalogado à parte como **[Item 42](../04-LISTA-DE-AFAZERES.md)**, prioridade alta. A correção é escrita na EC2 e tem autorização própria. O worker **não** piora isso: ele herda o conserto quando o Item 42 for aplicado |
+| R-03 | **não sobreviver a reboot da EC2**            | 🔴 **medido em 24/09/2026: não sobrevive, e o site principal também não.** A unit `pm2-ubuntu` não existe (`not-found`/`inactive`), e a máquina está de pé desde 07/08 (49 dias). Catalogado à parte como **[Item 42](../04-LISTA-DE-AFAZERES.md)**, prioridade alta. A correção é escrita na EC2 e tem autorização própria. O worker **não** piora isso: ele herda o conserto quando o Item 42 for aplicado. ✅ **Retificado em 24/09/2026:** o Item 42 foi corrigido e **provado com reboot real** (`pm2-ubuntu` `enabled`; site de volta com 200 em ~46 s, sem intervenção). O worker herda isso desde que o deploy rode `pm2 save` depois de subi-lo |
 | R-04 | **ambiente incompleto** no worker             | sem `CRON_SECRET`, todas as rotas respondem 503, o que é visível no log do worker mas silencioso para o paciente. Prova: a primeira rodada depois do deploy registra `200` nas três rotas                                                                                                    |
 | R-05 | **limite do `mercadopago/processar`**         | chamando `127.0.0.1` sem `x-forwarded-for`, o worker cai no balde `mp-processar:desconhecido` (`lib/seguranca/limite-de-requisicao.ts:108`). 1/min contra um limite de 10/min está folgado, mas **qualquer outro chamador sem cabeçalho divide o mesmo balde**. O limite também é por processo (Item 31) |
 | R-06 | **a rota da Fase 4 esquecida no middleware**  | D-05 item 3. O guarda `o-cron-chama-rota-que-o-middleware-deixa-passar` precisa passar a ler também as rotas que o worker chama, não só as do `filas.yml`                                                                                                                                    |
@@ -210,6 +211,7 @@ erro 3). Isso é escopo da Fase 4, não deste worker.
 
 **Medido antes da implementação (24/09/2026):** a porta é 3000, sem `PORT` configurada (D-02).
 O `pm2 startup` nunca foi configurado, então nada sobrevive a reboot (R-03, Item 42).
+✅ **Mesmo dia, depois:** o Item 42 foi corrigido e provado com reboot real.
 
 ## Fontes lidas
 

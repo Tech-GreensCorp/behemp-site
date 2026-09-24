@@ -93,6 +93,16 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       `em_processamento` (Fase 4): rodando hoje, cancelaria reserva com pagamento em curso.
       Diagnóstico, os modos de erro e o perigo de mexer em
       [04 — Item 40](04-LISTA-DE-AFAZERES.md). **Decisão do dono.**
+- [x] **Item 42 — ✅ CORRIGIDO em 24/09/2026, com prova real**: o `pm2 startup` **nunca tinha
+      sido configurado** na EC2 (unit `pm2-ubuntu` `not-found`, máquina de pé havia 49 dias), e
+      um reboot derrubaria produção sem religar. O `pm2 save` de cada deploy gravava um dump que
+      ninguém lia no boot. Correção na EC2, pelo dono:
+      `pm2 startup systemd -u ubuntu --hp /home/ubuntu` + o `sudo` impresso + `pm2 save` →
+      `systemctl is-enabled pm2-ubuntu` = `enabled`. **Prova:** `sudo reboot` às 12:10
+      (Brasília, inferido); `curl` a cada 5 s deu o primeiro 200 às 12:10:44, ~46 s de queda,
+      **zero intervenção manual**. Nenhum arquivo do repositório mudou. Destrava a R-03 da
+      [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md).
+      Detalhe em [04 — Item 42](04-LISTA-DE-AFAZERES.md).
 - [x] **Item 41 — ✅ CORRIGIDO em 23/09/2026** · `fix/mercadopago-processar-publico`: o
       processador do Mercado Pago **exigia login em produção** (`307 → /entrar`, medido logo
       depois do deploy do PR #122). O cron do `filas.yml` receberia 307 a cada execução e a
@@ -438,6 +448,13 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
       qualquer XHR → o host dela é o `CHATPRO_CHAT_API_URL`. ⚠️ **Não filtrar por `sparks`** — a
       lista viria vazia e pareceria que o método não funciona.
 
+- [ ] **Item 43 — ROTACIONAR a senha da `DATABASE_URL` de produção (Neon)**, catalogado em
+      24/09/2026. A senha apareceu em texto puro no terminal durante a investigação do Item 42
+      (`head -c 300 ~/.pm2/dump.pm2`, JSON com todo o ambiente do processo). **Sem urgência,
+      por decisão do Diniz: tratar depois.** Rotacionar exige janela, porque derruba o acesso
+      ao banco até o processo subir com a URL nova, e medir antes se o
+      `preservar-ambiente-do-pm2.mjs` copia de volta a URL antiga. Detalhe em
+      [04 — Item 43](04-LISTA-DE-AFAZERES.md).
 - [ ] 🔴 **ROTACIONAR o `CHATPRO_INSTANCE_TOKEN` da BeHemp** — recomendação da Greens em
       14/09/2026, e ela é correta. Nosso token trafegou **repetidamente** para um host da conta
       deles, por semanas. Eles registram que nada nosso entrou lá e nada deles saiu — o 401 em

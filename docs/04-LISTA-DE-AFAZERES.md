@@ -19,9 +19,45 @@
 
 ---
 
-## 🔴 Item 42 — CATALOGADO, 24/09/2026: o `pm2 startup` nunca foi configurado na EC2, e um reboot derruba produção inteira
+## 🔴 Item 43 — CATALOGADO, 24/09/2026: a senha da `DATABASE_URL` de produção apareceu em texto puro no terminal
 
-**Status:** catalogado, **não corrigido**. **Prioridade alta.** Achado ao medir os valores
+**Status:** catalogado, **não corrigido**. **Sem urgência**, por decisão do Diniz em 24/09/2026:
+tratar depois. Achado durante a investigação do [Item 42](#-item-42--corrigido-24092026-com-prova-real-o-pm2-startup-nunca-tinha-sido-configurado-na-ec2-e-um-reboot-derrubava-produção-inteira).
+
+### O que aconteceu
+
+Ao inspecionar o `~/.pm2/dump.pm2` na EC2 com `head -c 300`, a saída mostrou a `DATABASE_URL`
+com a senha. O arquivo é um JSON com **todas** as variáveis de ambiente de cada processo, e
+`DATABASE_URL` é uma delas. Isso é comportamento esperado do PM2: é assim que o `pm2 resurrect`
+religa o processo com o ambiente certo, o que este projeto usa de propósito
+(`preservar-ambiente-do-pm2.mjs`).
+
+**O que se sabe:** a senha apareceu na tela do terminal de quem estava investigando.
+**O que não foi medido:** se a saída foi copiada para outro lugar (chat, ticket, gravação de
+tela) e qual é a permissão do `~/.pm2/dump.pm2` na EC2.
+
+### A correção, quando decidida
+
+Rotacionar a senha do role do banco no Neon e atualizar a `DATABASE_URL` onde ela vive:
+secret do GitHub, `.env` da EC2 e, por consequência, o `dump.pm2` no próximo `pm2 save`.
+
+⚠️ **Perigo de mexer:** trocar a senha no Neon derruba o acesso ao banco do processo em execução
+até ele subir com a URL nova. Precisa de janela própria. A ordem (secret → deploy ou `.env` →
+restart) e o risco do `preservar-ambiente-do-pm2.mjs` **copiar de volta a URL antiga** do
+ambiente do processo precisam ser medidos **antes**, porque é a mesma classe do Item 36 (trocar credencial que vive no ambiente herdado do PM2).
+
+**Para não repetir:** inspecionar o dump sem imprimir valores, por exemplo
+`jq '.[] | {name, pm_exec_path, env_keys: (.env | keys)}' ~/.pm2/dump.pm2`.
+
+---
+
+## ✅ Item 42 — CORRIGIDO, 24/09/2026, com prova real: o `pm2 startup` nunca tinha sido configurado na EC2, e um reboot derrubava produção inteira
+
+**Status:** ✅ **corrigido em 24/09/2026 e provado com reboot controlado real** (ver
+[a correção aplicada](#a-correção-aplicada-24092026) e [a prova](#a-prova-reboot-controlado-real-24092026)).
+O diagnóstico abaixo fica como estava ao catalogar: ele é o _antes_ da prova.
+
+**Status ao catalogar:** catalogado, **não corrigido**. **Prioridade alta.** Achado ao medir os valores
 pendentes da [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md)
 (R-03). É um defeito próprio e **anterior** a ela: não depende do worker e não se resolve com ele.
 
@@ -69,8 +105,9 @@ faltava.
 
 ### A correção, quando autorizada
 
-🔴 **Não aplicada.** É escrita na EC2 e precisa de **autorização explícita separada**, mesmo
-sendo simples.
+✅ **Aplicada em 24/09/2026** — ver a seção seguinte. O texto abaixo é o plano como foi escrito
+ao catalogar: _"🔴 **Não aplicada.** É escrita na EC2 e precisa de **autorização explícita
+separada**, mesmo sendo simples."_
 
 ```bash
 pm2 startup systemd -u ubuntu --hp /home/ubuntu   # imprime um comando sudo; rodar o que ele imprimir
@@ -88,12 +125,62 @@ deploy passaria a mexer em unit systemd. A configuração é feita uma vez só. 
 repositório é **registrar** que ela existe (este item) e, se valer a pena, um passo de
 **verificação** no deploy que só lê `systemctl is-enabled pm2-ubuntu` e avisa, sem corrigir.
 
+### A correção aplicada (24/09/2026)
+
+Rodado na EC2 de produção, pelo dono, nesta ordem:
+
+```bash
+pm2 startup systemd -u ubuntu --hp /home/ubuntu                              # imprime o comando sudo
+sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu # o comando impresso
+pm2 save                                                                     # grava a lista em execução
+```
+
+**Resultado:** unit `pm2-ubuntu.service` criada em `/etc/systemd/system/` e habilitada via
+`systemctl enable` — conferido por `systemctl is-enabled pm2-ubuntu` → **`enabled`** (antes:
+`not-found`).
+
+⚠️ **Não relatado:** a saída de `pm2 ls` antes do `pm2 save` (a conferência do `script path`
+pedida acima). O reboot abaixo é a evidência indireta de que o dump restaurou o processo
+certo: o site voltou com 200.
+
+### A prova: reboot controlado real (24/09/2026)
+
+Configuração habilitada não prova que o boot restaura. A prova é reiniciar a máquina.
+
+`sudo reboot` disparado às **12:10**, medido por `curl` em loop a cada 5 s contra
+`https://be4hope.org/`:
+
+| horário           | resposta         | leitura                          |
+| ----------------- | ---------------- | -------------------------------- |
+| 12:10:04–12:10:22 | **sem resposta** | máquina reiniciando              |
+| 12:10:30          | **HTTP 502**     | nginx de pé, app ainda subindo   |
+| 12:10:36          | **sem resposta** | troca de processo durante o boot |
+| 12:10:44          | **HTTP 200**     | app no ar                        |
+| 12:10:50          | **HTTP 200**     | estável                          |
+
+- **Indisponibilidade total:** ~46 s, do reboot ao primeiro 200.
+- **Intervenção manual: nenhuma.** O site voltou sozinho, pela cadeia systemd →
+  `pm2-ubuntu.service` → `pm2 resurrect` → `dump.pm2`.
+
+⚠️ **Fuso do horário, inferido e não registrado na medição:** os horários são de
+**Brasília (UTC−3)**, ou seja, 15:10 UTC. A inferência: o Item 42 foi catalogado no commit
+`13e8728`, às 11:21 −03:00. Se fosse 12:10 UTC, o reboot teria sido às 09:10 de Brasília,
+**antes** de o defeito ser conhecido.
+
+🔴 **Ressalva de segurança, catalogada à parte:** durante a investigação, a senha da
+`DATABASE_URL` de produção apareceu em texto puro no terminal. Ver
+[Item 43](#-item-43--catalogado-24092026-a-senha-da-database_url-de-produção-apareceu-em-texto-puro-no-terminal).
+
 ### Relação com a ADR-0027
 
 A ADR-0027 R-03 dependia deste valor. O worker sobrevive a **deploy** pelo passo `delete` +
 `start` + `pm2 save`, mas só sobrevive a **reboot** depois que este item for corrigido. E isso
 vale igual para o site principal. A ADR não fica bloqueada por este item: ela não piora nada que
 já não esteja quebrado.
+
+**Depois da correção (24/09/2026):** o site principal sobrevive a reboot, provado. O
+`behemp-filas` ainda não existe. Quando existir, herda a correção **desde que** o deploy rode
+`pm2 save` depois de subi-lo, porque o boot restaura o dump, não o `deploy.yml`.
 
 ---
 
