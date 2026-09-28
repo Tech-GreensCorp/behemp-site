@@ -3,7 +3,16 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, Clock, Copy, Loader2, QrCode, RotateCcw } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Copy,
+  CreditCard,
+  Loader2,
+  QrCode,
+  RotateCcw,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +45,12 @@ interface PainelDoPagamentoProps {
   ocupado?: boolean;
   onTentarDeNovo?: () => void;
   onPedirQrDeNovo?: () => void;
+  /** Gera o PIX direto, sem o Brick — a saída quando o cartão falhou de forma definitiva. */
+  onPagarComPix?: () => void;
 }
+
+/** A frase e os dois botões de "tente outro meio" — mostrados só quando a falha foi definitiva. */
+export const TEXTO_OUTRO_MEIO = 'Você pode tentar com outro cartão ou pagar com PIX.';
 
 function Aguardando({ titulo, texto }: { titulo: string; texto: string }) {
   return (
@@ -165,6 +179,7 @@ export function PainelDoPagamento({
   ocupado = false,
   onTentarDeNovo,
   onPedirQrDeNovo,
+  onPagarComPix,
 }: PainelDoPagamentoProps) {
   const tentarDeNovo =
     reservaNoPrazo && onTentarDeNovo ? (
@@ -241,12 +256,45 @@ export function PainelDoPagamento({
       );
 
     case 'recusado':
-      return <Falha titulo="Pagamento recusado" texto={estado.mensagem} acao={tentarDeNovo} />;
-
-    case 'erro':
-      return (
-        <Falha titulo="Não foi possível concluir" texto={estado.mensagem} acao={tentarDeNovo} />
-      );
+    case 'erro': {
+      const titulo =
+        estado.tipo === 'recusado' ? 'Pagamento recusado' : 'Não foi possível concluir';
+      // Outro meio só com a falha DEFINITIVA (`sugerirOutroMeio`, de `podeSugerirOutroMeio`) e a
+      // reserva no prazo: numa falha ambígua o pagamento pode ter sido criado.
+      if (estado.sugerirOutroMeio && reservaNoPrazo && onTentarDeNovo && onPagarComPix) {
+        return (
+          <Falha
+            titulo={titulo}
+            // Várias mensagens de recusa JÁ sugerem o PIX ("Tente outro cartão ou o PIX.", de
+            // `mensagemDeRecusa`); acrescentar a frase ali a repetiria.
+            texto={
+              /PIX/.test(estado.mensagem)
+                ? estado.mensagem
+                : `${estado.mensagem} ${TEXTO_OUTRO_MEIO}`
+            }
+            acao={
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={onTentarDeNovo} className="gap-1.5">
+                  <CreditCard size={14} />
+                  Tentar outro cartão
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onPagarComPix}
+                  disabled={ocupado}
+                  className="gap-1.5"
+                >
+                  <QrCode size={14} />
+                  Pagar com PIX
+                </Button>
+              </div>
+            }
+          />
+        );
+      }
+      return <Falha titulo={titulo} texto={estado.mensagem} acao={tentarDeNovo} />;
+    }
 
     case 'reserva_expirada':
       return (
