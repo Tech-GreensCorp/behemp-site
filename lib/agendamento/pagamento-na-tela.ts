@@ -263,3 +263,62 @@ export function podeEnviar(estado: EstadoDoPagamento, reservaExpiraEm: string, a
     estado.tipo === 'escolhendo' || estado.tipo === 'recusado' || estado.tipo === 'erro';
   return aberto && new Date(reservaExpiraEm).getTime() > agora;
 }
+
+/**
+ * Quanto a tela espera a resposta de uma cobrança antes de desistir. O servidor desiste da API
+ * do Mercado Pago em 20 s (`lib/mercadopago/cobranca.ts`); isto cobre a ida e a volta da action.
+ */
+export const TEMPO_MAXIMO_DO_ENVIO_MS = 45_000;
+
+export type DesfechoDoEnvio<T> =
+  | { tipo: 'feito'; valor: T }
+  /** Já havia um envio em curso: este foi descartado, e o primeiro cuida da tela. */
+  | { tipo: 'ignorado' }
+  /** O tempo acabou sem resposta. O envio PODE ter chegado ao servidor. */
+  | { tipo: 'sem_resposta' };
+
+/**
+ * 🔴 UM ENVIO POR VEZ — a trava contra o duplo clique no "Pagar" do Brick.
+ *
+ * O botão mora dentro do Brick e o SDK nunca o desabilita. No cartão, o Brick TOKENIZA antes de
+ * chamar o `onSubmit`, e um segundo clique nesse intervalo gera um SEGUNDO token — e token novo é
+ * chave de idempotência nova (`chaveDeIdempotencia`, `lib/mercadopago/cobranca.ts`): duas
+ * cobranças. O overlay da tela é a barreira visual; esta é a determinística. Enquanto um envio
+ * está em curso, qualquer outro é descartado sem chamar o servidor.
+ *
+ * ⚠️ No `sem_resposta` a trava é LIBERADA de propósito — sem isso, uma action que nunca responde
+ * prenderia a tela para sempre. O envio pode ter chegado, e é por isso que quem chama relê o
+ * estado no banco antes de oferecer nova tentativa; e o servidor ainda recusa cobrança dupla
+ * quando o primeiro pagamento já está gravado (`pagamento_em_andamento`).
+ */
+export function umEnvioPorVez<A extends unknown[], T>(
+  enviar: (...args: A) => Promise<T>,
+  opcoes: {
+    tempoMaximoMs?: number;
+    agendar?: (fn: () => void, ms: number) => unknown;
+    cancelar?: (id: unknown) => void;
+  } = {},
+): (...args: A) => Promise<DesfechoDoEnvio<T>> {
+  const {
+    tempoMaximoMs = TEMPO_MAXIMO_DO_ENVIO_MS,
+    agendar = (fn, ms) => setTimeout(fn, ms),
+    cancelar = (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+  } = opcoes;
+  let emCurso = false;
+
+  return async (...args: A) => {
+    if (emCurso) return { tipo: 'ignorado' };
+    emCurso = true;
+    let relogio: unknown;
+    try {
+      const esgotou = new Promise<DesfechoDoEnvio<T>>((resolver) => {
+        relogio = agendar(() => resolver({ tipo: 'sem_resposta' }), tempoMaximoMs);
+      });
+      const feito = enviar(...args).then((valor): DesfechoDoEnvio<T> => ({ tipo: 'feito', valor }));
+      return await Promise.race([feito, esgotou]);
+    } finally {
+      cancelar(relogio);
+      emCurso = false;
+    }
+  };
+}
