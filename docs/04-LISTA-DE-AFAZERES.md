@@ -62,6 +62,7 @@ login da instância inteira, e fica para decisão do dono.
 
 **Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
 
+- **Medido em produção em 28/09/2026:** 134 das 145 fichas com CPF (92 %) guardam o CPF **com pontuação**, e **1** CPF já está em duas fichas.
 - `pacientes.cpf` é `text` **sem unique e sem índice** (`db/schema/pacientes.ts:30`). Hoje duas
   fichas com o mesmo CPF nascem **sem erro e sem log**.
 - O handoff e o cadastro por link gravam só dígitos (`lib/parceiros/handoff.ts:307`,
@@ -127,7 +128,7 @@ medida, e a medição é um `SELECT` de solicitações com o mesmo telefone e e-
 **🔴 O que falta:**
 
 1. **O CLIQUE não foi visto rodando.** Sem `CLERK_SECRET_KEY` no `.env`, a página real não renderiza local.
-2. **O `SELECT` do passo 0** (ADR-0028 §5) na VPS. Ele foi retificado para a regra nacional do telefone e **testado contra o Postgres local**.
+2. ✅ **O passo 0 foi medido em produção** em 28/09/2026: 145 fichas com CPF, **1** CPF repetido, **134** CPFs gravados com pontuação (92 %), 0 e-mails repetidos por maiúscula e **3** celulares repetidos. O impacto é pequeno. Detalhe na ADR-0028, seção "Como foi provado".
 3. A frase _"o que eu quero que você tome cuidado"_ continua sem complemento.
 4. Commit, PR e o merge, que é do dono. O que ficou de fora está no Item 54, logo abaixo.
 

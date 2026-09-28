@@ -602,4 +602,14 @@ cada achado:
   - `o-cadastro-retoma-de-onde-parou`: dois casos.
 - **Prévia estática** das 7 possibilidades em `previa-da-identidade/`, conferida por texto e por print em 900px e 390px.
 - 🔴 **NÃO provado: o CLIQUE.** Sem `CLERK_SECRET_KEY` no `.env` (medido: 0), a página real não renderiza localmente. O "Sair", o foco e os avisos reagindo **não foram vistos rodando**. A prévia mostra cada estado; ela não clica.
-- 🔴 **NÃO medido: o passo 0.** Quantos CPFs e telefones já estão repetidos em produção continua desconhecido, e é isso que diz quantos pacientes reais vão parar no suporte ou no campo travado.
+- ✅ **Passo 0 MEDIDO em produção, 28/09/2026 às 17:20 UTC**, pela VPS e só com leitura. A primeira tentativa falhou porque o `.env` mora em `.next/standalone/.env` (`deploy.yml:180`), não na raiz:
+
+  | medição                                | valor          | o que significa                                                                    |
+  | -------------------------------------- | -------------- | ---------------------------------------------------------------------------------- |
+  | fichas com CPF                         | **145**        | a base                                                                             |
+  | CPFs repetidos                         | **1**          | um CPF já está em duas fichas; essas duas pessoas vão ao suporte num cadastro novo |
+  | CPFs gravados com pontuação            | **134 (92 %)** | 🔴 **confirma a D-03**: comparando cru, a conferência não enxergaria 92 % da base  |
+  | e-mails repetidos ignorando maiúsculas | **0**          | a correção da §9.2 vale para o futuro; hoje não há caso                            |
+  | celulares repetidos (regra nacional)   | **3**          | três números em mais de uma conta, que travam o campo num cadastro novo            |
+
+  **Leitura:** no máximo umas 8 pessoas afetadas numa base de 145 fichas. O impacto é pequeno, e não bloqueia o deploy. Mais motivo para o caminho 1 da mensagem da Ponte: o suporte absorve.

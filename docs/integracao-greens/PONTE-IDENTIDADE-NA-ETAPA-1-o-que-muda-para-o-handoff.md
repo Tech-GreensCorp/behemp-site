@@ -57,12 +57,15 @@ Portanto, **para quem parou:**
 ⚠️ **O reenvio administrativo não destrava esses casos.** O paciente volta pelo mesmo link e cai na
 mesma conferência. Quem destrava é o **nosso suporte**, pelo protocolo.
 
-## Quantos são: ainda não medimos
+## Quantos são: medido em produção em 28/09/2026
 
-**Não sabemos quantos pacientes de produção caem nesses dois casos.** A consulta que responde,
-só de leitura e sem dado pessoal, está no ADR-0028 §5 (passo 0), testada no nosso Postgres local.
-Ela ainda não rodou na VPS. Mandamos o número a vocês quando rodar. Até lá, qualquer estimativa
-seria palpite.
+A consulta roda só com leitura e sem dado pessoal (ADR-0028 §5). Na base inteira da BeHemp:
+
+- **1** CPF já está em duas fichas;
+- **3** números de celular estão em mais de uma conta.
+
+São no máximo umas 8 pessoas, em 145 fichas com CPF. **O impacto esperado sobre os handoffs de
+vocês é pequeno**, e é por isso que recomendamos o caminho 1 abaixo.
 
 ## A pergunta para vocês — e ela não é pedido de mudança
 
