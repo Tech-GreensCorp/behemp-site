@@ -173,6 +173,14 @@ a tela diz que a conta existe e leva ao login.
 **Rejeitado: bloquear o link para quem já tem conta.** O bot não sabe quem é antes de perguntar à
 API, e a tela resolve isso melhor que um travamento no fluxo do painel.
 
+⚠️ **Retificada em parte pela
+[ADR-0028](ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md) D-06, em
+28/09/2026.**
+
+- **O que continua valendo:** quem tem conta **pelo e-mail** vai ao login, como decidido aqui, e o bot continua sem bloquear nada.
+- **O que passou a parar:** o **CPF que está na ficha de outra conta**. A pessoa vai ao suporte da BeHemp (`DO-62`), e o link continua válido.
+- **Por que esta ADR não previu isso:** ela não conhecia o caso, porque nenhum código conferia CPF. O texto acima fica como foi escrito.
+
 ### D-05 — Falha do endpoint transfere para humano, e isso já está pronto
 
 Comportamento herdado da ADR-0015: status não-2xx dispara a _"Ação em caso de falha"_ do painel,

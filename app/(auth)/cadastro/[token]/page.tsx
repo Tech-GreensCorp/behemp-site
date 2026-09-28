@@ -15,6 +15,8 @@ import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
 import { destinoDepoisDoCadastro } from '@/lib/parceiros/destino-do-paciente';
 import { Button } from '@/components/ui/button';
 import { pendenciasDe, recebidosDe } from '@/lib/parceiros/documentos';
+import { conferirIdentidade, telefoneEmUso, temAviso } from '@/lib/cadastro/conferir-identidade';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 import { FormularioDeCadastro } from './_components/formulario-de-cadastro';
 
@@ -200,12 +202,51 @@ export default async function CadastroPorLinkPage({
     }
   }
 
+  /**
+   * 🔴 A CONFERÊNCIA DE IDENTIDADE AO ABRIR — ADR-0028 D-02.
+   *
+   * Com os dados que a solicitação JÁ TEM: quem vem da Greens chega com CPF, e a tela precisa
+   * saber na etapa 1 — _"não dps que ele preenche tudo"_ (`DO-59`). Não há entrada do usuário
+   * aqui, então não há oráculo nem limite: só o que o próprio link trouxe.
+   *
+   * ⚠️ Vai para a tela só o veredito — uma palavra. Nenhum dado da conta encontrada.
+   */
+  const usuarioDaSessao = clerkIdDaSessao ? await currentUser() : null;
+  const vereditoInicial = await conferirIdentidade({
+    entrada: { cpf: resultado.cpf, email: resultado.email, telefone: resultado.telefone },
+    emailDoLink: resultado.email,
+    sessao: {
+      clerkId: clerkIdDaSessao,
+      emailDaSessao: usuarioDaSessao?.emailAddresses?.[0]?.emailAddress,
+      emailsDoCadastro: [resultado.email],
+    },
+  });
+
+  // Só o que a tela vai MOSTRAR. `sessao_propria` e os demais se repetem a cada recarga, e
+  // auditar cada uma encheria o log de "visualizar" sem ato nenhum por trás (revisão, 28/09).
+  if (temAviso(vereditoInicial) || telefoneEmUso(vereditoInicial)) {
+    await registrarAuditoria({
+      userId: null,
+      acao: 'visualizar',
+      entidade: 'solicitacoes_cadastro',
+      entidadeId: resultado.id,
+      dadosDepois: {
+        evento: 'conferencia_de_identidade',
+        veredito: vereditoInicial,
+        porta: 'abertura',
+        protocolo: resultado.protocolo,
+      },
+    });
+  }
+
   return (
     <div className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 py-10 sm:py-16">
       <AuroraDeFundo />
       <FormularioDeCadastro
         token={token}
         protocolo={resultado.protocolo}
+        vereditoInicial={vereditoInicial}
+        linkDoSuporte={LINK_DO_WHATSAPP}
         pendencias={pendenciasDe(resultado.documentosDoParceiro)}
         /**
          * 🔴 O QUE JÁ CHEGOU TAMBÉM APARECE.

@@ -19,6 +19,186 @@
 
 ---
 
+## ⚪ Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele
+
+**Status:** catalogado, **não corrigido**. Todos saíram da revisão dos quatro agentes (ADR-0028
+§9.2). Cada um é trabalho próprio ou pergunta.
+
+| # | o quê | onde | perigo | o que pede |
+|---|---|---|---|---|
+| 1 | O limite por IP lê o **primeiro** `x-forwarded-for`. Se o nginx da VPS **acrescenta** em vez de sobrescrever, o atacante escolhe o próprio IP, e só o limite por link segura | `lib/seguranca/limite-de-requisicao.ts:106` | médio (inferência: a configuração do nginx não está no repositório) | medir na VPS: `proxy_set_header X-Forwarded-For $remote_addr` ou `real_ip` |
+| 2 | 🔴 **O telefone de um médico ou admin trava o paciente.** `donosDoTelefone` não filtra `role` | `lib/cadastro/conferir-identidade.ts` (consulta do telefone) | baixo/médio | ✅ **respondido em 28/09/2026: não agora.** Resposta: _"isso por enquanto não vamos nos preocupar"_. Fica catalogado, sem data |
+| 3 | `porClerk` da transação não filtra `deletedAt`: uma conta Clerk ligada a um `users` apagado confere contra outra pessoa | `app/_actions/cadastro-por-link.ts` (transação, `porClerk`) | baixo, e já existia antes | um filtro, com teste |
+| 4 | Checagem e escrita não são atômicas: dois links com o mesmo CPF, ao mesmo tempo, passam os dois | conferência fora da transação | baixo | só um índice fecha, e depende do Item 52 (duplicatas antes do unique) |
+| 5 | As consultas com `regexp_replace`/`lower()` varrem `users` e `pacientes` inteiras | `lib/cadastro/conferir-identidade.ts` | baixo hoje, cresce com a base | índice de expressão, com migration |
+| 6 | A auditoria do veredito `limite` grava a cada chamada: dá para inflar `logs_auditoria` | `app/_actions/identidade-no-cadastro.ts` | baixo | auditar uma vez por janela |
+| 7 | Quem para no suporte ou no telefone não conclui. **A Greens fica com o handoff pendente** sem saber por quê | fluxo `greens_handoff` | médio para a operação (inferência: não foi conferido em `greens-corp` se há prazo ou retentativa) | 🔴 **prioridade do dono em 28/09/2026:** avisar a Greens pela "Ponte". ✅ **Mensagem escrita**: `docs/integracao-greens/PONTE-IDENTIDADE-NA-ETAPA-1-o-que-muda-para-o-handoff.md`. Medido no código deles: não há prazo nem retentativa, só o reenvio manual. **Falta:** o dono levar a mensagem e os três de lá decidirem entre os caminhos 1, 2 e 3 |
+| 8 | `emailAddresses?.[0]` não é necessariamente o e-mail principal: numa conta com vários e-mails, dá `sessao_alheia` falso | `page.tsx`, `identidade-no-cadastro.ts` | baixo, e segue o padrão que já existia | `primaryEmailAddress` em todos os pontos |
+| 9 | O texto do e-mail passa por baixo do ícone de check quando o campo é válido | `Campo` em `formulario-de-cadastro.tsx` | cosmético, e já existia | `pr-10` quando válido |
+
+---
+
+## ⚪ Item 53 — CATALOGADO, 28/09/2026: o guarda de limite só enxerga Route Handler, e nenhuma Server Action tem limite
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+`as-rotas-sensiveis-tem-limite` confere uma **lista fixa** de seis route handlers
+(`__tests__/guardas/as-rotas-sensiveis-tem-limite.test.ts:30`, `ROTAS_QUE_PRECISAM`). Server Action não
+entra, e `rg "consumir\(" app/_actions` volta **vazio**: nenhuma action pública tem limite. Isso
+pesa porque `/cadastro(.*)` é público (`middleware.ts:57`), e a action do cadastro por link roda
+sem autenticação.
+
+**O Item 50 cobre a action dele** no guarda próprio (ADR-0028 D-08). Estender o guarda antigo
+para **derivar** as actions públicas, em vez de listar, é trabalho próprio: é a mesma lição do
+`duas-contas-de-chatpro-nao-se-misturam`, onde a lista fixa ficou verde com a rota errada.
+
+**Também fica registrado aqui, pela mesma pesquisa:** a **User Enumeration Protection** do Clerk
+em modo Strict (ADR-0028 D-10) fecharia a enumeração pelo sign-up. Mas ela muda a estratégia de
+login da instância inteira, e fica para decisão do dono.
+
+---
+
+## 🟠 Item 52 — CATALOGADO, 28/09/2026: o CPF não tem unique, e é gravado em dois formatos
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+- **Medido em produção em 28/09/2026:** 134 das 145 fichas com CPF (92 %) guardam o CPF **com pontuação**, e **1** CPF já está em duas fichas.
+- `pacientes.cpf` é `text` **sem unique e sem índice** (`db/schema/pacientes.ts:30`). Hoje duas
+  fichas com o mesmo CPF nascem **sem erro e sem log**.
+- O handoff e o cadastro por link gravam só dígitos (`lib/parceiros/handoff.ts:307`,
+  `app/_actions/cadastro-por-link.ts:181`). O perfil (`app/_actions/perfil-paciente.ts:200`) e o
+  `criarPaciente` do admin gravam **como foi digitado**.
+- O CPF **não é cifrado** em lugar nenhum.
+
+**O que o Item 50 faz com isso:** compara com `regexp_replace` e **não** migra nada (ADR-0028
+D-03). A causa fica aqui.
+
+**Perigo de mexer:** normalizar exige `UPDATE` em produção. Unique exige **antes** resolver as
+duplicatas que existirem. Quantas existem, o passo 0 do Item 50 mede. Cifrar muda toda leitura de
+CPF. São três trabalhos próprios, com migration e autorização.
+
+---
+
+## 🟠 Item 51 — CATALOGADO, 28/09/2026: o ChatPro reaproveita a solicitação pelo telefone sem conferir se o e-mail é de outra pessoa
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+`ServicoDeSolicitacao.buscarAtiva` (`lib/chatpro/solicitacao.ts:159`) procura pelo `leadId` e
+depois pelo **telefone** uma solicitação `link_gerado` ainda não usada e não vencida. O update
+faz `email: params.email ?? existente.email` (`:243`, `:271`), **sem conferir** se o e-mail que
+chegou diverge do que já estava lá. O handoff da Greens tem essa trava
+(`lib/parceiros/handoff.ts:422-434`, _"FALHA FECHADA … telefone não identifica pessoa"_). O
+ChatPro não tem.
+
+**O perigo:** duas pessoas com o mesmo aparelho, como um cuidador ou um familiar. A segunda recebe
+o link da solicitação da primeira, com o e-mail dela trocado ou mantido. É a mesma classe de
+OWASP API1 que o `handoff.ts:233-250` descreve.
+
+**Perigo de mexer:** baixo no código (uma condição, espelhando o `reaproveitavel`). Mas muda o
+número de solicitações criadas, e o guarda `o-reaproveitamento-nao-funde-duas-pessoas` **só lê o
+`handoff.ts`**: teria de passar a ler este também. **Em produção:** sim. A ocorrência real não foi
+medida, e a medição é um `SELECT` de solicitações com o mesmo telefone e e-mails diferentes.
+**Autorização** antes de mexer.
+
+---
+
+## 🟡 Item 50 — IMPLEMENTADO, 28/09/2026 (tela não provada no navegador): a identidade se confere na etapa 1 do cadastro ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md))
+
+**Status:** 🟡 **implementado em 28/09/2026, não commitado, não em produção**, na branch
+`docs/adr-0028-identidade-na-etapa-1`. Aprovado por quem pediu, com as respostas A, B, C e E
+(`DO-64` a `DO-67`). O que mudou em relação ao plano está na ADR-0028 §9.
+
+**O que foi provado** (depois da revisão pelos quatro agentes, ADR-0028 §9.2):
+
+- guarda `a-identidade-e-conferida-na-etapa-1`: 49 casos;
+- integração contra Postgres real: 28 casos;
+- 33 sabotagens, todas vermelhas;
+- suíte 1587/69, integração 135/11 sem as prévias, type-check 0, baseline verde, `pnpm build` verde;
+- prévia estática das 7 possibilidades em `previa-da-identidade/`, conferida em 900px e 390px.
+
+**Regras da segunda rodada:**
+
+- `DO-68`: o telefone de outra conta trava o campo, com saída para "entrar" ou "suporte";
+- com qualquer aviso, a senha não é pedida;
+- a referência do CPF e do telefone é o e-mail **do link**;
+- as recusas da action final têm limite;
+- o login não recria a ficha;
+- a transação acha o e-mail sem diferenciar maiúsculas.
+
+**🔴 O que falta:**
+
+1. **O CLIQUE não foi visto rodando.** Sem `CLERK_SECRET_KEY` no `.env`, a página real não renderiza local.
+2. ✅ **O passo 0 foi medido em produção** em 28/09/2026: 145 fichas com CPF, **1** CPF repetido, **134** CPFs gravados com pontuação (92 %), 0 e-mails repetidos por maiúscula e **3** celulares repetidos. O impacto é pequeno. Detalhe na ADR-0028, seção "Como foi provado".
+3. A frase _"o que eu quero que você tome cuidado"_ continua sem complemento.
+4. Commit, PR e o merge, que é do dono. O que ficou de fora está no Item 54, logo abaixo.
+
+**Status ao ser escrito:** 📋 planejado, não implementado. A ADR-0028 é proposta e espera a aprovação de
+quem pediu **e** as respostas A–E da §7 dela. Plano em PDF:
+[`planos/PLANO-IDENTIDADE-NA-ETAPA-1.pdf`](planos/PLANO-IDENTIDADE-NA-ETAPA-1.pdf).
+Branch de docs: `docs/adr-0028-identidade-na-etapa-1`.
+
+**O pedido** (`DO-59` a `DO-63`): conferir, **logo na etapa 1**, se a pessoa já tem dado
+(**CPF, telefone ou e-mail**, sem nome parecido) no sistema, se já é cadastrada ou se já está
+logada. Se logada, "é você?" com **Sair que continua no formulário**. Se o CPF bate, **suporte
+da BeHemp**. Vale para **todas** as portas.
+
+### Diagnóstico — o que existe hoje (lido e reconferido em 28/09/2026)
+
+| # | fato | onde |
+|---|---|---|
+| 1 | o "Continuar" da etapa 1 **não vai ao servidor** | `app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx:1313` |
+| 2 | a etapa 1 é `subEtapa === 0`; os dados do parceiro aparecem em "Confirme seus dados" | `:1151`, `:1165` |
+| 3 | com sessão válida, a etapa 1 já mostra "Você já está logado como X" | `:1255` |
+| 4 | o aviso de **sessão de outra pessoa** só aparece na **etapa 3** | `:1807`, `:1850` |
+| 5 | "Sair" chama `signOut()` **sem destino**, e o `ClerkProvider` não define `afterSignOutUrl` (`app/layout.tsx:102`). Pelo padrão do Clerk, a pessoa vai para `/` (**inferência, não executada**) | `:1876` |
+| 6 | `signOut()` automático em `criarConta` e em `confirmarCodigo` | `:814`, `:905` |
+| 7 | conta existente só aparece **no fim**, com `form_identifier_exists` | `:858`, `:182` |
+| 8 | a action recusa sessão de outro e-mail, e aceita o e-mail digitado no fluxo | `app/_actions/cadastro-por-link.ts:276-287` |
+| 9 | **nada** consulta CPF; `pacientes.cpf` não tem unique nem índice | `db/schema/pacientes.ts:30` |
+| 10 | o unique de `users.email` diferencia maiúsculas | `db/schema/users.ts:21` |
+| 11 | telefone em quatro formatos; a triagem compara os últimos 8 dígitos com `regexp_replace` | Item 26 · `lib/chatpro/triagem.ts:123` |
+| 12 | todas as portas levam ao mesmo `/cadastro/[token]`; só dois criadores de solicitação | `lib/chatpro/solicitacao.ts:280` · `lib/parceiros/handoff.ts:301` |
+| 13 | o middleware deixa `/cadastro(.*)` público, então a action da etapa 1 roda **sem auth** | `middleware.ts:57` |
+| 14 | há limite em memória (`consumir`, `identificarChamador`), e nenhuma action o usa | `lib/seguranca/limite-de-requisicao.ts:67`, `:105` |
+| 15 | WhatsApp da BeHemp: `NEXT_PUBLIC_WHATSAPP_BEHEMP`, usado só nas telas de link recusado | `lib/env.ts:247` · `app/(auth)/cadastro/[token]/page.tsx:39-40` |
+| 16 | auditoria: `registrarAuditoria({ userId, acao, entidade, entidadeId?, dadosAntes?, dadosDepois? })`, que engole erro | `lib/utils/audit.ts:44` |
+
+**Lado da Greens** (lido em `greens-corp-backend`, ADR-0028 §1.6): o handoff manda o e-mail sem
+minúsculas e o telefone sem E.164. O relay do ChatPro não manda CPF nem e-mail. A Greens **não
+espera** sinal de "já existe". Recusar no handoff derruba a jornada e o desconto dela. **Por isso
+a conferência mora no nosso formulário (D-01), e o contrato não muda.**
+
+### O que se implementa (ADR-0028 §8)
+
+| fase | entrega | arquivo provável |
+|---|---|---|
+| 0 | `SELECT` de CPFs, e-mails e telefones repetidos em produção (ADR-0028 §5), **antes** do código | VPS, só leitura |
+| 2 | guarda `a-identidade-e-conferida-na-etapa-1`, **vermelho** primeiro, + integração com seed (um cenário por classe + controle) | `__tests__/guardas/`, `__tests__/integracao/` |
+| 3 | conferência de domínio: consulta normalizada + veredito sem dado da outra conta | `lib/cadastro/conferir-identidade.ts` (novo) |
+| 4 | action da etapa 1: Zod, limite por link e IP, auditoria · conferência no carregamento | `app/_actions/` · `app/(auth)/cadastro/[token]/page.tsx` |
+| 5 | a tela: veredito na etapa 1, aviso de sessão alheia movido da etapa 3, `signOut({ sessionId, redirectUrl })` | `formulario-de-cadastro.tsx` |
+| 6 | a action final confere o CPF antes do `insert` | `app/_actions/cadastro-por-link.ts` |
+| 7 | retificação dos guardas que casam literais | `a-sessao-precisa-ser-do-dono-do-link`, `o-cadastro-retoma-de-onde-parou` |
+| 8 | prova local: `standalone` + Postgres em Docker + Chromium | — |
+
+### Perigo de mexer
+
+- **Em produção:** sim. É o funil de cadastro de **todas** as portas.
+- **Arquivo central:** `formulario-de-cadastro.tsx` tem **2300 linhas** e é lido por mais de 10 guardas, alguns por literal.
+- **Teste de antes e depois:** existe para os caminhos atuais (os guardas da tabela do `CLAUDE.md`). Para a conferência, nasce com o guarda novo.
+- **O que quebra em quem consome:** a Greens, **nada** (D-01). O paciente passa a ver um passo novo na etapa 1.
+- 🔴 **Não se prova local sem `CLERK_SECRET_KEY` de desenvolvimento:** a tela logada, o "Sair" e se o `#` do token sobrevive ao `redirectUrl`.
+
+### Pendente de quem pediu (ADR-0028 §7)
+
+- **A.** Onde vendas vê a "pesquisa".
+- **B.** O suporte precisa de pendência no painel (migration)?
+- **C.** O `/registrar-se` entra agora?
+- **D.** O que fazer com os CPFs que já estão repetidos.
+- **E.** CPF igual com o mesmo e-mail vai ao login ou ao suporte?
+
+---
+
 ## ✅ Item 49 — CORRIGIDO, 28/09/2026: `POST /api/pusher/auth` negava TODO canal pessoal e todo chat desde 09/09
 
 **Status:** ✅ **diagnosticado e corrigido** em 28/09/2026 (ver [a causa](#a-causa-medida-em-28092026)).
@@ -218,6 +398,8 @@ processamento, que fecha o mesmo buraco pelo outro lado (e o caso da gravação 
 **Perigo de mexer:** migration aditiva (colunas nulas) + `criarCobranca` + a releitura da tela.
 **Em produção hoje:** risco **zero** até a Fase 5 subir — nenhuma tela cobra (0 pagamentos
 `em_processamento`, medido em 28/09). Com a Fase 5 no ar, o botão existe.
+
+---
 
 ---
 

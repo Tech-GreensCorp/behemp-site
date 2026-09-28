@@ -171,13 +171,38 @@ describe('a sessão precisa ser do dono do link', () => {
      * primeiro `)}` que aparecer pega um fechamento interno do JSX e corta o aviso pela metade,
      * acusando o que está logo abaixo do corte. Recorte se faz na granularidade do defeito.
      */
-    const bloco = TELA.slice(TELA.indexOf('{sessaoEDeOutraPessoa && ('));
-    const fim = bloco.search(/\n\s*\)\}/);
-    expect(fim, 'não achei o fim do bloco do aviso').toBeGreaterThan(-1);
-    const aviso = bloco.slice(0, fim);
+    /**
+     * 🔴 RETIFICADO EM 28/09/2026 (ADR-0028 D-05, `DO-60`) — a FORMA mudou, a propriedade não.
+     *
+     * O aviso virou o componente `AvisoDeSessaoAlheia`, porque passou a aparecer DUAS vezes (na
+     * etapa 1, pedido de 28/09, e na 3, para a sessão que nasce entre as etapas) — duas cópias
+     * inline divergiriam. E "sair" deixou de ser `signOut()`: sem argumento, o Clerk navega para
+     * `/` e a pessoa perde o formulário. Agora é `sairDaSessao`, que sai sem deixar a página.
+     *
+     * Este caso passou a exigir o que protege, na nova forma: TODA ocorrência do aviso passa as
+     * DUAS saídas, e o componente liga as duas a botões.
+     */
+    const ocorrencias = TELA.split('{sessaoEDeOutraPessoa && (').slice(1);
+    expect(ocorrencias.length, 'o aviso de sessão alheia sumiu da tela').toBeGreaterThan(0);
+    for (const bloco of ocorrencias) {
+      const fim = bloco.search(/\n\s*\)\}/);
+      expect(fim, 'não achei o fim do bloco do aviso').toBeGreaterThan(-1);
+      const aviso = bloco.slice(0, fim);
+      expect(aviso, 'sumiu a saída de trocar de conta').toMatch(/aoSair=\{sairDaSessao\}/);
+      expect(aviso, 'sumiu a saída de continuar com a conta aberta').toMatch(
+        /aoContinuar=\{continuarComASessaoAberta\}/,
+      );
+    }
 
-    expect(aviso, 'sumiu a saída de trocar de conta').toMatch(/signOut\(\)/);
-    expect(aviso, 'sumiu a saída de continuar com a conta aberta').toMatch(
+    const componente = TELA.slice(TELA.indexOf('function AvisoDeSessaoAlheia('));
+    const corpo = componente.slice(0, componente.indexOf('\n}\n'));
+    expect(corpo, 'o componente não liga "continuar" a um botão').toMatch(
+      /onClick=\{aoContinuar\}/,
+    );
+    expect(corpo, 'o componente não liga "sair" a um botão').toMatch(/onClick=\{aoSair\}/);
+
+    const continuar = TELA.slice(TELA.indexOf('function continuarComASessaoAberta('));
+    expect(continuar.slice(0, 200), 'continuar não registra a escolha').toMatch(
       /setContinuarComASessao\(true\)/,
     );
   });

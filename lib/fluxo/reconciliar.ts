@@ -40,6 +40,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { documentos, pacientes, solicitacoesCadastro, users } from '@/db/schema';
 import { materializarDocumentosDoParceiro } from '@/lib/parceiros/materializar-documentos';
+import { cpfEstaEmOutraConta } from '@/lib/cadastro/conferir-identidade';
 
 export type ResultadoDaReconciliacao =
   | { reconciliou: true; pacienteId: string; documentosMaterializados: number }
@@ -141,6 +142,25 @@ export async function reconciliarPelaSessao(params: {
     .limit(1);
 
   if (!ficha) return { reconciliou: false, porque: 'sem_ficha' };
+
+  /**
+   * 🔴 O CPF DA SOLICITAÇÃO ESTÁ NA FICHA DE OUTRA CONTA? ENTÃO NÃO RECONCILIA — ADR-0028 D-06.
+   *
+   * Achado na revisão de backend de 28/09/2026. A action do cadastro passou a recusar o CPF que
+   * está em outra conta — mas a recusa não consome o link, a solicitação continua aberta, e esta
+   * função roda em TODO login. Sem isto, quem foi mandado ao suporte entrava pela conta e aqui
+   * ganhava o CPF alheio na própria ficha, com os documentos do parceiro copiados junto: a
+   * segunda ficha com o mesmo CPF (Item 52), pela porta que a D-06 não vigiava.
+   *
+   * ⚠️ FALHA FECHADA e sem escrever nada: o caso é do suporte, e a tela do cadastro já diz isso.
+   */
+  if (
+    solicitacao.cpf &&
+    !ficha.cpf &&
+    (await cpfEstaEmOutraConta({ cpf: solicitacao.cpf, userIdDaPessoa: usuario.id }))
+  ) {
+    return { reconciliou: false, porque: 'cpf_em_outra_conta' };
+  }
 
   /**
    * ⚠️ SÓ PREENCHE O QUE ESTÁ VAZIO. A ficha pode ter sido completada pelo próprio paciente
