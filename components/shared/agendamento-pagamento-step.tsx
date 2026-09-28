@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, Clock, CreditCard, Loader2, Wallet } from 'lucide-react';
+import { AlertTriangle, Clock, CreditCard, Loader2, QrCode, Wallet } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 import { obterPagamentoDaReserva } from '@/app/(public)/_actions/agendamento';
 import { iniciarCobranca } from '@/app/(public)/_actions/pagamento';
@@ -19,7 +20,7 @@ import {
   combinarComSituacao,
   diagnosticoDoEnvio,
   entradaDoBrick,
-  estadoDoResultado,
+  estadoDoResultadoDe,
   haPagamentoEmCurso,
   podeEnviar,
   type EstadoDoPagamento,
@@ -190,7 +191,7 @@ export function AgendamentoPagamentoStep({
     setEnviando(true);
     try {
       const res = await iniciarCobranca(entrada);
-      setEstado(estadoDoResultado(res));
+      setEstado(estadoDoResultadoDe(res, entrada.metodo));
     } catch {
       setEstado({
         tipo: 'erro',
@@ -330,6 +331,7 @@ export function AgendamentoPagamentoStep({
               ocupado={enviando}
               onTentarDeNovo={() => setEstado({ tipo: 'escolhendo' })}
               onPedirQrDeNovo={() => void cobrar({ consultaId, metodo: 'pix' })}
+              onPagarComPix={() => void cobrar({ consultaId, metodo: 'pix' })}
             />
           )}
 
@@ -342,8 +344,30 @@ export function AgendamentoPagamentoStep({
                   ? 'O pagamento pelo site ainda não está disponível para este médico. Fale com a clínica para concluir o agendamento.'
                   : valor === null
                     ? 'O valor desta consulta ainda não foi definido. Fale com a clínica para concluir o agendamento.'
-                    : 'O pagamento está indisponível no momento. Tente de novo em alguns minutos ou fale com a clínica.'}
+                    : 'Não conseguimos carregar o pagamento com cartão agora. Você pode pagar com PIX, tentar de novo em alguns minutos ou falar com a clínica.'}
               </p>
+            )}
+
+          {/* 🔴 O Brick não carregou (ou nem tem chave): o PIX NÃO depende dele — o servidor gera o QR
+              code com `iniciarCobranca({ metodo: 'pix' })`, sem public key. Esta é a saída, em vez de
+              a tela parar numa mensagem. Só com médico conectado e valor definido: sem eles o PIX
+              falharia pelo mesmo motivo. */}
+          {!lendo &&
+            estado.tipo === 'escolhendo' &&
+            reservaNoPrazo &&
+            medicoConectado === true &&
+            valor !== null &&
+            (publicKey === null || brickFalhou) && (
+              <Button
+                variant="outline"
+                onClick={() => void cobrar({ consultaId, metodo: 'pix' })}
+                disabled={enviando}
+                className="gap-1.5"
+                data-pix-sem-brick
+              >
+                <QrCode size={14} />
+                Pagar com PIX
+              </Button>
             )}
 
           {mostrarBrick && publicKey !== null && valor !== null && (

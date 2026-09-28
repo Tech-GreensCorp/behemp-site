@@ -495,6 +495,44 @@ describe('só à vista — o servidor decide', () => {
   });
 });
 
+describe('🔴 a falha do cartão e o outro meio — o caso real de 28/09/2026', () => {
+  it('o MP responde HTTP 400 ao cartão (como em produção): a tela oferece outro cartão ou PIX', async () => {
+    const c = await cenario();
+    responder = () => json(400, { message: 'bad_request', cause: [] });
+
+    const entrada = tela.entradaDoBrick(c.consultaId, envioDeCartao)!;
+    const estado = tela.estadoDoResultadoDe(await iniciarCobranca(entrada), 'cartao');
+
+    expect(estado).toMatchObject({ tipo: 'erro', sugerirOutroMeio: true });
+    // e o PIX, sem o Brick, passa para o mesmo paciente e a mesma reserva
+    responder = () =>
+      json(201, {
+        id: 9201,
+        status: 'pending',
+        date_of_expiration: new Date(Date.now() + 31 * 60 * 1000).toISOString(),
+        point_of_interaction: {
+          transaction_data: { qr_code: 'q', qr_code_base64: 'b', ticket_url: null },
+        },
+      });
+    const pix = tela.estadoDoResultadoDe(
+      await iniciarCobranca({ consultaId: c.consultaId, metodo: 'pix' }),
+      'pix',
+    );
+    expect(pix.tipo).toBe('pix');
+  });
+
+  it('⚠️ o MP responde 500 (ambíguo): NÃO oferece o PIX — o pagamento pode existir', async () => {
+    const c = await cenario();
+    responder = () => json(500, { message: 'internal_error' });
+
+    const entrada = tela.entradaDoBrick(c.consultaId, envioDeCartao)!;
+    const estado = tela.estadoDoResultadoDe(await iniciarCobranca(entrada), 'cartao');
+
+    expect(estado.tipo).toBe('erro');
+    expect(estado).not.toHaveProperty('sugerirOutroMeio');
+  });
+});
+
 describe('escopo', () => {
   it('7. a leitura do estado só responde a consulta DO paciente da sessão', async () => {
     const c = await cenario();

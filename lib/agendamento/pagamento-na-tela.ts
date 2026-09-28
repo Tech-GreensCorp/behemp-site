@@ -161,7 +161,7 @@ export type EstadoDoPagamento =
   | { tipo: 'aprovado' }
   /** Cartão em análise (`in_process`/`pending`): o resultado chega depois, pelo aviso. */
   | { tipo: 'em_analise' }
-  | { tipo: 'recusado'; mensagem: string }
+  | { tipo: 'recusado'; mensagem: string; sugerirOutroMeio?: boolean }
   /** Já existe pagamento em andamento para esta reserva (cobrança dupla recusada no servidor). */
   | { tipo: 'em_andamento' }
   | { tipo: 'reserva_expirada' }
@@ -173,7 +173,7 @@ export type EstadoDoPagamento =
   /** O webhook confirmou: a consulta existe. */
   | { tipo: 'confirmado' }
   /** Falha que admite tentar de novo (rede, instabilidade do MP, dado inválido). */
-  | { tipo: 'erro'; mensagem: string };
+  | { tipo: 'erro'; mensagem: string; sugerirOutroMeio?: boolean };
 
 /**
  * Mensagem ao paciente por `status_detail` de recusa. Códigos da doc oficial ("Resultados de
@@ -203,6 +203,36 @@ const RECUSA_GENERICA = 'O pagamento foi recusado. Tente outro cartão ou pague 
 
 export function mensagemDeRecusa(statusDetail: string | null | undefined): string {
   return (statusDetail && RECUSAS[statusDetail]) || RECUSA_GENERICA;
+}
+
+/**
+ * 🔴 A falha do CARTÃO foi DEFINITIVA — nenhum dinheiro em trânsito —, a ponto de a tela poder
+ * sugerir outro cartão ou o PIX?
+ *
+ * Só em dois casos: o cartão foi RECUSADO (o MP respondeu, e recusou), ou a API recusou o PEDIDO
+ * (`dados_invalidos`, um 4xx: o pagamento não foi criado — é o HTTP 400 de 28/09/2026).
+ *
+ * ⚠️ NUNCA em `falha_de_comunicacao`, "sem resposta" ou exceção de rede. Nesses, o pagamento PODE
+ * ter sido criado (`lib/mercadopago/cobranca.ts`, o comentário "AMBÍGUO"), e sugerir o PIX é o
+ * caminho para o paciente pagar duas vezes. Nem em `conta_do_medico_invalida`/`medico_sem_conta`:
+ * o PIX falharia pelo mesmo motivo.
+ */
+export function podeSugerirOutroMeio(res: ResultadoDaAction, metodo: 'pix' | 'cartao'): boolean {
+  if (metodo !== 'cartao') return false;
+  if (res.sucesso) return res.dados.status === 'recusado' || res.dados.statusMp === 'rejected';
+  return res.motivo === 'dados_invalidos';
+}
+
+/** `estadoDoResultado`, marcando quando a falha do cartão permite sugerir outro meio. */
+export function estadoDoResultadoDe(
+  res: ResultadoDaAction,
+  metodo: 'pix' | 'cartao',
+): EstadoDoPagamento {
+  const estado = estadoDoResultado(res);
+  if ((estado.tipo === 'erro' || estado.tipo === 'recusado') && podeSugerirOutroMeio(res, metodo)) {
+    return { ...estado, sugerirOutroMeio: true };
+  }
+  return estado;
 }
 
 /** O resultado da action → o que a tela mostra. */

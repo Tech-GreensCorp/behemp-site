@@ -24,16 +24,21 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { PainelDoPagamento } from '@/components/shared/agendamento-pagamento-painel';
+import {
+  PainelDoPagamento,
+  TEXTO_OUTRO_MEIO,
+} from '@/components/shared/agendamento-pagamento-painel';
 import {
   combinarComSituacao,
   diagnosticoDoEnvio,
   entradaDoBrick,
   estadoDaSituacao,
   estadoDoResultado,
+  estadoDoResultadoDe,
   haPagamentoEmCurso,
   mensagemDeRecusa,
   podeEnviar,
+  podeSugerirOutroMeio,
   type EstadoDoPagamento,
 } from '@/lib/agendamento/pagamento-na-tela';
 
@@ -521,5 +526,110 @@ describe('🔴 7. o Brick não se recria a cada render', () => {
     expect(passo).toMatch(/const aoFalharOBrick = useCallback\(/);
     expect(passo).toMatch(/onEnviar=\{aoEnviarDoBrick\}/);
     expect(passo).toMatch(/onFalhaDoBrick=\{aoFalharOBrick\}/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * 🔴 9. A FALHA DEFINITIVA DO CARTÃO OFERECE OUTRO MEIO — E SÓ A DEFINITIVA (28/09/2026).
+ *
+ * Antes, a recusa do cartão só oferecia "Tentar de novo", e o Brick que não carregava parava numa
+ * mensagem — com o PIX junto, porque o PIX mora dentro do Brick. Agora a tela sugere outro cartão
+ * ou o PIX, e o PIX tem um botão próprio que não depende do Brick.
+ *
+ * ⚠️ O limite é o que importa: numa falha AMBÍGUA (comunicação, sem resposta) o pagamento pode ter
+ * sido criado, e sugerir o PIX ali é o caminho para o paciente pagar duas vezes.
+ */
+describe('🔴 9. a falha definitiva do cartão oferece outro meio — e só ela', () => {
+  const falha = (motivo: string) => ({ sucesso: false as const, erro: 'x', motivo });
+  const resposta = (status: string, statusMp: string) => ({
+    sucesso: true as const,
+    dados: { status, statusMp, statusDetailMp: null },
+  });
+
+  it.each<[string, Parameters<typeof podeSugerirOutroMeio>[0], boolean]>([
+    ['cartão RECUSADO pelo MP', resposta('recusado', 'rejected'), true],
+    ['API recusou o PEDIDO (HTTP 4xx — o 400 de 28/09)', falha('dados_invalidos'), true],
+    ['⚠️ falha de COMUNICAÇÃO (o pagamento pode existir)', falha('falha_de_comunicacao'), false],
+    ['conta do médico inválida (o PIX falharia igual)', falha('conta_do_medico_invalida'), false],
+    ['médico sem conta', falha('medico_sem_conta'), false],
+    ['pagamento já em andamento', falha('pagamento_em_andamento'), false],
+    ['reserva expirada', falha('reserva_expirada'), false],
+    ['cartão APROVADO', resposta('em_processamento', 'approved'), false],
+    ['cartão EM ANÁLISE', resposta('em_processamento', 'in_process'), false],
+  ])('%s → sugere outro meio: %s', (_n, res, esperado) => {
+    expect(podeSugerirOutroMeio(res, 'cartao')).toBe(esperado);
+  });
+
+  it('no PIX nunca sugere — não há "outro meio" a oferecer', () => {
+    expect(podeSugerirOutroMeio(falha('dados_invalidos'), 'pix')).toBe(false);
+  });
+
+  it('a etapa monta o estado COM a marcação, a partir do método do envio', () => {
+    expect(estadoDoResultadoDe(falha('dados_invalidos'), 'cartao')).toMatchObject({
+      tipo: 'erro',
+      sugerirOutroMeio: true,
+    });
+    expect(estadoDoResultadoDe(falha('falha_de_comunicacao'), 'cartao')).not.toHaveProperty(
+      'sugerirOutroMeio',
+    );
+    const passo = ler('components/shared/agendamento-pagamento-step.tsx');
+    expect(passo).toMatch(/setEstado\(estadoDoResultadoDe\(res, entrada\.metodo\)\)/);
+  });
+
+  const painel = (estado: EstadoDoPagamento, reservaNoPrazo = true) =>
+    renderToStaticMarkup(
+      createElement(PainelDoPagamento, {
+        estado,
+        agora: AGORA,
+        reservaNoPrazo,
+        onTentarDeNovo: () => {},
+        onPagarComPix: () => {},
+      }),
+    );
+
+  it('a falha definitiva mostra a sugestão, "Tentar outro cartão" e "Pagar com PIX"', () => {
+    const html = painel({
+      tipo: 'erro',
+      mensagem: 'O pagamento não foi aceito.',
+      sugerirOutroMeio: true,
+    });
+    expect(html).toContain(TEXTO_OUTRO_MEIO);
+    expect(html).toContain('Tentar outro cartão');
+    expect(html).toContain('Pagar com PIX');
+  });
+
+  it('a mensagem que já sugere o PIX não ganha a frase repetida', () => {
+    const html = painel({
+      tipo: 'recusado',
+      mensagem: 'O cartão não tem limite suficiente. Tente outro cartão ou o PIX.',
+      sugerirOutroMeio: true,
+    });
+    expect(html).not.toContain(TEXTO_OUTRO_MEIO);
+    expect(html.match(/PIX/g)?.length).toBe(2); // o da mensagem e o do botão
+  });
+
+  it('a falha AMBÍGUA não mostra o PIX — só "Tentar de novo"', () => {
+    const html = painel({ tipo: 'erro', mensagem: 'Não conseguimos falar com o Mercado Pago.' });
+    expect(html).not.toContain('Pagar com PIX');
+    expect(html).not.toContain(TEXTO_OUTRO_MEIO);
+    expect(html).toContain('Tentar de novo');
+  });
+
+  it('com a reserva vencida, nenhum botão de pagar aparece', () => {
+    const html = painel({ tipo: 'recusado', mensagem: 'x', sugerirOutroMeio: true }, false);
+    expect(html).not.toContain('Pagar com PIX');
+    expect(html).not.toContain('Tentar outro cartão');
+  });
+
+  it('o Brick que não carrega oferece o PIX SEM o Brick', () => {
+    const passo = ler('components/shared/agendamento-pagamento-step.tsx');
+    const bloco = passo.slice(passo.indexOf('(publicKey === null || brickFalhou) && ('));
+    expect(bloco.length, 'o botão de PIX sem o Brick sumiu').toBeGreaterThan(0);
+    expect(bloco.slice(0, 400)).toMatch(/cobrar\(\{ consultaId, metodo: 'pix' \}\)/);
+    expect(bloco.slice(0, 600)).toContain('data-pix-sem-brick');
+    expect(passo).toContain(
+      'Não conseguimos carregar o pagamento com cartão agora. Você pode pagar com PIX',
+    );
   });
 });
