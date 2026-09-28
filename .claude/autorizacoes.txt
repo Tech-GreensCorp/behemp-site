@@ -899,3 +899,27 @@ path:.github/workflows/deploy.yml
 # COMMITADO; aplicar em produção depende de decisão do dono sobre esses e-mails.
 #
 # (Os dois caminhos já estavam autorizados em 23/09; este registro documenta a mudança.)
+
+# ── Autorizado pelo dono em 28/09/2026 — Fase 5 (Payment Brick), a página do agendamento ────
+# PEDIDO (verbatim, do prompt da Fase 5): "Public key entregue por prop do servidor (Server
+# Component pai busca do ambiente, passa para o Client Component) — nunca hardcoded".
+# RESPOSTA do dono à pergunta sobre o bloqueio do hook: "Authorize page.tsx (Recommended)".
+#
+# O QUE MUDA: a Server Component lê MERCADOPAGO_PUBLIC_KEY_{TESTE,PRODUCAO} — escolhida por
+# MERCADOPAGO_AMBIENTE, como decide `lib/env.ts:120-125` — e passa por prop ao wizard.
+# Nenhuma outra parte da página muda.
+#
+# PERIGO MEDIDO: BAIXO. A public key é pública por natureza (identifica a conta, não autoriza
+# cobrança). O que cobra é o access token do MÉDICO, no servidor. Granularidade: o arquivo exato.
+path:app/(paciente)/paciente/agendamento/page.tsx
+
+# ── Pedido do dono em 28/09/2026 — Fase 5, o schema da action de cobrança ───────────────────
+# PEDIDO (verbatim): "Parcelamento: confirmar na doc do SDK se maxInstallments no Brick fixa em
+# 1, e também capar no schema da action (que hoje aceita até 12) — o servidor decide, não o
+# cliente." DECISÃO DE NEGÓCIO do mesmo dono: "parcelamento só à vista (installments: 1)".
+#
+# O QUE MUDA: `esquemaCartao.installments` passa de `.max(12)` para `.max(1)`. Nada mais no
+# arquivo. PERIGO MEDIDO: BAIXO — nenhuma tela cobra em produção hoje (0 pagamentos
+# `em_processamento`, medido em 28/09); o Brick passa a oferecer só 1x; um envio com mais
+# parcelas é recusado ANTES de chamar o Mercado Pago. Granularidade: o arquivo exato.
+path:app/(public)/_actions/pagamento.ts
