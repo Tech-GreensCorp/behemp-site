@@ -1,7 +1,12 @@
 # ADR-0027 — O worker das filas roda no PM2, e o cron do GitHub vira rede de segurança
 
-> **Status:** ✅ **aceita** — 24/09/2026, implementada no mesmo dia (branch
-> `feat/worker-filas-pm2`, [Item 44](../04-LISTA-DE-AFAZERES.md)). **Ainda não em produção.**
+> **Status:** ✅ **aceita e em produção** — deploy do PR #127 (run `36046549816`, 24/09/2026
+> 19:15 UTC): o log mostra `behemp-site` e `behemp-filas` **`online`**. ⚠️ Os critérios de pronto
+> 2 a 4 (§4) **não foram remedidos** nesta revisão. A quarta rota (D-05) entrou na Fase 4, em
+> 28/09/2026: ver a §7.
+>
+> **Status anterior (24/09/2026):** ✅ **aceita**, implementada no mesmo dia (branch
+> `feat/worker-filas-pm2`, [Item 44](../04-LISTA-DE-AFAZERES.md)). ~~**Ainda não em produção.**~~
 > O que a implementação mudou ou acrescentou está na §6, e as versões anteriores ficam.
 >
 > **Status ao ser escrita:** 📋 **proposta** — 24/09/2026. Escrita **antes** do código, como a ADR-0020 §4
@@ -208,6 +213,8 @@ implementa com segurança depois desta ADR**, porque:
 ⚠️ **Antes da Fase 4 cancelar qualquer coisa**, as 7 reservas vencidas precisam de decisão
 própria. O e-mail de "sua reserva expirou" chegaria duas semanas depois (Item 40, modo de
 erro 3). Isso é escopo da Fase 4, não deste worker.
+✅ **Decidido em 28/09/2026:** eram **8** na remedição, e foram canceladas à mão, **sem e-mail**,
+antes do deploy da Fase 4 (§7).
 
 ## §6 — O que a implementação ensinou
 
@@ -274,6 +281,33 @@ e foram refeitas.
 **Medido antes da implementação (24/09/2026):** a porta é 3000, sem `PORT` configurada (D-02).
 O `pm2 startup` nunca foi configurado, então nada sobrevive a reboot (R-03, Item 42).
 ✅ **Mesmo dia, depois:** o Item 42 foi corrigido e provado com reboot real.
+
+## §7 — A Fase 4 entrou no laço (28/09/2026), e o que ela mudou da D-05
+
+A quarta rota é `GET /api/agendamento/expirar` (`app/api/agendamento/expirar/route.ts`), a
+última de `ROTAS` (`scripts/worker-filas-nucleo.mjs:24`) e o último passo do `filas.yml`
+(`:96`). A regra mora em `lib/agendamento/liberar-reservas-expiradas.ts`. Diagnóstico e provas
+no [Item 40](../04-LISTA-DE-AFAZERES.md).
+
+| D-05 | pedido | o que foi feito |
+| --- | --- | --- |
+| 1 | `CRON_SECRET` com falha fechada | ✅ 503 sem ele, 401 com o errado. E limite de 10/min **antes** do segredo, como o `mercadopago/processar` |
+| 2 | reivindicação com `FOR UPDATE SKIP LOCKED` | 🔄 **retificado:** um `UPDATE … WHERE id IN (subquery) … RETURNING`, com a condição repetida no `WHERE` externo. Não há trabalho longo entre reivindicar e concluir (é um `UPDATE` só), então não há o que "reservar" para processar depois. Quem perde a corrida não recebe a linha no `RETURNING`, e só quem a recebe envia e-mail e audita. **Provado pelo desfecho:** duas chamadas simultâneas sobre 6 reservas dão 6 liberações, 6 e-mails e 6 auditorias. ⚠️ **Não provado pelo mecanismo:** a sabotagem que tira a condição do `WHERE` externo continuou verde, e o teste não garante que as duas chamadas se sobreponham dentro do Postgres |
+| 3 | caminho exato no `middleware.ts` | ✅ `middleware.ts:103`. O guarda `o-cron-chama-rota-que-o-middleware-deixa-passar` pegou a rota nova **sozinho**, e ganhou 4 controles de prefixo para ela |
+| 4 | ler `pix_valido_ate`, pular `em_processamento` | ✅ `semPagamentoEmCurso`. **E achou um segundo caminho** com o mesmo defeito, fora do job: `expirarReservasVencidasDoPaciente`, que roda a cada vez que o paciente abre a tela |
+
+**R-06, retificado.** O risco pedia que o guarda do middleware lesse também as rotas do worker.
+Não foi preciso: `o-worker-das-filas-nao-para-numa-rota` exige que `ROTAS` seja **igual** às
+URLs do `filas.yml`, e o do middleware deriva do `filas.yml`. A rota que entrar só no worker
+deixa o primeiro vermelho, e a que entrar nos dois sem o middleware deixa o segundo (as duas
+sabotagens foram feitas).
+
+**D-06, uma nota.** "O `filas.yml` não é alterado" valia para a cadência, que não mudou. Ele
+ganhou o passo da quarta rota, como a própria D-05 pedia.
+
+**Um modo de erro novo, catalogado e não resolvido aqui:** um PIX que nunca se resolve deixa a
+reserva protegida para sempre, e aparece no log do worker como `protegidas` que não cai com o
+tempo (Item 45).
 
 ## Fontes lidas
 

@@ -11,6 +11,7 @@ import {
   confirmarConsultaPaga,
   marcarErroConfirmacao,
 } from '@/lib/agendamento/confirmar-consulta-paga';
+import { semPagamentoEmCurso } from '@/lib/agendamento/liberar-reservas-expiradas';
 import { revalidatePath } from 'next/cache';
 import { atualizarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
 import {
@@ -33,7 +34,8 @@ import { format } from 'date-fns';
  *    todos os agendamentos do médico), envia e-mails, e vincula o pagamento.
  *
  * Reservas que expiram sem confirmação são liberadas por um job (ver
- * `liberarReservasExpiradas` em lib/integrations/inngest/functions.ts).
+ * `liberarReservasExpiradas` em lib/agendamento/liberar-reservas-expiradas.ts, chamada pelo
+ * worker das filas por `GET /api/agendamento/expirar`).
  */
 
 /** Placeholder ajustável — quanto tempo o paciente tem para pagar após reservar. */
@@ -472,8 +474,13 @@ async function resolverPacienteIdAutenticado(): Promise<
  * lógica de `liberarReservasExpiradas` (Inngest, roda a cada 5 min), mas disparada na hora
  * em que o paciente abre a tela de agendamento, para o status já vir correto sem esperar
  * o próximo ciclo do cron.
+ *
+ * 🔴 Com a MESMA trava do job (Fase 4): reserva com PIX ainda pagável ou pagamento em
+ * processamento não é liberada — sem ela, o paciente que volta à tela para ver o QR code
+ * cancelaria a própria reserva.
  */
 async function expirarReservasVencidasDoPaciente(pacienteId: string): Promise<void> {
+  const agora = new Date();
   const expiradas = await db
     .select({ id: consultas.id })
     .from(consultas)
@@ -481,7 +488,8 @@ async function expirarReservasVencidasDoPaciente(pacienteId: string): Promise<vo
       and(
         eq(consultas.pacienteId, pacienteId),
         eq(consultas.status, 'reservada'),
-        lte(consultas.expiraEm, new Date()),
+        lte(consultas.expiraEm, agora),
+        semPagamentoEmCurso(agora),
       ),
     );
 
@@ -494,7 +502,8 @@ async function expirarReservasVencidasDoPaciente(pacienteId: string): Promise<vo
       and(
         eq(consultas.pacienteId, pacienteId),
         eq(consultas.status, 'reservada'),
-        lte(consultas.expiraEm, new Date()),
+        lte(consultas.expiraEm, agora),
+        semPagamentoEmCurso(agora),
       ),
     );
 

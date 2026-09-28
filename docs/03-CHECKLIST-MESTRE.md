@@ -79,20 +79,21 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       aplica uma só, e ela era no-op medido. 🔴 **Falta confirmar o EFEITO:** que um cadastro
       real deixe linha em `consentimentos`. Diagnóstico e a medição antes/depois em
       [04 — Item 32](04-LISTA-DE-AFAZERES.md).
-- [ ] **Item 40** — 🔴 **o job `liberarReservasExpiradas` do Inngest nunca rodou em produção**:
-      **7 reservas `reservada` e vencidas desde 10/09/2026** seguem travando esses horários
-      (medido em 23/09 pela sessão da Fase 2/3, **não remedido**). O job existe
-      (`lib/integrations/inngest/functions.ts:440`, cron de 5 min) e está registrado em
-      `app/api/inngest/route.ts`. **Causa ainda não medida.** 🔴 **Retratado em 23/09:** eu
-      tinha escrito que as chaves `INNGEST_*` não chegavam ao processo. O log do deploy do PR
-      #122 mostra as duas **no ambiente do processo** em produção. Sobra a hipótese de o app
-      nunca ter sido sincronizado no painel.
-      ⛔ **Não "ligar" o Inngest:** o mesmo endpoint liga outras 4 funções que também nunca
-      rodaram, e a primeira execução dispararia de uma vez o e-mail acumulado de semanas (o
-      aviso de 10/09, por outro caminho). E o job ainda não respeita `pix_valido_ate` nem
-      `em_processamento` (Fase 4): rodando hoje, cancelaria reserva com pagamento em curso.
-      Diagnóstico, os modos de erro e o perigo de mexer em
-      [04 — Item 40](04-LISTA-DE-AFAZERES.md). **Decisão do dono.**
+- [x] **Item 40 — ✅ CORRIGIDO na Fase 4, 28/09/2026** · `feat/fase4-expiracao-reservas`: o
+      job `liberarReservasExpiradas` do Inngest **nunca rodou em produção**, e as reservas
+      vencidas travavam horário (**8** remedidas em 28/09, a mais antiga de 10/09). A expiração
+      agora roda no **worker das filas** (ADR-0027), a cada ~60 s, pela rota
+      `GET /api/agendamento/expirar` — sem depender do Inngest nem do `filas.yml`, que roda a
+      cada ~4 h. 🔴 **A regra da Fase 4:** não libera reserva com PIX ainda pagável
+      (`pix_valido_ate > agora`) nem com pagamento `em_processamento`
+      (`semPagamentoEmCurso`, `lib/agendamento/liberar-reservas-expiradas.ts:49`). **Achado no
+      caminho:** `expirarReservasVencidasDoPaciente` (roda a cada vez que o paciente abre a tela)
+      também violava a regra, e passou a usar a mesma trava. O Inngest **continua desligado**, e
+      o job dele delega à mesma função. **Antes do deploy**, as 8 reservas antigas foram
+      canceladas à mão, **sem e-mail**, COMMIT em 28/09 às 08:10 (Brasília), pagamentos
+      intactos (hash antes/depois). Integração 13 casos, guarda novo 5, 12 sabotagens vermelhas.
+      **1538 casos em 68 arquivos** (portão) · **integração 108 em 11**. Ficaram os Itens 45 e 46. Detalhe, IDs e o adendo em
+      [04 — Item 40](04-LISTA-DE-AFAZERES.md).
 - [ ] **Item 44 — ⏳ IMPLEMENTADO em 24/09/2026, aguardando o primeiro deploy** ·
       `feat/worker-filas-pm2`: o **worker das filas no PM2** (`behemp-filas`,
       [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md), agora
@@ -385,6 +386,22 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
+
+- [ ] 🟠 **Item 45 — CATALOGADO, 28/09/2026: um PIX que nunca se resolve trava o horário além
+      da janela da conciliação.** A Fase 4 não libera reserva com pagamento `em_processamento`,
+      mesmo com o PIX vencido (é a regra). Se a notificação de cancelamento do MP se perder, a
+      conciliação só olha as últimas **24 h** (`lib/mercadopago/notificacoes.ts:88-99`): depois
+      disso o pagamento fica `em_processamento` para sempre e o horário nunca é liberado.
+      Precisa de verificação periódica contra a API, a desenhar. **Hoje: 0 casos** (nenhuma tela
+      cobra ainda). Query de medição e diagnóstico em [04 — Item 45](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 46 — CATALOGADO, 28/09/2026: três outros caminhos cancelam reserva sem olhar o
+      pagamento em curso** — `confirmarConsultaPaga` sem `ignorarPrazo`
+      (`lib/agendamento/confirmar-consulta-paga.ts:102`), `iniciarAguardoPagamento`
+      (`app/(public)/_actions/agendamento.ts:377`) e `cancelarReserva` (`:704`, que ainda marca
+      o pagamento `cancelado`). Mesma classe do defeito corrigido em
+      `expirarReservasVencidasDoPaciente`. **Decisão de UX pendente** (o que a tela diz quando há
+      PIX pagável ou cartão em análise), antes da Fase 5. Detalhe em
+      [04 — Item 46](04-LISTA-DE-AFAZERES.md).
 
 - [ ] ⏳ **PENDENTE DE APROVAÇÃO — depois da teleconsulta, a ANVISA vira a única pendência, e a
       tela precisa dizer isso.** Descrito pelo dono em 14/09/2026: _"depois que ele termina a

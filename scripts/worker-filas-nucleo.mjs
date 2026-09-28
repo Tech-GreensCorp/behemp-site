@@ -3,7 +3,7 @@
  *
  * O QUE FAZ
  * ---------
- * Chama, em sequência, as três rotas que o `filas.yml` já chama, com o `CRON_SECRET` do
+ * Chama, em sequência, as rotas que o `filas.yml` já chama, com o `CRON_SECRET` do
  * ambiente, e registra uma linha por chamada. Não processa fila nenhuma: todo o trabalho
  * continua dentro do `behemp-site`, nas rotas, que reivindicam com `FOR UPDATE SKIP LOCKED`.
  *
@@ -21,6 +21,7 @@ export const ROTAS = Object.freeze([
   '/api/chatpro/processar',
   '/api/parceiros/enviar',
   '/api/mercadopago/processar',
+  '/api/agendamento/expirar',
 ]);
 
 /**
