@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -56,6 +57,31 @@ import { concluirCadastroPorLink } from '@/app/_actions/cadastro-por-link';
 import { ConsentimentoDoCompartilhamento } from '@/components/paciente/ConsentimentoDoCompartilhamento';
 import { CepRapido, type ValoresDeEndereco } from '@/components/paciente/CepRapido';
 import type { Finalidade } from '@/lib/parceiros/consentimento';
+import { conferirIdentidadeNaEtapa1 } from '@/app/_actions/identidade-no-cadastro';
+import {
+  TEXTO_DO_TELEFONE_EM_USO,
+  linkDoSuporteComProtocolo,
+  telefoneEmUso,
+  temAviso,
+  type Veredito,
+} from '@/lib/cadastro/veredito-de-identidade';
+import { AvisoDeIdentidade } from './aviso-de-identidade';
+
+/**
+ * 🔴 SAIR DA CONTA SEM SAIR DA PÁGINA — `DO-60`: _"o botão de sair não sai da página do
+ * formúlario ele continua na página"_.
+ *
+ * `signOut()` sem argumentos navega para o `afterSignOutUrl`, e como o `ClerkProvider` não o
+ * define, o destino é `/` — a pessoa perdia o formulário, e o token que vive no `#` da URL.
+ * Lido no código do `clerk-js` (`packages/clerk-js/src/core/clerk.ts`, 28/09/2026): quando o
+ * primeiro argumento é uma FUNÇÃO, ela roda NO LUGAR da navegação. Um callback que não faz nada
+ * é, portanto, "saia e fique aqui". O Clerk atualiza `useAuth`/`useUser`, e a tela se redesenha
+ * sem sessão, com tudo o que já foi digitado.
+ *
+ * ⚠️ E o `sessionId` vai junto: em multi-session, `signOut` sem ele derruba TODAS as contas do
+ * navegador, e a pessoa pediu para sair de uma.
+ */
+const FICAR_NESTA_PAGINA = () => {};
 
 interface Props {
   token: string;
@@ -113,6 +139,25 @@ interface Props {
    * saía errado.
    */
   jaDeclarouSobreReceita?: boolean;
+  /**
+   * 🔴 O VEREDITO DA CONFERÊNCIA AO ABRIR O LINK — ADR-0028 D-02.
+   *
+   * Calculado no servidor com os dados que a solicitação já tinha. É UMA palavra: nenhum dado
+   * da conta encontrada chega aqui. Vale enquanto os campos forem os que chegaram; qualquer
+   * correção pede uma conferência nova no "Continuar".
+   */
+  vereditoInicial?: Veredito;
+  /**
+   * O WhatsApp da BeHemp, para o aviso de CPF em outra conta (`DO-62`). Obrigatório e sem
+   * padrão: o número mora em `NEXT_PUBLIC_WHATSAPP_BEHEMP`, lido na `page.tsx` — um segundo
+   * número escrito aqui seria o atendimento configurável em dois lugares.
+   */
+  linkDoSuporte: string;
+}
+
+/** A chave do que foi conferido: um veredito só vale para os MESMOS três dados. */
+function chaveDaConferencia(cpf: string, email: string, telefone: string) {
+  return `${somenteDigitosDoCpf(cpf)}|${email.trim().toLowerCase()}|${telefone.replace(/\D/g, '')}`;
 }
 
 /**
@@ -143,6 +188,53 @@ async function lerAnexo(arquivo: File | null) {
     tipoMime: arquivo.type,
     conteudoBase64: btoa(binario),
   };
+}
+
+/**
+ * 🔴 SESSÃO DE OUTRA PESSOA — e com SAÍDA, não só com o aviso.
+ *
+ * Dizer "este link é de outro e-mail" e parar aí deixa o paciente preso: ele não sabe que
+ * precisa sair da conta, e muito menos onde. O botão faz o trabalho — e, desde `DO-60`, sem
+ * tirá-lo da página (`sairDaSessao`, ver `FICAR_NESTA_PAGINA`).
+ *
+ * ⚠️ Mostra o e-mail da SESSÃO e o do LINK, e isto não é o oráculo que a ADR-0028 fecha: a
+ * sessão é de quem está no navegador, e o e-mail do link é o que o próprio link trouxe. Nenhum
+ * dos dois vem de uma busca no banco.
+ */
+function AvisoDeSessaoAlheia({
+  emailDaSessao,
+  emailDoLink,
+  aoContinuar,
+  aoSair,
+}: {
+  emailDaSessao: string;
+  emailDoLink: string;
+  aoContinuar: () => void;
+  aoSair: () => void;
+}) {
+  return (
+    <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
+      {/* `text-left` e `break-words`: o `justify` do celular abria buracos na linha com e-mail. */}
+      <p className="text-foreground text-left text-sm leading-relaxed">
+        Você está nesta página com a conta <strong className="break-words">{emailDaSessao}</strong>,
+        e este link foi enviado para <strong className="break-words">{emailDoLink}</strong>. É você?
+      </p>
+      {/*
+        🔴 DUAS SAÍDAS, e antes havia UMA — que era a errada para o caso mais comum.
+        Quem trocou o próprio e-mail (porque o parceiro mandou o antigo) não tem para onde ir
+        com "sair desta conta": a conta certa é a que está aberta. Oferecer só a saída que não
+        serve é o que transforma proteção em beco.
+        ⚠️ A escolha é do paciente e fica explícita — o servidor registra a troca.
+      */}
+      <Button className="h-11 w-full rounded-xl" onClick={aoContinuar} type="button">
+        {/* Sem o e-mail no rótulo: com `whitespace-nowrap`, ele estourava o botão no celular. */}
+        Sou eu, continuar com esta conta
+      </Button>
+      <Button variant="outline" className="h-11 w-full rounded-xl" onClick={aoSair} type="button">
+        Não sou eu, sair desta conta
+      </Button>
+    </div>
+  );
 }
 
 /** Uma linha de dado já confirmado: rótulo à esquerda, valor à direita. */
@@ -221,6 +313,8 @@ export function FormularioDeCadastro({
   veioDeParceiro = false,
   jaDeclarouSobreAnvisa = false,
   jaDeclarouSobreReceita = false,
+  vereditoInicial,
+  linkDoSuporte,
 }: Props) {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -237,7 +331,7 @@ export function FormularioDeCadastro({
    * `concluirCadastroPorLink` já exige `auth()`, então ela funciona sozinha, sem passar pelo
    * Clerk outra vez.
    */
-  const { isSignedIn, isLoaded: authCarregou } = useAuth();
+  const { isSignedIn, isLoaded: authCarregou, sessionId } = useAuth();
 
   /**
    * 🔴 DE QUEM É A SESSÃO ABERTA — e ela precisa ser de quem o link chama.
@@ -253,6 +347,8 @@ export function FormularioDeCadastro({
    */
   const { user } = useUser();
   const { signOut } = useClerk();
+  /** O ÚNICO jeito de sair nesta tela: da sessão ativa, e sem deixar a página. Ver `FICAR_NESTA_PAGINA`. */
+  const sairDaSessao = () => signOut(FICAR_NESTA_PAGINA, sessionId ? { sessionId } : undefined);
   const emailDaSessao = user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? '';
   /**
    * ⚠️ A COMPARAÇÃO É COM `emailInicial` — o e-mail que o PARCEIRO mandou —, nunca com o
@@ -686,6 +782,108 @@ export function FormularioDeCadastro({
     (jaTemSessaoUtil || (senhaValida && senhasConferem));
   const podeAvancarStep1 = tratamentoRespondido;
 
+  /**
+   * 🔴 A CONFERÊNCIA DE IDENTIDADE DA ETAPA 1 — ADR-0028, `DO-59`: _"isso é logo na etapa 1 do
+   * formúlario, não dps que ele preenche tudo"_.
+   *
+   * O "Continuar" da etapa 1 ia direto para a etapa 2, sem perguntar nada ao servidor, e a conta
+   * existente só aparecia no FIM, pelo `form_identifier_exists` do Clerk. Agora ele pergunta —
+   * com os dados que a pessoa confirmou ou digitou, que no bot do ChatPro são os únicos com CPF.
+   *
+   * ⚠️ O veredito vale para os MESMOS três dados (`chaveDaConferencia`). Corrigir um campo o
+   * invalida por construção — derivado no render, sem efeito —, e o próximo "Continuar"
+   * pergunta de novo. O veredito de abertura vale enquanto os campos forem os que chegaram.
+   */
+  const [conferencia, setConferencia] = useState<{ chave: string; veredito: Veredito } | null>(
+    null,
+  );
+  const [conferindo, setConferindo] = useState(false);
+  const chaveAtual = chaveDaConferencia(cpf, email, telefone);
+  // Pelos MESMOS formatadores do estado inicial dos campos: `telefoneInicial` chega em E.164 e
+  // o campo mostra sem o DDI, e comparar os dois crus faria o veredito de abertura nunca valer.
+  const chaveDeAbertura = chaveDaConferencia(
+    cpfInicial ?? '',
+    emailInicial ?? '',
+    formatarTelefoneParaTela(telefoneInicial),
+  );
+  const vereditoDaEtapa1: Veredito | null =
+    conferencia?.chave === chaveAtual
+      ? conferencia.veredito
+      : chaveAtual === chaveDeAbertura
+        ? (vereditoInicial ?? null)
+        : null;
+  /**
+   * O aviso que a etapa 1 mostra. Só com a sessão resolvida: enquanto houver sessão de OUTRA
+   * pessoa, a pergunta "é você?" vem antes de qualquer coisa (`DO-60`), porque é ela que decide
+   * de quem são os dados.
+   */
+  const avisoDaEtapa1 =
+    !sessaoEDeOutraPessoa && temAviso(vereditoDaEtapa1) ? vereditoDaEtapa1 : null;
+  /**
+   * 🔴 O TELEFONE DE OUTRA CONTA TRAVA O CAMPO — `DO-68`: _"deve-se ficar bloqueado com aviso na
+   * caixa de texto informando que este numero está em uso"_. Vale para os dados que foram
+   * conferidos: trocar o número muda a chave, destrava o campo, e o "Continuar" confere de novo.
+   */
+  const telefoneBloqueado = !sessaoEDeOutraPessoa && telefoneEmUso(vereditoDaEtapa1);
+
+  async function continuarDaEtapa1() {
+    if (sessaoEDeOutraPessoa || conferindo) return;
+    setErro('');
+    let veredito = conferencia?.chave === chaveAtual ? conferencia.veredito : null;
+
+    if (!veredito) {
+      setConferindo(true);
+      try {
+        const resposta = await conferirIdentidadeNaEtapa1({
+          token,
+          cpf: somenteDigitosDoCpf(cpf),
+          email: email.trim().toLowerCase(),
+          telefone: telefone.trim(),
+        });
+        // Falha nossa não trava o paciente: segue como seguia antes (ADR-0028 §5). A action
+        // final confere o CPF de novo.
+        veredito = resposta.sucesso ? resposta.dados.veredito : 'indisponivel';
+      } catch {
+        veredito = 'indisponivel';
+      } finally {
+        setConferindo(false);
+      }
+      // `flushSync` para o foco achar o que o veredito acabou de desenhar — sem efeito.
+      const decidido = veredito;
+      flushSync(() => setConferencia({ chave: chaveAtual, veredito: decidido }));
+      /**
+       * 🔴 O FOCO VAI PARA O QUE MUDOU — revisão de frontend, 28/09/2026. Com aviso, o "Continuar"
+       * some com o foco dentro, e o foco caía no `body`: quem usa leitor de tela clicava e não
+       * ouvia nada. O campo do telefone lê a própria dica pelo `aria-describedby`.
+       */
+      if (telefoneEmUso(decidido)) document.getElementById('telefone')?.focus();
+      else if (temAviso(decidido)) document.getElementById('aviso-de-identidade')?.focus();
+    }
+
+    if (!temAviso(veredito) && !telefoneEmUso(veredito)) setSubEtapa(1);
+  }
+
+  /**
+   * "Quero usar outro e-mail": abre os campos (no fluxo da Greens eles estão em confirmação) e
+   * leva o foco ao e-mail. Sem o foco, no fluxo do bot o clique não mudava nada visível — os
+   * campos já eram editáveis — e parecia quebrado (revisão de frontend, 28/09/2026).
+   */
+  function corrigirOEmail() {
+    flushSync(() => setCorrigindo(true));
+    const campo = document.getElementById('email') as HTMLInputElement | null;
+    campo?.focus();
+    campo?.select();
+  }
+
+  /**
+   * "Sou eu, continuar" com a sessão aberta. Alinha o e-mail do formulário ao da sessão — senão
+   * a tela diria uma coisa e o servidor receberia outra (`sessaoEDoCadastroEmCurso`).
+   */
+  function continuarComASessaoAberta() {
+    setContinuarComASessao(true);
+    setEmail(emailDaSessao);
+  }
+
   /** Força da senha, para dar retorno em vez de só recusar no envio. */
   const forcaDaSenha = useMemo(() => {
     let pontos = 0;
@@ -811,7 +1009,7 @@ export function FormularioDeCadastro({
        * propagou. Pedir de novo o que o paciente já fez é o que transforma correção em beco.
        */
       if (authCarregou && isSignedIn) {
-        await signOut();
+        await sairDaSessao();
       }
 
       const emailAlvo = email.trim().toLowerCase();
@@ -902,7 +1100,7 @@ export function FormularioDeCadastro({
        * cadastro morre no meio, com a conta ainda inexistente.
        */
       if (authCarregou && isSignedIn) {
-        await signOut();
+        await sairDaSessao();
       }
 
       const verificado = await signUp.attemptEmailAddressVerification({ code: codigo.trim() });
@@ -1150,7 +1348,26 @@ export function FormularioDeCadastro({
 
             {subEtapa === 0 && (
               <>
-                {confirmandoDados ? (
+                {/*
+              🔴 "É VOCÊ?" ANTES DE TUDO — `DO-60`, ADR-0028 D-05.
+              O aviso de sessão de outra pessoa só existia na etapa 3: a pessoa preenchia o
+              formulário inteiro com a conta errada aberta e só então descobria. Agora ele abre
+              a etapa 1, e o "Continuar" espera a escolha. Sair não tira da página.
+            */}
+                {sessaoEDeOutraPessoa && (
+                  <AvisoDeSessaoAlheia
+                    emailDaSessao={emailDaSessao}
+                    emailDoLink={emailDoLink}
+                    aoContinuar={continuarComASessaoAberta}
+                    aoSair={sairDaSessao}
+                  />
+                )}
+
+                {/*
+              ⚠️ Com o telefone em uso, a confirmação dá lugar aos campos: a pessoa precisa
+              TROCAR o número, e na confirmação ele não é editável (`DO-68`).
+            */}
+                {confirmandoDados && !telefoneBloqueado ? (
                   /**
                    * 🔴 O PACIENTE QUE VEIO DO PARCEIRO CONFIRMA — NÃO DIGITA.
                    *
@@ -1218,7 +1435,9 @@ export function FormularioDeCadastro({
                         inputMode="tel"
                         autoComplete="tel"
                         icone={Phone}
-                        valido={telefoneValido}
+                        valido={telefoneValido && !telefoneBloqueado}
+                        // 🔴 `DO-68`: o número de outra conta trava o campo, com o aviso NA caixa.
+                        dica={telefoneBloqueado ? TEXTO_DO_TELEFONE_EM_USO : undefined}
                       />
                       <Campo
                         id="email"
@@ -1233,6 +1452,33 @@ export function FormularioDeCadastro({
                         dica="Será o seu login"
                       />
                     </div>
+                    {/*
+                  🔴 A SAÍDA DE QUEM É DONO DO NÚMERO TRAVADO — revisões de 28/09/2026. O campo
+                  continua travado (`DO-68`), mas "informe outro número" sozinho é beco para quem
+                  tem uma conta antiga com esse número: sem isto, a única saída seria digitar o
+                  número de um familiar e nascer outra conta com o contato errado.
+                */}
+                    {telefoneBloqueado && (
+                      <p className="text-muted-foreground text-left text-xs leading-relaxed">
+                        O número é seu?{' '}
+                        <Link
+                          href={`/entrar?redirect_url=${encodeURIComponent(`/cadastro/${token}`)}`}
+                          className="text-primary font-medium underline-offset-2 hover:underline"
+                        >
+                          Entre na sua conta
+                        </Link>{' '}
+                        ou{' '}
+                        <a
+                          href={linkDoSuporteComProtocolo(linkDoSuporte, protocolo)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary font-medium underline-offset-2 hover:underline"
+                        >
+                          fale com a gente pelo WhatsApp
+                        </a>
+                        .
+                      </p>
+                    )}
                   </Secao>
                 )}
 
@@ -1257,7 +1503,14 @@ export function FormularioDeCadastro({
                       cadastro.
                     </p>
                   </div>
-                ) : (
+                ) : avisoDaEtapa1 ? null : (
+                  /*
+                   * ⚠️ Com um aviso na tela, a senha não é pedida. Com o CPF em outra conta o
+                   * cadastro PARA (`DO-62`); com o e-mail que já tem conta, a pessoa vai ENTRAR
+                   * com a senha que já tem — pedir uma nova aqui a faria digitar a antiga no
+                   * lugar errado. Achado na prévia e na revisão de frontend de 28/09/2026.
+                   * Corrigir o dado muda a chave, e a senha volta.
+                   */
                   <Secao titulo="Crie sua senha" icone={Lock}>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div className="space-y-2">
@@ -1308,15 +1561,40 @@ export function FormularioDeCadastro({
                   </Secao>
                 )}
 
-                <Button
-                  type="button"
-                  onClick={() => setSubEtapa(1)}
-                  disabled={!podeAvancarStep0}
-                  className="h-12 w-full rounded-xl text-base"
-                >
-                  Continuar
-                  <ArrowRight size={18} />
-                </Button>
+                {/*
+              🔴 O VEREDITO DA CONFERÊNCIA — ADR-0028. Diz o que fazer, nunca o que achou.
+              Com aviso na tela, o "Continuar" sai: a ação está nos botões do aviso.
+            */}
+                {avisoDaEtapa1 ? (
+                  <AvisoDeIdentidade
+                    veredito={avisoDaEtapa1}
+                    token={token}
+                    protocolo={protocolo}
+                    linkDoSuporte={linkDoSuporte}
+                    aoCorrigir={corrigirOEmail}
+                  />
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={continuarDaEtapa1}
+                    disabled={
+                      !podeAvancarStep0 || sessaoEDeOutraPessoa || telefoneBloqueado || conferindo
+                    }
+                    className="h-12 w-full rounded-xl text-base"
+                  >
+                    {conferindo ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Conferindo…
+                      </>
+                    ) : (
+                      <>
+                        Continuar
+                        <ArrowRight size={18} />
+                      </>
+                    )}
+                  </Button>
+                )}
               </>
             )}
 
@@ -1847,38 +2125,18 @@ export function FormularioDeCadastro({
               ⚠️ Vem ANTES do aviso de sessão aberta: os dois são sobre sessão, e este é o
               que impede de continuar.
             */}
+                {/*
+              ⚠️ O MESMO AVISO DA ETAPA 1, de novo aqui: a sessão pode nascer ENTRE as etapas
+              (login em outra aba, enquanto a pessoa preenchia). Um componente só, para as duas
+              ocorrências não divergirem.
+            */}
                 {sessaoEDeOutraPessoa && (
-                  <div className="animate-fade-in space-y-3 rounded-xl border border-amber-300/60 bg-amber-50/60 px-4 py-4">
-                    <p className="text-foreground text-sm leading-relaxed">
-                      Você está nesta página com a conta <strong>{emailDaSessao}</strong>, e este
-                      link foi enviado para <strong>{emailDoLink}</strong>.
-                    </p>
-                    {/*
-                  🔴 DUAS SAÍDAS, e antes havia UMA — que era a errada para o caso mais comum.
-                  Quem trocou o próprio e-mail (porque o parceiro mandou o antigo) não tem para
-                  onde ir com "sair desta conta": a conta certa é a que está aberta. Oferecer só
-                  a saída que não serve é o que transforma proteção em beco.
-                  ⚠️ A escolha é do paciente e fica explícita — o servidor registra a troca.
-                */}
-                    <Button
-                      className="h-11 w-full rounded-xl"
-                      onClick={() => {
-                        setContinuarComASessao(true);
-                        setEmail(emailDaSessao);
-                      }}
-                      type="button"
-                    >
-                      Continuar com {emailDaSessao}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-11 w-full rounded-xl"
-                      onClick={() => signOut()}
-                      type="button"
-                    >
-                      Sair e entrar com outro e-mail
-                    </Button>
-                  </div>
+                  <AvisoDeSessaoAlheia
+                    emailDaSessao={emailDaSessao}
+                    emailDoLink={emailDoLink}
+                    aoContinuar={continuarComASessaoAberta}
+                    aoSair={sairDaSessao}
+                  />
                 )}
 
                 {/*
@@ -2185,6 +2443,9 @@ function Campo({
           value={exibir ?? valor}
           onChange={(e) => aoMudar(e.target.value)}
           placeholder={placeholder}
+          // O aviso do campo é LIDO junto com ele por leitor de tela — senão o bloqueio é só cor.
+          aria-invalid={preenchido && valido === false ? true : undefined}
+          aria-describedby={dica ? `${id}-dica` : undefined}
           className={cn(
             'h-12 rounded-xl transition-all duration-300',
             Icone && 'pl-10',
@@ -2202,6 +2463,7 @@ function Campo({
       </div>
       {dica && (
         <p
+          id={`${id}-dica`}
           className={cn(
             'text-xs',
             valido === false && preenchido ? 'text-destructive' : 'text-muted-foreground',

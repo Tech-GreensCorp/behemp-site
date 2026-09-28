@@ -6,7 +6,8 @@
 🔴 **Todo arquivo ou pasta novo em docs/ entra neste mapa NO MESMO COMMIT que o cria. Índice
 atrasado é defeito, não atraso.**
 
-**Atualizado em 21/09/2026 — 19 arquivos e 6 pastas em `docs/`.**
+**Atualizado em 28/09/2026 — 19 arquivos e 7 pastas em `docs/`.** (era _"21/09/2026 — 19
+arquivos e 6 pastas"_; entrou `planos/`)
 
 ⚠️ **Retificação, 21/09/2026.** O mapa anterior cobria 14 arquivos e 3 pastas, e **omitia sete
 entradas que existem no disco**: `09-FRONTEND-VIDAI-MEDIDO.md`, `10-PADRAO-DO-KANBAN.md`,
@@ -36,8 +37,9 @@ link morto.
 | — | [DECISOES_TECNICAS](DECISOES_TECNICAS.md) | decisão de infraestrutura e deploy — **DT-001 a DT-010**, não migrar, não apagar |
 | 07 | [ESTADO-DO-KIT](07-ESTADO-DO-KIT.md) | quer saber o que do kit de documentação entrou — auditado em 19/08/2026, o kit foi removido depois de integrado |
 | 08 | [AVALIACAO-DAS-SKILLS](08-AVALIACAO-DAS-SKILLS.md) | quer saber por que uma skill entrou ou foi descartada — feita em 19/08/2026 a pedido do dono |
-| — | [adr/](adr/) · 23 ADRs | vai decidir algo, ou propor algo que talvez já tenha sido **rejeitado** |
+| — | [adr/](adr/) · 28 ADRs (medido em 28/09/2026; a linha dizia 23) | vai decidir algo, ou propor algo que talvez já tenha sido **rejeitado** |
 | — | [sprints/](sprints/) · 9 sprints + o plano | quer o escopo de uma fatia: entregáveis, aceite e o que fica fora |
+| — | [planos/](planos/) · 1 plano (PDF + HTML-fonte) | vai implementar um item que tem **plano de implementação em PDF** pedido pelo dono. Hoje: `PLANO-IDENTIDADE-NA-ETAPA-1` ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md), Item 50). O PDF se gera do `.html` com o Chromium headless, e **o HTML é a fonte** |
 | — | [arvore-do-conhecimento/](arvore-do-conhecimento/00-RAIZ.md) · 15 arquivos | precisa da teoria de um tópico — **abra só o ramo**, nunca a árvore toda |
 | — | [decisoes-visuais/](decisoes-visuais/) · 2 arquivos | 🔴 **ANTES DE CADA SPRINT** (`DO-32`) — o `LEIA-ANTES-DE-CADA-SPRINT.md` diz quando abrir o `.html` ao lado |
 | — | [chatpro/](chatpro/) · 3 arquivos | vai mexer na integração do ChatPro — `COMO-CONECTAR-NO-PAINEL`, `CONTRATO-DA-PAGINA-DE-CADASTRO`, `QA-DA-INTEGRACAO` |

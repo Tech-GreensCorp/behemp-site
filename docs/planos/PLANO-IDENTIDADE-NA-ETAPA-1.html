@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Identidade na etapa 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Epilogue:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: #f5f2ed;
+        --foreground: #1a1612;
+        --primary: #ea5429;
+        --secondary: #2d4f3c;
+        --muted: #ede8e1;
+        --accent: #e8e2da;
+        --border: #ddd8d1;
+        --destructive: #dc2626;
+        --suave: #5c544b;
+      }
+      @page {
+        size: A4;
+        margin: 16mm 15mm 18mm;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          10pt/1.5 'Epilogue',
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 180mm;
+        margin: 0 auto;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Outfit', system-ui, sans-serif;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 23pt;
+        margin: 0 0 4pt;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 14pt;
+        margin: 20pt 0 6pt;
+        padding-top: 6pt;
+        border-top: 2px solid var(--primary);
+        break-after: avoid;
+      }
+      h3 {
+        font-size: 11pt;
+        margin: 12pt 0 4pt;
+        color: var(--secondary);
+        break-after: avoid;
+      }
+      p {
+        margin: 0 0 6pt;
+      }
+      code,
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 8.3pt;
+      }
+      code {
+        background: var(--muted);
+        padding: 0 3px;
+        border-radius: 3px;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 7.6pt;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8pt;
+        white-space: pre-wrap;
+        break-inside: avoid;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 4pt 0 10pt;
+        font-size: 8.8pt;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 4pt 5pt;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        background: var(--accent);
+      }
+      tr {
+        break-inside: avoid;
+      }
+      ul,
+      ol {
+        margin: 0 0 8pt;
+        padding-left: 16pt;
+      }
+      li {
+        margin-bottom: 2pt;
+      }
+      .capa {
+        border-left: 5px solid var(--primary);
+        padding: 4pt 0 4pt 12pt;
+        margin-bottom: 14pt;
+      }
+      .sub {
+        color: var(--suave);
+        font-size: 10.5pt;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6pt;
+        margin-top: 8pt;
+      }
+      .tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 7.8pt;
+        background: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1pt 7pt;
+      }
+      .tag.status {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+      }
+      .caixa {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 8px;
+        padding: 8pt 10pt;
+        margin: 6pt 0 10pt;
+        break-inside: avoid;
+      }
+      .alerta {
+        border-left: 4px solid var(--destructive);
+      }
+      .verde {
+        border-left: 4px solid var(--secondary);
+      }
+      .laranja {
+        border-left: 4px solid var(--primary);
+      }
+      .rotulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 9pt;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--suave);
+        margin-bottom: 2pt;
+      }
+      blockquote {
+        margin: 3pt 0;
+        padding: 3pt 8pt;
+        border-left: 3px solid var(--secondary);
+        background: var(--muted);
+        font-style: italic;
+      }
+      .fluxo {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6pt;
+        margin: 6pt 0 10pt;
+      }
+      .passo {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-top: 3px solid var(--secondary);
+        border-radius: 6px;
+        padding: 6pt;
+        font-size: 8.4pt;
+        break-inside: avoid;
+      }
+      .passo b {
+        display: block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9pt;
+        margin-bottom: 2pt;
+      }
+      .passo.forte {
+        border-top-color: var(--primary);
+      }
+      .quebra {
+        break-before: page;
+      }
+      .ok {
+        color: var(--secondary);
+        font-weight: 600;
+      }
+      .nao {
+        color: var(--destructive);
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 18pt;
+        padding-top: 6pt;
+        border-top: 1px solid var(--border);
+        color: var(--suave);
+        font-size: 8pt;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="capa">
+        <h1>Identidade na etapa 1 do cadastro</h1>
+        <div class="sub">
+          Plano de implementação: conferir CPF, telefone, e-mail e sessão aberta <b>antes</b> de o
+          paciente preencher o formulário, sem transformar a tela num oráculo que diz quem é
+          paciente.
+        </div>
+        <div class="meta">
+          <span class="tag status">PROPOSTA · aguardando aprovação</span>
+          <span class="tag">28/09/2026</span>
+          <span class="tag">ADR-0028</span>
+          <span class="tag">Itens 50 · 51 · 52 · 53 · 54</span>
+          <span class="tag">DO-59 a DO-63</span>
+          <span class="tag">branch docs/adr-0028-identidade-na-etapa-1</span>
+        </div>
+      </div>
+
+      <div class="caixa laranja">
+        <div class="rotulo">Resumo em uma página</div>
+        <ul>
+          <li>
+            <b>Hoje</b>, a tela só descobre que a pessoa já tem conta <b>no fim</b>, quando o Clerk
+            recusa o e-mail. Por <b>CPF</b> e <b>telefone</b>, nada descobre. Uma segunda ficha com
+            o mesmo CPF nasce <b>sem erro</b>.
+          </li>
+          <li>
+            <b>O pedido:</b> conferir na <b>etapa 1</b>. Se estiver logado em outra conta, "é você?"
+            com <b>Sair que continua no formulário</b>. Se o <b>CPF</b> bater, vai ao
+            <b>suporte da BeHemp</b>. Vale para <b>todas</b> as portas.
+          </li>
+          <li>
+            <b>A recomendação:</b>
+            <ul>
+              <li>
+                a conferência fica <b>dentro do nosso formulário</b>, porque no handoff ou no bot
+                quebraria a Greens;
+              </li>
+              <li>roda no servidor, com os dados do link <b>e</b> com os digitados;</li>
+              <li>a tela recebe só um <b>veredito</b>, nunca o dado da outra conta;</li>
+              <li>há limite por link e IP e auditoria, e a action final confere o CPF de novo.</li>
+            </ul>
+          </li>
+          <li>
+            <b>Antes do código:</b> aprovar a ADR-0028, responder as perguntas <b>A–E</b> (§9) e
+            rodar o <code>SELECT</code> do passo 0 na VPS.
+          </li>
+          <li>
+            <b>Limite honesto:</b> nada foi executado ainda. A tela logada só se prova local com uma
+            <code>CLERK_SECRET_KEY</code> de desenvolvimento.
+          </li>
+        </ul>
+      </div>
+
+      <h2>1. O que foi alinhado, nas palavras de quem pediu</h2>
+      <p>
+        A pessoa que pediu não se identificou no chat. Por isso a autoria fica como
+        <i>"quem pediu"</i>, sem atribuir a ninguém. Cada frase virou um ID citável no
+        <code>docs/02-CATALOGO-DE-REGRAS.md</code>.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 9%">ID</th>
+          <th style="width: 55%">frase literal</th>
+          <th>o que fixa</th>
+        </tr>
+        <tr>
+          <td><code>DO-59</code></td>
+          <td>
+            <blockquote>
+              "vamos logo antes dele preecnher ter uma confirmação de dados estão, certos, perguntas
+              se a pessoa ja possui conta com numero/email/cpf ou qualquer outro dado que seja
+              identificado no sistema, mas isso é logo na etapa 1 do formúlario, não dps que ele
+              preenche tudo"
+            </blockquote>
+          </td>
+          <td>a conferência é na <b>etapa 1</b></td>
+        </tr>
+        <tr>
+          <td><code>DO-60</code></td>
+          <td>
+            <blockquote>
+              "na situação 1 deveria aparecer o botão de sair so que o botão de sair não sai da
+              página do formúlario ele continua na página"
+            </blockquote>
+          </td>
+          <td>logado: <b>Sair</b> mantém a pessoa no formulário</td>
+        </tr>
+        <tr>
+          <td><code>DO-61</code></td>
+          <td>
+            <blockquote>
+              "1 - cpf, telefone, e-mail" · "5 nome parecido não, dado parecido s]ao os que eu te
+              falei, cpf, telefone, e-mail"
+            </blockquote>
+          </td>
+          <td>CPF, telefone e e-mail. <b>Nome não conta</b></td>
+        </tr>
+        <tr>
+          <td><code>DO-62</code></td>
+          <td>
+            <blockquote>"3 - se for cpf a gente encaminha para o suporte da behemp"</blockquote>
+          </td>
+          <td>CPF que bate vai ao <b>suporte</b></td>
+        </tr>
+        <tr>
+          <td><code>DO-63</code></td>
+          <td><blockquote>"4 - vale para tudo"</blockquote></td>
+          <td><b>todas</b> as portas</td>
+        </tr>
+        <tr>
+          <td>pendente</td>
+          <td>
+            <blockquote>
+              "2 - isso entra para uma pesquisa direcionada a jsutamente vendas"
+            </blockquote>
+          </td>
+          <td>
+            quem diz "sim, sou eu" entra numa pesquisa voltada a <b>vendas</b>. A <b>forma</b> está
+            em aberto (pergunta A)
+          </td>
+        </tr>
+      </table>
+      <p class="sub">
+        A frase 2 respondeu à pergunta "a solicitação nova se liga à ficha existente ou vira ficha
+        nova?". Ela diz para onde vai a <b>informação</b> (vendas), e não o que acontece com a
+        <b>ficha</b>. Por isso a pergunta A reabre essa parte.
+      </p>
+
+      <h2>2. O que a pesquisa mediu no nosso código</h2>
+      <p>
+        Tudo foi <b>lido</b> na <code>main</code> <code>ab6d8ef</code> e reconferido linha a linha.
+        Nada foi executado.
+      </p>
+
+      <h3>
+        2.1 O formulário:
+        <code>app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx</code>
+      </h3>
+      <table>
+        <tr>
+          <th>fato</th>
+          <th style="width: 22%">linha</th>
+        </tr>
+        <tr>
+          <td>O "Continuar" da etapa 1 só avança o passo, <b>sem ir ao servidor</b></td>
+          <td><code>:1313</code></td>
+        </tr>
+        <tr>
+          <td>
+            A etapa 1 é <code>subEtapa === 0</code>. Quem veio do parceiro vê "Confirme seus dados"
+          </td>
+          <td><code>:1151</code> · <code>:1165</code></td>
+        </tr>
+        <tr>
+          <td>
+            Com sessão válida, a etapa 1 já mostra "Você já está logado como X" e esconde a senha
+          </td>
+          <td><code>:1255</code></td>
+        </tr>
+        <tr>
+          <td>O aviso de <b>sessão de outra pessoa</b> só aparece na <b>etapa 3</b></td>
+          <td><code>:1807</code> · <code>:1850</code></td>
+        </tr>
+        <tr>
+          <td>
+            O "Sair" desse aviso chama <code>signOut()</code> <b>sem destino</b>. O
+            <code>ClerkProvider</code> (<code>app/layout.tsx:102</code>) não define
+            <code>afterSignOutUrl</code>, então a pessoa vai para <code>/</code>, fora do
+            formulário. É <b>inferência</b>: não foi executado
+          </td>
+          <td><code>:1876</code></td>
+        </tr>
+        <tr>
+          <td><code>signOut()</code> automático no envio e na confirmação do código</td>
+          <td><code>:814</code> · <code>:905</code></td>
+        </tr>
+        <tr>
+          <td>
+            Conta existente só aparece <b>no fim</b>, pelo <code>form_identifier_exists</code> do
+            Clerk
+          </td>
+          <td><code>:858</code> · <code>:182</code></td>
+        </tr>
+        <tr>
+          <td>O "Entrar" já leva a <code>/entrar?redirect_url=/cadastro/{token}</code></td>
+          <td><code>:1940</code> · <code>:1958</code></td>
+        </tr>
+        <tr>
+          <td>
+            <code>sessaoEDeOutraPessoa</code>: há sessão, o e-mail dela difere do link <b>e</b> do
+            digitado, e a pessoa não escolheu continuar
+          </td>
+          <td><code>:382-389</code></td>
+        </tr>
+      </table>
+
+      <h3>2.2 A action e o banco</h3>
+      <table>
+        <tr>
+          <th>fato</th>
+          <th style="width: 34%">onde</th>
+        </tr>
+        <tr>
+          <td>A action recusa sessão de outro e-mail, e aceita o e-mail digitado no fluxo</td>
+          <td><code>app/_actions/cadastro-por-link.ts:276-287</code></td>
+        </tr>
+        <tr>
+          <td><b>Nada consulta CPF.</b> A ficha nova é inserida sem conferir se o CPF já existe</td>
+          <td><code>cadastro-por-link.ts:~403, ~433</code></td>
+        </tr>
+        <tr>
+          <td>
+            <code>pacientes.cpf</code> é texto, <b>sem unique e sem índice</b>, e
+            <b>não é cifrado</b>
+          </td>
+          <td><code>db/schema/pacientes.ts:30</code></td>
+        </tr>
+        <tr>
+          <td>O unique de <code>users.email</code> diferencia maiúsculas</td>
+          <td><code>db/schema/users.ts:21</code></td>
+        </tr>
+        <tr>
+          <td>
+            <code>users.telefone</code> é texto livre, sem índice, e está gravado em
+            <b>4 formatos</b>
+          </td>
+          <td><code>users.ts:16</code> · Item 26</td>
+        </tr>
+        <tr>
+          <td>
+            O CPF é gravado só com dígitos no handoff e no cadastro, e <b>como foi digitado</b> no
+            perfil e no admin
+          </td>
+          <td><code>handoff.ts:307</code> · <code>perfil-paciente.ts:200</code></td>
+        </tr>
+        <tr>
+          <td>
+            A triagem já compara telefone no SQL, pelos últimos 8 dígitos com
+            <code>regexp_replace</code>
+          </td>
+          <td><code>lib/chatpro/triagem.ts:123</code></td>
+        </tr>
+        <tr>
+          <td>
+            <code>/cadastro(.*)</code> é público no middleware, então a action da etapa 1 roda
+            <b>sem autenticação</b>
+          </td>
+          <td><code>middleware.ts:57</code></td>
+        </tr>
+        <tr>
+          <td>Existe limite em memória (<code>consumir</code>), e <b>nenhuma action o usa</b></td>
+          <td><code>lib/seguranca/limite-de-requisicao.ts:67, 105</code></td>
+        </tr>
+        <tr>
+          <td>O WhatsApp da BeHemp existe, e hoje só aparece nas telas de link recusado</td>
+          <td><code>lib/env.ts:247</code> · <code>page.tsx:39-40</code></td>
+        </tr>
+      </table>
+
+      <h3>2.3 As portas de entrada: todas chegam ao mesmo formulário</h3>
+      <table>
+        <tr>
+          <th>porta</th>
+          <th>origem gravada</th>
+          <th>o que chega</th>
+        </tr>
+        <tr>
+          <td>bot BeHemp e bot Greens (<code>/api/chatpro/bot-link</code>)</td>
+          <td><code>chatpro_bot</code></td>
+          <td>nome, e-mail, telefone. <b>Sem CPF</b></td>
+        </tr>
+        <tr>
+          <td><code>/api/chatpro/intake</code> · <code>/api/chatpro/start</code></td>
+          <td><code>chatpro_bot</code> · <code>chatpro_start</code></td>
+          <td>idem · telefone e lead</td>
+        </tr>
+        <tr>
+          <td>link do admin</td>
+          <td><code>painel_admin</code></td>
+          <td>nome, e-mail, telefone</td>
+        </tr>
+        <tr>
+          <td>handoff da Greens</td>
+          <td><code>greens_handoff</code></td>
+          <td>nome, e-mail, telefone, <b>CPF</b>, RG, nascimento, gênero</td>
+        </tr>
+      </table>
+      <p>
+        Só dois lugares criam a solicitação: <code>lib/chatpro/solicitacao.ts:280</code> e
+        <code>lib/parceiros/handoff.ts:301</code>.
+        <b>Um ponto de conferência no formulário cobre as quatro portas.</b> Não usam link, e ficam
+        fora: o <code>/registrar-se</code>, o webhook do Clerk (cria ficha <b>vazia</b>, sem CPF), o
+        <code>/redirect</code> e as criações pelo admin e pelo médico, que conferem só o e-mail.
+      </p>
+
+      <h3>2.4 Detecção de duplicidade que já existe</h3>
+      <table>
+        <tr>
+          <th style="width: 18%">por</th>
+          <th>o que existe</th>
+        </tr>
+        <tr>
+          <td>CPF</td>
+          <td class="nao">nada</td>
+        </tr>
+        <tr>
+          <td>e-mail</td>
+          <td>
+            a action, o webhook e o <code>/redirect</code> ligam a conta à linha de
+            <code>users</code> com o mesmo e-mail
+          </td>
+        </tr>
+        <tr>
+          <td>telefone, ChatPro</td>
+          <td>
+            reaproveita a solicitação do mesmo telefone
+            <b>sem conferir se o e-mail diverge</b> (<code>solicitacao.ts:159, 243</code>). Virou o
+            <b>Item 51</b>
+          </td>
+        </tr>
+        <tr>
+          <td>telefone, handoff</td>
+          <td>
+            reaproveita, mas
+            <b>recusa quando o e-mail diverge</b> (<code>handoff.ts:422-434</code>):
+            <i>"telefone não identifica pessoa"</i>
+          </td>
+        </tr>
+      </table>
+
+      <h2>3. O que a pesquisa mediu no lado da Greens</h2>
+      <p>
+        Lido no próprio código deles: <code>greens-corp-backend</code> (main <code>0e7b8a4</code>) e
+        <code>greens-corp-frontend</code> (main <code>21d72dd</code>).
+      </p>
+      <ul>
+        <li>
+          <b>Handoff:</b> manda o e-mail <b>sem minúsculas</b> e o telefone
+          <b>só com dígitos, sem E.164</b> (<code>HandoffService.ts:385-406</code>). Por isso,
+          normalizamos do nosso lado.
+        </li>
+        <li>
+          <b>Relay do ChatPro:</b> manda só <code>sessionId</code>, <code>name</code> e
+          <code>number</code>.
+          <b>Sem CPF e sem e-mail</b> (<code>ChatproIntakeService.ts:504-507</code>).
+        </li>
+        <li>
+          <b>A Greens não espera nenhum sinal de "paciente já existe".</b> Da nossa resposta ela lê
+          só <code>referralId</code>, <code>urlDeContinuacao</code>, <code>protocolo</code> e
+          <code>reenvio</code>.
+        </li>
+        <li>
+          <b>Se recusássemos no handoff:</b> 503 no lado deles, a jornada
+          <code>SENT_TO_BEHEMP</code> não seria gravada e a cobrança iria ao gateway
+          <b>sem desconto</b>. O "Tentar de novo" repetiria a recusa para sempre.
+        </li>
+        <li>
+          <b>Se recusássemos no bot:</b> qualquer não-2xx transfere o paciente a um atendente
+          <b>da Greens</b>, e não ao suporte da BeHemp.
+        </li>
+        <li>
+          A Greens casa paciente por CPF e depois por e-mail, e <b>reaproveita</b> a conta, sem
+          bloquear (<code>MedicationRequestService.ts:532-549</code>).
+        </li>
+        <li>
+          Regra da "Ponte" deles: nada muda entre as empresas sem consenso dos três participantes.
+          <b>Conferir dentro do nosso formulário não muda o contrato.</b>
+        </li>
+      </ul>
+
+      <h2>4. O que a pesquisa externa disse</h2>
+      <table>
+        <tr>
+          <th style="width: 26%">fonte</th>
+          <th>o que diz</th>
+          <th style="width: 12%">status</th>
+        </tr>
+        <tr>
+          <td>OWASP Authentication Cheat Sheet</td>
+          <td>
+            No <b>registro</b>, <i>"This user ID is already in use."</i> é a resposta
+            <b>incorreta</b>: cria um <i>"discrepancy factor"</i> para enumeração. →
+            <code>OWASP-01</code>
+          </td>
+          <td class="ok">lido</td>
+        </tr>
+        <tr>
+          <td>OWASP API4:2023</td>
+          <td>
+            Limitar quantas vezes um cliente executa uma operação; alguns endpoints exigem política
+            mais estrita. → <code>OWASP-02</code>
+          </td>
+          <td class="ok">lido</td>
+        </tr>
+        <tr>
+          <td>OWASP API2:2023</td>
+          <td>
+            Mecanismos contra força bruta. Enumeração alimenta credential stuffing. →
+            <code>OWASP-03</code>
+          </td>
+          <td class="ok">lido</td>
+        </tr>
+        <tr>
+          <td>OWASP WSTG-IDNT-04</td>
+          <td>Responder igual a toda tentativa. → <code>OWASP-04</code></td>
+          <td>só localizado</td>
+        </tr>
+        <tr>
+          <td>LGPD arts. 5º II, 5º X, 6º III/VII/VIII, 46</td>
+          <td>
+            Dizer que alguém tem conta <b>aqui</b> revela dado de saúde; "comunicação" é tratamento;
+            mínimo necessário; segurança. → <code>LGPD-06</code> a <code>LGPD-09</code>
+          </td>
+          <td class="ok">lido, fonte secundária</td>
+        </tr>
+        <tr>
+          <td>Clerk <code>signOut</code></td>
+          <td>
+            <code>signOut({ sessionId, redirectUrl })</code> sai de <b>uma</b> sessão e navega para
+            onde se pede. Sem <code>sessionId</code>, derruba <b>todas</b>
+          </td>
+          <td class="ok">lido + tipo local</td>
+        </tr>
+        <tr>
+          <td>Clerk Enumeration Protection</td>
+          <td>
+            O modo Strict não revela no sign-up e avisa o dono.
+            <b>Muda o login da instância inteira</b>
+          </td>
+          <td class="ok">lido</td>
+        </tr>
+        <tr>
+          <td>Patient matching (MPI)</td>
+          <td>
+            Três faixas (match, possível, não-match). O caso incerto vai para <b>revisão humana</b>,
+            nunca para fusão automática
+          </td>
+          <td class="ok">lido</td>
+        </tr>
+        <tr>
+          <td>telefone compartilhado em família</td>
+          <td>
+            Nenhuma fonte lida afirma diretamente. Fica como <b>inferência</b>, reforçada pelo
+            WhatsApp
+          </td>
+          <td>inferência</td>
+        </tr>
+      </table>
+
+      <h2 class="quebra">5. A recomendação: como a etapa 1 passa a funcionar</h2>
+
+      <div class="fluxo">
+        <div class="passo">
+          <b>1 · Abre o link</b>O servidor confere com os dados <b>que a solicitação já tem</b>.
+          Cobre a Greens, que chega preenchida.
+        </div>
+        <div class="passo">
+          <b>2 · Etapa 1</b>A tela mostra o veredito <b>antes</b> de pedir o resto. Logado em outra
+          conta: "é você?".
+        </div>
+        <div class="passo">
+          <b>3 · "Continuar"</b>A action confere de novo com o que foi <b>digitado</b>. Cobre o
+          ChatPro, que não traz CPF.
+        </div>
+        <div class="passo forte">
+          <b>4 · Envio final</b>A action que grava a ficha confere o CPF <b>outra vez</b>. A tela
+          sozinha não segura.
+        </div>
+      </div>
+
+      <h3>5.1 O veredito: a tela nunca recebe o dado da outra conta</h3>
+      <table>
+        <tr>
+          <th style="width: 22%">veredito</th>
+          <th style="width: 32%">quando</th>
+          <th>o que a pessoa vê</th>
+        </tr>
+        <tr>
+          <td><code>livre</code></td>
+          <td>nada bateu</td>
+          <td>segue como hoje</td>
+        </tr>
+        <tr>
+          <td><code>sessao_propria</code></td>
+          <td>logada na própria conta</td>
+          <td>"Você já está logado como X" (já existe) e segue sem senha</td>
+        </tr>
+        <tr>
+          <td><code>sessao_alheia</code></td>
+          <td>logada em <b>outra</b> conta</td>
+          <td>
+            "É você?" · <b>Sou eu, continuar</b> · <b>Não sou eu, sair</b>, que fica no formulário
+          </td>
+        </tr>
+        <tr>
+          <td><code>conta_pelo_email</code></td>
+          <td>o e-mail já tem conta</td>
+          <td>
+            "Você já tem conta? Entre para continuar", com o "Entrar" que já existe e a volta ao
+            link
+          </td>
+        </tr>
+        <tr>
+          <td><code>cpf_em_outra_conta</code></td>
+          <td>o CPF está na ficha de <b>outra</b> conta</td>
+          <td>
+            "Precisamos confirmar alguns dados com a nossa equipe", com o botão do WhatsApp da
+            BeHemp e o <b>protocolo</b> na mensagem. O cadastro para, e o link continua válido
+          </td>
+        </tr>
+        <tr>
+          <td><code>telefone_conhecido</code></td>
+          <td>só o telefone bateu</td>
+          <td>
+            "Você já tem cadastro conosco?" · Sim → login · Não → segue. O "sim" vai para a pesquisa
+            de vendas (A)
+          </td>
+        </tr>
+        <tr>
+          <td><code>limite</code></td>
+          <td>passou de 5 conferências no link, ou o teto do IP</td>
+          <td>texto genérico + WhatsApp</td>
+        </tr>
+        <tr>
+          <td><code>indisponivel</code></td>
+          <td>a conferência falhou</td>
+          <td>segue como hoje: falha nossa não trava o paciente</td>
+        </tr>
+      </table>
+      <div class="caixa alerta">
+        <div class="rotulo">Por que a tela nunca diz "este CPF já está cadastrado"</div>
+        O link chega por WhatsApp e vale 7 dias, e quem o abre nem sempre é o paciente. Se a tela
+        dissesse qual dado bateu, qualquer um com o link testaria CPFs e descobriria quem é paciente
+        de cannabis medicinal. Isso é dado de saúde (<code>LGPD-06</code>), e é exatamente a
+        resposta que o OWASP chama de incorreta (<code>OWASP-01</code>). O veredito diz
+        <b>o que fazer</b>, não <b>o que foi encontrado</b>.
+      </div>
+
+      <h3>5.2 Como se compara</h3>
+      <table>
+        <tr>
+          <th>dado</th>
+          <th>normalização</th>
+          <th>comparação no SQL</th>
+        </tr>
+        <tr>
+          <td>CPF</td>
+          <td><code>somenteDigitosDoCpf</code></td>
+          <td><code>regexp_replace(cpf,'[^0-9]','','g') = $1</code></td>
+        </tr>
+        <tr>
+          <td>e-mail</td>
+          <td><code>trim</code> + minúsculas</td>
+          <td><code>lower(email) = $1</code></td>
+        </tr>
+        <tr>
+          <td>telefone</td>
+          <td><code>normalizarTelefoneWhatsapp</code> e depois só dígitos</td>
+          <td>últimos <b>11</b> dígitos (DDD + 9 + número)</td>
+        </tr>
+      </table>
+      <p>
+        Filtra <code>deleted_at IS NULL</code>. <b>Nada é migrado</b>: a comparação normaliza os
+        dois lados.
+      </p>
+      <ul>
+        <li>
+          <b>Por que 11 e não 8:</b> a triagem usa 8, mas só <b>informa</b>. Aqui, 8 dígitos
+          casariam números de DDDs diferentes.
+        </li>
+        <li>
+          <b>Fixo de 10 dígitos:</b> não casa. É um falso negativo aceito, porque errar para "não
+          achou" deixa a pessoa seguir como hoje.
+        </li>
+      </ul>
+
+      <h3>5.3 Sair sem sair da página (DO-60)</h3>
+      <ul>
+        <li>
+          "Não sou eu, sair" passa a chamar
+          <code
+            >signOut({ sessionId: &lt;sessão ativa&gt;, redirectUrl: &lt;URL atual do formulário&gt;
+            })</code
+          >. Isso sai só da sessão ativa e volta ao próprio formulário.
+        </li>
+        <li>
+          O mesmo vale para os dois <code>signOut()</code> automáticos (<code>:814</code>,
+          <code>:905</code>).
+        </li>
+        <li>
+          ⚠️
+          <b
+            >O token vive no <code>#</code> da URL, e não está provado que o Clerk preserva o
+            <code>#</code>.</b
+          >
+          Se não preservar, o plano B é <code>signOut({ sessionId })</code> seguido de
+          <code>router.refresh()</code>. A página é pública, então não cai no login.
+        </li>
+      </ul>
+
+      <h3>5.4 Proteções contra o oráculo</h3>
+      <ul>
+        <li>
+          <b>Até 5 conferências por link</b> e um teto por IP, com <code>consumir</code> e
+          <code>identificarChamador</code> (<code>OWASP-02</code>).
+        </li>
+        <li>
+          <b>Auditoria</b> de todo veredito diferente de <code>livre</code>, <b>sem</b> gravar o
+          CPF.
+        </li>
+        <li><b>Validação com Zod</b> na action. A entrada só é aceita junto de um token válido.</li>
+        <li>
+          <b>A action final confere o CPF</b> antes do <code>insert</code>. Chamar a action direto
+          não pula a regra.
+        </li>
+        <li>
+          ⚠️ O limite é <b>por processo</b> (Item 31). Com um <code>behemp-site</code> no PM2,
+          basta, e fica declarado.
+        </li>
+      </ul>
+
+      <h2>6. O que foi rejeitado, e por quê</h2>
+      <table>
+        <tr>
+          <th style="width: 38%">alternativa</th>
+          <th>por que não</th>
+        </tr>
+        <tr>
+          <td>conferir no handoff da Greens</td>
+          <td>503, jornada não gravada, cobrança sem desconto; muda o contrato</td>
+        </tr>
+        <tr>
+          <td>conferir no <code>/bot-link</code></td>
+          <td>transfere a um atendente da Greens; o bot não traz CPF</td>
+        </tr>
+        <tr>
+          <td>conferir só no fim (hoje), ou só ao abrir</td>
+          <td>é o que se pediu para mudar; o ChatPro não traz CPF</td>
+        </tr>
+        <tr>
+          <td>nome parecido / casamento probabilístico</td>
+          <td>decisão de quem pediu (<code>DO-61</code>)</td>
+        </tr>
+        <tr>
+          <td>normalizar os dados gravados, ou criar índice de CPF agora</td>
+          <td>exige migration; já rejeitado de passagem (ADR-0017, Item 26); medir antes</td>
+        </tr>
+        <tr>
+          <td>dizer qual dado bateu, ou mostrar o e-mail mascarado</td>
+          <td>enumeração (<code>OWASP-01</code>) e dado de saúde (<code>LGPD-06</code>)</td>
+        </tr>
+        <tr>
+          <td><code>signOut()</code> sem destino; sair de todas as sessões</td>
+          <td>tira a pessoa do formulário; fecha contas que ela não pediu para fechar</td>
+        </tr>
+        <tr>
+          <td>fundir contas automaticamente</td>
+          <td>custa a ficha clínica de alguém; MPI manda o caso incerto para um humano</td>
+        </tr>
+        <tr>
+          <td>deixar nascer a segunda ficha com o mesmo CPF</td>
+          <td>é o defeito de hoje, em silêncio</td>
+        </tr>
+        <tr>
+          <td>conferência sem limite</td>
+          <td>vira oráculo</td>
+        </tr>
+        <tr>
+          <td>telefone sozinho como identidade</td>
+          <td>o próprio código diz que ele não identifica pessoa</td>
+        </tr>
+        <tr>
+          <td>ligar o Strict do Clerk agora</td>
+          <td>muda o login da plataforma inteira; não provado (Item 53)</td>
+        </tr>
+        <tr>
+          <td><code>/registrar-se</code> na primeira versão</td>
+          <td>sem link, a conferência é oráculo aberto; pede confirmação (pergunta C)</td>
+        </tr>
+      </table>
+      <div class="caixa laranja">
+        <div class="rotulo">Conflito com uma decisão anterior</div>
+        <p>
+          A <b>ADR-0017 D-04</b> rejeitou <i>"bloquear o link para quem já tem conta"</i>. Mandar o
+          CPF ao suporte é um bloqueio, e a decisão nova prevalece.
+        </p>
+        <p>A retificação é parcial:</p>
+        <ul>
+          <li>quem tem conta <b>pelo e-mail</b> continua indo ao login;</li>
+          <li>
+            o que passa a parar é o <b>CPF em outra conta</b>, que a D-04 não conhecia, porque
+            ninguém conferia CPF.
+          </li>
+        </ul>
+        <p>Ao aprovar, a ADR-0017 ganha uma nota apontando para a 0028, e o texto dela fica.</p>
+      </div>
+
+      <h2>7. Modos de erro: como o sistema reage a cada estado sujo</h2>
+      <table>
+        <tr>
+          <th style="width: 40%">estado</th>
+          <th>reação</th>
+        </tr>
+        <tr>
+          <td>banco fora ou timeout na conferência</td>
+          <td>
+            <code>indisponivel</code>: a tela segue como hoje, e a action final confere de novo
+          </td>
+        </tr>
+        <tr>
+          <td>limite estourado</td>
+          <td>texto genérico + WhatsApp; não diz que achou algo</td>
+        </tr>
+        <tr>
+          <td>a mesma pessoa voltando (CPF e e-mail iguais)</td>
+          <td>login (recomendação, pergunta E)</td>
+        </tr>
+        <tr>
+          <td>já existem duas fichas com o mesmo CPF</td>
+          <td>suporte. <b>Quantas existem, o passo 0 mede</b></td>
+        </tr>
+        <tr>
+          <td>CPF antigo gravado formatado</td>
+          <td><code>regexp_replace</code> casa</td>
+        </tr>
+        <tr>
+          <td>ficha apagada (soft delete)</td>
+          <td>não conta</td>
+        </tr>
+        <tr>
+          <td>a sessão expira entre a etapa 1 e o envio</td>
+          <td>a action já trata; não muda</td>
+        </tr>
+        <tr>
+          <td>o <code>#</code> do token se perde no <code>signOut</code></td>
+          <td>plano B da §5.3; a prova local decide</td>
+        </tr>
+        <tr>
+          <td>o webhook do Clerk cria a ficha vazia primeiro</td>
+          <td>ficha sem CPF não casa; o guarda da corrida continua valendo</td>
+        </tr>
+        <tr>
+          <td>a pessoa corrige o CPF depois do veredito</td>
+          <td>confere de novo no "Continuar" e na action</td>
+        </tr>
+        <tr>
+          <td>alguém chama a action pulando a tela</td>
+          <td>a action confere o CPF</td>
+        </tr>
+      </table>
+
+      <h2 class="quebra">8. A entrega, fase por fase</h2>
+      <table>
+        <tr>
+          <th style="width: 6%">#</th>
+          <th>o quê</th>
+          <th style="width: 30%">onde</th>
+        </tr>
+        <tr>
+          <td>0</td>
+          <td>
+            <b>Perguntar ao banco</b>: CPFs, e-mails e telefones repetidos em produção, sem PII
+            (bloco abaixo)
+          </td>
+          <td>VPS, só leitura · o dono</td>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td>Aprovar a ADR-0028, responder A–E e acrescentar a nota de retificação na ADR-0017</td>
+          <td>quem pediu</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>
+            Guarda novo <b>vermelho</b> primeiro + integração com seed: CPF formatado × cru, mesmo
+            CPF com mesmo e-mail, mesmo CPF com outro e-mail, telefone em 4 formatos, e-mail em
+            maiúsculas, ficha apagada e um <b>controle limpo</b>
+          </td>
+          <td>
+            <code>__tests__/guardas/a-identidade-e-conferida-na-etapa-1.test.ts</code> ·
+            <code>__tests__/integracao/</code>
+          </td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>A conferência de domínio: consulta normalizada → veredito</td>
+          <td><code>lib/cadastro/conferir-identidade.ts</code> (novo)</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>A action da etapa 1 (Zod, limite, auditoria) e a conferência ao abrir</td>
+          <td><code>app/_actions/</code> · <code>cadastro/[token]/page.tsx</code></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>
+            A tela: veredito na etapa 1, aviso de sessão alheia vindo da etapa 3,
+            <code>signOut</code> com destino
+          </td>
+          <td><code>formulario-de-cadastro.tsx</code></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>A action final confere o CPF antes do <code>insert</code></td>
+          <td><code>app/_actions/cadastro-por-link.ts</code></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>
+            Retificar os guardas que casam literais: o que eles <b>medem</b>, nunca o que eles
+            protegem
+          </td>
+          <td>
+            <code>a-sessao-precisa-ser-do-dono-do-link</code> ·
+            <code>o-cadastro-retoma-de-onde-parou</code>
+          </td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>
+            Prova local com o mesmo artefato: <code>pnpm build</code> +
+            <code>node .next/standalone/server.js</code> + Postgres em Docker + Chromium
+          </td>
+          <td>sem deploy</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>Atualizar 03, 04 e a §N da ADR, e contar os guardas pela saída do runner</td>
+          <td><code>docs/</code></td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>PR para <code>feat/*</code>. <b>O merge é do dono</b>, porque o merge é o deploy</td>
+          <td>GitHub</td>
+        </tr>
+      </table>
+
+      <div class="rotulo">Passo 0: o bloco para a VPS (só leitura, sem PII)</div>
+      <pre>
+select
+  (select count(*) from pacientes where deleted_at is null and cpf is not null and cpf &lt;&gt; '') as fichas_com_cpf,
+  (select count(*) from (select regexp_replace(cpf,'[^0-9]','','g') from pacientes
+     where deleted_at is null and cpf is not null and cpf &lt;&gt; '' group by 1 having count(*) &gt; 1) x) as cpfs_repetidos,
+  (select count(*) from pacientes where deleted_at is null and cpf ~ '[^0-9]') as cpfs_formatados,
+  (select count(*) from (select lower(email) from users where deleted_at is null
+     group by 1 having count(*) &gt; 1) x) as emails_repetidos_ignorando_caixa,
+  (select count(*) from (select right(regexp_replace(coalesce(telefone,''),'[^0-9]','','g'),11) t from users
+     where deleted_at is null and coalesce(telefone,'') &lt;&gt; '' group by 1 having count(*) &gt; 1) x) as telefones_repetidos</pre
+      >
+      <p class="sub">
+        Roda-se no script de leitura do <code>CLAUDE.md</code> ("Como investigar na VPS"), que só
+        aceita <code>select</code>, dentro de <code>/home/ubuntu/behemp-site-main</code>.
+      </p>
+
+      <h3>O guarda novo fica vermelho se…</h3>
+      <ol>
+        <li>o "Continuar" da etapa 1 voltar a só avançar o passo;</li>
+        <li>a conferência receber ou devolver dado da <b>outra</b> conta;</li>
+        <li>o limite sumir, ou deixar de ser alcançável;</li>
+        <li>
+          algum <code>signOut(</code> do formulário voltar a ficar sem <code>redirectUrl</code> e
+          <code>sessionId</code>;
+        </li>
+        <li>a action final deixar de conferir o CPF antes do <code>insert</code>;</li>
+        <li>o texto da tela passar a dizer qual dado bateu;</li>
+        <li>a comparação deixar de normalizar;</li>
+        <li>o aviso de sessão alheia sair da etapa 1.</li>
+      </ol>
+
+      <div class="caixa alerta">
+        <div class="rotulo">O limite da prova local</div>
+        Sem uma <code>CLERK_SECRET_KEY</code> de desenvolvimento no <code>.env</code> (o
+        <code>grep</code> dá zero), <b>não se prova local</b> a tela logada, o clique em "Sair" nem
+        se o <code>#</code> sobrevive. Sem a chave, a prova cobre a conferência, a action e a etapa
+        1 sem sessão. Liberar a chave é decisão do dono.
+      </div>
+
+      <h2>9. O que falta decidir</h2>
+      <table>
+        <tr>
+          <th style="width: 5%">#</th>
+          <th style="width: 38%">pergunta</th>
+          <th style="width: 27%">por que importa</th>
+          <th>recomendação</th>
+        </tr>
+        <tr>
+          <td><b>A</b></td>
+          <td>
+            "Pesquisa direcionada a vendas": <b>onde</b> vendas vê quem disse "sim, sou eu"? Lista
+            no admin, e-mail ou planilha Google? E a pessoa <b>continua</b> o cadastro depois?
+          </td>
+          <td>
+            lista no admin exige migration; e-mail e planilha usam integrações que já existem (Brevo
+            e Google Sheets)
+          </td>
+          <td>
+            lista no admin, quando houver migration autorizada; até lá, o registro de auditoria
+          </td>
+        </tr>
+        <tr>
+          <td><b>B</b></td>
+          <td>
+            No caso do CPF, <b>basta</b> o WhatsApp com o protocolo, ou o admin precisa ver uma
+            pendência no painel?
+          </td>
+          <td>pendência no painel = migration = autorização</td>
+          <td>começar só com o WhatsApp + a auditoria</td>
+        </tr>
+        <tr>
+          <td><b>C</b></td>
+          <td>O <code>/registrar-se</code>, sem link, entra agora?</td>
+          <td>sem link, a conferência é oráculo aberto</td>
+          <td>depois, com captcha e o Strict decididos antes</td>
+        </tr>
+        <tr>
+          <td><b>D</b></td>
+          <td>As fichas que <b>já</b> têm CPF repetido vão ao suporte como as outras?</td>
+          <td>se forem muitas, pacientes reais param no suporte</td>
+          <td>sim, e o número do passo 0 decide se é preciso um mutirão antes</td>
+        </tr>
+        <tr>
+          <td><b>E</b></td>
+          <td>CPF igual <b>com o mesmo e-mail</b> vai ao login ou ao suporte?</td>
+          <td>se for ao suporte, toda recompra vira atendimento</td>
+          <td><b>login</b>. Suporte só para o CPF que está em <b>outra</b> conta</td>
+        </tr>
+      </table>
+
+      <h2>10. Achados da pesquisa, catalogados e não corrigidos</h2>
+      <table>
+        <tr>
+          <th style="width: 12%">item</th>
+          <th>o que é</th>
+        </tr>
+        <tr>
+          <td><b>51</b> 🟠</td>
+          <td>
+            O ChatPro reaproveita a solicitação pelo telefone <b>sem conferir o e-mail</b> (<code
+              >lib/chatpro/solicitacao.ts:159, 243</code
+            >). Duas pessoas no mesmo aparelho podem receber a mesma solicitação. O handoff tem a
+            trava; o ChatPro não
+          </td>
+        </tr>
+        <tr>
+          <td><b>52</b> 🟠</td>
+          <td>
+            O CPF não tem unique, é gravado em dois formatos e não é cifrado. A ficha duplicada
+            nasce sem erro. Normalizar, criar unique e cifrar são três trabalhos com migration
+          </td>
+        </tr>
+        <tr>
+          <td><b>53</b> ⚪</td>
+          <td>
+            O guarda de limite só enxerga Route Handler (lista fixa), e nenhuma Server Action usa
+            limite, nem as públicas do <code>/cadastro</code>. Também registra o Strict do Clerk
+            para decisão do dono
+          </td>
+        </tr>
+        <tr>
+          <td>índice das ADRs</td>
+          <td>
+            a contagem somava 26 com 27 linhas (a 0027 ficou fora da soma). Retificado no
+            <code>docs/adr/README.md</code> junto com a 0028
+          </td>
+        </tr>
+      </table>
+
+      <h2>11. As seis perguntas do <code>CLAUDE.md</code>, respondidas</h2>
+      <table>
+        <tr>
+          <th style="width: 36%">pergunta</th>
+          <th>resposta</th>
+        </tr>
+        <tr>
+          <td>1 · examinei todo o escopo?</td>
+          <td>
+            as duas criadoras de solicitação, as portas, os oito criadores de
+            <code>users</code>/<code>pacientes</code>, o formulário, a action, o schema, a
+            reconciliação, o middleware, o limite e a auditoria
+          </td>
+        </tr>
+        <tr>
+          <td>2 · examinei o outro lado?</td>
+          <td>
+            o código da Greens (backend e frontend). O ChatPro, pelo relay e pelo nosso
+            <code>bot-link</code>. O Clerk, pela doc e pelo tipo instalado
+          </td>
+        </tr>
+        <tr>
+          <td>3 · segui do começo ao fim?</td>
+          <td>
+            handoff/bot → solicitação → link → etapa 1 → etapa 3 → envio → código → action → ficha
+          </td>
+        </tr>
+        <tr>
+          <td>4 · pesquisei para correlacionar?</td>
+          <td>
+            OWASP, NIST, LGPD, Clerk e MPI, separando o lido do localizado. Sem prova: o Strict e o
+            <code>#</code> no redirect
+          </td>
+        </tr>
+        <tr>
+          <td>5 · procurei mais gaps?</td>
+          <td>os Itens 51, 52 e 53, e o índice das ADRs</td>
+        </tr>
+        <tr>
+          <td>6 · listei os modos de erro?</td>
+          <td>§7</td>
+        </tr>
+      </table>
+      <p>
+        <b>O que vale só até aqui:</b> nada foi executado. O número de CPFs repetidos em produção é
+        desconhecido até o passo 0. O comportamento do <code>#</code> no <code>redirectUrl</code> é
+        desconhecido até a prova local.
+      </p>
+
+      <h2>12. O que foi escrito junto com este plano</h2>
+      <table>
+        <tr>
+          <th style="width: 44%">arquivo</th>
+          <th>o quê</th>
+        </tr>
+        <tr>
+          <td><code>docs/adr/ADR-0028-…-nao-vira-oraculo.md</code></td>
+          <td>a ADR, proposta: D-01 a D-11, rejeitados, prova, modos de erro, perguntas</td>
+        </tr>
+        <tr>
+          <td><code>docs/adr/README.md</code></td>
+          <td>linha da 0028 + retificação da contagem</td>
+        </tr>
+        <tr>
+          <td><code>docs/02-CATALOGO-DE-REGRAS.md</code></td>
+          <td>
+            <code>DO-59</code> a <code>DO-63</code> · <code>LGPD-06</code> a <code>LGPD-09</code> ·
+            prefixo e <code>OWASP-01</code> a <code>OWASP-04</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>docs/04-LISTA-DE-AFAZERES.md</code></td>
+          <td>Item 50 (plano com <code>caminho:linha</code>) · Itens 51, 52 e 53 (catalogados)</td>
+        </tr>
+        <tr>
+          <td><code>docs/03-CHECKLIST-MESTRE.md</code></td>
+          <td>Item 50 na prioridade 2 · 48, 49 e 50 nos achados · linha 17 na fila</td>
+        </tr>
+        <tr>
+          <td><code>docs/planos/</code> (pasta nova)</td>
+          <td>
+            este PDF e o HTML-fonte · entrada no <code>docs/00-LEIA-PRIMEIRO.md</code> e no índice
+            do <code>CLAUDE.md</code>
+          </td>
+        </tr>
+      </table>
+      <p class="sub">Nenhum código foi alterado. Nada foi commitado nem enviado.</p>
+
+      <footer>
+        BeHemp · Be4Hope — plano de implementação do Item 50 / ADR-0028 · 28/09/2026 · fonte:
+        <code>docs/planos/PLANO-IDENTIDADE-NA-ETAPA-1.html</code>
+      </footer>
+    </main>
+  </body>
+</html>

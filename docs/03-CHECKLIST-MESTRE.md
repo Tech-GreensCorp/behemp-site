@@ -257,6 +257,29 @@ db:migrate`. Se falhar, nada chega ao servidor e nenhuma migration é aplicada.
 
 ## 🟠 Prioridade 2 — custa depois
 
+- [ ] **Item 50 — 🟡 IMPLEMENTADO em 28/09/2026, tela não provada no navegador** ·
+      `docs/adr-0028-identidade-na-etapa-1` (não commitado): **a identidade se confere na
+      ETAPA 1 do cadastro**
+      ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md),
+      plano em [PDF](planos/PLANO-IDENTIDADE-NA-ETAPA-1.pdf)). **O pedido** (`DO-59` a `DO-63`):
+      conferir CPF, telefone e e-mail (sem nome parecido), conta existente e sessão aberta
+      **antes** de a pessoa preencher o resto; logado em outra conta, "é você?" com **Sair que
+      continua no formulário**; CPF que bate vai ao **suporte da BeHemp**; vale para **todas** as
+      portas. **Entregue:** a etapa 1 confere no servidor; o "é você?" abre a etapa 1 e o "Sair"
+      fica na página; CPF em outra conta vai ao suporte com o protocolo, e a action final recusa
+      **antes** de escrever; o limite para de responder depois de 5 conferências, sem travar;
+      respostas A, B, C e E em `DO-64` a `DO-67`. **O desenho:** a conferência fica no nosso
+      formulário, nunca no handoff nem no `/bot-link` (a Greens perderia a jornada e o desconto),
+      e a tela recebe **veredito, nunca o dado** da outra conta (`OWASP-01`, `LGPD-06` a
+      `LGPD-09`). **Provado:** guarda de 36 casos, integração de 21, 16 sabotagens vermelhas,
+      `pnpm build` verde. **Segunda rodada e revisão pelos quatro agentes (ADR-0028
+      §9.1–9.2):** o telefone de outra conta trava o campo, com saída (`DO-68`); a senha some
+      com qualquer aviso; as recusas da action final têm limite; o login não recria a ficha; a
+      referência do CPF é o e-mail do link. Guarda 49, integração 28, **33 sabotagens**, suíte
+      1587/69. 🔴 **Falta:** ver o clique rodando (exige `CLERK_SECRET_KEY` de desenvolvimento no
+      `.env`), o `SELECT` do passo 0 na VPS (já testado local), o complemento de _"o que eu
+      quero que você tome cuidado"_, e commit e PR. O que ficou de fora é o Item 54. Detalhe em
+      [04 — Item 50](04-LISTA-DE-AFAZERES.md).
 - [ ] **Item 2** — 8 uniões literais de role escritas à mão divergem do `userRoleEnum` em
       silêncio; `app/(admin)/_actions/usuarios.ts:66` é **cast**, não validação.
 - [ ] **Item 4** — `prescricoes.medicamentos` é JSONB de texto livre sem FK para `medicamentos`:
@@ -387,6 +410,29 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🟠 **Item 51 — CATALOGADO, 28/09/2026: o ChatPro reaproveita a solicitação pelo telefone
+      sem conferir se o e-mail é de outra pessoa.** `buscarAtiva` (`lib/chatpro/solicitacao.ts:159`)
+      reaproveita pelo telefone e faz `email: params.email ?? existente.email` (`:243`). O handoff
+      tem a trava (`lib/parceiros/handoff.ts:422-434`), e o ChatPro não. Duas pessoas no mesmo
+      aparelho podem receber a mesma solicitação: é OWASP API1. Achado no Item 50. **Autorização**
+      antes de mexer. Detalhe em [04 — Item 51](04-LISTA-DE-AFAZERES.md).
+- [ ] ⚪ **Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele.** São
+      nove pontos: o `x-forwarded-for` no nginx (medir na VPS); telefone de médico ou admin
+      trava paciente (**dono, 28/09: não agora**); `porClerk` sem `deletedAt`; TOCTOU sem índice;
+      varredura sem índice; auditoria do `limite` sem teto; **a Greens com handoff pendente sem
+      motivo visível (avisar pela Ponte)**; `emailAddresses[0]` em vez do principal; e o texto
+      sob o ícone de check. Detalhe em [04 — Item 54](04-LISTA-DE-AFAZERES.md).
+- [ ] ⚪ **Item 53 — CATALOGADO, 28/09/2026: o guarda de limite só enxerga Route Handler.** A
+      lista é fixa (`__tests__/guardas/as-rotas-sensiveis-tem-limite.test.ts:30`), e nenhuma Server
+      Action usa `consumir`, nem as públicas do `/cadastro`. O Item 50 cobre a dele. Derivar as
+      actions é trabalho próprio. Também registra que o Strict do Clerk fica para decisão do dono
+      (ADR-0028 D-10). Detalhe em [04 — Item 53](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 52 — CATALOGADO, 28/09/2026: o CPF não tem unique, e é gravado em dois formatos.**
+      `pacientes.cpf` é texto, sem índice (`db/schema/pacientes.ts:30`). O perfil
+      (`app/_actions/perfil-paciente.ts:200`) grava o CPF como foi digitado, e o handoff grava só
+      dígitos. Ficha duplicada nasce sem erro. O Item 50 contorna com `regexp_replace`, sem migrar.
+      A causa fica aqui: normalizar, unique e cifra são três trabalhos com migration. Detalhe em
+      [04 — Item 52](04-LISTA-DE-AFAZERES.md).
 - [ ] 🟠 **Item 45 — CATALOGADO, 28/09/2026: um PIX que nunca se resolve trava o horário além
       da janela da conciliação.** A Fase 4 não libera reserva com pagamento `em_processamento`,
       mesmo com o PIX vencido (é a regra). Se a notificação de cancelamento do MP se perder, a
@@ -1038,17 +1084,18 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 
 ### 🎯 A fazer, nesta ordem
 
-| #        | item                                                                                                                                 | sprint                                                                                     | bloqueado por                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| ~~8~~ ✅ | **E3 da S4** — divergir com "por que a IA errou" (opcional) + medicamento a prescrever, alimentando o RAG                            | S4 · [ADR-0011](adr/ADR-0011-a-divergencia-do-medico-alimenta-o-rag.md)                    | `GAP-16` bloqueia só a **ingestão**, não os campos         |
-| ~~9~~ ✅ | **E7 da S4** — rascunho da revisão **no servidor**, com histórico                                                                    | S4 · ADR-0011 D-03/D-04                                                                    | prazo de retenção = Jurídico (campo fica vazio)            |
-| 10       | **E8 da S4** — urgência na tela, 4 níveis, com o mapa **7→4 escrito antes**. É gatilho contra medicamento errado (`DO-42`, `CAN-05`) | S4                                                                                         | escrever o mapa 7→4                                        |
-| 11       | **Análise assistida como ABA do sidebar da teleconsulta**, etapas dentro dela                                                        | S1/S4 · [ADR-0010](adr/ADR-0010-analise-assistida-e-uma-aba-do-sidebar-da-teleconsulta.md) | rótulo e posição da aba = perguntar ao dono                |
-| 12       | **Área do paciente** — diário, dose, resumo                                                                                          | [S6](sprints/SPRINT-6-area-do-paciente.md)                                                 | `GAP-12` · **exige a S5 pronta** (entregável 7 dela)       |
-| 13       | **Exames** — anexar, ver, vincular. A última da Metade 1                                                                             | [S7](sprints/SPRINT-7-exames.md)                                                           | 🔴 conversa do dono com o chefe (`DO-13`)                  |
-| 14       | **Metade 2** — motor, RAG, corpus, exames com IA                                                                                     | S8–S12                                                                                     | 🔴 AWS (`GAP-11`) · Jurídico (`CF-01`, `GAP-06`, `GAP-16`) |
-| 15       | **Item 6** — store privado nos 10+ uploads existentes                                                                                | —                                                                                          | autorização                                                |
-| 16       | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                   | —                                                                                          | ler a RDC 873/2024 primeiro · autorização                  |
+| #        | item                                                                                                                                 | sprint                                                                                     | bloqueado por                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| ~~8~~ ✅ | **E3 da S4** — divergir com "por que a IA errou" (opcional) + medicamento a prescrever, alimentando o RAG                            | S4 · [ADR-0011](adr/ADR-0011-a-divergencia-do-medico-alimenta-o-rag.md)                    | `GAP-16` bloqueia só a **ingestão**, não os campos                             |
+| ~~9~~ ✅ | **E7 da S4** — rascunho da revisão **no servidor**, com histórico                                                                    | S4 · ADR-0011 D-03/D-04                                                                    | prazo de retenção = Jurídico (campo fica vazio)                                |
+| 10       | **E8 da S4** — urgência na tela, 4 níveis, com o mapa **7→4 escrito antes**. É gatilho contra medicamento errado (`DO-42`, `CAN-05`) | S4                                                                                         | escrever o mapa 7→4                                                            |
+| 11       | **Análise assistida como ABA do sidebar da teleconsulta**, etapas dentro dela                                                        | S1/S4 · [ADR-0010](adr/ADR-0010-analise-assistida-e-uma-aba-do-sidebar-da-teleconsulta.md) | rótulo e posição da aba = perguntar ao dono                                    |
+| 12       | **Área do paciente** — diário, dose, resumo                                                                                          | [S6](sprints/SPRINT-6-area-do-paciente.md)                                                 | `GAP-12` · **exige a S5 pronta** (entregável 7 dela)                           |
+| 13       | **Exames** — anexar, ver, vincular. A última da Metade 1                                                                             | [S7](sprints/SPRINT-7-exames.md)                                                           | 🔴 conversa do dono com o chefe (`DO-13`)                                      |
+| 14       | **Metade 2** — motor, RAG, corpus, exames com IA                                                                                     | S8–S12                                                                                     | 🔴 AWS (`GAP-11`) · Jurídico (`CF-01`, `GAP-06`, `GAP-16`)                     |
+| 15       | **Item 6** — store privado nos 10+ uploads existentes                                                                                | —                                                                                          | autorização                                                                    |
+| 16       | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                   | —                                                                                          | ler a RDC 873/2024 primeiro · autorização                                      |
+| 17       | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)   | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR |
 
 ### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
 

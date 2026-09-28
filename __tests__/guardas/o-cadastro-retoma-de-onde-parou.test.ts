@@ -227,18 +227,25 @@ describe('o cadastro retoma de onde parou', () => {
    * A saída é sair da sessão ANTES, nos dois pontos — e automaticamente. Pedir de novo o
    * que o paciente já fez é o que transforma correção em beco.
    */
+  /**
+   * 🔴 RETIFICADO EM 28/09/2026 (ADR-0028 D-05, `DO-60`): `await signOut()` virou
+   * `await sairDaSessao()`. Sem argumento, o `signOut` do Clerk NAVEGA para `/` — no meio do
+   * envio, a pessoa saía do formulário antes do `signUp.create`. A propriedade é a mesma (sair
+   * ANTES), e o guarda `a-identidade-e-conferida-na-etapa-1` prova que `sairDaSessao` fica na
+   * página e sai só da sessão ativa.
+   */
   it('🔴 sai da sessão ANTES de criar o cadastro', () => {
     const corpo = corpoDe('criarConta');
     const i = corpo.indexOf('if (authCarregou && isSignedIn) {');
     expect(i, 'criarConta não sai da sessão').toBeGreaterThan(-1);
-    expect(corpo.slice(i, i + 120)).toMatch(/await signOut\(\)/);
+    expect(corpo.slice(i, i + 120)).toMatch(/await sairDaSessao\(\)/);
     // E isso acontece ANTES do `signUp.create`, senão não adianta.
     expect(i).toBeLessThan(corpo.indexOf('signUp.create('));
   });
 
   it('🔴 e sai de novo ANTES de confirmar o código — a sessão pode nascer entre as etapas', () => {
     const corpo = corpoDe('confirmarCodigo');
-    const saida = corpo.indexOf('await signOut()');
+    const saida = corpo.indexOf('await sairDaSessao()');
     const tentativa = corpo.indexOf('attemptEmailAddressVerification');
     expect(saida, 'confirmarCodigo não sai da sessão').toBeGreaterThan(-1);
     expect(tentativa).toBeGreaterThan(saida);
