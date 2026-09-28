@@ -199,20 +199,60 @@ a conferência mora no nosso formulário (D-01), e o contrato não muda.**
 
 ---
 
-## 🟠 Item 49 — CATALOGADO, 28/09/2026: `POST /api/pusher/auth` respondendo 403 na tela de pagamento
+## ✅ Item 49 — CORRIGIDO, 28/09/2026: `POST /api/pusher/auth` negava TODO canal pessoal e todo chat desde 09/09
 
-**Status:** catalogado, **não investigado** (decisão do dono). Visto pelo dono no teste manual
-da tela de pagamento em produção, no mesmo dia do defeito do Brick remontando (PR
-`fix/payment-brick-loop-e-csp`). **Não se sabe ainda qual canal recusou, nem por quê.**
+**Status:** ✅ **diagnosticado e corrigido** em 28/09/2026 (ver [a causa](#a-causa-medida-em-28092026)).
+~~Catalogado, **não investigado**.~~ Visto pelo dono no teste manual da tela de pagamento em
+produção, no mesmo dia do defeito do Brick remontando.
 
-### Por que importa
+### A causa, medida em 28/09/2026
+
+🔴 **Não era id errado: era a rota.** Os ramos `private-user-` (`app/api/pusher/auth/route.ts:51`)
+e `private-chat-` (`:57`) só **recusavam**. Na permissão, a execução saía do `if / else if` e caía
+no default — que o commit `e65771d` (09/09/2026) trocou, corretamente, de "autoriza qualquer canal"
+para "nega" (`:108`, `Canal não reconhecido`). Antes dele, a função terminava com
+`return … autenticarCanal(socketId, canal)`, a saída de sucesso dos dois ramos. **Desde o deploy
+de 09/09, todo `private-user-` e todo `private-chat-` legítimo recebeu 403** — o aviso do webhook
+de pagamento, o aviso de teleconsulta do painel do paciente, e o chat em tempo real (que não tem
+polling: a mensagem de outro só aparecia no reload).
+
+**Como se achou:** executando as duas pontas com a MESMA sessão, contra Postgres real — o canal que
+`obterPagamentoDaReserva` entrega à tela, e o `POST` real da rota. O corpo da resposta
+(`Canal não reconhecido`) apontou a linha 108 para um canal que COMEÇA com `private-user-`.
+
+**Hipótese refutada no caminho:** `users.clerk_id` **não é único** no schema (só `email` é) e as
+duas pontas fazem `.limit(1)` sem `orderBy` — com duplicata, cada uma poderia pegar uma linha.
+Medido em produção: **0** `clerk_id` duplicados. Não é a causa; fica como fragilidade (abaixo).
+
+**A correção:** cada ramo termina com o próprio `return … autenticarCanal(socketId, canal)`,
+depois da checagem. O default continua negando. Provas:
+
+- integração `o-canal-que-a-tela-assina-e-o-que-a-rota-aceita` (6 casos): **nasceu vermelha** nos
+  dois legítimos (tela de pagamento e participante do chat) com os controles verdes; depois, 6/6
+- guarda `todo-ramo-do-pusher-autoriza-no-proprio-ramo` (6 casos, no portão): deriva os ramos do
+  código; **vermelho contra a rota de produção** (`e65771d`) e em 3 sabotagens, inclusive o
+  default voltando a autorizar
+
+### O que ficou (catalogado, não corrigido)
+
+- 🔴 **`private-sala-*` sempre 403.** `components/teleconsulta/CopilotClinico.tsx:44` assina
+  `private-sala-${salaId}`, prefixo sem ramo na rota → cai no default. E **ninguém publica** nesse
+  canal (as únicas ocorrências são o `subscribe` e o `unsubscribe`). É assinatura morta na
+  teleconsulta do médico. Corrigir é decidir se o canal deve existir — fora do escopo
+- ⚠️ **`users.clerk_id` sem `unique`.** Não causou este defeito (0 duplicatas medidas), mas nada
+  impede uma duplicata, e aí `.limit(1)` sem `orderBy` em várias pontas escolheria linhas
+  diferentes. Exigiria migration
+
+### ~~O que se sabia antes da medição~~ (mantido)
+
+#### Por que importava
 
 A tela de pagamento assina `private-user-{userId}` para receber o aviso do webhook
 (`pagamento:atualizado`, `lib/mercadopago/aviso-ao-paciente.ts`). Se **esse** canal for o
 recusado, o aviso em tempo real não chega. **O pagamento não se perde:** a confirmação também vai
 por e-mail, e a tela relê o estado ao voltar ao foco. Mas o paciente fica sem o "confirmado" na hora.
 
-### O que o código mostra — sem concluir
+#### O que o código mostrava — sem concluir
 
 `app/api/pusher/auth/route.ts` tem **cinco** saídas 403, e cada uma diz um `erro` diferente no
 corpo. É o que as distingue:
@@ -229,7 +269,7 @@ corpo. É o que as distingue:
 E o 403 pode ser de um canal que **outra** parte da página assina (o layout do paciente, a
 teleconsulta global), e não da tela de pagamento. Nenhuma das hipóteses foi medida.
 
-### Como medir, antes de corrigir qualquer coisa
+#### Como medir, antes de corrigir qualquer coisa
 
 No navegador, na tela onde o 403 aparece: DevTools → Network → o pedido `auth` → **Payload**
 (`channel_name`) e **Response** (`erro`). O par diz qual das cinco linhas respondeu. Sem PII: o

@@ -54,6 +54,11 @@ export async function POST(request: NextRequest) {
       if (canalUserId !== user.id) {
         return NextResponse.json({ erro: 'Acesso negado' }, { status: 403 });
       }
+      // 🔴 Todo ramo termina AUTORIZANDO, no próprio ramo. Até 28/09/2026 este e o do chat só
+      // recusavam e, na permissão, caíam no default — que desde `e65771d` (09/09) NEGA. Todo
+      // `private-user-` e todo `private-chat-` legítimo recebia 403 "Canal não reconhecido".
+      // Item 49 de docs/04; prova em `o-canal-que-a-tela-assina-e-o-que-a-rota-aceita`.
+      return NextResponse.json(autenticarCanal(socketId, canal));
     } else if (canal.startsWith('private-chat-')) {
       // Canal de chat: verificar se o usuário é participante do grupo
       const grupoId = canal.replace('private-chat-', '');
@@ -71,6 +76,7 @@ export async function POST(request: NextRequest) {
       if (!participante) {
         return NextResponse.json({ erro: 'Acesso negado ao grupo' }, { status: 403 });
       }
+      return NextResponse.json(autenticarCanal(socketId, canal));
     } else if (canal === CANAL_SALA_DE_ESPERA) {
       // Sala de espera virtual: é a lista de quem está aguardando, e quem a consome é o
       // médico (app/(medico)/medico/teleconsulta/page.tsx). Paciente não entra aqui — veria

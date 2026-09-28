@@ -444,12 +444,15 @@ de passagem.**
       tem a trava (`lib/parceiros/handoff.ts:422-434`), e o ChatPro não. Duas pessoas no mesmo
       aparelho podem receber a mesma solicitação: é OWASP API1. Achado no Item 50. **Autorização**
       antes de mexer. Detalhe em [04 — Item 51](04-LISTA-DE-AFAZERES.md).
-- [ ] 🟠 **Item 49 — CATALOGADO, 28/09/2026: `POST /api/pusher/auth` respondendo 403 na tela de
-      pagamento** — visto pelo dono no teste manual. **Não investigado.** A rota tem cinco saídas 403
-      (`app/api/pusher/auth/route.ts:55,72,81,96,108`), e o par `channel_name` + `erro` do pedido
-      no DevTools diz qual respondeu. Se for o `private-user-{id}`, o aviso do webhook não chega em
-      tempo real (o e-mail e a releitura continuam). ⚠️ Afrouxar a rota abre canal alheio — medir
-      antes. Detalhe em [04 — Item 49](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 49 — ✅ CORRIGIDO em 28/09/2026 · aguardando merge (PR #131)**: `POST /api/pusher/auth`
+      **negava todo canal pessoal e todo chat desde 09/09**. Os ramos `private-user-` e
+      `private-chat-` só recusavam e, na permissão, caíam no default que `e65771d` passou a fazer
+      negar (`Canal não reconhecido`, `:108`). Afetava o aviso de pagamento, o aviso de
+      teleconsulta e o chat em tempo real. Cada ramo agora autoriza no próprio ramo; o default segue
+      negando. Integração nasceu vermelha (6 casos) e guarda no portão (6 casos, vermelho contra a
+      rota de produção). Ficaram catalogados: `private-sala-*` sempre 403 (`CopilotClinico.tsx:44`,
+      ninguém publica) e `users.clerk_id` sem `unique` (0 duplicatas hoje). Detalhe em
+      [04 — Item 49](04-LISTA-DE-AFAZERES.md).
 - [ ] 🟠 **Item 47 — CATALOGADO, 28/09/2026: o PIX pedido de novo depende da memória do Mercado
       Pago sobre a chave de idempotência.** O QR code não é gravado; depois de um reload, _"Mostrar
       o QR code de novo"_ refaz o pedido e só recebe o MESMO PIX se o MP lembrar da chave, e a doc
