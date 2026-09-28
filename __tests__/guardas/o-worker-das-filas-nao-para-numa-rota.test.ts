@@ -81,19 +81,21 @@ function capturarLog() {
 }
 
 describe('uma rota falhar não impede as outras', () => {
-  it('rede recusada, 500 e 200: as três rotas são chamadas, na ordem', async () => {
+  it('rede recusada, 500 e 200: todas as rotas são chamadas, na ordem', async () => {
     const { buscar, chamadas } = fetchFalso({
       '/api/chatpro/processar': recusaConexao,
       '/api/parceiros/enviar': async () => json(500, { sucesso: false, erro: 'Falha ao enviar' }),
       '/api/mercadopago/processar': async () =>
         json(200, { sucesso: true, dados: { falharam: 0 } }),
+      '/api/agendamento/expirar': async () =>
+        json(200, { sucesso: true, dados: { liberadas: 0, protegidas: 0 } }),
     });
     const { log, logErro } = capturarLog();
 
     const r = await rodada({ base: BASE, segredo: SEGREDO, fetch: buscar, log, logErro });
 
     expect(chamadas.map((c) => new URL(c.url).pathname)).toEqual([...ROTAS]);
-    expect(r.map((x) => x.ok)).toEqual([false, false, true]);
+    expect(r.map((x) => x.ok)).toEqual([false, false, true, true]);
     expect(r[0]).toMatchObject({ status: null, falha: 'ECONNREFUSED' });
     expect(r[1]).toMatchObject({ status: 500 });
   });
@@ -103,6 +105,7 @@ describe('uma rota falhar não impede as outras', () => {
       '/api/chatpro/processar': pendura,
       '/api/parceiros/enviar': async () => json(200, { sucesso: true, dados: {} }),
       '/api/mercadopago/processar': async () => json(200, { sucesso: true, dados: {} }),
+      '/api/agendamento/expirar': async () => json(200, { sucesso: true, dados: {} }),
     });
     const { log, logErro } = capturarLog();
 
@@ -115,9 +118,9 @@ describe('uma rota falhar não impede as outras', () => {
       timeoutMs: 20,
     });
 
-    expect(chamadas).toHaveLength(3);
+    expect(chamadas).toHaveLength(ROTAS.length);
     expect(r[0]).toMatchObject({ ok: false, status: null, falha: 'timeout' });
-    expect(r[2].ok).toBe(true);
+    expect(r.slice(1).every((x) => x.ok)).toBe(true);
   });
 
   it('`chamar` nunca lança, nem quando o `fetch` lança algo que não é Error', async () => {
@@ -177,6 +180,8 @@ describe('nada sensível chega ao log', () => {
       '/api/chatpro/processar': async () => json(401, { sucesso: false, erro: 'Não autorizado' }),
       '/api/parceiros/enviar': recusaConexao,
       '/api/mercadopago/processar': async () => json(200, { sucesso: true, dados: { a: 1 } }),
+      '/api/agendamento/expirar': async () =>
+        json(200, { sucesso: true, dados: { liberadas: 1, protegidas: 2 } }),
     });
     const { linhas, log, logErro } = capturarLog();
 
@@ -186,7 +191,7 @@ describe('nada sensível chega ao log', () => {
       (c) => (c.init.headers as Record<string, string>).authorization,
     );
     expect(cabecalhos).toEqual(ROTAS.map(() => `Bearer ${SEGREDO}`));
-    expect(linhas).toHaveLength(3);
+    expect(linhas).toHaveLength(ROTAS.length);
     for (const l of linhas) expect(l).not.toContain(SEGREDO);
   });
 

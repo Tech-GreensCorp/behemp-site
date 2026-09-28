@@ -878,3 +878,24 @@ path:.github/workflows/filas.yml
 #
 # (O caminho já estava autorizado desde 20/08; este registro documenta a mudança.)
 path:.github/workflows/deploy.yml
+
+# ── Pedido do usuário em 28/09/2026 — Fase 4 (expiração de reservas), filas.yml e agendamento.ts ─
+# PEDIDO (verbatim): "Adicionar ao filas.yml também (rede de segurança, mesmo padrão das outras
+# 3)" e "Liberar no middleware.ts (mesma correção do Item 41 — caminho exato, nunca prefixo)".
+# REGRA CRÍTICA do mesmo pedido: "nunca cancelar uma reserva com pix_valido_ate > now() nem com
+# pagamento.status = 'em_processamento'".
+#
+# O QUE MUDA:
+#   · `.github/workflows/filas.yml` — um passo NOVO no fim (`if: always()`) que chama
+#     `GET /api/agendamento/expirar`. Os três passos existentes não são tocados.
+#   · `app/(public)/_actions/agendamento.ts` — `expirarReservasVencidasDoPaciente` passa a usar a
+#     MESMA trava (`semPagamentoEmCurso`) nas duas queries. Sem isso, o paciente que volta à tela
+#     para ver o QR code do PIX cancelaria a própria reserva — violaria a regra crítica acima.
+#   · `middleware.ts` (fora do hook) — o caminho EXATO `/api/agendamento/expirar`.
+#
+# PERIGO MEDIDO: a rota cancela reservas e envia e-mail. Remedido em produção (leitura, 28/09):
+# 8 reservas vencidas, 0 com PIX, 0 em_processamento, 7 com o horário JÁ PASSADO — o primeiro
+# ciclo enviaria 8 e-mails de "reserva expirada", o mais antigo com 18 dias de atraso. NÃO
+# COMMITADO; aplicar em produção depende de decisão do dono sobre esses e-mails.
+#
+# (Os dois caminhos já estavam autorizados em 23/09; este registro documenta a mudança.)

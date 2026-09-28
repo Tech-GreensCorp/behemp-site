@@ -1,11 +1,11 @@
 import { inngest } from './client';
 import { db } from '@/lib/db';
-import { documentos, dosagens, medicamentos, pacientes, users, notificacoes, emailsNotificacao, alertasEnviados, alertasConfig, consultas, pagamentos, medicos } from '@/db/schema';
+import { documentos, dosagens, medicamentos, pacientes, users, notificacoes, emailsNotificacao, alertasEnviados, alertasConfig } from '@/db/schema';
 import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
 import { coletarAlertasMedicacao, coletarAlertasLicencas, coletarAlertasMensalidades } from '@/lib/alertas/coletor';
 import { gerarHtmlDigestAdmin, gerarHtmlAlertaPaciente } from '@/lib/email/alertas';
 import { enviarEmailGenerico } from '@/lib/email/brevo';
+import { liberarReservasExpiradas as liberarReservasVencidas } from '@/lib/agendamento/liberar-reservas-expiradas';
 
 /**
  * Job: Verificar documentos próximos do vencimento.
@@ -430,12 +430,11 @@ export const enviarEmailRecompraAgendado = inngest.createFunction(
 /**
  * Job: Liberar reservas de agendamento expiradas.
  *
- * Roda a cada 5 minutos. Reservas nascem com `consultas.status = 'reservada'` e um
- * prazo em `expiraEm` (ver `reservarConsulta` em app/(public)/_actions/agendamento.ts).
- * Quem não confirma dentro do prazo perde o horário: este job cancela a consulta
- * (liberando o horário para outro paciente, via o índice único que já trata
- * 'reservada' como ativa) e avisa o paciente por e-mail. O médico nunca chegou a ser
- * notificado da reserva (só é avisado na confirmação), então não recebe e-mail aqui.
+ * ⚠️ NÃO RODA EM PRODUÇÃO (Item 40): quem libera as reservas é o worker das filas, por
+ * `GET /api/agendamento/expirar` (ADR-0027). Mantido registrado, mas delegando à MESMA função,
+ * para que religar o Inngest não traga de volta uma cópia sem a trava da Fase 4 (PIX ainda
+ * pagável, pagamento em processamento). O retorno do step leva só os contadores — nada de
+ * nome ou e-mail do paciente na nuvem do Inngest.
  */
 export const liberarReservasExpiradas = inngest.createFunction(
   {
@@ -444,65 +443,14 @@ export const liberarReservasExpiradas = inngest.createFunction(
     triggers: [{ cron: '*/5 * * * *' }],
   },
   async ({ step }) => {
-    const reservasExpiradas = await step.run('buscar-reservas-expiradas', async () => {
-      const agora = new Date();
-      // users é referenciado duas vezes (paciente e médico) — alias evita ambiguidade.
-      const medicoUsers = alias(users, 'medico_users');
-
-      const resultado = await db
-        .select({
-          consultaId: consultas.id,
-          dataHora: consultas.dataHora,
-          pacienteNome: users.nome,
-          pacienteEmail: users.email,
-          medicoNome: medicoUsers.nome,
-        })
-        .from(consultas)
-        .innerJoin(pacientes, eq(consultas.pacienteId, pacientes.id))
-        .innerJoin(users, eq(pacientes.userId, users.id))
-        .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
-        .innerJoin(medicoUsers, eq(medicoUsers.id, medicos.userId))
-        .where(and(
-          eq(consultas.status, 'reservada'),
-          lte(consultas.expiraEm, agora),
-          isNull(consultas.deletedAt),
-        ));
-
-      console.log(`[Job] Encontradas ${resultado.length} reservas expiradas`);
-      return resultado;
-    });
-
-    for (const reserva of reservasExpiradas) {
-      await step.run(`liberar-reserva-${reserva.consultaId}`, async () => {
-        await db
-          .update(consultas)
-          .set({ status: 'cancelada', expiraEm: null })
-          .where(eq(consultas.id, reserva.consultaId));
-
-        await db
-          .update(pagamentos)
-          .set({ erroConfirmacao: 'Reserva expirada antes da confirmação.' })
-          .where(eq(pagamentos.consultaId, reserva.consultaId));
-
-        try {
-          const { enviarEmailReservaExpirada } = await import('@/lib/email/consultas');
-          await enviarEmailReservaExpirada({
-            pacienteNome: reserva.pacienteNome,
-            pacienteEmail: reserva.pacienteEmail,
-            medicoNome: reserva.medicoNome,
-            dataHora: new Date(reserva.dataHora),
-          });
-          console.log(`[Job] Reserva ${reserva.consultaId} liberada e paciente avisado`);
-        } catch (error) {
-          console.error(`[Job] Reserva ${reserva.consultaId} liberada, mas falhou o e-mail:`, error);
-        }
-      });
-    }
+    const resultado = await step.run('liberar-reservas-expiradas', () =>
+      liberarReservasVencidas(),
+    );
 
     return {
-      reservasLiberadas: reservasExpiradas.length,
+      reservasLiberadas: resultado.liberadas,
+      reservasProtegidas: resultado.protegidas,
       timestamp: new Date().toISOString(),
     };
   },
 );
-

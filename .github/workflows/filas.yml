@@ -85,3 +85,19 @@ jobs:
             echo "::error::processador do Mercado Pago respondeu $CODIGO"
             exit 1
           fi
+
+      - name: Liberar as reservas expiradas
+        # `if: always()` pelo mesmo motivo: independente dos passos acima. A rota não libera
+        # reserva com PIX ainda pagável nem com pagamento em processamento (Fase 4).
+        if: always()
+        run: |
+          CODIGO=$(curl -s -o /tmp/expirar.json -w "%{http_code}" --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://be4hope.org/api/agendamento/expirar")
+          echo "HTTP $CODIGO"
+          cat /tmp/expirar.json
+          echo
+          if [ "$CODIGO" != "200" ]; then
+            echo "::error::expirador de reservas respondeu $CODIGO"
+            exit 1
+          fi

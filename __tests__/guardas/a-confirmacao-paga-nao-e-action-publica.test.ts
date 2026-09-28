@@ -23,8 +23,13 @@ import { describe, expect, it } from 'vitest';
 const raiz = process.cwd();
 
 /** Funções que NÃO conferem quem chama — e os módulos onde moram. */
-const PROTEGIDAS = ['confirmarConsultaPaga', 'criarCobranca'];
-const MODULOS = ['lib/agendamento/confirmar-consulta-paga.ts', 'lib/mercadopago/cobranca.ts'];
+const PROTEGIDAS = ['confirmarConsultaPaga', 'criarCobranca', 'liberarReservasExpiradas'];
+const MODULOS = [
+  'lib/agendamento/confirmar-consulta-paga.ts',
+  'lib/mercadopago/cobranca.ts',
+  // Fase 4: cancela toda reserva vencida e envia os e-mails — sem conferir quem chama.
+  'lib/agendamento/liberar-reservas-expiradas.ts',
+];
 
 function arquivosDeFonte(dir: string, achados: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

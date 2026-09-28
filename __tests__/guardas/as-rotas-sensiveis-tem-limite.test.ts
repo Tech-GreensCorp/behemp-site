@@ -36,6 +36,8 @@ const ROTAS_QUE_PRECISAM = [
   // As duas são porta de consumo e de tentativa de segredo. Acrescentadas em 23/09/2026.
   'app/api/webhooks/mercadopago/route.ts',
   'app/api/mercadopago/processar/route.ts',
+  // Fase 4 (28/09/2026): compara o CRON_SECRET e, aceita, cancela reservas e envia e-mails.
+  'app/api/agendamento/expirar/route.ts',
 ];
 
 describe('o limitador conta e corta', () => {
@@ -159,6 +161,14 @@ describe('as rotas sensíveis aplicam o limite', () => {
     const processar = ler('app/api/mercadopago/processar/route.ts');
     const limite = processar.indexOf('consumir(');
     const segredo = processar.indexOf('segredosConferem(');
+    expect(limite).toBeGreaterThan(-1);
+    expect(limite).toBeLessThan(segredo);
+  });
+
+  it('o expirador de reservas limita antes de comparar o CRON_SECRET', () => {
+    const expirar = ler('app/api/agendamento/expirar/route.ts');
+    const limite = expirar.indexOf('consumir(');
+    const segredo = expirar.indexOf('segredosConferem(');
     expect(limite).toBeGreaterThan(-1);
     expect(limite).toBeLessThan(segredo);
   });

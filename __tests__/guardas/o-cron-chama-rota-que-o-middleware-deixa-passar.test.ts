@@ -107,3 +107,19 @@ describe('🔴 o processador do Mercado Pago é público pelo caminho EXATO, nã
     expect(publica(caminho)).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('🔴 o expirador de reservas é público pelo caminho EXATO, não pelo prefixo', () => {
+  it('o expirador passa', () => {
+    expect(publica('/api/agendamento/expirar')).toBe(true);
+  });
+
+  it.each([
+    '/api/agendamento/outra-rota',
+    '/api/agendamento/expirar-tudo',
+    '/api/agendamento/expirar/extra',
+    '/api/agendamento',
+  ])('%s continua exigindo sessão', (caminho) => {
+    expect(publica(caminho)).toBe(false);
+  });
+});

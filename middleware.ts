@@ -96,6 +96,11 @@ const isPublicRoute = createRouteMatcher([
    * toda rota futura com esse prefixo: guarda `o-cron-chama-rota-que-o-middleware-deixa-passar`.
    */
   '/api/mercadopago/processar',
+  /**
+   * 🔴 O EXPIRADOR DE RESERVAS (Fase 4) — pelo caminho EXATO, mesmo motivo do de cima. Quem
+   * chama é o worker das filas e o `filas.yml`, sem sessão; a autenticação é o `CRON_SECRET`.
+   */
+  '/api/agendamento/expirar',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',

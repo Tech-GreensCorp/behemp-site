@@ -19,6 +19,70 @@
 
 ---
 
+## 🟠 Item 46 — CATALOGADO, 28/09/2026: três outros caminhos cancelam reserva sem olhar o pagamento em curso
+
+**Status:** catalogado, **não corrigido**. Achado ao implementar a Fase 4 (Item 40). É a **mesma
+classe** do defeito corrigido em `expirarReservasVencidasDoPaciente`: cancelar reserva com PIX
+ainda pagável ou pagamento `em_processamento`, o que entrega o horário a outro paciente e faz o
+pagamento aprovado depois cair em `pago_sem_horario` (`lib/mercadopago/notificacoes.ts`).
+
+| caminho | onde | quando cancela | olha o pagamento? |
+| --- | --- | --- | --- |
+| `confirmarConsultaPaga` **sem** `ignorarPrazo` | `lib/agendamento/confirmar-consulta-paga.ts:102-106` | prazo vencido, comparado em JS | não |
+| `iniciarAguardoPagamento` | `app/(public)/_actions/agendamento.ts:377-380` | prazo vencido, comparado em JS | não |
+| `cancelarReserva` (o paciente cancela) | `app/(public)/_actions/agendamento.ts:704`, e marca o pagamento `cancelado` logo depois | a pedido | não |
+
+O guarda `a-expiracao-respeita-o-pagamento-em-curso` **não** os cobre: ele só enxerga filtro
+**SQL** (`lte(consultas.expiraEm …)`), e os dois primeiros comparam em JavaScript.
+
+**Por que não foi corrigido junto:** corrigir é decidir o que a tela diz. Se a reserva vencida
+tem PIX pagável, `iniciarAguardoPagamento` deveria mostrar o QR code de novo? `confirmarAgendamento`
+deveria responder "pagamento em andamento, aguarde"? E o paciente que pede para cancelar com o
+cartão em análise, o que ouve? São decisões de UX e de negócio (Fase 5, a tela do Payment Brick).
+
+**Perigo de mexer:** baixo no código (três condições), mas muda o que o paciente lê. **Em
+produção hoje:** o risco é **zero enquanto nenhuma tela cobra de verdade**: medido em 28/09, 0
+pagamentos `em_processamento` e 0 consultas com `pix_valido_ate`. Passa a valer com a Fase 5.
+
+**Decisão do dono**, a pedir antes da Fase 5.
+
+---
+
+## 🟠 Item 45 — CATALOGADO, 28/09/2026: um PIX que nunca se resolve trava o horário além da janela da conciliação
+
+**Status:** catalogado, **não corrigido**. Consequência deliberada da regra da Fase 4.
+
+**O mecanismo.** A Fase 4 não libera reserva com pagamento `em_processamento`
+(`lib/agendamento/liberar-reservas-expiradas.ts:49`, `semPagamentoEmCurso`), **mesmo com o PIX
+já vencido**: foi a regra pedida, porque o dinheiro pode estar em trânsito. E `em_processamento`
+é o status de **qualquer** resposta do Mercado Pago que não seja recusa, cancelamento ou estorno
+(`lib/mercadopago/cobranca.ts:158`, o `default` de `statusLocal`), inclusive PIX `pending`.
+
+Quem tira o pagamento de `em_processamento` é a notificação do MP (`cancelled` quando o PIX
+expira) ou a conciliação. A conciliação só reenfileira pagamento iniciado **nas últimas 24 h**
+(`lib/mercadopago/notificacoes.ts:88-99`). Se a notificação de cancelamento se perder **e** as
+24 h passarem, o pagamento fica `em_processamento` para sempre, e a reserva **nunca** é liberada:
+o horário do médico fica travado até alguém intervir.
+
+**Por que não foi corrigido:** afrouxar a regra (liberar PIX vencido mesmo `em_processamento`)
+reabre a corrida que a Fase 4 fecha. O caminho seguro é **conferir na API** antes de liberar, e
+isso é decisão de desenho: estender a janela da conciliação para pagamentos com reserva vencida,
+ou uma verificação periódica própria.
+
+**Como medir, enquanto não houver correção** (leitura):
+
+```sql
+select count(*) from consultas c join pagamentos p on p.consulta_id = c.id
+where c.status = 'reservada' and c.expira_em < now() and p.status = 'em_processamento'
+  and p.pagamento_iniciado_em < now() - interval '24 hours';
+```
+
+**Em produção hoje:** 0 (medido em 28/09, nenhum pagamento `em_processamento`). Passa a importar
+com a Fase 5. Aparece também no contador `protegidas` do log do worker: um `protegidas` que não
+cai com o tempo é este caso.
+
+---
+
 ## ⏳ Item 44 — IMPLEMENTADO, 24/09/2026: o worker das filas no PM2 (ADR-0027), aguardando o primeiro deploy
 
 **Status:** implementado e provado **localmente**, branch `feat/worker-filas-pm2`. **Não está em
@@ -340,10 +404,12 @@ passo teria mostrado o 307 em segundos.
 
 ---
 
-## 🔴 Item 40 — CATALOGADO, 23/09/2026: o job `liberarReservasExpiradas` do Inngest nunca rodou em produção
+## ✅ Item 40 — CORRIGIDO na Fase 4, 28/09/2026: o job `liberarReservasExpiradas` do Inngest nunca rodou em produção
 
-**Status:** catalogado, **não corrigido**. Achado ao desenhar a Fase 3 do Mercado Pago, não é
-consequência dela.
+**Status:** ✅ **corrigido pela Fase 4** em 28/09/2026, branch `feat/fase4-expiracao-reservas`
+(ver [a correção](#-a-correção-fase-4-28092026) e [o adendo da limpeza manual](#-adendo-28092026--as-8-reservas-vencidas-canceladas-à-mão-antes-da-fase-4)
+no fim deste item). ~~Catalogado, **não corrigido**.~~ Achado ao desenhar a Fase 3 do Mercado
+Pago, não é consequência dela.
 
 ### O que o código promete
 
@@ -429,6 +495,93 @@ continuam sendo o próximo passo, agora sem a pista falsa.
 
 **Decisão do dono**, a pedir: corrigir junto da Fase 4, com o job lendo `pix_valido_ate` e
 pulando `em_processamento`, e primeiro remedir as 7 e o volume das outras 4 funções.
+
+### ✅ A correção (Fase 4, 28/09/2026)
+
+**A causa raiz deixou de importar:** a expiração não depende mais do Inngest (que nunca rodou)
+nem do `filas.yml` (que roda a cada ~4 h, ADR-0027 §1). Ela roda no **worker das filas**, a cada
+~60 s, e o Inngest **continua sem ser ligado**: por isso o volume das outras 4 funções não
+precisou ser medido.
+
+| peça | onde | o que faz |
+| --- | --- | --- |
+| a regra | `lib/agendamento/liberar-reservas-expiradas.ts:49` (`semPagamentoEmCurso`) | não libera com `pix_valido_ate > agora` nem com pagamento `em_processamento` (soft delete não tira a proteção) |
+| a função | `lib/agendamento/liberar-reservas-expiradas.ts:81` | UM `UPDATE … WHERE id IN (subquery)`, teto de 50 por chamada; mantém o efeito antigo (motivo no pagamento, e-mail) e acrescenta auditoria. Devolve `{ liberadas, protegidas }` |
+| a rota | `app/api/agendamento/expirar/route.ts` | limite de 10/min **antes** do segredo, 503 sem `CRON_SECRET`, 401 com o errado |
+| middleware | `middleware.ts:103` | o caminho **exato** (lição do Item 41) |
+| chamadores | `scripts/worker-filas-nucleo.mjs:24`, `.github/workflows/filas.yml:96` | a quarta rota do worker, e o passo de rede no cron |
+| 🔴 o segundo caminho | `app/(public)/_actions/agendamento.ts` (`expirarReservasVencidasDoPaciente`) | **também violava a regra**: roda toda vez que o paciente abre a tela de agendamento. Quem volta para ver o QR code cancelaria a própria reserva. Agora usa a mesma `semPagamentoEmCurso` |
+| Inngest | `lib/integrations/inngest/functions.ts` | delega à mesma função: religá-lo não traz de volta a cópia sem a trava, e o step devolve só contadores (nada de nome/e-mail na nuvem dele) |
+
+**Provas:** integração `a-expiracao-respeita-o-pagamento-em-curso` (**13 casos** contra Postgres
+real, inclusive duas chamadas simultâneas e a corrida do plano: protegida agora, webhook aprovado
+confirma depois). Guarda novo `a-expiracao-respeita-o-pagamento-em-curso` (5 casos). Estendidos
+`as-rotas-sensiveis-tem-limite`, `a-confirmacao-paga-nao-e-action-publica`,
+`o-segredo-cadastrado-chega-ao-servidor`, `o-cron-chama-rota-que-o-middleware-deixa-passar` (este
+pegou a rota nova sozinho, por derivar do `filas.yml`) e `o-worker-das-filas-nao-para-numa-rota`.
+**Sabotagens:** 12 ficaram vermelhas, incluindo tirar a checagem de `pix_valido_ate` e a de
+`em_processamento`. Uma terceira, a primeira tentativa contra `em_processamento`, passou verde
+porque a **sabotagem** estava mal escrita (acrescentava em vez de remover) e foi refeita em duas
+variantes, as duas vermelhas. Build `standalone` com o middleware real do Clerk: 401 sem segredo e com o
+errado, 200 com o certo, 307 no controle de prefixo.
+
+⚠️ **Duas sabotagens ficaram verdes, e o motivo está escrito:** tirar do `WHERE` externo do
+`UPDATE` a trava do pagamento, e tirar dele a trava inteira (mantendo as duas na subquery). É defesa em profundidade; nenhum teste
+reproduz a corrida dentro de um único comando do Postgres. E o limite do que ela garante está no
+cabeçalho da função: um pagamento que **commita durante** o comando não o impede (cai em
+`pago_sem_horario`, visível ao admin).
+
+**O que ficou:** [Item 45](#-item-45--catalogado-28092026-um-pix-que-nunca-se-resolve-trava-o-horário-além-da-janela-da-conciliação)
+(PIX nunca resolvido trava o horário) e [Item 46](#-item-46--catalogado-28092026-três-outros-caminhos-cancelam-reserva-sem-olhar-o-pagamento-em-curso)
+(três outros caminhos de cancelamento). E **a primeira execução em produção**, que acontece no
+deploy desta branch.
+
+### 🔧 Adendo, 28/09/2026 — as 8 reservas vencidas canceladas à mão ANTES da Fase 4
+
+**Motivo:** limpar dado histórico antes da primeira execução real da Fase 4. Sem isso, o
+primeiro ciclo do worker (~60 s depois do deploy) enviaria o e-mail de "sua reserva expirou" a 8
+pacientes, o mais antigo com **18 dias** de atraso e 7 deles para horários **que já tinham
+passado**. É correção de dado, não evento de negócio: por isso **sem e-mail**.
+
+**COMMIT em 28/09/2026 às 11:10:00 UTC (08:10:00 de Brasília)**, pedido pelo dono, depois de
+ele conferir os IDs contra a medição de leitura do mesmo dia.
+
+```sql
+UPDATE consultas SET status = 'cancelada'
+WHERE status = 'reservada' AND expira_em < now();
+```
+
+| id | `expira_em` (UTC) | horário original (UTC) |
+| --- | --- | --- |
+| `gc1fj16vu1s48wyhz3i36290` | 10/09 19:55:44 | 13/09 19:40 |
+| `xvopycf4lz4jg53du0z2i5je` | 11/09 16:55:48 | 24/09 23:30 |
+| `rr7zcb18s897siee8ckltp24` | 11/09 16:55:55 | **29/09 23:30** (o único ainda futuro, horário devolvido) |
+| `cm34md723tlc0qn0ww2k7bfo` | 11/09 16:55:58 | 14/09 21:00 |
+| `e4ntpdqzbo9ay1zq684a8fsp` | 11/09 16:56:22 | 25/09 02:00 |
+| `x96vddk5eu1zg3fhwja73cq8` | 14/09 17:54:53 | 15/09 23:30 |
+| `twoairsx778uc4av2bcz1nr5` | 14/09 17:55:02 | 14/09 21:30 |
+| `amjqo4u3sfjbsp8613jh4vc7` | 24/09 14:18:36 | 25/09 00:00 |
+
+Nenhuma tinha `pix_valido_ate` nem pagamento `em_processamento`: 4 com pagamento `pendente`, 4
+sem linha de pagamento.
+
+**Como foi feito:** uma transação só, com o `SELECT` antes (8 linhas), o `UPDATE … RETURNING`
+(8 linhas, **os mesmos IDs**), e `ROLLBACK` automático se a contagem, os IDs ou os pagamentos
+divergissem. Ficou aberta até o dono responder, com `ROLLBACK` automático em 20 min.
+`consultas` não tem trigger nem regra (conferido em `pg_trigger`/`pg_rules`), então nada fora
+dela foi escrito.
+
+**Confirmado:**
+
+- **nenhum e-mail disparado.** O `UPDATE` foi direto no banco, sem passar pela aplicação
+- **pagamentos intactos:** as 4 linhas de `pagamentos` dessas consultas, `md5` da linha inteira,
+  **`62cfa550cb8c` antes e depois** do `UPDATE`, e de novo numa conexão nova depois do COMMIT.
+  `pagamentos.status` não foi tocado
+- depois do COMMIT: as 8 `cancelada`, e **0** reservas `reservada` vencidas no banco
+
+⚠️ **O que a query do dono não fez, de propósito:** `expira_em` continua preenchido (o código
+limpa ao cancelar), `updated_at` não mudou (quem o atualiza é o Drizzle, não o banco), e não há
+registro em `logs_auditoria`. Este adendo é o registro.
 
 ---
 

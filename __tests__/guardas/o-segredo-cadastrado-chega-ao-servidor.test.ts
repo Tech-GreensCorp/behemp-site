@@ -58,6 +58,9 @@ const AREAS = [
   // se não entrarem aqui — é o ponto cego descrito acima.
   'app/api/webhooks/mercadopago',
   'app/api/mercadopago',
+  // Fase 4 (28/09/2026): o expirador de reservas, chamado pelo worker das filas.
+  'lib/agendamento',
+  'app/api/agendamento',
 ];
 
 function arquivosDe(dir: string): string[] {
