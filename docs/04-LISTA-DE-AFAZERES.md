@@ -32,7 +32,7 @@
 | 4 | Checagem e escrita não são atômicas: dois links com o mesmo CPF, ao mesmo tempo, passam os dois | conferência fora da transação | baixo | só um índice fecha, e depende do Item 52 (duplicatas antes do unique) |
 | 5 | As consultas com `regexp_replace`/`lower()` varrem `users` e `pacientes` inteiras | `lib/cadastro/conferir-identidade.ts` | baixo hoje, cresce com a base | índice de expressão, com migration |
 | 6 | A auditoria do veredito `limite` grava a cada chamada: dá para inflar `logs_auditoria` | `app/_actions/identidade-no-cadastro.ts` | baixo | auditar uma vez por janela |
-| 7 | Quem para no suporte ou no telefone não conclui. **A Greens fica com o handoff pendente** sem saber por quê | fluxo `greens_handoff` | médio para a operação (inferência: não foi conferido em `greens-corp` se há prazo ou retentativa) | 🔴 **prioridade do dono em 28/09/2026:** avisar a Greens pela "Ponte". ✅ **Mensagem escrita**: `docs/integracao-greens/PONTE-IDENTIDADE-NA-ETAPA-1-o-que-muda-para-o-handoff.md`. Medido no código deles: não há prazo nem retentativa, só o reenvio manual. **Falta:** o dono levar a mensagem e os três de lá decidirem entre os caminhos 1, 2 e 3 |
+| 7 | Quem para no suporte ou no telefone não conclui. **A Greens fica com o handoff pendente** sem saber por quê | fluxo `greens_handoff` | médio para a operação (inferência: não foi conferido em `greens-corp` se há prazo ou retentativa) | 🔴 **prioridade do dono em 28/09/2026:** avisar a Greens pela "Ponte". ✅ **Mensagem entregue ao dono no CHAT** em 28/09/2026, e não como arquivo. O conteúdo técnico está na ADR-0028 §10. A Ponte (`greens-corp/docs/ponte/README.md` §3 e §4) tem só dois arquivos vivos, e o chat não é arquivo. Medido no código deles: não há prazo nem retentativa, só o reenvio manual. **Falta:** o dono levar a mensagem e os três de lá decidirem entre os caminhos 1, 2 e 3 |
 | 8 | `emailAddresses?.[0]` não é necessariamente o e-mail principal: numa conta com vários e-mails, dá `sessao_alheia` falso | `page.tsx`, `identidade-no-cadastro.ts` | baixo, e segue o padrão que já existia | `primaryEmailAddress` em todos os pontos |
 | 9 | O texto do e-mail passa por baixo do ícone de check quando o campo é válido | `Campo` em `formulario-de-cadastro.tsx` | cosmético, e já existia | `pr-10` quando válido |
 
@@ -102,7 +102,7 @@ medida, e a medição é um `SELECT` de solicitações com o mesmo telefone e e-
 
 ---
 
-## 🟡 Item 50 — IMPLEMENTADO, 28/09/2026 (tela não provada no navegador): a identidade se confere na etapa 1 do cadastro ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md))
+## ✅ Item 50 — EM PRODUÇÃO desde 28/09/2026, 17:34 UTC (PR #133; o clique real ainda não foi testado): a identidade se confere na etapa 1 do cadastro ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md))
 
 **Status:** 🟡 **implementado em 28/09/2026, não commitado, não em produção**, na branch
 `docs/adr-0028-identidade-na-etapa-1`. Aprovado por quem pediu, com as respostas A, B, C e E

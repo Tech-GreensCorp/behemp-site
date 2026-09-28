@@ -795,3 +795,36 @@ select origem, status, count(*) from solicitacoes_cadastro group by origem, stat
 WhatsApp. **São portões diferentes, e um pode estar quebrado sem afetar o outro.** Misturá-los
 faz o diagnóstico apontar para o lugar errado — e faz quem lê perder a confiança no relatório,
 com razão.
+
+## 🔴 Mensagem para a Greens ou o Desktop vai no CHAT, nunca em arquivo novo
+
+**Decisão do dono em 28/09/2026**, depois de eu criar dois arquivos em `docs/integracao-greens/`
+para uma mensagem da Ponte:
+
+> _"queria um prompt no chat e não nas docs, isso foi um dos problemas que catalogamos antes…
+> é 2 pontes para desktop e greens, arquivos mutáveis apenas 2, você está criando mais, e isso é
+> prejudicial"_
+
+A regra é da própria Ponte (`greens-corp/docs/ponte/README.md` §3 e §4):
+
+| o quê                                                     | onde vive                                                                                                                           | quem escreve                      |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| **o chat**: prompt ou mensagem para a Greens ou o Desktop | **no texto da resposta**, que o dono cola na sessão de destino                                                                      | eu, na conversa                   |
+| **os dois documentos vivos** da Ponte                     | `greens-corp/docs/ponte/chat-para-claude-desktop.md` e `chat-para-claude-behemp.md`: só esses dois, reescritos a cada implementação | a Greens, no repositório **dela** |
+| o que a mensagem **decidiu ou mediu** do nosso lado       | a **ADR** do assunto, ou o `04`, no lugar de sempre                                                                                 | eu                                |
+
+- 🔴 **Não se cria** `PROMPT-PARA-*.md`, `PONTE-*.md` nem `CHAT-PARA-*.md`. Um terceiro arquivo obriga
+  quem chega a decidir qual versão vale, e é exatamente isso que a Ponte existe para evitar.
+- **O chat traduz, não resume:** _"número sobrevive à tradução; adjetivo não"_.
+- **Não editar o repositório da Greens.**
+- Os três arquivos antigos de `docs/integracao-greens/` são anteriores à regra: ficam, e não se
+  acrescenta outro.
+
+### E apagar exige realocar
+
+🔴 **Informação não se apaga: se muda de lugar.** Antes de remover um arquivo ou uma seção, o que
+ele tinha de medido ou decidido vai para o lugar certo (ADR, `04`, `03`, `02`) **no mesmo
+commit**, e a remoção diz para onde foi.
+
+Em 28/09 o conteúdo da mensagem apagada foi para a ADR-0028 §10. Conferi linha a linha que nada se
+perdeu.

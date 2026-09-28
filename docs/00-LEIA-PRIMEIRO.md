@@ -43,7 +43,7 @@ link morto.
 | — | [arvore-do-conhecimento/](arvore-do-conhecimento/00-RAIZ.md) · 15 arquivos | precisa da teoria de um tópico — **abra só o ramo**, nunca a árvore toda |
 | — | [decisoes-visuais/](decisoes-visuais/) · 2 arquivos | 🔴 **ANTES DE CADA SPRINT** (`DO-32`) — o `LEIA-ANTES-DE-CADA-SPRINT.md` diz quando abrir o `.html` ao lado |
 | — | [chatpro/](chatpro/) · 3 arquivos | vai mexer na integração do ChatPro — `COMO-CONECTAR-NO-PAINEL`, `CONTRATO-DA-PAGINA-DE-CADASTRO`, `QA-DA-INTEGRACAO` |
-| — | [integracao-greens/](integracao-greens/) · 4 arquivos | vai trocar mensagem com a Greens — a ponte do Fluxo 2, o prompt sobre documentos que não chegam, a resposta sobre o reenvio, e (28/09/2026) **o que a identidade na etapa 1 muda para o handoff** (ADR-0028) |
+| — | [integracao-greens/](integracao-greens/) · 3 arquivos | vai trocar mensagem com a Greens — a ponte do Fluxo 2, o prompt sobre documentos que não chegam, e a resposta sobre o reenvio. 🔴 **Não se acrescenta arquivo aqui** (28/09/2026): mensagem para a Greens vai no **chat**, e a Ponte tem só os dois arquivos vivos de `greens-corp/docs/ponte/` (README §3 e §4). Estes três são anteriores à regra |
 | — | [historico/](historico/2026-09-organizacao/) | documentos de estado morto, arquivados com README de desfecho — nunca fonte |
 | — | [BACKUP_LOG](historico/2026-09-organizacao/BACKUP_LOG.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
 | — | [progresso](historico/2026-09-organizacao/progresso.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |

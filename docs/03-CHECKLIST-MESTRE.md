@@ -268,7 +268,9 @@ db:migrate`. Se falhar, nada chega ao servidor e nenhuma migration é aplicada.
 
 ## 🟠 Prioridade 2 — custa depois
 
-- [ ] **Item 50 — 🟡 IMPLEMENTADO em 28/09/2026, tela não provada no navegador** ·
+- [x] **Item 50 — ✅ EM PRODUÇÃO desde 28/09/2026, 17:34 UTC** (PR #133, merge `a5c4326`, deploy
+      `36458560019`, portão "produção está servindo ESTE build"). ⚠️ O clique real ainda não foi
+      testado. A mensagem da Ponte foi entregue ao dono no chat, e ainda não chegou à Greens ·
       `docs/adr-0028-identidade-na-etapa-1` (não commitado): **a identidade se confere na
       ETAPA 1 do cadastro**
       ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md),
