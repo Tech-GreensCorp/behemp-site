@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ComponentProps } from 'react';
 import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
 
 import type { FormDataDoBrick, MeioDoBrick } from '@/lib/agendamento/pagamento-na-tela';
@@ -38,16 +38,50 @@ interface PagamentoBrickProps {
   onFalhaDoBrick: () => void;
 }
 
-export default function PagamentoBrick({
-  publicKey,
-  valor,
-  onEnviar,
-  onFalhaDoBrick,
-}: PagamentoBrickProps) {
+type PropsDoPayment = ComponentProps<typeof Payment>;
+type EnvioDoPayment = Parameters<PropsDoPayment['onSubmit']>[0];
+type ErroDoPayment = Parameters<NonNullable<PropsDoPayment['onError']>>[0];
+
+/**
+ * 🔴 TODA PROP DO `<Payment>` TEM DE TER IDENTIDADE ESTÁVEL — inclusive as FUNÇÕES.
+ *
+ * O `<Payment>` do SDK (`@mercadopago/sdk-react@1.0.7`, `esm/bricks/payment/index.js`) destrói
+ * e recria o Brick — `paymentBrickController.unmount()` + `initBrick` 200 ms depois — sempre que
+ * muda a identidade de `[initialization, customization, onReady, onError, onSubmit, onBinChange]`.
+ *
+ * Foi o defeito de 28/09/2026, em produção: `onSubmit` e `onError` eram setas inline, a etapa
+ * re-renderiza a cada segundo (o cronômetro), e o Brick era recriado a cada segundo — os meios
+ * sumiam e voltavam, e o que o paciente digitava se perdia. Por isso: as callbacks são criadas
+ * UMA vez e leem a versão atual das props por `ref`, e o componente é `memo`.
+ * Guarda: `a-tela-de-pagamento-nao-promete-o-que-o-webhook-nao-confirmou`, bloco 7.
+ */
+function PagamentoBrick({ publicKey, valor, onEnviar, onFalhaDoBrick }: PagamentoBrickProps) {
   garantirSdk(publicKey);
 
-  // Referências estáveis: o Brick se remonta quando `initialization`/`customization` mudam de
-  // identidade, e remontar no meio da digitação apaga o que o paciente preencheu.
+  // A versão mais recente das props, lida DENTRO das callbacks estáveis abaixo.
+  const onEnviarRef = useRef(onEnviar);
+  const onFalhaRef = useRef(onFalhaDoBrick);
+  useEffect(() => {
+    onEnviarRef.current = onEnviar;
+    onFalhaRef.current = onFalhaDoBrick;
+  });
+
+  // Resolve sempre: quem mostra o resultado (QR code, recusa, análise) é a nossa tela, que
+  // desmonta o Brick logo depois. Rejeitar faria o Brick mostrar um erro genérico dele.
+  const onSubmit = useCallback(async (envio: EnvioDoPayment) => {
+    await onEnviarRef.current({
+      selectedPaymentMethod: envio.selectedPaymentMethod,
+      formData: envio.formData as FormDataDoBrick,
+    });
+  }, []);
+
+  const onError = useCallback((erro: ErroDoPayment) => {
+    // Só o tipo e a causa do SDK — nunca o conteúdo do formulário.
+    console.error('[pagamento] erro do Payment Brick', { tipo: erro.type, causa: erro.cause });
+    if (erro.type === 'critical') onFalhaRef.current();
+  }, []);
+
+  // Referências estáveis também aqui, pelo mesmo motivo.
   const initialization = useMemo(() => ({ amount: valor }), [valor]);
   const customization = useMemo(
     () => ({
@@ -68,19 +102,11 @@ export default function PagamentoBrick({
       initialization={initialization}
       customization={customization}
       locale="pt-BR"
-      onSubmit={async (envio) => {
-        // Resolve sempre: quem mostra o resultado (QR code, recusa, análise) é a nossa tela, que
-        // desmonta o Brick logo depois. Rejeitar faria o Brick mostrar um erro genérico dele.
-        await onEnviar({
-          selectedPaymentMethod: envio.selectedPaymentMethod,
-          formData: envio.formData as FormDataDoBrick,
-        });
-      }}
-      onError={(erro) => {
-        // Só o tipo e a causa do SDK — nunca o conteúdo do formulário.
-        console.error('[pagamento] erro do Payment Brick', { tipo: erro.type, causa: erro.cause });
-        if (erro.type === 'critical') onFalhaDoBrick();
-      }}
+      onSubmit={onSubmit}
+      onError={onError}
     />
   );
 }
+
+/** `memo`: o cronômetro da etapa re-renderiza a cada segundo, e o Brick não precisa ouvir. */
+export default memo(PagamentoBrick);
