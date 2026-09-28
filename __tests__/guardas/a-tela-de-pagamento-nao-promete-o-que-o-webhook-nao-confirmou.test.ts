@@ -27,6 +27,7 @@ import { describe, expect, it } from 'vitest';
 import { PainelDoPagamento } from '@/components/shared/agendamento-pagamento-painel';
 import {
   combinarComSituacao,
+  diagnosticoDoEnvio,
   entradaDoBrick,
   estadoDaSituacao,
   estadoDoResultado,
@@ -47,6 +48,18 @@ const html = (estado: EstadoDoPagamento, reservaNoPrazo = true) =>
   renderToStaticMarkup(createElement(PainelDoPagamento, { estado, agora: AGORA, reservaNoPrazo }));
 
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * 🔴 OS VALORES DE `selectedPaymentMethod` AQUI SÃO OS QUE O BRICK REALMENTE ENVIA.
+ *
+ * Fonte: o bundle servido pelo Mercado Pago, `https://http2.mlstatic.com/frontend-assets/
+ * op-cho-bricks/build/{3.18.0,3.17.1}/components/payment.js` — enum `dm` (módulo 7765):
+ * `CREDIT_CARD="credit_card"`, `DEBIT_CARD="debit_card"`, `BANK_TRANSFER="bank_transfer"`.
+ *
+ * ⚠️ NÃO a tipagem do pacote npm (`@mercadopago/sdk-react`, `TPaymentBrickPaymentType`), que diz
+ * `'creditCard'`/`'debitCard'`. Estes testes usavam a tipagem e passavam, enquanto em produção
+ * TODO cartão parava antes do servidor (Item 55, 28/09/2026). Teste que confia na mesma premissa
+ * que o código não prova nada sobre ela.
+ */
 describe('o envio do Brick vira a entrada da action', () => {
   it('PIX (`bank_transfer`) não leva nada do formulário — o pagador sai do cadastro', () => {
     expect(
@@ -57,10 +70,10 @@ describe('o envio do Brick vira a entrada da action', () => {
     ).toEqual({ consultaId: 'c1', metodo: 'pix' });
   });
 
-  it('cartão: snake_case do Brick → camelCase da action, só o token', () => {
+  it('cartão (`credit_card`, o valor real): snake_case do Brick → camelCase da action, só o token', () => {
     expect(
       entradaDoBrick('c1', {
-        selectedPaymentMethod: 'creditCard',
+        selectedPaymentMethod: 'credit_card',
         formData: {
           token: 't',
           issuer_id: 25,
@@ -82,15 +95,90 @@ describe('o envio do Brick vira a entrada da action', () => {
     });
   });
 
+  it('`creditCard` (a tipagem) continua aceito, só como reserva', () => {
+    expect(
+      entradaDoBrick('c1', {
+        selectedPaymentMethod: 'creditCard',
+        formData: {
+          token: 't',
+          payment_method_id: 'visa',
+          installments: 1,
+          payer: { email: 'a@b.com' },
+        },
+      })?.metodo,
+    ).toBe('cartao');
+  });
+
   it.each([
     ['boleto', { selectedPaymentMethod: 'ticket', formData: {} }],
-    ['débito', { selectedPaymentMethod: 'debitCard', formData: { token: 't' } }],
+    [
+      'débito (o valor real, `debit_card`)',
+      { selectedPaymentMethod: 'debit_card', formData: { token: 't' } },
+    ],
+    [
+      'débito (a tipagem, `debitCard`)',
+      { selectedPaymentMethod: 'debitCard', formData: { token: 't' } },
+    ],
     [
       'cartão sem token',
-      { selectedPaymentMethod: 'creditCard', formData: { payment_method_id: 'visa' } },
+      { selectedPaymentMethod: 'credit_card', formData: { payment_method_id: 'visa' } },
     ],
   ])('%s não vira cobrança', (_n, envio) => {
     expect(entradaDoBrick('c1', envio)).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('🔴 o envio recusado deixa o PORQUÊ no log — e nunca dado de cartão', () => {
+  it('meio desconhecido: diz qual meio chegou', () => {
+    expect(diagnosticoDoEnvio({ selectedPaymentMethod: 'algo_novo', formData: {} })).toEqual({
+      meio: 'algo_novo',
+      reconhecido: false,
+      faltando: [],
+    });
+  });
+
+  it('cartão incompleto: diz os NOMES dos campos que faltaram', () => {
+    expect(
+      diagnosticoDoEnvio({
+        selectedPaymentMethod: 'credit_card',
+        formData: { payment_method_id: 'visa' },
+      }),
+    ).toEqual({
+      meio: 'credit_card',
+      reconhecido: true,
+      faltando: ['token', 'payer.email', 'installments'],
+    });
+  });
+
+  it('nenhum VALOR de campo entra no diagnóstico', () => {
+    const d = JSON.stringify(
+      diagnosticoDoEnvio({
+        selectedPaymentMethod: 'credit_card',
+        formData: {
+          token: 'TOKEN-SECRETO-123',
+          payment_method_id: 'visa',
+          installments: 1,
+          payer: {
+            email: 'pessoa@exemplo.com',
+            identification: { type: 'CPF', number: '52998224725' },
+          },
+        },
+      }),
+    );
+    for (const valor of ['TOKEN-SECRETO-123', 'pessoa@exemplo.com', '52998224725', 'visa']) {
+      expect(d).not.toContain(valor);
+    }
+  });
+
+  it('a etapa loga o diagnóstico ANTES da mensagem genérica', () => {
+    const passo = ler('components/shared/agendamento-pagamento-step.tsx');
+    const log = passo.indexOf(
+      "console.warn('[pagamento] envio do Brick não virou cobrança', diagnosticoDoEnvio(envio))",
+    );
+    const mensagem = passo.indexOf("'Este meio de pagamento não está disponível.'");
+    expect(log).toBeGreaterThan(-1);
+    expect(log).toBeLessThan(mensagem);
   });
 });
 

@@ -19,6 +19,73 @@
 
 ---
 
+## 🟠 Item 55 — CORRIGIDO no código, 28/09/2026 · ⏳ falta a prova manual: todo pagamento com cartão parava antes do servidor
+
+**Status:** a causa está corrigida e provada nos testes; **falta a prova real, que é manual** (ver
+abaixo). Branch `fix/cartao-credit-card-do-brick`.
+
+### O defeito
+
+No teste real do dono com cartão, a tela mostrou _"Este meio de pagamento não está disponível"_.
+Essa mensagem **não vem do Mercado Pago nem do banco**: só a nossa tela a escreve
+(`components/shared/agendamento-pagamento-step.tsx`), quando `entradaDoBrick`
+(`lib/agendamento/pagamento-na-tela.ts`) devolve `null`. Nesse caso **o servidor nem é chamado**.
+
+`entradaDoBrick` comparava `selectedPaymentMethod` com `'creditCard'` — o que a tipagem de
+`@mercadopago/sdk-react@1.0.7` declara (`TPaymentBrickPaymentType`). **O Brick que o Mercado Pago
+serve envia `'credit_card'`**: no bundle
+`https://http2.mlstatic.com/frontend-assets/op-cho-bricks/build/{3.18.0,3.17.1}/components/payment.js`
+(o endereço que `sdk.mercadopago.com/js/v2` monta), o enum `dm` do módulo 7765 é
+`CREDIT_CARD="credit_card"`, `DEBIT_CARD="debit_card"`, `BANK_TRANSFER="bank_transfer"`. O PIX
+funcionava porque `bank_transfer` coincide nos dois lados. **Todo cartão parava.**
+
+⚠️ **Os testes tinham a mesma premissa do código** (usavam `'creditCard'`) e passavam. Com a
+correção, pôr o código de volta deixa **7 de 13** casos da integração vermelhos.
+
+⚠️ **O valor em runtime não foi medido diretamente**: ele só aparece no `onSubmit` com o cartão
+preenchido, e os campos são iframes que o harness não preenche. A prova é o código do Brick + o
+sintoma. **O `25003100` visto no console não foi identificado:** não está no SDK, nem nos dois
+bundles do Brick, nem em página pública do Mercado Pago. Não é recusa do banco — a cobrança nem foi
+pedida.
+
+### A correção
+
+- aceita `'credit_card'` (real) e `'creditCard'` (reserva, se o SDK corrigir a tipagem); débito
+  (`debit_card`/`debitCard`) continua fora
+- quando o envio não vira cobrança, `console.warn` com `diagnosticoDoEnvio`: o meio e os NOMES dos
+  campos que faltaram — nunca valor (token, e-mail, documento). ⚠️ É log do **navegador**: em
+  produção, só quem tem o console aberto vê. Levar ao servidor é outra decisão
+- ⚠️ as CHAVES de `customization.paymentMethods` (`creditCard`, `bankTransfer`) **estão certas** em
+  camelCase — são outra coisa, e o Brick renderiza os dois meios com elas (medido). Busca completa
+  no repositório: a comparação equivocada existia **só** em `pagamento-na-tela.ts`
+
+### 🔴 A prova manual — só o Diniz consegue, e é o que fecha este item
+
+Os campos do cartão são iframes de `secure-fields.mercadopago.com` (cross-origin): nenhum teste
+automatizado deste repositório consegue digitar neles. **Não automatizar agora** (decisão do dono).
+
+**Pré-condição:** `MERCADOPAGO_AMBIENTE=teste` (a public key de teste no Brick) e o médico
+conectado. ⚠️ **Ponto em aberto, não medido:** a cobrança usa o access token OAuth **do médico**. Se
+a conta conectada for de **produção** e a chave do Brick for de **teste**, o token do cartão pode ser
+recusado por mistura de ambientes — um erro que **não** é do cartão. Se o passo 4 falhar com erro
+da API, conferir isso antes de concluir qualquer coisa.
+
+**Os passos** (cartões e nomes da doc oficial:
+`developers/pt/docs/checkout-bricks/integration-test/test-cards`, lida em 28/09/2026):
+
+1. abrir o console do navegador — o `[pagamento] envio do Brick não virou cobrança`, se aparecer,
+   diz o `meio` e os campos que faltaram
+2. na etapa de pagamento, escolher **Cartão de crédito**
+3. Mastercard `5480 8328 0103 3311`, CVV `123`, validade `11/30`; nome do titular **`APRO`**
+   (aprovado); CPF `12345678909`; qualquer e-mail
+4. **Pagar.** Esperado: _"Pagamento aprovado — confirmando sua consulta"_, e **nenhum**
+   `[pagamento] envio do Brick não virou cobrança` no console
+5. repetir com o nome **`OTHE`** (recusa geral): esperado _"Pagamento recusado"_ com o motivo e o
+   botão "Tentar de novo"
+6. (opcional) **`SECU`** (CVV inválido): a mensagem deve falar do código de segurança
+
+---
+
 ## ⚪ Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele
 
 **Status:** catalogado, **não corrigido**. Todos saíram da revisão dos quatro agentes (ADR-0028
