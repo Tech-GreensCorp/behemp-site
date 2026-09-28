@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -22,6 +22,7 @@ import {
   estadoDoResultado,
   haPagamentoEmCurso,
   podeEnviar,
+  umEnvioPorVez,
   type EstadoDoPagamento,
 } from '@/lib/agendamento/pagamento-na-tela';
 
@@ -186,20 +187,48 @@ export function AgendamentoPagamentoStep({
   // 🔴 Estáveis de propósito: a etapa re-renderiza a cada segundo (o cronômetro), e o Brick
   // (`memo`) só deixa de re-renderizar se o que recebe não mudar de identidade. Ver o
   // cabeçalho de `agendamento-pagamento-brick.tsx` — o defeito de 28/09/2026.
-  const cobrar = useCallback(async (entrada: Parameters<typeof iniciarCobranca>[0]) => {
-    setEnviando(true);
-    try {
-      const res = await iniciarCobranca(entrada);
-      setEstado(estadoDoResultado(res));
-    } catch {
-      setEstado({
-        tipo: 'erro',
-        mensagem: 'Não conseguimos falar com o servidor. Confira a conexão e tente de novo.',
-      });
-    } finally {
+  // A trava contra o duplo clique: um envio por vez (ver `umEnvioPorVez`). Criada uma vez só,
+  // porque o estado dela ("há envio em curso") tem de sobreviver aos re-renders.
+  const enviarUmaVez = useMemo(
+    () =>
+      umEnvioPorVez((entrada: Parameters<typeof iniciarCobranca>[0]) => iniciarCobranca(entrada)),
+    [],
+  );
+
+  const cobrar = useCallback(
+    async (entrada: Parameters<typeof iniciarCobranca>[0]) => {
+      setEnviando(true);
+      let desfecho: Awaited<ReturnType<typeof enviarUmaVez>> | { tipo: 'falhou' };
+      try {
+        desfecho = await enviarUmaVez(entrada);
+      } catch {
+        desfecho = { tipo: 'falhou' };
+      }
+      // Um segundo clique chegou com o primeiro em curso: descartado sem chamar o servidor. Não
+      // mexe em nada — o overlay e o resultado são do primeiro envio.
+      if (desfecho.tipo === 'ignorado') return;
+
       setEnviando(false);
-    }
-  }, []);
+      if (desfecho.tipo === 'feito') {
+        setEstado(estadoDoResultado(desfecho.valor));
+      } else if (desfecho.tipo === 'sem_resposta') {
+        // O envio pode ter chegado: antes de oferecer nova tentativa, relê o banco — se houver
+        // pagamento em curso, é ele que a tela passa a mostrar.
+        setEstado({
+          tipo: 'erro',
+          mensagem:
+            'Não tivemos resposta do pagamento a tempo. Aguarde um instante: se ele foi aprovado, esta tela mostra sozinha.',
+        });
+        void reler();
+      } else {
+        setEstado({
+          tipo: 'erro',
+          mensagem: 'Não conseguimos falar com o servidor. Confira a conexão e tente de novo.',
+        });
+      }
+    },
+    [enviarUmaVez, reler],
+  );
 
   const aoEnviarDoBrick = useCallback(
     async (envio: EnvioDoBrick) => {
@@ -218,9 +247,10 @@ export function AgendamentoPagamentoStep({
 
   const aoFalharOBrick = useCallback(() => setBrickFalhou(true), []);
 
+  // O Brick CONTINUA MONTADO durante o envio, coberto pelo overlay (o padrão da Greens): tirá-lo
+  // no meio do `onSubmit` destruía o formulário antes da resposta.
   const mostrarBrick =
     !lendo &&
-    !enviando &&
     !brickFalhou &&
     medicoConectado === true &&
     estado.tipo === 'escolhendo' &&
@@ -315,7 +345,7 @@ export function AgendamentoPagamentoStep({
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(lendo || enviando) && (
+          {(lendo || (enviando && !mostrarBrick)) && (
             <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
               <Loader2 size={16} className="animate-spin" />
               {enviando ? 'Processando o pagamento…' : 'Carregando…'}
@@ -347,12 +377,33 @@ export function AgendamentoPagamentoStep({
             )}
 
           {mostrarBrick && publicKey !== null && valor !== null && (
-            <PagamentoBrick
-              publicKey={publicKey}
-              valor={valor}
-              onEnviar={aoEnviarDoBrick}
-              onFalhaDoBrick={aoFalharOBrick}
-            />
+            <div className="relative">
+              <PagamentoBrick
+                publicKey={publicKey}
+                valor={valor}
+                onEnviar={aoEnviarDoBrick}
+                onFalhaDoBrick={aoFalharOBrick}
+              />
+              {/* 🔴 O "Pagar" mora dentro do Brick e o SDK nunca o desabilita. Este overlay
+                  absorve o segundo clique enquanto o primeiro está em curso; a trava
+                  determinística é `umEnvioPorVez`, em `cobrar`. */}
+              {enviando && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-trava-do-pagamento
+                  className="bg-card/80 pointer-events-auto absolute inset-0 z-10 flex cursor-wait items-center justify-center backdrop-blur-sm"
+                >
+                  <div className="flex flex-col items-center gap-2 px-6 text-center">
+                    <Loader2 size={22} className="text-muted-foreground animate-spin" />
+                    <p className="text-sm font-medium">Processando o pagamento…</p>
+                    <p className="text-muted-foreground text-xs">
+                      Não feche nem atualize esta tela.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

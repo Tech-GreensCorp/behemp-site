@@ -34,6 +34,7 @@ import {
   haPagamentoEmCurso,
   mensagemDeRecusa,
   podeEnviar,
+  umEnvioPorVez,
   type EstadoDoPagamento,
 } from '@/lib/agendamento/pagamento-na-tela';
 
@@ -521,5 +522,101 @@ describe('🔴 7. o Brick não se recria a cada render', () => {
     expect(passo).toMatch(/const aoFalharOBrick = useCallback\(/);
     expect(passo).toMatch(/onEnviar=\{aoEnviarDoBrick\}/);
     expect(passo).toMatch(/onFalhaDoBrick=\{aoFalharOBrick\}/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * 🔴 8. UM CLIQUE, UMA COBRANÇA — a trava contra o duplo clique (achado da Greens, 28/09/2026).
+ *
+ * O "Pagar" mora dentro do Brick e o SDK nunca o desabilita. No cartão, o Brick tokeniza antes
+ * do `onSubmit`, e um segundo clique gera outro token — outra chave de idempotência, outra
+ * cobrança. Duas camadas: `umEnvioPorVez` (determinística, testada aqui EXECUTANDO) e o overlay.
+ */
+describe('🔴 8. um clique, uma cobrança', () => {
+  function adiado<T>() {
+    let resolver!: (v: T) => void;
+    let rejeitar!: (e: unknown) => void;
+    const promessa = new Promise<T>((a, b) => {
+      resolver = a;
+      rejeitar = b;
+    });
+    return { promessa, resolver, rejeitar };
+  }
+
+  it('dois cliques com o primeiro em curso: o servidor é chamado UMA vez', async () => {
+    const pendente = adiado<string>();
+    let chamadas = 0;
+    const enviar = umEnvioPorVez(() => {
+      chamadas += 1;
+      return pendente.promessa;
+    });
+
+    const primeiro = enviar();
+    const segundo = await enviar();
+    expect(segundo).toEqual({ tipo: 'ignorado' });
+    expect(chamadas).toBe(1);
+
+    pendente.resolver('ok');
+    expect(await primeiro).toEqual({ tipo: 'feito', valor: 'ok' });
+  });
+
+  it('depois da resposta, a trava solta — "tentar de novo" funciona', async () => {
+    let chamadas = 0;
+    const enviar = umEnvioPorVez(async () => {
+      chamadas += 1;
+      return 'ok';
+    });
+    await enviar();
+    await enviar();
+    expect(chamadas).toBe(2);
+  });
+
+  it('uma falha também solta a trava (e a falha chega a quem chamou)', async () => {
+    let chamadas = 0;
+    const enviar = umEnvioPorVez(async () => {
+      chamadas += 1;
+      if (chamadas === 1) throw new Error('rede');
+      return 'ok';
+    });
+    await expect(enviar()).rejects.toThrow('rede');
+    expect(await enviar()).toEqual({ tipo: 'feito', valor: 'ok' });
+  });
+
+  it('sem resposta no tempo: devolve `sem_resposta` e solta — a tela não fica presa', async () => {
+    let dispararTimeout!: () => void;
+    const nunca = new Promise<string>(() => {});
+    const enviar = umEnvioPorVez(() => nunca, {
+      agendar: (fn) => {
+        dispararTimeout = fn;
+        return 1;
+      },
+      cancelar: () => {},
+    });
+    const envio = enviar();
+    dispararTimeout();
+    expect(await envio).toEqual({ tipo: 'sem_resposta' });
+    expect(await Promise.race([enviar(), Promise.resolve('seguiu')])).not.toEqual({
+      tipo: 'ignorado',
+    });
+  });
+
+  const passo = ler('components/shared/agendamento-pagamento-step.tsx');
+
+  it('a etapa passa TODO envio pela trava, criada uma vez só', () => {
+    expect(passo).toMatch(/const enviarUmaVez = useMemo\(\s*\(\)\s*=>\s*umEnvioPorVez\(/);
+    expect(passo).toMatch(/desfecho = await enviarUmaVez\(entrada\);/);
+    expect(passo.match(/await iniciarCobranca\(/g) ?? []).toHaveLength(0);
+    expect(passo).toMatch(/if \(desfecho\.tipo === 'ignorado'\) return;/);
+  });
+
+  it('o Brick continua montado durante o envio, e o overlay o cobre', () => {
+    const mostrar = passo.slice(
+      passo.indexOf('const mostrarBrick ='),
+      passo.indexOf('return (', passo.indexOf('const mostrarBrick =')),
+    );
+    expect(mostrar, 'o Brick não pode sumir no meio do onSubmit').not.toMatch(/!enviando/);
+    expect(passo).toMatch(/\{enviando && \(\s*<div\s+role="status"[\s\S]*?data-trava-do-pagamento/);
+    expect(passo).toMatch(/pointer-events-auto absolute inset-0 z-10/);
   });
 });
