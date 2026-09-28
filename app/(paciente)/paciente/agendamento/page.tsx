@@ -1,6 +1,7 @@
 import { AgendamentoWizard } from '@/components/shared/agendamento-wizard';
 import { obterEstadoAgendamentoPaciente } from '@/app/(public)/_actions/agendamento';
 import { PageHeader } from '@/components/shared/page-header';
+import { publicKeyDoBrick } from '@/lib/mercadopago/public-key';
 
 /**
  * Agendamento — única rota do fluxo (não existe versão pública). Protegida pelo
@@ -24,6 +25,7 @@ export default async function PacienteAgendamentoPage() {
       <AgendamentoWizard
         reservaAtivaInicial={estado.dados?.reservaAtiva ?? null}
         historicoInicial={estado.dados?.historico ?? []}
+        publicKeyMercadoPago={publicKeyDoBrick()}
       />
     </div>
   );

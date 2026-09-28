@@ -123,16 +123,21 @@ const nextConfig: NextConfig = {
             ].join(', '),
           },
           {
+            // Mercado Pago (Payment Brick, Fase 5): os hosts abaixo foram MEDIDOS em 28/09/2026,
+            // com o Brick real montado no Chrome headless (chave de teste) e o próprio header de
+            // produção — carregado, com "Cartão de crédito" aberto (os campos de cartão são
+            // iframes de secure-fields) e com "Pix" aberto. Nenhum host a mais: o que o Brick não
+            // pediu não entra. Guarda: `o-csp-conhece-o-payment-brick`.
             key: 'Content-Security-Policy-Report-Only',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com https://sdk.mercadopago.com https://http2.mlstatic.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://img.clerk.com https://images.clerk.dev https://*.public.blob.vercel-storage.com",
-              "connect-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com",
+              "img-src 'self' data: blob: https://img.clerk.com https://images.clerk.dev https://*.public.blob.vercel-storage.com https://www.mercadolibre.com https://www.mercadolivre.com",
+              "connect-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com https://api.mercadopago.com https://api.mercadolibre.com https://http2.mlstatic.com https://www.mercadolibre.com https://secure-fields.mercadopago.com",
               "media-src 'self' blob: https://*.public.blob.vercel-storage.com",
-              "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com",
+              "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://secure-fields.mercadopago.com",
               "worker-src 'self' blob:",
             ].join('; '),
           },

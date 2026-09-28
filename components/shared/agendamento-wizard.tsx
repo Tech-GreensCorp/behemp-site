@@ -48,7 +48,7 @@ import type { LucideIcon } from 'lucide-react';
  *    a reserva estiver ativa
  * 2. Confirmação da reserva — dentro do prazo, avança para pagamento (`iniciarAguardoPagamento`).
  *    A consulta continua 'reservada' (aguardando pagamento) até uma confirmação real existir.
- * 3. Pagamento — layout de PIX/boleto/cartão, sem integração real de gateway ainda.
+ * 3. Pagamento — Payment Brick do Mercado Pago (cartão de crédito e PIX), confirmado pelo webhook.
  *
  * A etapa inicial NÃO nasce sempre em 0: `reservaAtivaInicial` vem do servidor
  * (`obterEstadoAgendamentoPaciente`, chamada pela Server Component da página) e reflete a
@@ -64,10 +64,14 @@ interface Medico {
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
+  /** `podeAgendarCom` — `false` só com o bloqueio do Mercado Pago ligado e o médico sem conta. */
+  agendavel: boolean;
 }
 
 interface AgendamentoWizardProps {
   reservaAtivaInicial: ReservaAtivaAgendamento | null;
+  /** Public key do Payment Brick, lida no servidor pela página. `null` = pagamento indisponível. */
+  publicKeyMercadoPago: string | null;
   historicoInicial: HistoricoAgendamentoItem[];
 }
 
@@ -116,7 +120,11 @@ const STEPS = [
   { label: 'Pagamento', icon: CreditCard },
 ];
 
-export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: AgendamentoWizardProps) {
+export function AgendamentoWizard({
+  reservaAtivaInicial,
+  historicoInicial,
+  publicKeyMercadoPago,
+}: AgendamentoWizardProps) {
   const router = useRouter();
 
   const [step, setStep] = useState(() => {
@@ -135,6 +143,8 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
           avatarUrl: reservaAtivaInicial.medicoAvatarUrl,
           valorConsulta: reservaAtivaInicial.valor,
           googleConectado: false,
+          // Retomando uma reserva: ela já passou pela checagem de `reservarConsulta`.
+          agendavel: true,
         }
       : null,
   );
@@ -208,6 +218,7 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
   }
 
   function handleSelecionarMedico(medico: Medico) {
+    if (!medico.agendavel) return;
     setMedicoSelecionado(medico);
     setStep(1);
     setDataSelecionada(undefined);
@@ -303,6 +314,18 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
     router.refresh();
   }
 
+  /** O webhook confirmou: o histórico passa a mostrar a consulta agendada. */
+  function handlePagamentoConfirmado() {
+    if (!reserva) return;
+    toast.success('Pagamento confirmado — sua consulta está agendada.');
+    setHistorico((atual) =>
+      atual.map((item) =>
+        item.id === reserva.consultaId ? { ...item, status: 'agendada' as const } : item,
+      ),
+    );
+    router.refresh();
+  }
+
   const dataHoraReserva = horarioSelecionadoParaData();
 
   return (
@@ -364,7 +387,13 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="group flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+                    disabled={!m.agendavel}
+                    aria-disabled={!m.agendavel}
+                    className={
+                      m.agendavel
+                        ? 'group flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]'
+                        : 'flex min-w-0 cursor-not-allowed flex-col gap-3 rounded-xl border border-border/60 p-5 text-left opacity-60'
+                    }
                   >
                     <div className="flex min-w-0 items-start gap-4">
                       {m.avatarUrl ? (
@@ -405,6 +434,13 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
                     {m.valorConsulta !== null && (
                       <p className="text-sm font-semibold text-primary">
                         R$ {formatarValor(m.valorConsulta)} <span className="font-normal text-muted-foreground">/ consulta</span>
+                      </p>
+                    )}
+
+                    {!m.agendavel && (
+                      <p className="text-xs text-muted-foreground">
+                        Agendamento pelo site ainda indisponível para este médico. Escolha outro
+                        profissional ou fale com a clínica.
                       </p>
                     )}
                   </button>
@@ -673,9 +709,12 @@ export function AgendamentoWizard({ reservaAtivaInicial, historicoInicial }: Age
         </Card>
       )}
 
-      {/* Step 3 — Pagamento (layout, sem integração real de gateway) */}
+      {/* Step 3 — Pagamento: Payment Brick do Mercado Pago (Parte 2, Fase 5) */}
       {step === 3 && reserva && medicoSelecionado && dataHoraReserva && (
         <AgendamentoPagamentoStep
+          consultaId={reserva.consultaId}
+          publicKey={publicKeyMercadoPago}
+          onConfirmado={handlePagamentoConfirmado}
           medicoNome={medicoSelecionado.nome}
           dataHora={dataHoraReserva}
           valor={reserva.valor}

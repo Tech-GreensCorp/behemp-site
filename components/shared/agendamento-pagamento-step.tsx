@@ -1,63 +1,171 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, Barcode, Clock, CreditCard, QrCode, Wallet } from 'lucide-react';
+import { AlertTriangle, Clock, CreditCard, Loader2, Wallet } from 'lucide-react';
+
+import { obterPagamentoDaReserva } from '@/app/(public)/_actions/agendamento';
+import { iniciarCobranca } from '@/app/(public)/_actions/pagamento';
+import {
+  PainelDoPagamento,
+  formatarContagem,
+} from '@/components/shared/agendamento-pagamento-painel';
+import type { EnvioDoBrick } from '@/components/shared/agendamento-pagamento-brick';
+import { getPusherClient, canalUsuario } from '@/lib/integrations/pusher/client';
+import {
+  combinarComSituacao,
+  entradaDoBrick,
+  estadoDoResultado,
+  haPagamentoEmCurso,
+  podeEnviar,
+  type EstadoDoPagamento,
+} from '@/lib/agendamento/pagamento-na-tela';
+
+/** Mesmo nome de `lib/mercadopago/aviso-ao-paciente.ts` — duplicado para não importar código de servidor. */
+const EVENTO_PAGAMENTO_ATUALIZADO = 'pagamento:atualizado';
+
+const PagamentoBrick = dynamic(() => import('@/components/shared/agendamento-pagamento-brick'), {
+  ssr: false,
+  loading: () => (
+    <div className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
+      <Loader2 size={16} className="animate-spin" />
+      Carregando as formas de pagamento…
+    </div>
+  ),
+});
 
 function formatarValor(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatarContagem(msRestante: number): string {
-  if (msRestante <= 0) return '00:00';
-  const totalSegundos = Math.floor(msRestante / 1000);
-  const minutos = Math.floor(totalSegundos / 60);
-  const segundos = totalSegundos % 60;
-  return `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-}
-
 interface AgendamentoPagamentoStepProps {
+  consultaId: string;
   medicoNome: string;
   dataHora: Date;
   valor: number | null;
   moeda: string;
-  /** ISO — prazo para pagar antes da reserva ser liberada automaticamente. */
+  /** ISO — prazo da RESERVA. O do PIX é outro, e vem da API quando o PIX é gerado. */
   expiraEm: string;
-  /** Disparado uma única vez quando o prazo chega a zero — quem usa decide o que fazer
-   *  (ex.: voltar para a etapa de escolha de horário). */
+  /** Public key do Payment Brick, lida no servidor (`lib/mercadopago/public-key.ts`). `null` = não configurada. */
+  publicKey: string | null;
+  /**
+   * Disparado uma única vez quando o prazo acaba SEM pagamento em curso. Com PIX pagável ou
+   * cartão em análise, não dispara — a reserva também não é liberada no banco (Fase 4).
+   */
   onExpirar?: () => void;
+  /** Disparado uma única vez quando o webhook confirma a consulta. */
+  onConfirmado?: () => void;
 }
 
 /**
- * Última etapa do wizard: layout de pagamento (PIX/boleto/cartão), sem integração real
- * de gateway ainda. Nenhum botão aqui dispara cobrança — é só estrutura visual, pronta
- * para plugar o checkout de verdade quando o Gather existir. A consulta continua
- * 'reservada' (aguardando pagamento) até essa integração existir.
+ * Última etapa do wizard: o pagamento de verdade (Parte 2, Fase 5), pelo Payment Brick do
+ * Mercado Pago. Cartão de crédito e PIX.
+ *
+ * O caminho: o Brick tokeniza o cartão (ou só escolhe PIX) → `iniciarCobranca` cria a cobrança
+ * em nome do médico → a tela mostra o QR code, a recusa ou "aprovado, confirmando" → o webhook
+ * confirma e avisa pelo Pusher (`pagamento:atualizado`, canal pessoal). A tela também relê o
+ * estado no banco ao abrir e ao voltar ao foco, para quem perdeu o aviso.
+ *
+ * A lógica de estado mora em `lib/agendamento/pagamento-na-tela.ts`; o que se desenha em cada
+ * estado, em `agendamento-pagamento-painel.tsx`.
  */
 export function AgendamentoPagamentoStep({
+  consultaId,
   medicoNome,
   dataHora,
   valor,
   moeda,
   expiraEm,
+  publicKey,
   onExpirar,
+  onConfirmado,
 }: AgendamentoPagamentoStepProps) {
   const [agora, setAgora] = useState(() => Date.now());
+  const [estado, setEstado] = useState<EstadoDoPagamento>({ tipo: 'escolhendo' });
+  const [lendo, setLendo] = useState(true);
+  const [enviando, setEnviando] = useState(false);
+  const [brickFalhou, setBrickFalhou] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  /** `null` até a primeira leitura. Sem conta conectada, o Brick não aparece — a cobrança falharia. */
+  const [medicoConectado, setMedicoConectado] = useState<boolean | null>(null);
   const expirarAvisadoRef = useRef(false);
+  const confirmadoAvisadoRef = useRef(false);
 
   useEffect(() => {
     const intervalo = setInterval(() => setAgora(Date.now()), 1000);
     return () => clearInterval(intervalo);
   }, []);
 
+  /** Aplica o que o banco disse, combinado com o que a tela já sabe (ver `combinarComSituacao`). */
+  const aplicar = useCallback((res: Awaited<ReturnType<typeof obterPagamentoDaReserva>>) => {
+    if (!res.sucesso || !res.dados) return;
+    const situacao = res.dados;
+    setUserId(situacao.userId);
+    setMedicoConectado(situacao.medicoConectado);
+    setEstado((atual) => combinarComSituacao(atual, situacao));
+  }, []);
+
+  /** Relê o banco — chamado pelos eventos (aviso do webhook, volta ao foco). */
+  const reler = useCallback(async () => {
+    aplicar(await obterPagamentoDaReserva({ consultaId }));
+  }, [consultaId, aplicar]);
+
+  // Ao abrir (inclusive depois de um reload): retoma o pagamento que já estiver em curso. O
+  // estado só muda no `.then`, depois da resposta — nunca de forma síncrona no corpo do efeito.
+  useEffect(() => {
+    let ativo = true;
+    obterPagamentoDaReserva({ consultaId })
+      .then((res) => {
+        if (ativo) aplicar(res);
+      })
+      .catch(() => {
+        // sem a leitura, a tela abre em "escolhendo"; o servidor ainda recusa cobrança dupla
+      })
+      .finally(() => {
+        if (ativo) setLendo(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [consultaId, aplicar]);
+
+  // O aviso do webhook, pelo canal pessoal. Só relê — o corpo não é confiável para decidir nada.
+  useEffect(() => {
+    if (!userId) return;
+    let pusher: ReturnType<typeof getPusherClient>;
+    try {
+      pusher = getPusherClient();
+    } catch {
+      return; // sem Pusher configurado, a releitura ao voltar ao foco continua valendo
+    }
+    const canal = canalUsuario(userId);
+    const aoAtualizar = (dados: { consultaId?: string }) => {
+      if (dados?.consultaId === consultaId) void reler();
+    };
+    const assinatura = pusher.subscribe(canal);
+    assinatura.bind(EVENTO_PAGAMENTO_ATUALIZADO, aoAtualizar);
+    return () => {
+      assinatura.unbind(EVENTO_PAGAMENTO_ATUALIZADO, aoAtualizar);
+      pusher.unsubscribe(canal);
+    };
+  }, [userId, consultaId, reler]);
+
+  // Quem trocou de aba para pagar no app do banco volta e vê o estado de agora.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') void reler();
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => document.removeEventListener('visibilitychange', aoVoltar);
+  }, [reler]);
+
   const msRestante = new Date(expiraEm).getTime() - agora;
-  const expirado = msRestante <= 0;
+  const reservaNoPrazo = msRestante > 0;
+  const emCurso = haPagamentoEmCurso(estado, agora);
+  const expirado = !reservaNoPrazo && !emCurso && !lendo;
   const valorFormatado = valor !== null ? `${moeda} ${formatarValor(valor)}` : 'A confirmar';
 
   useEffect(() => {
@@ -66,6 +174,53 @@ export function AgendamentoPagamentoStep({
       onExpirar?.();
     }
   }, [expirado, onExpirar]);
+
+  useEffect(() => {
+    if (estado.tipo === 'confirmado' && !confirmadoAvisadoRef.current) {
+      confirmadoAvisadoRef.current = true;
+      onConfirmado?.();
+    }
+  }, [estado.tipo, onConfirmado]);
+
+  // 🔴 Estáveis de propósito: a etapa re-renderiza a cada segundo (o cronômetro), e o Brick
+  // (`memo`) só deixa de re-renderizar se o que recebe não mudar de identidade. Ver o
+  // cabeçalho de `agendamento-pagamento-brick.tsx` — o defeito de 28/09/2026.
+  const cobrar = useCallback(async (entrada: Parameters<typeof iniciarCobranca>[0]) => {
+    setEnviando(true);
+    try {
+      const res = await iniciarCobranca(entrada);
+      setEstado(estadoDoResultado(res));
+    } catch {
+      setEstado({
+        tipo: 'erro',
+        mensagem: 'Não conseguimos falar com o servidor. Confira a conexão e tente de novo.',
+      });
+    } finally {
+      setEnviando(false);
+    }
+  }, []);
+
+  const aoEnviarDoBrick = useCallback(
+    async (envio: EnvioDoBrick) => {
+      const entrada = entradaDoBrick(consultaId, envio);
+      if (!entrada) {
+        setEstado({ tipo: 'erro', mensagem: 'Este meio de pagamento não está disponível.' });
+        return;
+      }
+      await cobrar(entrada);
+    },
+    [consultaId, cobrar],
+  );
+
+  const aoFalharOBrick = useCallback(() => setBrickFalhou(true), []);
+
+  const mostrarBrick =
+    !lendo &&
+    !enviando &&
+    !brickFalhou &&
+    medicoConectado === true &&
+    estado.tipo === 'escolhendo' &&
+    podeEnviar(estado, expiraEm, agora);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -103,39 +258,45 @@ export function AgendamentoPagamentoStep({
             </div>
           </div>
 
-          <div
-            className={`flex items-center gap-3 rounded-xl border p-4 ${
-              expirado
-                ? 'border-destructive/40 bg-destructive/5'
-                : 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20'
-            }`}
-          >
-            {expirado ? (
-              <AlertTriangle size={18} className="text-destructive shrink-0" />
-            ) : (
-              <Clock size={18} className="shrink-0 text-amber-700 dark:text-amber-400" />
-            )}
-            <div className="flex-1">
-              <p
-                className={`text-sm font-semibold ${
-                  expirado ? 'text-destructive' : 'text-amber-800 dark:text-amber-400'
-                }`}
-              >
-                {expirado
-                  ? 'O prazo para pagamento acabou'
-                  : `Tempo restante para pagar: ${formatarContagem(msRestante)}`}
-              </p>
-              <p
-                className={`text-xs ${
-                  expirado ? 'text-destructive/80' : 'text-amber-700/80 dark:text-amber-400/70'
-                }`}
-              >
-                {expirado
-                  ? 'Sua reserva pode já ter sido liberada. Volte à etapa de agendamento para escolher um novo horário.'
-                  : 'Se o pagamento não for concluído até o prazo, a reserva é liberada automaticamente e o horário volta a ficar disponível.'}
-              </p>
+          {/* A faixa do prazo da RESERVA só vale antes de haver pagamento em curso — depois
+              dele, o prazo que importa é o do PIX, ou nenhum (cartão em análise). */}
+          {!emCurso && (
+            <div
+              className={`flex items-center gap-3 rounded-xl border p-4 ${
+                reservaNoPrazo
+                  ? 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20'
+                  : 'border-destructive/40 bg-destructive/5'
+              }`}
+            >
+              {reservaNoPrazo ? (
+                <Clock size={18} className="shrink-0 text-amber-700 dark:text-amber-400" />
+              ) : (
+                <AlertTriangle size={18} className="text-destructive shrink-0" />
+              )}
+              <div className="flex-1">
+                <p
+                  className={`text-sm font-semibold ${
+                    reservaNoPrazo ? 'text-amber-800 dark:text-amber-400' : 'text-destructive'
+                  }`}
+                >
+                  {reservaNoPrazo
+                    ? `Tempo restante para pagar: ${formatarContagem(msRestante)}`
+                    : 'O prazo para pagamento acabou'}
+                </p>
+                <p
+                  className={`text-xs ${
+                    reservaNoPrazo
+                      ? 'text-amber-700/80 dark:text-amber-400/70'
+                      : 'text-destructive/80'
+                  }`}
+                >
+                  {reservaNoPrazo
+                    ? 'Se o pagamento não for iniciado até o prazo, a reserva é liberada automaticamente e o horário volta a ficar disponível.'
+                    : 'Sua reserva pode já ter sido liberada. Volte à etapa de agendamento para escolher um novo horário.'}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -146,117 +307,49 @@ export function AgendamentoPagamentoStep({
             Forma de pagamento
           </CardTitle>
           <p className="text-muted-foreground text-sm">
-            Escolha como prefere pagar. Nenhuma cobrança é feita agora — a integração de pagamento
-            ainda está em desenvolvimento.
+            Cartão de crédito ou PIX, pelo Mercado Pago. O valor vai direto para o médico.
           </p>
         </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="pix">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="pix">PIX</TabsTrigger>
-              <TabsTrigger value="boleto">Boleto</TabsTrigger>
-              <TabsTrigger value="credito">Crédito</TabsTrigger>
-              <TabsTrigger value="debito">Débito</TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-4">
+          {(lendo || enviando) && (
+            <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
+              <Loader2 size={16} className="animate-spin" />
+              {enviando ? 'Processando o pagamento…' : 'Carregando…'}
+            </div>
+          )}
 
-            <TabsContent value="pix" className="mt-6">
-              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-                <div className="border-border bg-muted/40 flex h-36 w-36 shrink-0 items-center justify-center rounded-xl border-2 border-dashed">
-                  <QrCode size={56} className="text-muted-foreground/50" />
-                </div>
-                <div className="flex-1 space-y-3">
-                  <p className="text-muted-foreground text-sm">
-                    Escaneie o QR Code com o app do seu banco ou copie o código PIX abaixo.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      disabled
-                      value="pix copia-e-cola indisponível ainda"
-                      className="text-xs"
-                    />
-                    <Button variant="outline" disabled>
-                      Copiar
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+          {!lendo && !enviando && (
+            <PainelDoPagamento
+              estado={estado}
+              agora={agora}
+              reservaNoPrazo={reservaNoPrazo}
+              ocupado={enviando}
+              onTentarDeNovo={() => setEstado({ tipo: 'escolhendo' })}
+              onPedirQrDeNovo={() => void cobrar({ consultaId, metodo: 'pix' })}
+            />
+          )}
 
-            <TabsContent value="boleto" className="mt-6">
-              <div className="space-y-3">
-                <Label>Linha digitável</Label>
-                <Input
-                  readOnly
-                  disabled
-                  value="00000.00000 00000.000000 00000.000000 0 00000000000000"
-                  className="text-xs"
-                />
-                <div className="flex items-center gap-2">
-                  <Barcode size={16} className="text-muted-foreground" />
-                  <Button variant="outline" disabled>
-                    Baixar boleto
-                  </Button>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Boletos costumam levar até 2 dias úteis para compensar — considere o prazo da
-                  reserva antes de escolher esta opção.
-                </p>
-              </div>
-            </TabsContent>
+          {!lendo &&
+            estado.tipo === 'escolhendo' &&
+            reservaNoPrazo &&
+            (medicoConectado !== true || publicKey === null || valor === null || brickFalhou) && (
+              <p className="text-destructive text-sm">
+                {medicoConectado === false
+                  ? 'O pagamento pelo site ainda não está disponível para este médico. Fale com a clínica para concluir o agendamento.'
+                  : valor === null
+                    ? 'O valor desta consulta ainda não foi definido. Fale com a clínica para concluir o agendamento.'
+                    : 'O pagamento está indisponível no momento. Tente de novo em alguns minutos ou fale com a clínica.'}
+              </p>
+            )}
 
-            <TabsContent value="credito" className="mt-6">
-              <div className="max-w-xs space-y-4">
-                <div className="space-y-1.5">
-                  <Label>Número do cartão</Label>
-                  <Input disabled placeholder="0000 0000 0000 0000" />
-                </div>
-                <div className="flex gap-3">
-                  <div className="w-24 space-y-1.5">
-                    <Label>Validade</Label>
-                    <Input disabled placeholder="MM/AA" />
-                  </div>
-                  <div className="w-20 space-y-1.5">
-                    <Label>CVV</Label>
-                    <Input disabled placeholder="123" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Nome impresso no cartão</Label>
-                  <Input disabled placeholder="Nome completo" />
-                </div>
-                <Button disabled className="w-full">
-                  Pagar com cartão de crédito
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="debito" className="mt-6">
-              <div className="max-w-xs space-y-4">
-                <div className="space-y-1.5">
-                  <Label>Número do cartão</Label>
-                  <Input disabled placeholder="0000 0000 0000 0000" />
-                </div>
-                <div className="flex gap-3">
-                  <div className="w-24 space-y-1.5">
-                    <Label>Validade</Label>
-                    <Input disabled placeholder="MM/AA" />
-                  </div>
-                  <div className="w-20 space-y-1.5">
-                    <Label>CVV</Label>
-                    <Input disabled placeholder="123" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Nome impresso no cartão</Label>
-                  <Input disabled placeholder="Nome completo" />
-                </div>
-                <Button disabled className="w-full">
-                  Pagar com cartão de débito
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
+          {mostrarBrick && publicKey !== null && valor !== null && (
+            <PagamentoBrick
+              publicKey={publicKey}
+              valor={valor}
+              onEnviar={aoEnviarDoBrick}
+              onFalhaDoBrick={aoFalharOBrick}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

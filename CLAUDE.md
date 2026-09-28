@@ -96,6 +96,9 @@ da `docs/`; se divergirem, o mapa é a fonte e esta tabela é o defeito.
 Runner: **Vitest 4** desde a Sprint 0 (20/08/2026). `pnpm test` roda todos.
 
 🔴 **Os números abaixo foram MEDIDOS com `pnpm test`, não estimados.** Última medição:
+**28/09/2026, depois do merge da `main` (PRs #129 e #130) na `feat/identidade-na-etapa-1` — 1650
+casos em 71 arquivos**, e a integração **148 em 12** (sem os dois arquivos de prévia). Antes do
+merge:
 **28/09/2026 — 1587 casos em 69 arquivos**, e a integração **135 casos em 11 arquivos** (sem os
 dois de prévia; com eles, 137 em 13), na branch `docs/adr-0028-identidade-na-etapa-1`
 (ADR-0028, depois da revisão pelos quatro agentes). A primeira medição do mesmo dia dizia 1574/69

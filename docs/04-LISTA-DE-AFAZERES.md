@@ -19,6 +19,88 @@
 
 ---
 
+## ⚪ Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele
+
+**Status:** catalogado, **não corrigido**. Todos saíram da revisão dos quatro agentes (ADR-0028
+§9.2). Cada um é trabalho próprio ou pergunta.
+
+| # | o quê | onde | perigo | o que pede |
+|---|---|---|---|---|
+| 1 | O limite por IP lê o **primeiro** `x-forwarded-for`. Se o nginx da VPS **acrescenta** em vez de sobrescrever, o atacante escolhe o próprio IP, e só o limite por link segura | `lib/seguranca/limite-de-requisicao.ts:106` | médio (inferência: a configuração do nginx não está no repositório) | medir na VPS: `proxy_set_header X-Forwarded-For $remote_addr` ou `real_ip` |
+| 2 | 🔴 **O telefone de um médico ou admin trava o paciente.** `donosDoTelefone` não filtra `role` | `lib/cadastro/conferir-identidade.ts` (consulta do telefone) | baixo/médio | ✅ **respondido em 28/09/2026: não agora.** Resposta: _"isso por enquanto não vamos nos preocupar"_. Fica catalogado, sem data |
+| 3 | `porClerk` da transação não filtra `deletedAt`: uma conta Clerk ligada a um `users` apagado confere contra outra pessoa | `app/_actions/cadastro-por-link.ts` (transação, `porClerk`) | baixo, e já existia antes | um filtro, com teste |
+| 4 | Checagem e escrita não são atômicas: dois links com o mesmo CPF, ao mesmo tempo, passam os dois | conferência fora da transação | baixo | só um índice fecha, e depende do Item 52 (duplicatas antes do unique) |
+| 5 | As consultas com `regexp_replace`/`lower()` varrem `users` e `pacientes` inteiras | `lib/cadastro/conferir-identidade.ts` | baixo hoje, cresce com a base | índice de expressão, com migration |
+| 6 | A auditoria do veredito `limite` grava a cada chamada: dá para inflar `logs_auditoria` | `app/_actions/identidade-no-cadastro.ts` | baixo | auditar uma vez por janela |
+| 7 | Quem para no suporte ou no telefone não conclui. **A Greens fica com o handoff pendente** sem saber por quê | fluxo `greens_handoff` | médio para a operação (inferência: não foi conferido em `greens-corp` se há prazo ou retentativa) | 🔴 **prioridade do dono em 28/09/2026:** avisar a Greens pela "Ponte". Mensagem em `docs/integracao-greens/` |
+| 8 | `emailAddresses?.[0]` não é necessariamente o e-mail principal: numa conta com vários e-mails, dá `sessao_alheia` falso | `page.tsx`, `identidade-no-cadastro.ts` | baixo, e segue o padrão que já existia | `primaryEmailAddress` em todos os pontos |
+| 9 | O texto do e-mail passa por baixo do ícone de check quando o campo é válido | `Campo` em `formulario-de-cadastro.tsx` | cosmético, e já existia | `pr-10` quando válido |
+
+---
+
+## ⚪ Item 53 — CATALOGADO, 28/09/2026: o guarda de limite só enxerga Route Handler, e nenhuma Server Action tem limite
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+`as-rotas-sensiveis-tem-limite` confere uma **lista fixa** de seis route handlers
+(`__tests__/guardas/as-rotas-sensiveis-tem-limite.test.ts:30`, `ROTAS_QUE_PRECISAM`). Server Action não
+entra, e `rg "consumir\(" app/_actions` volta **vazio**: nenhuma action pública tem limite. Isso
+pesa porque `/cadastro(.*)` é público (`middleware.ts:57`), e a action do cadastro por link roda
+sem autenticação.
+
+**O Item 50 cobre a action dele** no guarda próprio (ADR-0028 D-08). Estender o guarda antigo
+para **derivar** as actions públicas, em vez de listar, é trabalho próprio: é a mesma lição do
+`duas-contas-de-chatpro-nao-se-misturam`, onde a lista fixa ficou verde com a rota errada.
+
+**Também fica registrado aqui, pela mesma pesquisa:** a **User Enumeration Protection** do Clerk
+em modo Strict (ADR-0028 D-10) fecharia a enumeração pelo sign-up. Mas ela muda a estratégia de
+login da instância inteira, e fica para decisão do dono.
+
+---
+
+## 🟠 Item 52 — CATALOGADO, 28/09/2026: o CPF não tem unique, e é gravado em dois formatos
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+- `pacientes.cpf` é `text` **sem unique e sem índice** (`db/schema/pacientes.ts:30`). Hoje duas
+  fichas com o mesmo CPF nascem **sem erro e sem log**.
+- O handoff e o cadastro por link gravam só dígitos (`lib/parceiros/handoff.ts:307`,
+  `app/_actions/cadastro-por-link.ts:181`). O perfil (`app/_actions/perfil-paciente.ts:200`) e o
+  `criarPaciente` do admin gravam **como foi digitado**.
+- O CPF **não é cifrado** em lugar nenhum.
+
+**O que o Item 50 faz com isso:** compara com `regexp_replace` e **não** migra nada (ADR-0028
+D-03). A causa fica aqui.
+
+**Perigo de mexer:** normalizar exige `UPDATE` em produção. Unique exige **antes** resolver as
+duplicatas que existirem. Quantas existem, o passo 0 do Item 50 mede. Cifrar muda toda leitura de
+CPF. São três trabalhos próprios, com migration e autorização.
+
+---
+
+## 🟠 Item 51 — CATALOGADO, 28/09/2026: o ChatPro reaproveita a solicitação pelo telefone sem conferir se o e-mail é de outra pessoa
+
+**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+
+`ServicoDeSolicitacao.buscarAtiva` (`lib/chatpro/solicitacao.ts:159`) procura pelo `leadId` e
+depois pelo **telefone** uma solicitação `link_gerado` ainda não usada e não vencida. O update
+faz `email: params.email ?? existente.email` (`:243`, `:271`), **sem conferir** se o e-mail que
+chegou diverge do que já estava lá. O handoff da Greens tem essa trava
+(`lib/parceiros/handoff.ts:422-434`, _"FALHA FECHADA … telefone não identifica pessoa"_). O
+ChatPro não tem.
+
+**O perigo:** duas pessoas com o mesmo aparelho, como um cuidador ou um familiar. A segunda recebe
+o link da solicitação da primeira, com o e-mail dela trocado ou mantido. É a mesma classe de
+OWASP API1 que o `handoff.ts:233-250` descreve.
+
+**Perigo de mexer:** baixo no código (uma condição, espelhando o `reaproveitavel`). Mas muda o
+número de solicitações criadas, e o guarda `o-reaproveitamento-nao-funde-duas-pessoas` **só lê o
+`handoff.ts`**: teria de passar a ler este também. **Em produção:** sim. A ocorrência real não foi
+medida, e a medição é um `SELECT` de solicitações com o mesmo telefone e e-mails diferentes.
+**Autorização** antes de mexer.
+
+---
+
 ## 🟡 Item 50 — IMPLEMENTADO, 28/09/2026 (tela não provada no navegador): a identidade se confere na etapa 1 do cadastro ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md))
 
 **Status:** 🟡 **implementado em 28/09/2026, não commitado, não em produção**, na branch
@@ -116,85 +198,167 @@ a conferência mora no nosso formulário (D-01), e o contrato não muda.**
 
 ---
 
-## ⚪ Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele
+## 🟠 Item 49 — CATALOGADO, 28/09/2026: `POST /api/pusher/auth` respondendo 403 na tela de pagamento
 
-**Status:** catalogado, **não corrigido**. Todos saíram da revisão dos quatro agentes (ADR-0028
-§9.2). Cada um é trabalho próprio ou pergunta.
+**Status:** catalogado, **não investigado** (decisão do dono). Visto pelo dono no teste manual
+da tela de pagamento em produção, no mesmo dia do defeito do Brick remontando (PR
+`fix/payment-brick-loop-e-csp`). **Não se sabe ainda qual canal recusou, nem por quê.**
 
-| # | o quê | onde | perigo | o que pede |
-|---|---|---|---|---|
-| 1 | O limite por IP lê o **primeiro** `x-forwarded-for`. Se o nginx da VPS **acrescenta** em vez de sobrescrever, o atacante escolhe o próprio IP, e só o limite por link segura | `lib/seguranca/limite-de-requisicao.ts:106` | médio (inferência: a configuração do nginx não está no repositório) | medir na VPS: `proxy_set_header X-Forwarded-For $remote_addr` ou `real_ip` |
-| 2 | 🔴 **O telefone de um médico ou admin trava o paciente.** `donosDoTelefone` não filtra `role` | `lib/cadastro/conferir-identidade.ts` (consulta do telefone) | baixo/médio | ✅ **respondido em 28/09/2026: não agora.** Resposta: _"isso por enquanto não vamos nos preocupar"_. Fica catalogado, sem data |
-| 3 | `porClerk` da transação não filtra `deletedAt`: uma conta Clerk ligada a um `users` apagado confere contra outra pessoa | `app/_actions/cadastro-por-link.ts` (transação, `porClerk`) | baixo, e já existia antes | um filtro, com teste |
-| 4 | Checagem e escrita não são atômicas: dois links com o mesmo CPF, ao mesmo tempo, passam os dois | conferência fora da transação | baixo | só um índice fecha, e depende do Item 52 (duplicatas antes do unique) |
-| 5 | As consultas com `regexp_replace`/`lower()` varrem `users` e `pacientes` inteiras | `lib/cadastro/conferir-identidade.ts` | baixo hoje, cresce com a base | índice de expressão, com migration |
-| 6 | A auditoria do veredito `limite` grava a cada chamada: dá para inflar `logs_auditoria` | `app/_actions/identidade-no-cadastro.ts` | baixo | auditar uma vez por janela |
-| 7 | Quem para no suporte ou no telefone não conclui. **A Greens fica com o handoff pendente** sem saber por quê | fluxo `greens_handoff` | médio para a operação (inferência: não foi conferido em `greens-corp` se há prazo ou retentativa) | 🔴 **prioridade do dono em 28/09/2026:** avisar a Greens pela "Ponte". Mensagem em `docs/integracao-greens/` |
-| 8 | `emailAddresses?.[0]` não é necessariamente o e-mail principal: numa conta com vários e-mails, dá `sessao_alheia` falso | `page.tsx`, `identidade-no-cadastro.ts` | baixo, e segue o padrão que já existia | `primaryEmailAddress` em todos os pontos |
-| 9 | O texto do e-mail passa por baixo do ícone de check quando o campo é válido | `Campo` em `formulario-de-cadastro.tsx` | cosmético, e já existia | `pr-10` quando válido |
+### Por que importa
 
----
+A tela de pagamento assina `private-user-{userId}` para receber o aviso do webhook
+(`pagamento:atualizado`, `lib/mercadopago/aviso-ao-paciente.ts`). Se **esse** canal for o
+recusado, o aviso em tempo real não chega. **O pagamento não se perde:** a confirmação também vai
+por e-mail, e a tela relê o estado ao voltar ao foco. Mas o paciente fica sem o "confirmado" na hora.
 
-## 🟠 Item 51 — CATALOGADO, 28/09/2026: o ChatPro reaproveita a solicitação pelo telefone sem conferir se o e-mail é de outra pessoa
+### O que o código mostra — sem concluir
 
-**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+`app/api/pusher/auth/route.ts` tem **cinco** saídas 403, e cada uma diz um `erro` diferente no
+corpo. É o que as distingue:
 
-`ServicoDeSolicitacao.buscarAtiva` (`lib/chatpro/solicitacao.ts:159`) procura pelo `leadId` e
-depois pelo **telefone** uma solicitação `link_gerado` ainda não usada e não vencida. O update
-faz `email: params.email ?? existente.email` (`:243`, `:271`), **sem conferir** se o e-mail que
-chegou diverge do que já estava lá. O handoff da Greens tem essa trava
-(`lib/parceiros/handoff.ts:422-434`, _"FALHA FECHADA … telefone não identifica pessoa"_). O
-ChatPro não tem.
+| linha | canal | `erro` no corpo | quando |
+| --- | --- | --- | --- |
+| `:55` | `private-user-{id}` | `Acesso negado` | o id do canal não é o `users.id` da sessão |
+| `:72` | `private-chat-{grupo}` | `Acesso negado ao grupo` | a pessoa não participa do grupo |
+| `:81` | sala de espera | `Acesso negado` | quem assina não é médico nem admin |
+| `:96` | `presence-sala-{roomId}` | o `erro` de `garantirDonoDaSala` | a pessoa não é parte da sala |
+| `:108` | qualquer outro | `Canal não reconhecido` | o default nega |
 
-**O perigo:** duas pessoas com o mesmo aparelho, como um cuidador ou um familiar. A segunda recebe
-o link da solicitação da primeira, com o e-mail dela trocado ou mantido. É a mesma classe de
-OWASP API1 que o `handoff.ts:233-250` descreve.
+⚠️ **O `:55` e o `:81` devolvem o MESMO texto**, então só o `channel_name` do pedido os separa.
+E o 403 pode ser de um canal que **outra** parte da página assina (o layout do paciente, a
+teleconsulta global), e não da tela de pagamento. Nenhuma das hipóteses foi medida.
 
-**Perigo de mexer:** baixo no código (uma condição, espelhando o `reaproveitavel`). Mas muda o
-número de solicitações criadas, e o guarda `o-reaproveitamento-nao-funde-duas-pessoas` **só lê o
-`handoff.ts`**: teria de passar a ler este também. **Em produção:** sim. A ocorrência real não foi
-medida, e a medição é um `SELECT` de solicitações com o mesmo telefone e e-mails diferentes.
-**Autorização** antes de mexer.
+### Como medir, antes de corrigir qualquer coisa
 
----
+No navegador, na tela onde o 403 aparece: DevTools → Network → o pedido `auth` → **Payload**
+(`channel_name`) e **Response** (`erro`). O par diz qual das cinco linhas respondeu. Sem PII: o
+`channel_name` traz só ids internos.
 
-## ⚪ Item 53 — CATALOGADO, 28/09/2026: o guarda de limite só enxerga Route Handler, e nenhuma Server Action tem limite
-
-**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
-
-`as-rotas-sensiveis-tem-limite` confere uma **lista fixa** de seis route handlers
-(`__tests__/guardas/as-rotas-sensiveis-tem-limite.test.ts:30`, `ROTAS_QUE_PRECISAM`). Server Action não
-entra, e `rg "consumir\(" app/_actions` volta **vazio**: nenhuma action pública tem limite. Isso
-pesa porque `/cadastro(.*)` é público (`middleware.ts:57`), e a action do cadastro por link roda
-sem autenticação.
-
-**O Item 50 cobre a action dele** no guarda próprio (ADR-0028 D-08). Estender o guarda antigo
-para **derivar** as actions públicas, em vez de listar, é trabalho próprio: é a mesma lição do
-`duas-contas-de-chatpro-nao-se-misturam`, onde a lista fixa ficou verde com a rota errada.
-
-**Também fica registrado aqui, pela mesma pesquisa:** a **User Enumeration Protection** do Clerk
-em modo Strict (ADR-0028 D-10) fecharia a enumeração pelo sign-up. Mas ela muda a estratégia de
-login da instância inteira, e fica para decisão do dono.
+**Perigo de mexer:** a rota é o controle de acesso de TODO canal privado (chat, teleconsulta,
+notificações). Afrouxar um ramo para "resolver" o 403 é abrir canal alheio. O Item 11 (20/08) foi
+exatamente isso no sentido contrário. A correção só entra depois de saber qual ramo.
 
 ---
 
-## 🟠 Item 52 — CATALOGADO, 28/09/2026: o CPF não tem unique, e é gravado em dois formatos
+## ✅ Item 48 — IMPLEMENTADO em 28/09/2026: o Payment Brick real na tela do paciente (Parte 2, Fase 5) — ⏳ aguardando merge
 
-**Status:** catalogado, **não corrigido**. Achado ao pesquisar o Item 50.
+**Status:** implementado e provado **localmente**, branch `feat/fase5-payment-brick`, PR aberto.
+**Não está em produção:** o merge espera a confirmação explícita do dono, porque este é o primeiro
+PR que liga cobrança real ao fluxo do paciente. Com `MERCADOPAGO_AMBIENTE` ausente ou `teste`, a
+chave usada é a de teste.
 
-- `pacientes.cpf` é `text` **sem unique e sem índice** (`db/schema/pacientes.ts:30`). Hoje duas
-  fichas com o mesmo CPF nascem **sem erro e sem log**.
-- O handoff e o cadastro por link gravam só dígitos (`lib/parceiros/handoff.ts:307`,
-  `app/_actions/cadastro-por-link.ts:181`). O perfil (`app/_actions/perfil-paciente.ts:200`) e o
-  `criarPaciente` do admin gravam **como foi digitado**.
-- O CPF **não é cifrado** em lugar nenhum.
+### O que existia antes
 
-**O que o Item 50 faz com isso:** compara com `regexp_replace` e **não** migra nada (ADR-0028
-D-03). A causa fica aqui.
+A etapa de pagamento (`components/shared/agendamento-pagamento-step.tsx`) era **só layout**: quatro
+abas desabilitadas e _"Nenhuma cobrança é feita agora"_. O backend da Fase 2 (`iniciarCobranca`)
+existia e ninguém o chamava. E a tela nem recebia o `consultaId`.
 
-**Perigo de mexer:** normalizar exige `UPDATE` em produção. Unique exige **antes** resolver as
-duplicatas que existirem. Quantas existem, o passo 0 do Item 50 mede. Cifrar muda toda leitura de
-CPF. São três trabalhos próprios, com migration e autorização.
+### O que existe agora
+
+| peça | onde | o que faz |
+| --- | --- | --- |
+| o Brick | `components/shared/agendamento-pagamento-brick.tsx` | `@mercadopago/sdk-react@1.0.7`, `dynamic(…, { ssr: false })`; crédito (`:55`) e PIX, boleto e débito fora; **só à vista** (`maxInstallments: 1`, `:60`). O cartão chega tokenizado |
+| a lógica da tela | `lib/agendamento/pagamento-na-tela.ts` | pura: `entradaDoBrick` (`:56`, snake_case do Brick → camelCase da action), `estadoDoResultado` (`:163`), `haPagamentoEmCurso` (`:218`), `combinarComSituacao` (`:244`) |
+| o que se desenha | `components/shared/agendamento-pagamento-painel.tsx` | um painel por estado — QR code + copia-e-cola + validade REAL do PIX, aprovado, em análise, recusado (motivo pelo `status_detail`), expirada, pago sem horário, confirmado |
+| a public key | `lib/mercadopago/public-key.ts:15` → `app/(paciente)/paciente/agendamento/page.tsx` | da conta do **integrador** (doc do Split 1:1), escolhida por `MERCADOPAGO_AMBIENTE`, entregue por prop — nunca `NEXT_PUBLIC_` |
+| o aviso | `lib/mercadopago/aviso-ao-paciente.ts:27`, chamado em `lib/mercadopago/notificacoes.ts:315,342` | Pusher `pagamento:atualizado` no canal pessoal, só `{ consultaId, estado }`; nunca lança. A tela também relê ao voltar ao foco, e a confirmação já manda e-mail |
+| a releitura | `app/(public)/_actions/agendamento.ts:580` (`obterPagamentoDaReserva`) | só leitura, escopo do paciente; diz o pagamento em curso e se o médico tem conta (`:624`) |
+| à vista no servidor | `app/(public)/_actions/pagamento.ts:38` | `installments` `.max(1)` (era 12): o cliente não decide |
+
+### 🔴 Três regras que a tela sustenta
+
+1. **"aprovado" não é "confirmado".** A resposta do `POST` não confirma nada; a tela diz _"aprovado,
+   confirmando sua consulta"_ e só diz "agendada" depois do webhook
+2. **o prazo da reserva não expulsa quem está pagando** (`components/shared/agendamento-pagamento-step.tsx:168`).
+   Antes, o wizard voltava ao começo aos 30 min — com o PIX valendo 31 — e dizia "o prazo acabou"
+   a quem tinha acabado de pagar, desmentindo a trava da Fase 4
+3. **médico sem conta não recebe oferta de pagamento**, em duas camadas mais a original:
+   - na **escolha do médico** — `agendavel` de `podeAgendarCom` (`app/(public)/_actions/agendamento.ts:1070`),
+     card desabilitado com mensagem (`components/shared/agendamento-wizard.tsx:390`). Só age com o
+     interruptor do Item 38 ligado
+   - na **tela de pagamento** — o Brick só aparece com o médico conectado
+     (`components/shared/agendamento-pagamento-step.tsx:213`). Age também com o interruptor
+     desligado, que é quando o paciente ainda chega aqui com um médico sem conta
+   - e `reservarConsulta` continua recusando, como antes
+
+### Provas
+
+- guarda novo `a-tela-de-pagamento-nao-promete-o-que-o-webhook-nao-confirmou`: **39 casos**, com
+  cada estado RENDERIZADO por `react-dom/server` (sem jsdom — o `vitest.config.mts` o recusa sem
+  consumidor)
+- integração `a-tela-de-pagamento-segue-o-que-o-servidor-diz`: **13 casos**, do envio do Brick à
+  action real e ao aviso do webhook — PIX gera QR com a validade da API; cartão aprovado nunca vira
+  "confirmado" antes do webhook; recusa mostra o motivo e aceita outro cartão; reserva expirada não
+  chama a API; Pusher fora do ar não impede a confirmação; escopo de objeto; **o interruptor
+  desligado (estado de produção) e ligado (lançamento)**; 2 parcelas recusadas antes do MP
+- **17 sabotagens vermelhas.** Uma sobreviveu na primeira rodada por defeito do **guarda**: a regex
+  de `disabled={!m.agendavel}` casava dentro de `aria-disabled` — corrigida com lookbehind e refeita
+- `pnpm test` 1577/1577 · integração 121/121 · `tsc` 0 · baseline verde · `pnpm build` ok
+- prévia de todos os estados renderizada com o CSS do build e capturada no Chrome headless
+
+### ⚠️ O que NÃO foi provado
+
+- **o Brick real não renderizou localmente**: não há public key do Mercado Pago no `.env` local
+- o teste real de ponta a ponta (R$ 1,00, PIX e cartão, dinheiro na conta do médico) é a Fase 7 do
+  plano, e só se faz em produção
+
+### Medido em produção em 28/09 (leitura)
+
+- **1 dos 6 médicos ativos** tem conta do Mercado Pago conectada — é o motivo das duas camadas acima
+- `MERCADOPAGO_PUBLIC_KEY_TESTE/PRODUCAO` estão nos secrets; `MERCADOPAGO_AMBIENTE` e
+  `MERCADOPAGO_WEBHOOK_SECRET` foram cadastrados pelo dono em 28/09 e chegam no próximo deploy
+
+### O que ficou
+
+- [Item 47](#-item-47--catalogado-28092026-o-pix-pedido-de-novo-depende-da-memória-do-mercado-pago-sobre-a-chave-de-idempotência):
+  o QR code do PIX não é gravado (e o fallback por `external_reference` não existe)
+- [Item 46](#-item-46--catalogado-28092026-três-outros-caminhos-cancelam-reserva-sem-olhar-o-pagamento-em-curso):
+  os outros três caminhos de cancelamento
+- ligar o interruptor do [Item 38](#-item-38--pendente-22092026-ligar-o-bloqueio-de-agendamento-do-mercado-pago)
+  e trocar `MERCADOPAGO_AMBIENTE` para `producao` — **só no lançamento**, decisão do dono
+- o 3DS (`pending_challenge`) não é pedido: o backend não envia `three_d_secure_mode`
+
+---
+
+## 🟠 Item 47 — CATALOGADO, 28/09/2026: o PIX pedido de novo depende da memória do Mercado Pago sobre a chave de idempotência
+
+**Status:** catalogado, **não corrigido** (decisão do dono: _"guardar o QR code gerado em vez de
+depender da memória do Mercado Pago sobre a chave de idempotência. Não implementar agora."_).
+Achado ao implementar a Fase 5 (Payment Brick).
+
+**O mecanismo.** O QR code do PIX **não é gravado**: só volta na resposta do `POST /v1/payments`.
+Depois de um reload, a tela sabe que há PIX em curso, mas não tem o QR. O botão _"Mostrar o QR code
+de novo"_ (`components/shared/agendamento-pagamento-painel.tsx:212`, chamado em
+`components/shared/agendamento-pagamento-step.tsx:320`) pede o PIX outra vez, e isso só devolve
+**o mesmo** PIX porque a chave de idempotência é a mesma (`lib/mercadopago/cobranca.ts:123`,
+pagamento + prazo da reserva) e `criarCobranca` aceita essa repetição (`:251`).
+
+⚠️ **E a doc não publica por quanto tempo o Mercado Pago lembra de uma chave** — o próprio código
+diz isso (`lib/mercadopago/cobranca.ts:120`).
+
+**O modo de erro.** Se o MP não lembrar da chave, cria um **segundo** PIX. `criarCobranca` grava a
+referência nova por cima da antiga (`lib/mercadopago/cobranca.ts:476`, `gatewayReferenciaId`). Se o
+paciente pagar o **primeiro** (o que ele já tinha copiado):
+
+- a notificação chega com o id do primeiro, e `processarPagamento` procura a linha **só** por
+  `gatewayReferenciaId` (`lib/mercadopago/notificacoes.ts:195`) → não acha → `'desconhecido'`
+  (`:204`) — o dinheiro entra e a consulta **não** é confirmada
+- 🔴 **o comentário de `cobranca.ts:333-334` promete o contrário:** _"se a gravação abaixo falhar
+  depois de o MP criar o pagamento, o webhook ainda acha a linha por aqui"_ (pelo
+  `external_reference`). **O código não faz isso** — o processamento não consulta
+  `external_reference` para achar a linha. É um segundo achado, da mesma raiz
+
+**A correção decidida (não implementada):** guardar o QR code gerado (`qr_code`, `qr_code_base64`,
+validade) e devolvê-lo na releitura, sem chamar o MP de novo. Exige migration.
+
+**O que também vale considerar** ao implementar: o fallback por `external_reference` no
+processamento, que fecha o mesmo buraco pelo outro lado (e o caso da gravação que falha).
+
+**Perigo de mexer:** migration aditiva (colunas nulas) + `criarCobranca` + a releitura da tela.
+**Em produção hoje:** risco **zero** até a Fase 5 subir — nenhuma tela cobra (0 pagamentos
+`em_processamento`, medido em 28/09). Com a Fase 5 no ar, o botão existe.
+
+---
 
 ---
 
@@ -816,7 +980,12 @@ derruba o agendamento da plataforma inteira.
 ### O que já existe
 
 `reservarConsulta` (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico
-não tem conta do Mercado Pago conectada. A checagem usa `podeAgendarCom`
+não tem conta do Mercado Pago conectada.
+
+✅ **Acrescentado na Fase 5 (28/09/2026, Item 48):** com o interruptor ligado, o médico sem conta
+passa a ser recusado **antes**, na escolha do médico (card desabilitado, `agendavel` de
+`podeAgendarCom`) — o paciente não escolhe data e horário para ouvir "não" depois. E, com o
+interruptor desligado, a tela de pagamento não oferece o Brick a médico sem conta. A checagem usa `podeAgendarCom`
 (`lib/mercadopago/conta.ts`), que **não decifra nada** — só confere que existe linha sem
 `desconectadoEm`.
 
