@@ -421,6 +421,16 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🟠 **Item 55 — CORRIGIDO no código em 28/09/2026 · ⏳ falta a prova manual**: **todo
+      pagamento com cartão parava antes do servidor.** O Brick envia
+      `selectedPaymentMethod: 'credit_card'` (enum `dm` do bundle servido em `http2.mlstatic.com`),
+      e nós comparávamos com
+      `'creditCard'` — a tipagem do `@mercadopago/sdk-react`, errada em relação ao runtime. A tela
+      dizia _"Este meio de pagamento não está disponível"_ e a cobrança nem era pedida; o PIX não
+      era afetado. Os testes tinham a mesma premissa e passavam. Corrigido (aceita os dois; débito
+      segue fora), com log do porquê no navegador, sem dado de cartão. **A prova real é manual**
+      (iframes cross-origin): os passos, com os cartões de teste da doc oficial, em
+      [04 — Item 55](04-LISTA-DE-AFAZERES.md). `25003100` não identificado.
 - [ ] ⚪ **Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele.** São
       nove pontos: o `x-forwarded-for` no nginx (medir na VPS); telefone de médico ou admin
       trava paciente (**dono, 28/09: não agora**); `porClerk` sem `deletedAt`; TOCTOU sem índice;

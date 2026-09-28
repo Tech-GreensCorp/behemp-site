@@ -17,6 +17,7 @@ import type { EnvioDoBrick } from '@/components/shared/agendamento-pagamento-bri
 import { getPusherClient, canalUsuario } from '@/lib/integrations/pusher/client';
 import {
   combinarComSituacao,
+  diagnosticoDoEnvio,
   entradaDoBrick,
   estadoDoResultado,
   haPagamentoEmCurso,
@@ -204,6 +205,9 @@ export function AgendamentoPagamentoStep({
     async (envio: EnvioDoBrick) => {
       const entrada = entradaDoBrick(consultaId, envio);
       if (!entrada) {
+        // Antes da mensagem genérica, o PORQUÊ vai para o log — o meio e os nomes dos campos que
+        // faltaram, nunca valor de cartão. Foi a falta disto que escondeu o `credit_card` (Item 55).
+        console.warn('[pagamento] envio do Brick não virou cobrança', diagnosticoDoEnvio(envio));
         setEstado({ tipo: 'erro', mensagem: 'Este meio de pagamento não está disponível.' });
         return;
       }

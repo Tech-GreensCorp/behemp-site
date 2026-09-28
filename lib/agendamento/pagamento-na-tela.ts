@@ -19,8 +19,28 @@
  * aviso — nunca "consulta confirmada" a partir da resposta do POST.
  */
 
-/** O `selectedPaymentMethod` do Brick. Só dois são aceitos; os outros ficam desligados. */
-export type MeioDoBrick = 'creditCard' | 'bank_transfer' | (string & {});
+/**
+ * 🔴 O `selectedPaymentMethod` QUE O BRICK REALMENTE ENVIA — e não o que a tipagem diz.
+ *
+ * A tipagem de `@mercadopago/sdk-react@1.0.7` (`esm/bricks/payment/type.d.ts`,
+ * `TPaymentBrickPaymentType`) declara `'creditCard'`. O Brick que o Mercado Pago SERVE envia
+ * `'credit_card'`: no bundle `https://http2.mlstatic.com/frontend-assets/op-cho-bricks/build/
+ * {3.18.0,3.17.1}/components/payment.js` (o endereço que `sdk.mercadopago.com/js/v2` monta), o
+ * enum exportado como `dm` no módulo 7765 é `CREDIT_CARD="credit_card"`, `DEBIT_CARD="debit_card"`,
+ * `BANK_TRANSFER="bank_transfer"` — conferido em 28/09/2026.
+ *
+ * Confiar na tipagem fez TODO pagamento com cartão parar aqui, antes de chegar ao servidor, com
+ * "Este meio de pagamento não está disponível" (Item 55 de docs/04). `'creditCard'` fica só como
+ * reserva, para o dia em que o SDK corrigir a tipagem e o Brick passar a enviá-la.
+ *
+ * ⚠️ Isto é o VALOR do `onSubmit`. As CHAVES de `customization.paymentMethods` (`creditCard`,
+ * `bankTransfer`) são outra coisa, em camelCase de verdade — medido: o Brick renderiza os dois
+ * meios com elas.
+ */
+export const MEIOS_DE_CARTAO_DE_CREDITO: readonly string[] = ['credit_card', 'creditCard'];
+export const MEIO_PIX = 'bank_transfer';
+
+export type MeioDoBrick = 'credit_card' | 'creditCard' | 'bank_transfer' | (string & {});
 
 /** O subconjunto do `formData` do Brick que a cobrança usa (snake_case, como o Brick entrega). */
 export interface FormDataDoBrick {
@@ -57,11 +77,11 @@ export function entradaDoBrick(
   consultaId: string,
   envio: { selectedPaymentMethod?: MeioDoBrick; formData?: FormDataDoBrick },
 ): EntradaDaCobranca | null {
-  if (envio.selectedPaymentMethod === 'bank_transfer') {
+  if (envio.selectedPaymentMethod === MEIO_PIX) {
     // PIX: o pagador sai do CADASTRO no servidor (e-mail e CPF). O que o Brick coletou é ignorado.
     return { consultaId, metodo: 'pix' };
   }
-  if (envio.selectedPaymentMethod !== 'creditCard') return null;
+  if (!MEIOS_DE_CARTAO_DE_CREDITO.includes(envio.selectedPaymentMethod ?? '')) return null;
 
   const f = envio.formData ?? {};
   const parcelas = Number(f.installments);
@@ -83,6 +103,32 @@ export function entradaDoBrick(
       },
     },
   };
+}
+
+/**
+ * POR QUE O ENVIO NÃO VIROU COBRANÇA — o que vai para o log quando `entradaDoBrick` devolve `null`.
+ *
+ * Só o meio (texto curto do próprio Brick) e os NOMES dos campos que faltaram. Nunca o valor de
+ * nenhum campo: `token`, e-mail e documento do pagador não saem daqui. É o que teria mostrado, no
+ * primeiro teste, que o Brick mandava `credit_card` — em vez de só "meio não disponível".
+ */
+export function diagnosticoDoEnvio(envio: {
+  selectedPaymentMethod?: MeioDoBrick;
+  formData?: FormDataDoBrick;
+}): { meio: string; reconhecido: boolean; faltando: string[] } {
+  const meio = String(envio.selectedPaymentMethod ?? '(ausente)').slice(0, 40);
+  const cartao = MEIOS_DE_CARTAO_DE_CREDITO.includes(envio.selectedPaymentMethod ?? '');
+  const reconhecido = cartao || envio.selectedPaymentMethod === MEIO_PIX;
+  const f = envio.formData ?? {};
+  const faltando = !cartao
+    ? []
+    : [
+        !f.token && 'token',
+        !f.payment_method_id && 'payment_method_id',
+        !f.payer?.email && 'payer.email',
+        !Number.isInteger(Number(f.installments)) && 'installments',
+      ].filter((c): c is string => Boolean(c));
+  return { meio, reconhecido, faltando };
 }
 
 /** O resultado de `iniciarCobranca`, no formato serializado que chega ao client. */

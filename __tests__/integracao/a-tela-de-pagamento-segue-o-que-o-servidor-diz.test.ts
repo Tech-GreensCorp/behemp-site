@@ -193,9 +193,13 @@ async function cenario(opcoes: { expiraEmMs?: number; clerk?: string; conectado?
   };
 }
 
-/** O que o Brick entrega para cartão (snake_case, como `ICardPaymentFormData`). */
+/**
+ * O que o Brick entrega para cartão. `credit_card` é o valor REAL — do bundle servido pelo Mercado
+ * Pago (http2.mlstatic.com/frontend-assets/op-cho-bricks/…/payment.js, enum `dm`), não a tipagem
+ * do npm (`'creditCard'`), que fez este teste passar enquanto todo cartão falhava (Item 55).
+ */
 const envioDeCartao = {
-  selectedPaymentMethod: 'creditCard',
+  selectedPaymentMethod: 'credit_card',
   formData: {
     token: 'card-token-de-uso-unico',
     issuer_id: '25',
