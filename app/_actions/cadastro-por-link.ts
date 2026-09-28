@@ -36,6 +36,15 @@ import { FINALIDADES } from '@/lib/parceiros/consentimento';
 import { conceder } from '@/lib/parceiros/consentimento-registrado';
 import { enfileirarTransferencia } from '@/lib/parceiros/enfileirar-transferencia';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  cpfEstaEmOutraConta,
+  dentroDoLimiteDaConferencia,
+  telefoneEstaEmOutraConta,
+  TEXTO_DE_MUITAS_TENTATIVAS,
+  TEXTO_DO_SUPORTE,
+  TEXTO_DO_TELEFONE_EM_USO,
+} from '@/lib/cadastro/conferir-identidade';
+import { headers } from 'next/headers';
 import { cpfEhValido, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 import { normalizarTelefoneWhatsapp } from '@/lib/chatpro/telefone';
 import { marcarComoUtilizada, validarTokenDeCadastro } from '@/lib/chatpro/token-de-cadastro';
@@ -288,6 +297,80 @@ export async function concluirCadastroPorLink(
       );
     }
 
+    /**
+     * 🔴 O CPF EM OUTRA CONTA PARA AQUI — ADR-0028 D-06, `DO-62`.
+     *
+     * A etapa 1 já conferiu, mas a tela é client-side: chamar esta action direto pularia a
+     * conferência. Então ela se repete aqui, ANTES de qualquer escrita, contra a mesma pessoa que
+     * a transação abaixo vai usar — a da sessão ou, sem ela, a do e-mail.
+     *
+     * ⚠️ CPF igual na conta DESTA pessoa é ela voltando (resposta E, 28/09/2026), e segue. Só
+     * para o CPF que está na ficha de OUTRA conta — a segunda ficha com o mesmo CPF nascia aqui
+     * sem erro e sem log (Item 52).
+     */
+    const [pessoa] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          sql`(${users.clerkId} = ${clerkId} or lower(${users.email}) = ${emailConfirmado})`,
+          isNull(users.deletedAt),
+        ),
+      )
+      .orderBy(sql`(${users.clerkId} = ${clerkId}) desc nulls last`)
+      .limit(1);
+
+    /**
+     * 🔴 E AS RECUSAS TÊM LIMITE — achado na revisão de segurança de 28/09/2026.
+     *
+     * Sem isto esta action era um oráculo SEM TETO: com o próprio link e uma conta, bastava chamá-la
+     * em loop trocando o CPF. "Suporte" ou "telefone em uso" respondiam se o CPF tinha ficha, e a
+     * recusa não consome o link. O limite de 5 por hora da etapa 1 não valia aqui.
+     *
+     * ⚠️ CONTA SÓ AS RECUSAS, de propósito. A reconciliação da `page.tsx` chama esta action a cada
+     * abertura da página, e um limite por chamada trancaria quem só recarregou. O oráculo só
+     * funciona por recusa: o caminho sem conflito conclui o cadastro e consome o link na primeira
+     * vez. Estourou → a resposta deixa de dizer QUAL foi o motivo.
+     */
+    const referenciaDaPessoa = pessoa?.id ?? null;
+    const recusa: 'cpf_em_outra_conta' | 'telefone_conhecido' | null = (await cpfEstaEmOutraConta({
+      cpf,
+      userIdDaPessoa: referenciaDaPessoa,
+    }))
+      ? 'cpf_em_outra_conta'
+      : // O telefone vem DEPOIS do CPF: quem tem os dois batendo precisa do suporte (`DO-68`).
+        (await telefoneEstaEmOutraConta({ telefone, userIdDaPessoa: referenciaDaPessoa }))
+        ? 'telefone_conhecido'
+        : null;
+
+    if (recusa) {
+      const dentro = dentroDoLimiteDaConferencia(
+        'identidade-envio',
+        solicitacao.id,
+        await headers(),
+      );
+      // Só o FATO e o id — nunca o documento que bateu (o guarda de log confere a mensagem).
+      console.warn('[cadastro-por-link] identidade em outra conta — envio recusado', {
+        solicitacaoId: solicitacao.id,
+        dentroDoLimite: dentro,
+      });
+      await registrarAuditoria({
+        userId: null,
+        acao: 'visualizar',
+        entidade: 'solicitacoes_cadastro',
+        entidadeId: solicitacao.id,
+        dadosDepois: {
+          evento: 'conferencia_de_identidade',
+          veredito: dentro ? recusa : 'limite',
+          porta: 'envio_final',
+          // É por ele que o suporte acha o caso quando a pessoa chama no WhatsApp.
+          protocolo: solicitacao.protocolo,
+        },
+      });
+      if (!dentro) return falha(TEXTO_DE_MUITAS_TENTATIVAS);
+      return falha(recusa === 'cpf_em_outra_conta' ? TEXTO_DO_SUPORTE : TEXTO_DO_TELEFONE_EM_USO);
+    }
+
     if (!confereComASolicitacao) {
       /**
        * O paciente corrigiu o e-mail. A solicitação passa a valer com o endereço corrigido —
@@ -351,7 +434,15 @@ export async function concluirCadastroPorLink(
         const [porEmail] = await tx
           .select()
           .from(users)
-          .where(eq(users.email, emailConfirmado))
+          /**
+           * 🔴 SEM DIFERENCIAR MAIÚSCULAS — a mesma regra da conferência (revisão, 28/09/2026). O
+           * admin grava o e-mail como foi digitado (`Maria@Gmail.com`), e a busca exata não o
+           * achava: a transação criava OUTRA `users` e gravava o mesmo CPF de novo, justamente a
+           * duplicata que a conferência tinha liberado como "a mesma pessoa". O exato vem
+           * primeiro, para o caso raro de existirem as duas grafias.
+           */
+          .where(sql`lower(${users.email}) = ${emailConfirmado}`)
+          .orderBy(sql`(${users.email} = ${emailConfirmado}) desc`)
           .limit(1);
 
         if (porEmail) {
