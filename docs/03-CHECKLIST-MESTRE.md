@@ -137,6 +137,17 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       Integração contra Postgres real: 13 casos, 12 sabotagens. **1478 casos em 64 arquivos.**
       🔴 **Antes do deploy:** cadastrar o secret e a URL do webhook no painel do MP. Detalhe em
       [04 — Item 39](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 48 — ✅ IMPLEMENTADO em 28/09/2026 · ⏳ aguardando merge** ·
+      `feat/fase5-payment-brick`: o **Payment Brick real** na tela do paciente (Parte 2, Fase 5).
+      Antes, a etapa de pagamento era só layout desabilitado e o backend da Fase 2 não tinha quem o
+      chamasse. Crédito e PIX, **só à vista** (no Brick e no servidor), public key do integrador por
+      prop, aviso do webhook por Pusher (só id e estado). 🔴 **"aprovado" não vira "confirmado"**
+      antes do webhook, e **o prazo da reserva não expulsa quem está pagando** — antes, a tela
+      voltava ao começo aos 30 min com o PIX valendo 31. **Médico sem conta do MP** não recebe oferta
+      de pagamento: na escolha (com o interruptor do Item 38 ligado) e na tela (sempre). Guarda 39,
+      integração 13, 17 sabotagens. **1577 casos em 69 arquivos** · **integração 121 em 12**. ⚠️ O
+      Brick real não renderizou local (sem public key). Ficaram os Itens 46 e 47. Detalhe em
+      [04 — Item 48](04-LISTA-DE-AFAZERES.md).
 - [ ] **Item 38** — ⏳ **o bloqueio de agendamento do Mercado Pago está PRONTO e DESLIGADO**,
       e ligar cedo para a plataforma inteira. `reservarConsulta`
       (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico não tem conta
@@ -387,6 +398,14 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🟠 **Item 47 — CATALOGADO, 28/09/2026: o PIX pedido de novo depende da memória do Mercado
+      Pago sobre a chave de idempotência.** O QR code não é gravado; depois de um reload, _"Mostrar
+      o QR code de novo"_ refaz o pedido e só recebe o MESMO PIX se o MP lembrar da chave, e a doc
+      não diz por quanto tempo. Se não lembrar, um segundo PIX sobrescreve a referência, e pagar o
+      primeiro vira `'desconhecido'` no webhook. 🔴 E o comentário de `cobranca.ts:333-334` promete
+      um fallback por `external_reference` que o processamento **não** tem. **Decisão do dono:**
+      guardar o QR code — **não implementar agora**. Detalhe em
+      [04 — Item 47](04-LISTA-DE-AFAZERES.md).
 - [ ] 🟠 **Item 45 — CATALOGADO, 28/09/2026: um PIX que nunca se resolve trava o horário além
       da janela da conciliação.** A Fase 4 não libera reserva com pagamento `em_processamento`,
       mesmo com o PIX vencido (é a regra). Se a notificação de cancelamento do MP se perder, a

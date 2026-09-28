@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { podeAgendarCom } from '@/lib/mercadopago/conta';
+import { estaConectado, podeAgendarCom } from '@/lib/mercadopago/conta';
 import { consultas, medicos, pacientes, pagamentos, users } from '@/db/schema';
 import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
@@ -436,7 +436,7 @@ export async function iniciarAguardoPagamento(
 
 /** Resolve o pacienteId do usuário autenticado — usado só pelas funções de estado abaixo. */
 async function resolverPacienteIdAutenticado(): Promise<
-  { sucesso: true; pacienteId: string } | { sucesso: false; erro: string }
+  { sucesso: true; pacienteId: string; userId: string } | { sucesso: false; erro: string }
 > {
   const auth = await verificarPaciente();
   if (!auth.autorizado || !auth.clerkId) {
@@ -466,7 +466,7 @@ async function resolverPacienteIdAutenticado(): Promise<
     };
   }
 
-  return { sucesso: true, pacienteId: pacienteAuto.id };
+  return { sucesso: true, pacienteId: pacienteAuto.id, userId: userInterno.id };
 }
 
 /**
@@ -550,6 +550,86 @@ export interface HistoricoAgendamentoItem {
  * Component de `/paciente/agendamento` a cada carregamento — a etapa do wizard é sempre
  * derivada daqui, nunca só do estado local do componente.
  */
+const obterPagamentoDaReservaSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório').max(64),
+});
+
+export interface PagamentoDaReserva {
+  statusConsulta: string;
+  statusPagamento: string | null;
+  /** Meio do pagamento em trânsito — `em_processamento` com referência no gateway. */
+  emCurso: 'pix' | 'cartao' | null;
+  pixValidoAte: string | null;
+  /** O `users.id` do PRÓPRIO paciente: é o canal `private-user-{id}` que o aviso do pagamento usa. */
+  userId: string;
+  /**
+   * O médico tem conta do Mercado Pago conectada? Sem ela não há para onde a cobrança ir, e a
+   * tela não oferece o pagamento — com o interruptor de bloqueio desligado, o paciente ainda
+   * chega até aqui com um médico sem conta.
+   */
+  medicoConectado: boolean;
+}
+
+/**
+ * Onde está o pagamento desta reserva — o que a tela de pagamento relê ao abrir, ao voltar ao
+ * foco e ao receber o aviso do webhook (Parte 2, Fase 5).
+ *
+ * Só leitura, e só da consulta do PRÓPRIO paciente: "não existe" e "não é sua" respondem igual.
+ * Não devolve referência do gateway, QR code nem valor — só o estado, que é o que a tela usa.
+ */
+export async function obterPagamentoDaReserva(
+  dados: z.infer<typeof obterPagamentoDaReservaSchema>,
+): Promise<ActionResult<PagamentoDaReserva>> {
+  try {
+    const parsed = obterPagamentoDaReservaSchema.safeParse(dados);
+    if (!parsed.success) return { sucesso: false, erro: 'Dados inválidos' };
+
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+
+    const [linha] = await db
+      .select({
+        statusConsulta: consultas.status,
+        medicoId: consultas.medicoId,
+        pixValidoAte: consultas.pixValidoAte,
+        statusPagamento: pagamentos.status,
+        referencia: pagamentos.gatewayReferenciaId,
+        checkoutUrl: pagamentos.gatewayCheckoutUrl,
+      })
+      .from(consultas)
+      .leftJoin(pagamentos, eq(pagamentos.consultaId, consultas.id))
+      .where(
+        and(
+          eq(consultas.id, parsed.data.consultaId),
+          eq(consultas.pacienteId, resolvido.pacienteId),
+          isNull(consultas.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!linha) return { sucesso: false, erro: 'Reserva não encontrada.' };
+
+    // PIX grava `gatewayCheckoutUrl`; cartão não — a mesma distinção de `criarCobranca`.
+    const emTransito = linha.statusPagamento === 'em_processamento' && linha.referencia !== null;
+    const emCurso = !emTransito ? null : linha.checkoutUrl !== null ? 'pix' : 'cartao';
+
+    return {
+      sucesso: true,
+      dados: {
+        statusConsulta: linha.statusConsulta,
+        statusPagamento: linha.statusPagamento,
+        emCurso,
+        pixValidoAte: linha.pixValidoAte?.toISOString() ?? null,
+        userId: resolvido.userId,
+        medicoConectado: await estaConectado(linha.medicoId),
+      },
+    };
+  } catch (error) {
+    console.error('[Action] Erro ao ler o pagamento da reserva:', error);
+    return { sucesso: false, erro: 'Não foi possível ler o pagamento agora.' };
+  }
+}
+
 export async function obterEstadoAgendamentoPaciente(): Promise<
   ActionResult<{ reservaAtiva: ReservaAtivaAgendamento | null; historico: HistoricoAgendamentoItem[] }>
 > {
@@ -950,6 +1030,13 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
+  /**
+   * O paciente pode seguir com este médico? `podeAgendarCom`: `false` só com o interruptor
+   * `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO` ligado E o médico sem conta do Mercado Pago. É a
+   * mesma regra de `reservarConsulta`, aplicada ANTES — na escolha do médico, não depois de o
+   * paciente ter escolhido data e horário.
+   */
+  agendavel: boolean;
 }>>> {
   try {
     const resultado = await db
@@ -968,7 +1055,10 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
       .where(isNull(users.deletedAt))
       .orderBy(asc(medicos.ordem), asc(medicos.createdAt));
 
-    const lista = resultado.map((m) => ({
+    // Não decifra nada: `podeAgendarCom` só confere que existe vínculo (ADR-0024 §5).
+    const permissoes = await Promise.all(resultado.map((m) => podeAgendarCom(m.id)));
+
+    const lista = resultado.map((m, i) => ({
       id: m.id,
       nome: m.nome,
       especialidade: m.especialidade,
@@ -977,6 +1067,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
       avatarUrl: m.avatarUrl,
       valorConsulta: m.valorConsulta !== null ? Number(m.valorConsulta) : null,
       googleConectado: !!m.googleRefreshToken,
+      agendavel: permissoes[i].permitido,
     }));
 
     return { sucesso: true, dados: lista };

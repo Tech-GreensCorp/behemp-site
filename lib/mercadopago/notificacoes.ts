@@ -32,6 +32,7 @@ import { and, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { consultas, mercadopagoEventosWebhook, pagamentos } from '@/db/schema';
 import { confirmarConsultaPaga } from '@/lib/agendamento/confirmar-consulta-paga';
 import { db } from '@/lib/db';
+import { avisarPacienteDoPagamento } from '@/lib/mercadopago/aviso-ao-paciente';
 import { obterContaConectada } from '@/lib/mercadopago/conta';
 import { registrarAuditoria } from '@/lib/utils/audit';
 
@@ -311,6 +312,7 @@ export async function processarPagamento(mpPaymentId: string): Promise<EfeitoDoP
         });
         if (!res.sucesso) throw new Error(`confirmação falhou: ${res.erro ?? 'sem mensagem'}`);
         await auditar(linha.pagamentoId, { mpPaymentId, statusMp, efeito: 'confirmada' });
+        await avisarPacienteDoPagamento(linha.consultaId, 'confirmado');
         return 'confirmada';
       }
 
@@ -337,6 +339,7 @@ export async function processarPagamento(mpPaymentId: string): Promise<EfeitoDoP
         })
         .where(eq(pagamentos.id, linha.pagamentoId));
       await auditar(linha.pagamentoId, { mpPaymentId, statusMp, efeito: status });
+      await avisarPacienteDoPagamento(linha.consultaId, status);
       return status;
     }
 

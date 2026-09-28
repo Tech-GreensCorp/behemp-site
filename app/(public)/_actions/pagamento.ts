@@ -32,7 +32,10 @@ const esquemaCartao = z.object({
     .union([z.string().max(40), z.number().int()])
     .optional()
     .nullable(),
-  installments: z.number().int().min(1).max(12),
+  // Só à vista — decisão do dono em 28/09/2026. O Brick já oferece só 1x
+  // (`maxInstallments: 1`), mas quem decide é o servidor: um envio com mais parcelas é recusado
+  // aqui, antes de chamar o Mercado Pago.
+  installments: z.number().int().min(1).max(1),
   payer: z.object({
     email: z.string().email().max(254),
     identification: z
