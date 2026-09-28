@@ -182,7 +182,10 @@ export function AgendamentoPagamentoStep({
     }
   }, [estado.tipo, onConfirmado]);
 
-  async function cobrar(entrada: Parameters<typeof iniciarCobranca>[0]) {
+  // 🔴 Estáveis de propósito: a etapa re-renderiza a cada segundo (o cronômetro), e o Brick
+  // (`memo`) só deixa de re-renderizar se o que recebe não mudar de identidade. Ver o
+  // cabeçalho de `agendamento-pagamento-brick.tsx` — o defeito de 28/09/2026.
+  const cobrar = useCallback(async (entrada: Parameters<typeof iniciarCobranca>[0]) => {
     setEnviando(true);
     try {
       const res = await iniciarCobranca(entrada);
@@ -195,16 +198,21 @@ export function AgendamentoPagamentoStep({
     } finally {
       setEnviando(false);
     }
-  }
+  }, []);
 
-  async function aoEnviarDoBrick(envio: EnvioDoBrick) {
-    const entrada = entradaDoBrick(consultaId, envio);
-    if (!entrada) {
-      setEstado({ tipo: 'erro', mensagem: 'Este meio de pagamento não está disponível.' });
-      return;
-    }
-    await cobrar(entrada);
-  }
+  const aoEnviarDoBrick = useCallback(
+    async (envio: EnvioDoBrick) => {
+      const entrada = entradaDoBrick(consultaId, envio);
+      if (!entrada) {
+        setEstado({ tipo: 'erro', mensagem: 'Este meio de pagamento não está disponível.' });
+        return;
+      }
+      await cobrar(entrada);
+    },
+    [consultaId, cobrar],
+  );
+
+  const aoFalharOBrick = useCallback(() => setBrickFalhou(true), []);
 
   const mostrarBrick =
     !lendo &&
@@ -339,7 +347,7 @@ export function AgendamentoPagamentoStep({
               publicKey={publicKey}
               valor={valor}
               onEnviar={aoEnviarDoBrick}
-              onFalhaDoBrick={() => setBrickFalhou(true)}
+              onFalhaDoBrick={aoFalharOBrick}
             />
           )}
         </CardContent>

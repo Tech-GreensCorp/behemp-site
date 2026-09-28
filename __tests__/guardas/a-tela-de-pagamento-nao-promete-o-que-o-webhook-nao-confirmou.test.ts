@@ -351,3 +351,87 @@ describe('🔴 6. médico sem conta não recebe oferta de pagamento', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * 🔴 7. O BRICK NÃO SE RECRIA A CADA RENDER — o defeito de 28/09/2026, em produção.
+ *
+ * O `<Payment>` do SDK recria o Brick (unmount + `initBrick`) quando muda a identidade de
+ * `[initialization, customization, onReady, onError, onSubmit, onBinChange]`. Com `onSubmit` e
+ * `onError` inline e a etapa re-renderizando a cada segundo (o cronômetro), o Brick era recriado
+ * a cada segundo: os meios sumiam e voltavam, e o que o paciente digitava se perdia.
+ *
+ * ⚠️ O guarda lê a DEPENDÊNCIA do próprio SDK: se uma versão nova passar a observar outra prop,
+ * o caso de cobertura fica vermelho e nomeia a prop — em vez de o Brick voltar a piscar.
+ */
+describe('🔴 7. o Brick não se recria a cada render', () => {
+  const brick = ler('components/shared/agendamento-pagamento-brick.tsx');
+  const passo = ler('components/shared/agendamento-pagamento-step.tsx');
+  const sdk = ler('node_modules/@mercadopago/sdk-react/esm/bricks/payment/index.js');
+
+  const depsDoSdk = (sdk.match(/\}, \[([^\]]+)\]\);\s*return React\.createElement/)?.[1] ?? '')
+    .split(',')
+    .map((d) => d.trim())
+    .filter(Boolean);
+
+  it('o SDK observa as props que este guarda conhece (vacuidade e cobertura)', () => {
+    expect(
+      depsDoSdk.length,
+      'não extraí as dependências do useEffect do <Payment>',
+    ).toBeGreaterThan(0);
+    const conhecidas = [
+      'initialization',
+      'customization',
+      'onReady',
+      'onError',
+      'onSubmit',
+      'onBinChange',
+    ];
+    expect(depsDoSdk.filter((d) => !conhecidas.includes(d))).toEqual([]);
+  });
+
+  it.each(['onSubmit', 'onError', 'onReady', 'onBinChange'])(
+    '`%s` do <Payment> nunca é função inline',
+    (prop) => {
+      expect(brick).not.toMatch(
+        new RegExp(`${prop}=\\{\\s*(async\\s*)?(\\(|function|[a-zA-Z_$][\\w$]*\\s*=>)`),
+      );
+    },
+  );
+
+  /**
+   * O array de dependências que FECHA o `useCallback` da constante — o primeiro `}, [` depois
+   * dela. ⚠️ Um `[\s\S]*?\}, \[\]\)` atravessava blocos: pulava o `}, [onEnviar]);` do
+   * `onSubmit` e casava o `}, []);` do `onError`. A sabotagem R4 mostrou, em 28/09/2026.
+   */
+  const depsDoCallback = (nome: string) => {
+    const inicio = brick.indexOf(`const ${nome} = useCallback(`);
+    if (inicio < 0) return null;
+    return brick.slice(inicio).match(/\n  \}, \[([^\]]*)\]\);/)?.[1] ?? null;
+  };
+
+  it.each(['onSubmit', 'onError'])('`%s` é useCallback SEM dependências', (nome) => {
+    expect(depsDoCallback(nome), `${nome}: não achei o useCallback`).not.toBeNull();
+    expect(depsDoCallback(nome)?.trim()).toBe('');
+  });
+
+  it('as callbacks leem as props por ref, e são as que vão ao <Payment>', () => {
+    expect(brick).toMatch(/onEnviarRef\.current\(/);
+    expect(brick).toMatch(/onFalhaRef\.current\(/);
+    expect(brick).toMatch(/onSubmit=\{onSubmit\}/);
+    expect(brick).toMatch(/onError=\{onError\}/);
+  });
+
+  it('`initialization` e `customization` são useMemo', () => {
+    expect(brick).toMatch(/const initialization = useMemo\(/);
+    expect(brick).toMatch(/const customization = useMemo\(/);
+  });
+
+  it('o componente é `memo`, e a etapa lhe passa só props estáveis', () => {
+    expect(brick).toMatch(/export default memo\(PagamentoBrick\);/);
+    expect(passo).toMatch(/const aoEnviarDoBrick = useCallback\(/);
+    expect(passo).toMatch(/const aoFalharOBrick = useCallback\(/);
+    expect(passo).toMatch(/onEnviar=\{aoEnviarDoBrick\}/);
+    expect(passo).toMatch(/onFalhaDoBrick=\{aoFalharOBrick\}/);
+  });
+});

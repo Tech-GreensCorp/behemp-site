@@ -398,6 +398,12 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🟠 **Item 49 — CATALOGADO, 28/09/2026: `POST /api/pusher/auth` respondendo 403 na tela de
+      pagamento** — visto pelo dono no teste manual. **Não investigado.** A rota tem cinco saídas 403
+      (`app/api/pusher/auth/route.ts:55,72,81,96,108`), e o par `channel_name` + `erro` do pedido
+      no DevTools diz qual respondeu. Se for o `private-user-{id}`, o aviso do webhook não chega em
+      tempo real (o e-mail e a releitura continuam). ⚠️ Afrouxar a rota abre canal alheio — medir
+      antes. Detalhe em [04 — Item 49](04-LISTA-DE-AFAZERES.md).
 - [ ] 🟠 **Item 47 — CATALOGADO, 28/09/2026: o PIX pedido de novo depende da memória do Mercado
       Pago sobre a chave de idempotência.** O QR code não é gravado; depois de um reload, _"Mostrar
       o QR code de novo"_ refaz o pedido e só recebe o MESMO PIX se o MP lembrar da chave, e a doc

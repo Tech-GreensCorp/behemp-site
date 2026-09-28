@@ -19,6 +19,48 @@
 
 ---
 
+## 🟠 Item 49 — CATALOGADO, 28/09/2026: `POST /api/pusher/auth` respondendo 403 na tela de pagamento
+
+**Status:** catalogado, **não investigado** (decisão do dono). Visto pelo dono no teste manual
+da tela de pagamento em produção, no mesmo dia do defeito do Brick remontando (PR
+`fix/payment-brick-loop-e-csp`). **Não se sabe ainda qual canal recusou, nem por quê.**
+
+### Por que importa
+
+A tela de pagamento assina `private-user-{userId}` para receber o aviso do webhook
+(`pagamento:atualizado`, `lib/mercadopago/aviso-ao-paciente.ts`). Se **esse** canal for o
+recusado, o aviso em tempo real não chega. **O pagamento não se perde:** a confirmação também vai
+por e-mail, e a tela relê o estado ao voltar ao foco. Mas o paciente fica sem o "confirmado" na hora.
+
+### O que o código mostra — sem concluir
+
+`app/api/pusher/auth/route.ts` tem **cinco** saídas 403, e cada uma diz um `erro` diferente no
+corpo. É o que as distingue:
+
+| linha | canal | `erro` no corpo | quando |
+| --- | --- | --- | --- |
+| `:55` | `private-user-{id}` | `Acesso negado` | o id do canal não é o `users.id` da sessão |
+| `:72` | `private-chat-{grupo}` | `Acesso negado ao grupo` | a pessoa não participa do grupo |
+| `:81` | sala de espera | `Acesso negado` | quem assina não é médico nem admin |
+| `:96` | `presence-sala-{roomId}` | o `erro` de `garantirDonoDaSala` | a pessoa não é parte da sala |
+| `:108` | qualquer outro | `Canal não reconhecido` | o default nega |
+
+⚠️ **O `:55` e o `:81` devolvem o MESMO texto**, então só o `channel_name` do pedido os separa.
+E o 403 pode ser de um canal que **outra** parte da página assina (o layout do paciente, a
+teleconsulta global), e não da tela de pagamento. Nenhuma das hipóteses foi medida.
+
+### Como medir, antes de corrigir qualquer coisa
+
+No navegador, na tela onde o 403 aparece: DevTools → Network → o pedido `auth` → **Payload**
+(`channel_name`) e **Response** (`erro`). O par diz qual das cinco linhas respondeu. Sem PII: o
+`channel_name` traz só ids internos.
+
+**Perigo de mexer:** a rota é o controle de acesso de TODO canal privado (chat, teleconsulta,
+notificações). Afrouxar um ramo para "resolver" o 403 é abrir canal alheio. O Item 11 (20/08) foi
+exatamente isso no sentido contrário. A correção só entra depois de saber qual ramo.
+
+---
+
 ## ✅ Item 48 — IMPLEMENTADO em 28/09/2026: o Payment Brick real na tela do paciente (Parte 2, Fase 5) — ⏳ aguardando merge
 
 **Status:** implementado e provado **localmente**, branch `feat/fase5-payment-brick`, PR aberto.
