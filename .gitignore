@@ -92,3 +92,10 @@ Thumbs.db
 previa-da-tela.html
 previa-da-tela.png
 previa-da-identidade/
+
+# Instruções do Claude são PESSOAIS de cada desenvolvedor (decisão do Davi, 29/09/2026):
+# cada um tem o seu CLAUDE.md, e ele não vai para o GitHub. As regras de .claude/rules/ que
+# são do projeto (precedência, segurança/LGPD) continuam versionadas; só a da Ponte é pessoal.
+/CLAUDE.md
+/CLAUDE.local.md
+/.claude/rules/ponte-enderecamento-dos-prompts.md

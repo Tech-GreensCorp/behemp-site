@@ -1,7 +1,11 @@
 # ADR-0028 — A identidade se confere na etapa 1 do cadastro, e a tela não vira oráculo
 
-> **Status:** ✅ **aceita e implementada** — 28/09/2026, branch `docs/adr-0028-identidade-na-etapa-1`
-> (local, **não commitada, não em produção**). Aprovada por quem pediu (_"Pode seguir para as
+> **Status:** ✅ **aceita e EM PRODUÇÃO** — 28/09/2026, 17:34 UTC: PR #133, merge `a5c4326`,
+> deploy `36458560019`. O portão confirmou _"produção está servindo ESTE build, e a home responde
+> 200"_, e o PM2 mostrou `behemp-site` e `behemp-filas` `online`. `/cadastro` com token inexistente
+> responde 200 ("Link inválido"). ⚠️ **O clique real ainda não foi testado.**
+>
+> **Status anterior (28/09/2026):** ✅ aceita e implementada, local, não commitada, não em produção. Aprovada por quem pediu (_"Pode seguir para as
 > implementações, eu aprovo"_), com as respostas A, B, C e E da §7. O que a implementação mudou
 > está na §9; **as decisões da §2 ficam como foram escritas**, e a §9 diz onde cada uma foi
 > retificada.
@@ -613,3 +617,91 @@ cada achado:
   | celulares repetidos (regra nacional)   | **3**          | três números em mais de uma conta, que travam o campo num cadastro novo            |
 
   **Leitura:** no máximo umas 8 pessoas afetadas numa base de 145 fichas. O impacto é pequeno, e não bloqueia o deploy. Mais motivo para o caminho 1 da mensagem da Ponte: o suporte absorve.
+
+## §10 — O que esta decisão causa na Greens, e o que está em aberto com eles (28/09/2026)
+
+> **Origem desta seção.** Este conteúdo nasceu num arquivo à parte,
+> `docs/integracao-greens/PONTE-IDENTIDADE-NA-ETAPA-1-o-que-muda-para-o-handoff.md`, que foi para a
+> `main` no PR #133 e depois foi **apagado**. Criar arquivo para mensagem da Ponte viola a regra dela
+> (`greens-corp/docs/ponte/README.md` §3 e §4): a mensagem vai **no chat**, e a Ponte tem só os
+> dois arquivos vivos. O conteúdo técnico mora **aqui**, junto da decisão que o originou. O texto
+> que foi para a Greens saiu no chat, em 28/09/2026. **O contrato não mudou.**
+
+### 10.1 — O que NÃO muda para a Greens, medido no código deles
+
+| ponto                                                                                                             | onde, do lado de a Greens                                  | continua igual?                                                                             |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| o `POST /api/parceiros/greens/cadastro` responde 2xx com `referralId`, `urlDeContinuacao`, `protocolo`, `reenvio` | `HandoffService.ts:486-496`                                | ✅ sim. A conferência acontece **depois**, quando o paciente abre o link                    |
+| a jornada `SENT_TO_BEHEMP` (a cobrança com desconto) é gravada                                                    | `HandoffService.ts:520-528`                                | ✅ sim. O 2xx chega como antes                                                              |
+| o relay do ChatPro para o `/bot-link`                                                                             | `ChatproIntakeService.ts:504-535`                          | ✅ sim. Nada mudou no `/bot-link`                                                           |
+| o S1 (`receita_emitida`, `anvisa_aprovada`) e o S2 (`cadastro_transferido`)                                       | `behempValidator.ts:30`, `CadastroDoParceiroRepository.ts` | ✅ o formato é o mesmo. O que muda é que, para quem parou, **eles não chegam** (ver abaixo) |
+
+### 10.2 — Os dois casos em que o paciente vindo da Greens para
+
+| caso                                                 | o que o paciente vê                                                                                                                                                   | o que ele faz                                        |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| o **CPF** está na ficha de **outra conta** da BeHemp | _"Precisamos confirmar alguns dados com a nossa equipe antes de continuar"_, com o protocolo e o botão do WhatsApp **da BeHemp**. A tela **não diz** que o CPF existe | fala com o nosso suporte. O link continua válido     |
+| o **telefone** é de **outra conta** da BeHemp        | o campo trava: _"Este número está em uso. Informe outro número de telefone para continuar."_, com "Entre na sua conta" e "fale com a gente pelo WhatsApp" logo abaixo | troca o número, entra na conta ou fala com o suporte |
+
+**E um caso que continua como era:** CPF igual **com o mesmo e-mail** é a mesma pessoa voltando, a
+recompra do Fluxo 3, e vai ao **login** (`DO-67`). Não para no suporte.
+
+⚠️ **O caso que deve afetar mais o Fluxo 3 de vocês:** um paciente que voltou pela Greens com **outro
+e-mail**. Do lado de vocês, `findOrCreatePatientAccount` casa pelo CPF e **reaproveita** a conta
+(`MedicationRequestService.ts:532-549`). Do nosso, o mesmo CPF numa conta de outro e-mail vai ao
+**suporte**. As duas empresas passam a tratar esse caso de jeitos diferentes, e de propósito:
+aqui, fundir duas contas custaria a ficha clínica de alguém.
+
+### 10.3 — O que a Greens vê de um handoff parado: nada
+
+**Medido no código de vocês:**
+
+- a ida do handoff é síncrona e disparada pelo clique do paciente, e _"não existe fila, então não existe 'pendente'"_ (`SaudeService.ts:49-50`);
+- não achei prazo, cron nem retentativa para um handoff que não conclui;
+- o que existe é o **reenvio manual** pelo admin (`HandoffService.ts:300`, `POST /behemp/reenviar/:id`).
+
+Portanto, **para quem parou:**
+
+- a Greens fica com o pedido em `SENT_TO_BEHEMP` e **nunca recebe** o S2, porque o S2 só sai quando o cadastro conclui, com o consentimento;
+- também não recebe o S1, porque não há receita nem ANVISA sem cadastro;
+- nada do lado de vocês diz **por que** aquele paciente não andou.
+
+⚠️ **O reenvio administrativo não destrava esses casos.** O paciente volta pelo mesmo link e cai na
+mesma conferência. Quem destrava é o **nosso suporte**, pelo protocolo.
+
+### 10.4 — Quantos são
+
+Pelo passo 0, medido em produção (§ "Como foi provado"): **1** CPF em duas fichas e **3** celulares
+em mais de uma conta, numa base de 145 fichas com CPF. São no máximo umas 8 pessoas.
+
+### 10.5 — Os três caminhos, e a decisão que é da Greens
+
+**A pergunta:** a Greens quer saber quando um handoff para na conferência? **Ainda sem resposta.**
+
+Querem **saber** quando um handoff para na conferência?
+
+Se sim, vemos três caminhos. **Nenhum está implementado**, e cada um depende de vocês:
+
+| #   | caminho                                                                                                                                 | o que muda no contrato                  | o que sai da BeHemp                                                                                                                                                                                   |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **nada muda**: o nosso suporte resolve pelo protocolo, e vocês não são avisados                                                         | nada                                    | nada                                                                                                                                                                                                  |
+| 2   | um **evento novo no S1**, por exemplo `cadastro_retido`, com o `referralId` e um motivo em código fechado (`conferencia_de_identidade`) | um tipo novo em `behempValidator.ts:30` | o `referralId` e o código. **Nunca** CPF, telefone, e-mail, nem **qual** dado bateu: dizer isso a outra empresa é o mesmo oráculo que a tela evita (LGPD art. 5º II e art. 46, `LGPD-06` e `LGPD-09`) |
+| 3   | um **status consultável**: vocês perguntam pelo `referralId`, e respondemos em que passo o cadastro está                                | uma rota nova, assinada como o S2       | o passo, sem dado pessoal                                                                                                                                                                             |
+
+**A nossa recomendação é o 1, por enquanto**, até o passo 0 dizer quantos casos são. Se forem
+poucos, o suporte absorve. Se forem muitos, o 2 é o mais simples e reusa o trilho do S1 que
+já existe.
+
+### 10.6 — O que foi perguntado à Greens, e continua aberto
+
+1. Se o comportamento do Fluxo 3 (CPF igual com outro e-mail vai ao suporte aqui) conflita com
+   alguma promessa que a Greens faz ao paciente.
+2. Qual dos três caminhos vocês preferem, **com o consenso dos três**.
+3. Se existe, do lado de vocês, algum prazo ou alerta sobre pedido parado em `SENT_TO_BEHEMP` que
+   eu não tenha achado no código.
+
+⚠️ **Quando a Greens responder:**
+
+- a resposta entra **nesta seção**, com a data e com o que foi medido separado do que é inferência;
+- se o consenso deles escolher o caminho 2 ou 3, é **mudança de contrato com duas pontas**: nós enviamos, eles recebem, e combinamos a data para uma ponta não subir sem a outra;
+- a mudança exige ADR própria, ou uma retificação desta.

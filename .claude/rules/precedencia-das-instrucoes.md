@@ -17,12 +17,13 @@ arbitrarily."* Então a ordem está escrita, para não haver escolha arbitrária
 | 2 | `docs/adr/` | decisão de arquitetura e o que foi rejeitado |
 | 3 | `docs/06-PADROES-DO-CODIGO.md` | padrão medido do repositório |
 | 4 | `docs/DECISOES_TECNICAS.md` (DT-001…010) | infraestrutura e deploy |
-| 5 | `CLAUDE.md` | modo de trabalho e proibições |
+| 5 | `CLAUDE.md` | modo de trabalho e proibições. ⚠️ **Pessoal desde 29/09/2026**: cada desenvolvedor tem o seu, fora do git |
 | 6 | `AGENTS.md` | contrato geral — **e é o que envelhece primeiro** |
 
 ## 2. 🔴 Onde o `AGENTS.md` está desatualizado
 
-`AGENTS.md` entra em toda sessão por causa do `@AGENTS.md` no `CLAUDE.md`. Isso é
+`AGENTS.md` entra em toda sessão por causa do `@AGENTS.md` no `CLAUDE.md`. ⚠️ Com o `CLAUDE.md`
+pessoal (29/09/2026), **cada um precisa manter o `@AGENTS.md` no seu**, ou o contrato deixa de carregar. Isso é
 proposital — sem o import ele **não** era carregado (*"Claude Code reads CLAUDE.md, not
 AGENTS.md"*). Mas carregou junto três afirmações que o código contradiz:
 

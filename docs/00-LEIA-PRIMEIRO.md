@@ -43,7 +43,7 @@ link morto.
 | — | [arvore-do-conhecimento/](arvore-do-conhecimento/00-RAIZ.md) · 15 arquivos | precisa da teoria de um tópico — **abra só o ramo**, nunca a árvore toda |
 | — | [decisoes-visuais/](decisoes-visuais/) · 2 arquivos | 🔴 **ANTES DE CADA SPRINT** (`DO-32`) — o `LEIA-ANTES-DE-CADA-SPRINT.md` diz quando abrir o `.html` ao lado |
 | — | [chatpro/](chatpro/) · 3 arquivos | vai mexer na integração do ChatPro — `COMO-CONECTAR-NO-PAINEL`, `CONTRATO-DA-PAGINA-DE-CADASTRO`, `QA-DA-INTEGRACAO` |
-| — | [integracao-greens/](integracao-greens/) · 4 arquivos | vai trocar mensagem com a Greens — a ponte do Fluxo 2, o prompt sobre documentos que não chegam, a resposta sobre o reenvio, e (28/09/2026) **o que a identidade na etapa 1 muda para o handoff** (ADR-0028) |
+| — | [integracao-greens/](integracao-greens/) · 3 arquivos | vai trocar mensagem com a Greens — a ponte do Fluxo 2, o prompt sobre documentos que não chegam, e a resposta sobre o reenvio. 🔴 **Não se acrescenta arquivo aqui** (28/09/2026): mensagem para a Greens vai no **chat**, e a Ponte tem só os dois arquivos vivos de `greens-corp/docs/ponte/` (README §3 e §4). Estes três são anteriores à regra |
 | — | [historico/](historico/2026-09-organizacao/) | documentos de estado morto, arquivados com README de desfecho — nunca fonte |
 | — | [BACKUP_LOG](historico/2026-09-organizacao/BACKUP_LOG.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
 | — | [progresso](historico/2026-09-organizacao/progresso.md) | arquivado — [historico/2026-09-organizacao/](historico/2026-09-organizacao/) |
@@ -60,6 +60,13 @@ cobre o que está em disco aqui.
 ---
 
 ## Este mapa é a fonte; o `CLAUDE.md` espelha
+
+🔴 **Desde 29/09/2026, o `CLAUDE.md` é PESSOAL** (decisão do Davi): cada desenvolvedor tem o seu, no
+`.gitignore`, e ele não vai para o GitHub. A regra de "espelhar este mapa" vale para o `CLAUDE.md`
+de quem quiser manter a tabela. **Este mapa continua sendo a fonte comum.**
+
+⚠️ **Quem monta o próprio `CLAUDE.md` deve importar o `AGENTS.md`** (`@AGENTS.md`). O Claude Code
+lê o `CLAUDE.md`, e não o `AGENTS.md`: sem o import, o contrato do projeto não carrega.
 
 O `CLAUDE.md` da raiz tem uma tabela própria com o mesmo papel. **Divergência entre as duas é
 defeito a corrigir NO `CLAUDE.md`** — este mapa é a fonte, porque vive ao lado do que indexa.
