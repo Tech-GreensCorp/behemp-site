@@ -61,6 +61,13 @@ cobre o que está em disco aqui.
 
 ## Este mapa é a fonte; o `CLAUDE.md` espelha
 
+🔴 **Desde 29/09/2026, o `CLAUDE.md` é PESSOAL** (decisão do Davi): cada desenvolvedor tem o seu, no
+`.gitignore`, e ele não vai para o GitHub. A regra de "espelhar este mapa" vale para o `CLAUDE.md`
+de quem quiser manter a tabela. **Este mapa continua sendo a fonte comum.**
+
+⚠️ **Quem monta o próprio `CLAUDE.md` deve importar o `AGENTS.md`** (`@AGENTS.md`). O Claude Code
+lê o `CLAUDE.md`, e não o `AGENTS.md`: sem o import, o contrato do projeto não carrega.
+
 O `CLAUDE.md` da raiz tem uma tabela própria com o mesmo papel. **Divergência entre as duas é
 defeito a corrigir NO `CLAUDE.md`** — este mapa é a fonte, porque vive ao lado do que indexa.
 
