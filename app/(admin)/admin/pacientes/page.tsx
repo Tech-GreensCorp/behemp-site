@@ -32,7 +32,10 @@ import {
 
 // ── Configurações de display (mesmas da tela do médico) ────────
 
-const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+const STATUS_LABELS: Record<
+  string,
+  { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }
+> = {
   em_tratamento: { label: 'Em tratamento', variant: 'default' },
   aguardando_consulta: { label: 'Aguardando consulta', variant: 'secondary' },
   concluido: { label: 'Concluído', variant: 'outline' },
@@ -78,7 +81,15 @@ export default function AdminPacientesPage() {
   // Quais parâmetros geraram os dados que estão na tela. "Carregando" é DERIVADO disso:
   // enquanto a busca atual não for a que está exibida. Um booleano setado à mão travava
   // quando o valor voltava a ser igual ao anterior (nenhum effect rodava para desligá-lo).
-  const chave = JSON.stringify([buscaDebounced, filtroStatus, filtroTratamento, filtroJornada, pagina, porPagina, versao]);
+  const chave = JSON.stringify([
+    buscaDebounced,
+    filtroStatus,
+    filtroTratamento,
+    filtroJornada,
+    pagina,
+    porPagina,
+    versao,
+  ]);
   const [chaveExibida, setChaveExibida] = useState<string | null>(null);
   const carregando = chaveExibida !== chave;
 
@@ -168,12 +179,21 @@ export default function AdminPacientesPage() {
         const { importados, ignorados, erros } = resultado.dados;
 
         if (importados > 0) {
-          toast.success(`${importados} paciente${importados > 1 ? 's' : ''} importado${importados > 1 ? 's' : ''} com sucesso!`, {
-            description: ignorados > 0 ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} (ignorados)` : undefined,
-          });
+          toast.success(
+            `${importados} paciente${importados > 1 ? 's' : ''} importado${importados > 1 ? 's' : ''} com sucesso!`,
+            {
+              description:
+                ignorados > 0
+                  ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} (ignorados)`
+                  : undefined,
+            },
+          );
         } else {
           toast.info('Nenhum paciente novo importado.', {
-            description: ignorados > 0 ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} no sistema` : undefined,
+            description:
+              ignorados > 0
+                ? `${ignorados} já existente${ignorados > 1 ? 's' : ''} no sistema`
+                : undefined,
           });
         }
 
@@ -222,7 +242,10 @@ export default function AdminPacientesPage() {
   }
 
   const filtrando =
-    busca !== '' || filtroStatus !== 'todos' || filtroTratamento !== 'todos' || filtroJornada !== 'todos';
+    busca !== '' ||
+    filtroStatus !== 'todos' ||
+    filtroTratamento !== 'todos' ||
+    filtroJornada !== 'todos';
 
   return (
     <div className="space-y-6">
@@ -277,7 +300,10 @@ export default function AdminPacientesPage() {
       <Card className="border-border/40 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
           <div className="relative flex-1">
-            <Search size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              size={16}
+              className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2"
+            />
             <Input
               placeholder="Buscar por nome..."
               value={busca}
@@ -288,7 +314,9 @@ export default function AdminPacientesPage() {
           <Select value={filtroStatus} onValueChange={(v) => mudarFiltro(setFiltroStatus, v)}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Status">
-                {filtroStatus === 'todos' ? 'Todos os status' : (STATUS_LABELS[filtroStatus]?.label ?? filtroStatus)}
+                {filtroStatus === 'todos'
+                  ? 'Todos os status'
+                  : (STATUS_LABELS[filtroStatus]?.label ?? filtroStatus)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -300,10 +328,15 @@ export default function AdminPacientesPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={filtroTratamento} onValueChange={(v) => mudarFiltro(setFiltroTratamento, v)}>
+          <Select
+            value={filtroTratamento}
+            onValueChange={(v) => mudarFiltro(setFiltroTratamento, v)}
+          >
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Tratamento">
-                {filtroTratamento === 'todos' ? 'Todos os tipos' : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
+                {filtroTratamento === 'todos'
+                  ? 'Todos os tipos'
+                  : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -326,7 +359,8 @@ export default function AdminPacientesPage() {
                       className="inline-block h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: JORNADA_LABELS[filtroJornada]?.color }}
                     />
-                    {JORNADA_LABELS[filtroJornada]?.icon} {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
+                    {JORNADA_LABELS[filtroJornada]?.icon}{' '}
+                    {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
                   </span>
                 )}
               </SelectValue>
@@ -336,7 +370,10 @@ export default function AdminPacientesPage() {
               {Object.entries(JORNADA_LABELS).map(([key, { label, icon, color }]) => (
                 <SelectItem key={key} value={key}>
                   <span className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <span
+                      className="inline-block h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
                     {icon} {label}
                   </span>
                 </SelectItem>
@@ -349,7 +386,7 @@ export default function AdminPacientesPage() {
       {/* Lista */}
       {carregando ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 size={32} className="animate-spin text-primary" />
+          <Loader2 size={32} className="text-primary animate-spin" />
         </div>
       ) : erro ? (
         <DataEmpty icon={<User size={24} />} title="Não foi possível carregar" description={erro} />
@@ -357,19 +394,22 @@ export default function AdminPacientesPage() {
         <DataEmpty
           icon={<User size={24} />}
           title="Nenhum paciente encontrado"
-          description={filtrando ? 'Tente ajustar os filtros' : 'Comece cadastrando ou importando pacientes'}
+          description={
+            filtrando ? 'Tente ajustar os filtros' : 'Comece cadastrando ou importando pacientes'
+          }
         />
       ) : (
         <DataList>
           {pacientes.map((paciente) => {
-            const statusConfig = STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
+            const statusConfig =
+              STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
             const jornada = paciente.jornadaFase ? JORNADA_LABELS[paciente.jornadaFase] : undefined;
             return (
               <DataRow
                 key={paciente.id}
                 href={`/admin/pacientes/${paciente.id}`}
                 icon={
-                  <span className="font-heading text-sm font-semibold text-secondary">
+                  <span className="font-heading text-secondary text-sm font-semibold">
                     {paciente.nome.charAt(0).toUpperCase()}
                   </span>
                 }
@@ -378,7 +418,7 @@ export default function AdminPacientesPage() {
                 trailing={
                   <>
                     <div className="hidden items-center gap-2 sm:flex">
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                         <Stethoscope size={12} />
                         {paciente.medicoNome ?? 'Sem médico'}
                       </span>
@@ -404,7 +444,7 @@ export default function AdminPacientesPage() {
                         {statusConfig.label}
                       </Badge>
                     </div>
-                    <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
+                    <ChevronRight size={16} className="text-muted-foreground shrink-0" />
                   </>
                 }
               />
