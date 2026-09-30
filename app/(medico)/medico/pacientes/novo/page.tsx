@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ import {
  */
 export default function NovoPacientePage() {
   const router = useRouter();
+  // A mesma tela serve /admin/pacientes/novo: voltar/cancelar/salvar ficam na área de quem usa.
+  const listaHref = usePathname().startsWith('/admin/') ? '/admin/pacientes' : '/medico/pacientes';
   const [salvando, setSalvando] = useState(false);
 
   const [dados, setDados] = useState({
@@ -98,7 +100,7 @@ export default function NovoPacientePage() {
 
     if (resultado.sucesso) {
       toast.success('Paciente cadastrado com sucesso!');
-      router.push('/medico/pacientes');
+      router.push(listaHref);
     } else {
       toast.error(resultado.erro || 'Erro ao cadastrar paciente');
     }
@@ -106,7 +108,7 @@ export default function NovoPacientePage() {
 
   return (
     <div className="space-y-8">
-      <Link href="/medico/pacientes">
+      <Link href={listaHref}>
         <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false}>
           <ChevronLeft size={16} />
           Pacientes
@@ -589,7 +591,7 @@ export default function NovoPacientePage() {
 
         {/* ── Ações ────────────────────────────────────── */}
         <div className="flex justify-end gap-3 pb-8">
-          <Link href="/medico/pacientes">
+          <Link href={listaHref}>
             <Button variant="outline" type="button" nativeButton={false}>
               Cancelar
             </Button>

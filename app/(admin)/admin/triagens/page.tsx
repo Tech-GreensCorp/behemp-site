@@ -76,6 +76,8 @@ interface Triagem {
   statusVisualizacao: string;
   medicoClerkId: string | null;
   createdAt: Date;
+  /** Calculado no servidor: e-mail bate com paciente de ficha ativa. */
+  ehPaciente: boolean;
 }
 
 // ── LABEL MAP ──────────────────────────────────────────────────────────────
@@ -695,6 +697,15 @@ export default function TriagensAdminPage() {
                   }
                   meta={
                     <div className="flex items-center gap-3">
+                      {triagem.ehPaciente ? (
+                        <Badge className="border-0 bg-emerald-500/10 text-[11px] font-medium text-emerald-700">
+                          Paciente
+                        </Badge>
+                      ) : (
+                        <Badge className="border-0 bg-muted text-[11px] font-medium text-muted-foreground">
+                          Não paciente
+                        </Badge>
+                      )}
                       {formulario && (
                         <Badge className="border-0 bg-violet-500/10 text-[11px] font-medium text-violet-600">
                           Elementor

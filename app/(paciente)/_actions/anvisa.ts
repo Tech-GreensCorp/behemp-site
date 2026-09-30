@@ -2,7 +2,9 @@
 
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { autorizacoesAnvisa, documentos, logsAuditoria } from '@/db/schema';
+import { autorizacoesAnvisa, documentos, logsAuditoria, pedidosAtendimentoAssistido } from '@/db/schema';
+import { podeEntrarNaRepresentacao, STATUS_ABERTOS } from '@/lib/anvisa/pedido-de-atendimento';
+import { dbTransacional } from '@/lib/db/transacional';
 import { verificarPaciente } from '@/lib/auth/permissions';
 import { redirect } from 'next/navigation';
 import { eq, and, isNull, desc, inArray } from 'drizzle-orm';
@@ -211,32 +213,62 @@ export async function definirModalidadeAnvisa(
     )).limit(1);
   if (!autorizacao) return { sucesso: false, erro: 'Autorização não encontrada' };
 
+  /**
+   * 🔴 A PROCURAÇÃO SÓ ABRE DEPOIS QUE O ADMIN ATIVA — ADR-0029 D-04.3 (`DO-71`).
+   *
+   * Esconder o botão "Be4Hope faz por mim" não basta: esta action é chamável por quem conhece o
+   * id, e o "oculto" seria só visual (OWASP API5). A decisão é a mesma função que o guarda
+   * executa. ⚠️ Quem JÁ está em `representacao` segue liberado (D-08): eram 12 em produção em
+   * 30/09/2026, de antes da mudança, e a trava vale para ENTRAR, não para quem já está.
+   *
+   * 🔴 Conferir e gravar numa transação só (revisão de 30/09/2026). Em passos separados, um admin
+   * desativando no meio deixava gravar `representacao` depois da desativação — e, pela D-08, o
+   * paciente ficava na procuração para sempre. A trava segue a MESMA ordem do desativar (pedido,
+   * depois autorização): as duas esperam uma pela outra, sem deadlock.
+   */
   if (modalidade === 'representacao') {
-    const [autorizacaoAtual] = await db
-      .select({ documentos: autorizacoesAnvisa.documentos })
-      .from(autorizacoesAnvisa)
-      .where(eq(autorizacoesAnvisa.id, autorizacaoId))
-      .limit(1);
+    const liberada = await dbTransacional().transaction(async (tx) => {
+      const [pedido] = await tx
+        .select({ status: pedidosAtendimentoAssistido.status })
+        .from(pedidosAtendimentoAssistido)
+        .where(and(
+          eq(pedidosAtendimentoAssistido.autorizacaoId, autorizacao.id),
+          inArray(pedidosAtendimentoAssistido.status, [...STATUS_ABERTOS]),
+        ))
+        .for('update');
+      const [autorizacaoAtual] = await tx
+        .select({ modalidade: autorizacoesAnvisa.modalidade, documentos: autorizacoesAnvisa.documentos })
+        .from(autorizacoesAnvisa)
+        .where(eq(autorizacoesAnvisa.id, autorizacao.id))
+        .for('update');
+      if (!autorizacaoAtual) return false;
+      const pode = podeEntrarNaRepresentacao({
+        modalidadeAtual: autorizacaoAtual.modalidade,
+        statusDoPedido: pedido?.status ?? null,
+      });
+      if (!pode) return false;
 
-    const docsExistentes = (autorizacaoAtual?.documentos as { tipo: string }[]) ?? [];
-    const tiposExistentes = new Set(docsExistentes.map((d: any) => d.tipo));
+      const docsExistentes = (autorizacaoAtual.documentos as { tipo: string }[] | null) ?? [];
+      const tiposExistentes = new Set(docsExistentes.map((d) => d.tipo));
 
-    const novosItens = [];
-    if (!tiposExistentes.has('procuracao_especifica')) {
-      novosItens.push({ tipo: 'procuracao_especifica', enviado: false, validado: false, urlBlob: null, nomeArquivo: null });
-    }
-    if (!tiposExistentes.has('laudo_medico')) {
-      novosItens.push({ tipo: 'laudo_medico', enviado: false, validado: false, urlBlob: null, nomeArquivo: null });
-    }
+      const novosItens = [];
+      if (!tiposExistentes.has('procuracao_especifica')) {
+        novosItens.push({ tipo: 'procuracao_especifica', enviado: false, validado: false, urlBlob: null, nomeArquivo: null });
+      }
+      if (!tiposExistentes.has('laudo_medico')) {
+        novosItens.push({ tipo: 'laudo_medico', enviado: false, validado: false, urlBlob: null, nomeArquivo: null });
+      }
 
-    if (novosItens.length > 0) {
-      await db.update(autorizacoesAnvisa)
-        .set({ modalidade, documentos: [...docsExistentes, ...novosItens] })
-        .where(eq(autorizacoesAnvisa.id, autorizacaoId));
-    } else {
-      await db.update(autorizacoesAnvisa)
-        .set({ modalidade })
-        .where(eq(autorizacoesAnvisa.id, autorizacaoId));
+      await tx.update(autorizacoesAnvisa)
+        .set(novosItens.length > 0 ? { modalidade, documentos: [...docsExistentes, ...novosItens] } : { modalidade })
+        .where(eq(autorizacoesAnvisa.id, autorizacao.id));
+      return true;
+    });
+    if (!liberada) {
+      return {
+        sucesso: false,
+        erro: 'A procuração é liberada pela nossa equipe depois do seu pedido de atendimento.',
+      };
     }
   } else {
     await db.update(autorizacoesAnvisa)

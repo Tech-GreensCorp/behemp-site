@@ -38,6 +38,11 @@ const ROTAS_QUE_PRECISAM = [
   'app/api/mercadopago/processar/route.ts',
   // Fase 4 (28/09/2026): compara o CRON_SECRET e, aceita, cancela reservas e envia e-mails.
   'app/api/agendamento/expirar/route.ts',
+  // ADR-0029 §10 (30/09/2026): a chamada de atendimento. Sinalizar é porta de spam no canal; o
+  // TURN custa dinheiro por credencial; o print entrega arquivo sensível.
+  'app/api/atendimento/sinalizar/route.ts',
+  'app/api/atendimento/ice-servers/route.ts',
+  'app/api/atendimento/print/[mensagemId]/route.ts',
 ];
 
 describe('o limitador conta e corta', () => {

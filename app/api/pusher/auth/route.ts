@@ -1,7 +1,11 @@
+import { createHash } from 'node:crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { autenticarCanal } from '@/lib/integrations/pusher';
 import { garantirDonoDaSala } from '@/lib/auth/escopo-sala';
+import { garantirParticipanteDaChamada } from '@/lib/auth/escopo-chamada';
+import { PREFIXO_DO_CANAL } from '@/lib/atendimento/canal';
 import { db } from '@/lib/db';
 import { users, participantesGrupo } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -104,6 +108,22 @@ export async function POST(request: NextRequest) {
       const presenceData = {
         user_id: user.id,
         user_info: { id: user.id, clerkId },
+      };
+      return NextResponse.json(autenticarCanal(socketId, canal, presenceData));
+    } else if (canal.startsWith(PREFIXO_DO_CANAL)) {
+      // Chamada de atendimento com suporte (ADR-0029 D-14): só o paciente dono do pedido e o
+      // admin. O `user_info` leva só o PAPEL — nome, e-mail e ids ficam fora do canal.
+      const sala = canal.slice(PREFIXO_DO_CANAL.length);
+      const escopo = await garantirParticipanteDaChamada({ sala });
+      if (!escopo.ok) {
+        return NextResponse.json({ erro: escopo.erro }, { status: escopo.status });
+      }
+      // `user_id` opaco e POR ABA (revisão de 30/09/2026): o id interno não chega à outra pessoa
+      // pela lista de membros, e duas abas da mesma pessoa aparecem separadas — é o que deixa a
+      // tela perceber a aba repetida e não disputar a chamada.
+      const presenceData = {
+        user_id: createHash('sha256').update(`${sala}:${user.id}:${socketId}`).digest('hex').slice(0, 24),
+        user_info: { papel: escopo.papel },
       };
       return NextResponse.json(autenticarCanal(socketId, canal, presenceData));
     }

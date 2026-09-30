@@ -26,7 +26,7 @@
   ],
   "medido_em": "2026-09-15",
   "tetos": {
-    "lint_erros": 203,
+    "lint_erros": 202,
     "lint_warnings": 119,
     "prettier_arquivos": 317,
     "typecheck_erros": 0

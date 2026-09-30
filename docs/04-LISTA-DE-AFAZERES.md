@@ -19,6 +19,171 @@
 
 ---
 
+## 🟠 Item 63 — MEDIDO, 30/09/2026: produção roda sem TURN — teleconsulta e chamada de atendimento
+
+**Status:** medido por Davi na VPS, **não corrigido** — decisão dele (`DO-78`): _"sobre isso faremos
+depois"_.
+
+[medido] No processo `behemp-site` e no `.next/standalone/.env`: `CLOUDFLARE_TURN_KEY_ID` e
+`CLOUDFLARE_TURN_API_TOKEN` **ausentes** nos dois. `BLOB_TOKEN_PRIVADO` e `PUSHER_SECRET` definidos no
+processo. As duas chaves do TURN também **não estão** na lista `gravar` do `.github/workflows/deploy.yml`.
+
+**Consequência:** a rota de ICE devolve só STUN (`turnDisponivel: false`), e a tela avisa. A conexão
+direta funciona na maioria das redes; em NAT restritivo (parte do 4G, redes corporativas) a voz e a
+tela não completam. Vale para a teleconsulta de hoje e para a chamada nova. O site não cai por isso.
+
+**Para corrigir (quando decidido):** cadastrar os dois secrets no GitHub e acrescentá-los à lista
+`gravar` do `deploy.yml`. É arquivo protegido e pede autorização; o guarda
+`o-segredo-cadastrado-chega-ao-servidor` passaria a varrer `lib/webrtc/`, onde a leitura mora.
+
+---
+
+## 🔴 Item 60 — CATALOGADO, 30/09/2026: o anexo do chat vai para store público, sem conferir participação
+
+**Status:** catalogado, **não corrigido**. Achado ao investigar a Fase 2 da ADR-0029.
+
+- `enviarArquivoChat` (`app/_actions/chat.ts:608-661`) faz `put` com `access: 'public'` (`:627-629`),
+  **não confere** se quem envia participa do grupo, guarda a URL crua dentro de `conteudo` como
+  `[ARQUIVO:url] nome` (`:632`) e valida só o tamanho (10 MB), sem MIME. É o Item 6 voltando por outro
+  caminho: quem tiver a URL lê o arquivo sem autenticação.
+- `reagirMensagem` (`app/_actions/chat.ts:667`) também não confere participação.
+
+**Perigo de mexer:** o chat está em produção; trocar o store muda a entrega (rota autenticada, como
+`GET /api/atendimento/print/{id}`), e as mensagens antigas guardam a URL pública no texto. A chamada
+de atendimento **não** reusa esta action por isso (ADR-0029 D-18).
+
+---
+
+## 🟠 Item 61 — CATALOGADO, 30/09/2026: a tela do paciente na teleconsulta liga uma gravação sem condição
+
+**Status:** catalogado, **não corrigido**. `app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:176-196`
+cria um `MediaRecorder` no `ontrack` **sem conferir consentimento** e sem enviar o resultado a lugar
+nenhum: gravação local, sem uso e sem gate. O lado do médico só grava com o aceite dos dois
+(ADR-0007). **Perigo de mexer:** baixo (o arquivo não sai do navegador), mas é captura de áudio e
+vídeo sem a base que a ADR-0007 exige; tela clínica em produção, travada por guardas de layout.
+
+---
+
+## ⚪ Item 62 — CATALOGADO, 30/09/2026: o id da sala da teleconsulta é previsível
+
+**Status:** catalogado, **não corrigido**. `criarSalaTeleconsulta`
+(`app/(medico)/_actions/teleconsulta.ts:30`) gera o `roomId` com `Math.random` e 6 caracteres. O
+escopo da sala é conferido no servidor (`garantirDonoDaSala`), então o id sozinho não abre a sala;
+mas id previsível é convite para quem tenta adivinhar. A chamada de atendimento usa
+`crypto.randomUUID` (ADR-0029 D-13).
+
+---
+
+## ⚪ Item 59 — CATALOGADO, 30/09/2026: o clique em "Be4Hope faz por mim" é auditado sem quem clicou
+
+**Status:** catalogado, **não corrigido** — Davi, 30/09/2026 (`DO-77`): _"se ainda não existe,
+futuramente vamos criar"_.
+
+`definirModalidadeAnvisa` (`app/(paciente)/_actions/anvisa.ts`, no fim da função) grava
+`logs_auditoria` com `acao: 'DEFINIR_MODALIDADE'`, a entidade e o id, mas **sem `userId`** e **sem
+`dadosAntes`/`dadosDepois`**. E o `.catch(() => {})` descarta a falha em silêncio. O resto do
+caminho já tem rastreio completo: pedir, ativar, desativar e listar (ADR-0029 D-02 a D-04).
+**Perigo de mexer:** baixo, quatro linhas na mesma action, que a autorização de 30/09 já cobre;
+o guarda `o-pedido-de-atendimento-abre-a-procuracao` passaria a exigir os três campos.
+
+---
+
+## ⚪ Item 58 — CATALOGADO, 30/09/2026: enviar documento no checklist devolve o paciente ao passo a passo
+
+**Status:** catalogado, **não corrigido**. Anterior à ADR-0029; achado na revisão independente dela.
+
+Em `app/(paciente)/paciente/anvisa/page.tsx`, o `onUploaded` do checklist chama
+`recarregarAutorizacao`, que escolhe a etapa pela modalidade: com `guiada`, manda para a etapa
+`guiada`. Quem está no passo a passo, abre o checklist ("Enviar autorização obtida") e envia um
+arquivo é devolvido ao passo a passo a cada envio. **Perigo de mexer:** uma condição em
+`recarregarAutorizacao`, na mesma tela de produção; nenhum dado se perde, é navegação.
+
+---
+
+## ⚪ Item 57 — CATALOGADO, 30/09/2026: duas actions da ANVISA aceitam autorização de outro paciente
+
+**Status:** catalogado, **não corrigido**. Achado ao ler `app/(paciente)/_actions/anvisa.ts` para a
+ADR-0029.
+
+- `salvarFormulario8833` (`app/(paciente)/_actions/anvisa.ts:265`) confere o papel
+  `paciente` e grava `formulario8833` com `.where(eq(autorizacoesAnvisa.id, parsed.data.autorizacaoId))`,
+  **sem** `pacienteId` nem `deletedAt`. Um paciente logado que saiba o id da autorização de outro
+  sobrescreve o formulário 8833 dele;
+- `confirmarEnvioAnvisa` (mesmo arquivo, linha 282) faz o mesmo com `status`,
+  `dataEnvio` e `prazoEstimado`: um paciente pode marcar como "documentos enviados" a autorização
+  de outro.
+
+É OWASP API1 (BOLA). **Perigo de mexer, medido:** uma linha em cada action (acrescentar o filtro
+pelo paciente da sessão, como `definirModalidadeAnvisa` já faz, linhas 201-211); as duas são
+chamadas só pela tela `/paciente/anvisa`; o id é CUID2, então explorar exige conhecer o id de
+outro paciente. Nenhum teste prova o antes e o depois. **Custo de deixar:** dado regulatório
+alterável por terceiro, sem auditoria de quem alterou.
+
+---
+
+## 🔴 Item 56 — DECIDIDO, 29/09/2026, não implementado: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
+
+**Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
+**prioridade 1** da nova ordem definida na reunião de 29/09/2026. Nenhuma linha de código.
+Migration autorizada por escrito (`.claude/autorizacoes.txt`), com o roteiro de integridade da
+ADR-0029 D-05 como condição.
+
+**Onde mexe, com a evidência:**
+
+| o quê                                                    | onde                                                                    |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| a etapa `escolha` sai do caminho                         | `app/(paciente)/paciente/anvisa/page.tsx:341`, `:447`, `:722`, `:894`   |
+| vídeo, botão de suporte e botão da procuração            | a etapa `guiada`, `app/(paciente)/paciente/anvisa/page.tsx:710-876`     |
+| o paciente não liga `representacao` sozinho              | `app/(paciente)/_actions/anvisa.ts:187-240` (`definirModalidadeAnvisa`) |
+| a lista de pedidos, com `Accordion`                      | `app/(admin)/admin/anvisa/page.tsx:302-318`; `components/ui/accordion.tsx` |
+| o aviso do painel deixa de prometer a procuração         | `components/paciente/AvisoDaProcuracao.tsx:79-90`                       |
+| a tabela nova do pedido                                  | `db/schema/` + `db/migrations/0050_pedidos_atendimento_assistido.sql`   |
+
+**Perigo de mexer, medido:** a tela está em produção e é o destino de três caminhos
+(`lib/parceiros/destino-do-paciente.ts:40`, `app/(auth)/redirect/page.tsx:218` e o aviso do
+painel). Cinco guardas dependem dela (ADR-0029 §2), e dois deles **continuariam verdes** com o
+aviso prometendo uma procuração escondida. A migration é só aditiva, mas este repositório tem
+duas armadilhas medidas: as migrations **não rodam do zero** (`docs/03`, achado de 13/09) e o
+migrator **pula em silêncio** uma migration com `when` antigo (Item 32).
+
+**Medição de produção feita em 30/09/2026 por Davi** (ADR-0029 D-05, item 6): PostgreSQL 17.11,
+cópia da estrutura gerada sem dado, nomes novos livres, `max(created_at)` na 0049. A 0050 aplica
+sozinha. 🔴 **Doze autorizações já estão em `representacao` sem aprovação** (8 pendentes, 4 com
+documentos enviados): a action nova não pode tirar delas o checklist da procuração.
+
+**Andamento, 30/09/2026, branch `feat/anvisa-faco-eu-mesmo`:**
+
+- ✅ Grupo 3, banco: tabela e migration 0050 (commit `231a100`), provada contra o registro de
+  produção;
+- ✅ Grupo 4, servidor, sem as telas: `app/_actions/pedido-atendimento-assistido.ts` (pedir, ler o
+  próprio, ativar, desativar, listar), `lib/anvisa/pedido-de-atendimento.ts` (a regra pura) e
+  `lib/anvisa/concluir-pedido-de-atendimento.ts`, chamado pela rota de status no `aprovado`. Guarda
+  `o-pedido-de-atendimento-abre-a-procuracao` (**33 casos**) e integração homônima (**16 casos**),
+  provados por **9 sabotagens**. A 9ª sobreviveu na primeira rodada: o teste de "cliques
+  simultâneos" não reproduzia a corrida, e ganhou uma versão forçada que a reproduz;
+- ✅ autorização por escrito do Davi (30/09/2026) para os três arquivos protegidos; Grupos 5, 6 e 7
+  implementados: trava em `definirModalidadeAnvisa`, tela do paciente sem a escolha, com vídeo,
+  suporte e procuração no fim, e a seção de pedidos no admin;
+- ✅ revisão independente: 1 achado **alto** (a rota que gera a procuração contornava a trava),
+  2 médios e 2 baixos, **corrigidos** e provados. Ver ADR-0029 §9;
+- ✅ respondidas por Davi em 30/09: rejeitada vira `rejeitado_anvisa` (`DO-76`, implementado, 0050
+  gerada de novo e provada de novo); o aviso do painel não volta a oferecer a procuração, e o botão
+  é o único lugar (`DO-77`, retifica a D-10). Rastreio do clique: Item 59, para depois;
+- ⏳ **pré-deploy:** Davi, 30/09: _"quando tivermos aptos, testados e comprovados vamos fazer os
+  procedimentos pré-deploy"_. As telas só se conferem em produção (§0.20).
+- ⚠️ as telas **não foram vistas rodando**: sem chave do Clerk local, toda rota dá 500.
+- ✅ **Fase 2 implementada (30/09/2026), no mesmo deploy, por decisão do Davi:** a chamada de voz com
+  a tela do paciente, o chat lateral com print, as rotas `app/api/atendimento/*`, o ramo novo do
+  Pusher e as tabelas da chamada na mesma 0050. Provas e revisão na ADR-0029 §10.4. Catalogados, sem
+  correção: Itens 60, 61 e 62.
+
+**Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
+chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**
+compartilha tela (MDN `browser-compat-data`: `false` em Chrome Android, Safari iOS e Firefox
+Android); por isso o chat com print.
+
+---
+
 ## ⚖️ DECISÃO DE NEGÓCIO/JURÍDICA PENDENTE (não é achado técnico) — Nota fiscal automática (NFS-e) para o paciente, em nome do médico
 
 **Catalogado em 30/09/2026.** Fica **fora da numeração dos itens**, de propósito: não é defeito

@@ -12,7 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useUser } from '@clerk/nextjs';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
+import { DialogoEditarUsuario } from './_components/dialogo-editar-usuario';
+import { DialogoExcluirUsuario } from './_components/dialogo-excluir-usuario';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
@@ -20,9 +23,11 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   Loader2,
+  Pencil,
   Search,
   Shield,
   Stethoscope,
+  Trash2,
   User,
   Users,
 } from 'lucide-react';
@@ -37,6 +42,7 @@ interface Usuario {
   clerkId: string;
   nome: string;
   email: string;
+  telefone: string | null;
   role: string | null;
   createdAt: Date;
 }
@@ -82,6 +88,9 @@ export default function UsuariosPage() {
   const [totalFiltrado, setTotalFiltrado] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [stats, setStats] = useState({ total: 0, admins: 0, medicos: 0, pacientes: 0 });
+  const [editando, setEditando] = useState<Usuario | null>(null);
+  const [excluindo, setExcluindo] = useState<Usuario | null>(null);
+  const { user: euMesmo } = useUser();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -242,7 +251,35 @@ export default function UsuariosPage() {
                 title={user.nome}
                 subtitle={user.email}
                 meta={new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                trailing={<Badge variant={config?.variant ?? 'outline'}>{config?.label ?? 'Desconhecido'}</Badge>}
+                trailing={
+                  <>
+                    <Badge variant={config?.variant ?? 'outline'}>{config?.label ?? 'Desconhecido'}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Editar usuário"
+                      aria-label={`Editar ${user.nome}`}
+                      onClick={() => setEditando(user)}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive"
+                      title={
+                        user.clerkId && user.clerkId === euMesmo?.id
+                          ? 'Você não pode apagar a sua própria conta'
+                          : 'Apagar conta'
+                      }
+                      aria-label={`Apagar conta de ${user.nome}`}
+                      disabled={!!user.clerkId && user.clerkId === euMesmo?.id}
+                      onClick={() => setExcluindo(user)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </>
+                }
               />
             );
           })}
@@ -259,6 +296,27 @@ export default function UsuariosPage() {
           pageSize={porPagina}
           onPageSizeChange={setPorPagina}
           pageSizeOptions={POR_PAGINA_OPCOES}
+        />
+      )}
+
+      {editando && (
+        <DialogoEditarUsuario
+          key={editando.id}
+          usuario={editando}
+          onFechar={() => setEditando(null)}
+          onSalvo={carregar}
+        />
+      )}
+      {excluindo && (
+        <DialogoExcluirUsuario
+          key={excluindo.id}
+          usuario={excluindo}
+          onFechar={() => setExcluindo(null)}
+          onApagado={() => {
+            // Apagou o último da página? Volta uma página em vez de mostrar página vazia.
+            if (usuarios.length === 1 && pagina > 1) setPagina(pagina - 1);
+            else carregar();
+          }}
         />
       )}
     </div>

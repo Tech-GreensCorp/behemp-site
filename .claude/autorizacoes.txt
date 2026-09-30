@@ -923,3 +923,70 @@ path:app/(paciente)/paciente/agendamento/page.tsx
 # `em_processamento`, medido em 28/09); o Brick passa a oferecer só 1x; um envio com mais
 # parcelas é recusado ANTES de chamar o Mercado Pago. Granularidade: o arquivo exato.
 path:app/(public)/_actions/pagamento.ts
+
+# ── Autorizado por DAVI em 29/09/2026, no chat, ADR-0029 D-05 ──────────────────
+# Palavras dele: "temos que tomar cuidado e fazer testes além de pesquisas de técnicas para
+# conseguirmos fazer isso mantendo a integridade dos dados", e em seguida: "eu autorizo".
+#
+# O QUE MUDA: uma migration SÓ ADITIVA — tabela nova `pedidos_atendimento_assistido` e o enum
+# novo do status. Nenhuma coluna, tabela ou valor de enum EXISTENTE é alterado, e nenhuma
+# linha existente é tocada. Desfazer é apagar a tabela e o tipo novos.
+#
+# PERIGO MEDIDO: BAIXO para os dados que existem, porque nada existente muda. O ponto de
+# atenção é o lock: criar a chave estrangeira pede `SHARE ROW EXCLUSIVE` em
+# `autorizacoes_anvisa` e `pacientes` (doc do PostgreSQL 16, CREATE TABLE), por instantes, no
+# deploy. As condições do Davi viram o roteiro da ADR-0029 D-05, item 6: provar em Postgres de
+# Docker com o schema REAL de produção (as migrations não rodam do zero, achado de 13/09), pelo
+# MESMO migrator (`scripts/migrar.mjs`), medir as tabelas existentes antes e depois (contagem e
+# hash), conferir que o `when` da 0050 supera o max(created_at) de produção (senão o migrator a
+# pula em silêncio, como a 0039), e backup conferido antes do deploy.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`. O nome sai de
+# `drizzle-kit generate --name pedidos_atendimento_assistido`. ⚠️ Se outra branch gerar a 0050
+# antes, o número muda e esta autorização precisa ser reescrita, não estendida.
+# ⚠️ 30/09/2026: a 0050 foi GERADA DE NOVO nos mesmos três arquivos, depois do DO-76 (rejeitado
+# ANVISA), antes de chegar a produção. Mesma autorização, mesmos caminhos; a prova foi refeita.
+path:db/migrations/0050_pedidos_atendimento_assistido.sql
+path:db/migrations/meta/0050_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 D-01, D-04.3, D-03 e D-06 ──────────
+# Palavras dele: "pode seguir eu autorizo mas claro com cuidado e revisao".
+#
+# O QUE MUDA, e SÓ ISTO (DO-35: só as linhas do conteúdo, sem formatador no arquivo inteiro):
+#   · app/(paciente)/_actions/anvisa.ts — `definirModalidadeAnvisa` passa a recusar
+#     'representacao' sem pedido de atendimento ativado (`podeEntrarNaRepresentacao`). Quem já
+#     está em 'representacao' (12 em produção, medido em 30/09) segue liberado (D-08);
+#   · app/(paciente)/paciente/anvisa/page.tsx — a etapa 'escolha' sai do caminho; a etapa
+#     'guiada' ganha a área de vídeo, o botão "Atendimento com suporte" (registra o pedido) e,
+#     no fim, "Be4Hope faz por mim" só com o pedido ativado;
+#   · app/(admin)/admin/anvisa/page.tsx — seção nova "Pedidos de atendimento assistido", lista
+#     expansível (Accordion) com Ativar / Desativar. O que já existe na tela não muda.
+#
+# PERIGO MEDIDO: as três estão em produção. A página do paciente tem 1030 linhas e é destino de
+# três caminhos (aviso do painel, destino pós-cadastro, pós-login). A regra do servidor já está
+# provada pelo guarda `o-pedido-de-atendimento-abre-a-procuracao` (33) e pela integração
+# homônima (16), com 9 sabotagens. A condição do Davi, "com cuidado e revisão", vira: build de
+# produção local, os guardas da tela da ANVISA verdes, e revisão do diff antes do commit.
+#
+# Granularidade deliberada: os três arquivos exatos, não as pastas.
+path:app/(paciente)/_actions/anvisa.ts
+path:app/(paciente)/paciente/anvisa/page.tsx
+path:app/(admin)/admin/anvisa/page.tsx
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 §10 (Fase 2, a chamada de atendimento) ──
+# Palavras dele: "pode seguir para terminar vai ser tudo no mesmo deploy, teste tudo, temos que
+# fazer com segurança e disciplina… você está autorizado a utilizar todo o CLAUDE.md para terminar
+# isso com um código de qualidade e lógica ideal baseada nos nossos alinhamentos".
+#
+# O QUE MUDA: DUAS páginas NOVAS, finas — cada uma só lê o id do pedido e renderiza o componente
+# `components/atendimento/ChamadaDeAtendimento.tsx`. Nenhum arquivo existente dessas pastas muda.
+# O escopo (paciente dono do pedido ou admin) é conferido no servidor, em `lib/auth/escopo-chamada.ts`.
+#
+# PERIGO MEDIDO: baixo para o que existe — rotas novas, que nada no produto chama até o botão
+# "Entrar no atendimento" existir. A 0050 continua só aditiva e ganhou as duas tabelas da chamada
+# (mesmos três arquivos já autorizados, gerados de novo; a prova da D-05 se refaz).
+#
+# Granularidade deliberada: os dois arquivos exatos.
+path:app/(paciente)/paciente/anvisa/atendimento/[pedidoId]/page.tsx
+path:app/(admin)/admin/anvisa/atendimento/[pedidoId]/page.tsx

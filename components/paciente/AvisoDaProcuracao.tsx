@@ -79,15 +79,20 @@ export function AvisoDaProcuracao({ precisaDaProcuracao, destino = '/paciente/an
           <h3 className="text-foreground text-sm font-semibold">
             Falta a sua autorização da ANVISA
           </h3>
+          {/*
+            ADR-0029 D-10 (DO-73), texto aprovado por Davi em 29/09/2026 ("está sim"). O texto
+            antigo prometia a procuração pronta ("você só confere e assina"), e ela agora só existe
+            depois que a equipe ativa o pedido de atendimento: a tela de destino desmentiria o aviso.
+          */}
           <p className="text-muted-foreground text-xs leading-relaxed">
-            Ela é o que permite importar o medicamento. Nós preparamos a procuração com os
-            documentos que você já enviou — você só confere e assina.
+            Ela é o que permite importar o medicamento. Veja o passo a passo para fazer pelo Gov.br.
+            Se precisar de ajuda, peça atendimento com suporte.
           </p>
           <Link
             href={destino}
             className="text-primary inline-flex items-center gap-1.5 pt-1 text-xs font-medium transition-opacity hover:opacity-70"
           >
-            Fazer a procuração agora
+            Ver o passo a passo
             <ArrowRight size={13} />
           </Link>
         </div>

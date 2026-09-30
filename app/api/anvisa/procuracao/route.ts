@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   // Verificar acesso à autorização
   const [autorizacao] = await db
-    .select({ id: autorizacoesAnvisa.id, pacienteId: autorizacoesAnvisa.pacienteId })
+    .select({ id: autorizacoesAnvisa.id, pacienteId: autorizacoesAnvisa.pacienteId, modalidade: autorizacoesAnvisa.modalidade })
     .from(autorizacoesAnvisa)
     .where(and(
       eq(autorizacoesAnvisa.id, autorizacaoId),
@@ -74,6 +74,24 @@ export async function POST(request: NextRequest) {
     ))
     .limit(1);
   if (!autorizacao) return NextResponse.json({ erro: 'Autorização não encontrada' }, { status: 404 });
+
+  /**
+   * 🔴 A PROCURAÇÃO SÓ SE GERA PARA QUEM ENTROU NA PROCURAÇÃO — ADR-0029 D-04.3, revisão de 30/09/2026.
+   *
+   * Esta rota conferia só se a autorização era do paciente. Com isso, a trava de
+   * `definirModalidadeAnvisa` se contornava por aqui: um paciente no passo a passo, sem pedido
+   * ativado, chamava este POST direto e gerava — e depois assinava — a procuração sem o admin ter
+   * liberado. Medido no teste de integração: a chamada chegava até o upload do PDF.
+   *
+   * `representacao` gravada é o sinal certo: só se entra nela pela action que confere a liberação
+   * (ou já se estava nela antes da mudança, D-08).
+   */
+  if (autorizacao.modalidade !== 'representacao') {
+    return NextResponse.json(
+      { erro: 'A procuração é liberada pela nossa equipe depois do seu pedido de atendimento.' },
+      { status: 409 },
+    );
+  }
 
   // Atualizar dados complementares no perfil do paciente (Opção B — salva permanentemente)
   if (dadosComplementares && Object.keys(dadosComplementares).length > 0) {

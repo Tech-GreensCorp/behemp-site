@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, pacientes, users, procuracoesEspecificas, medicos } from '@/db/schema';
-import { eq, desc, isNull } from 'drizzle-orm';
+import { and, eq, desc, isNull } from 'drizzle-orm';
 
 export async function GET(_request: NextRequest) {
   const { userId } = await auth();
@@ -57,7 +57,12 @@ export async function GET(_request: NextRequest) {
           assinadoEm: procuracoesEspecificas.assinadoEm,
         })
         .from(procuracoesEspecificas)
-        .where(eq(procuracoesEspecificas.autorizacaoId, aut.id))
+        .where(
+          and(
+            eq(procuracoesEspecificas.autorizacaoId, aut.id),
+            isNull(procuracoesEspecificas.deletedAt),
+          ),
+        )
         .orderBy(desc(procuracoesEspecificas.createdAt))
         .limit(1);
 

@@ -56,3 +56,7 @@ export * from './chatpro-diretorio';
 export * from './chatpro-sessoes';
 export * from './parceiro-eventos-saida';
 export * from './consentimentos';
+
+// ── Pedido de atendimento assistido da ANVISA — ADR-0029 ──
+export * from './pedidos-atendimento-assistido';
+export * from './chamadas-de-atendimento';

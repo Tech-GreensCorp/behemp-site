@@ -26,6 +26,8 @@ import { toast } from 'sonner';
 import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, AlertCircle, XCircle, FileCheck, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { PedidosDeAtendimento } from '@/components/admin/anvisa/PedidosDeAtendimento';
+import { BotaoApagarAutorizacao } from './_components/botao-apagar-autorizacao';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus = 'pendente' | 'documentos_enviados' | 'em_analise' | 'aprovado' | 'pendencia_documental' | 'rejeitado';
@@ -167,6 +169,9 @@ export default function AdminAnvisaPage() {
           </Button>
         }
       />
+
+      {/* ADR-0029 D-03: quem pediu atendimento assistido, com Ativar / Desativar a procuração */}
+      <PedidosDeAtendimento />
 
       {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
@@ -316,6 +321,13 @@ export default function AdminAnvisaPage() {
                   <Button size="sm" variant="outline" onClick={() => abrirDialog(aut)}>
                     Atualizar status
                   </Button>
+                  <BotaoApagarAutorizacao
+                    id={aut.id}
+                    pacienteNome={aut.pacienteNome}
+                    aprovada={aut.status === 'aprovado'}
+                    temProcuracao={!!aut.procuracao}
+                    onApagado={() => void carregar()}
+                  />
                 </div>
 
               </CardContent>
