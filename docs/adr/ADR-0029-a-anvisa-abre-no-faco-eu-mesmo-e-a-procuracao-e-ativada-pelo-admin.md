@@ -655,6 +655,66 @@ diferentes. Por isso a lista de pós-deploy inclui uma chamada real entre dois a
 - ⚠️ **Não provado local, e só produção prova:** a tela inteira com login (sem chave do Clerk local),
   o TURN real e dois aparelhos diferentes. A lista de pós-deploy cobre isso (§11).
 
+## §11 — O roteiro de pré-deploy (30/09/2026)
+
+Davi: _"quando tivermos aptos, testados e comprovados vamos fazer os procedimentos pré-deploy"_ e
+_"o importante é o site não cair"_. Quem faz deploy: Davi, Dryelle ou Gabriel. Nenhuma sessão decide.
+
+### 11.1 O que já está provado, local
+
+- **Compatibilidade:** a `origin/main` (PRs #137 a #139) foi trazida para a branch **sem conflito**.
+  Sobre o código combinado: `pnpm test` **1798 em 75**; integração **204 em 17**; `pnpm build` ok;
+  prova no Chromium **15 de 15**; type-check 0; lint 202 (teto); Prettier 318, e o único a mais é o
+  arquivo pessoal da Ponte, fora do git.
+- **A 0050 final** (com as tabelas da chamada) provada contra o registro igual ao de produção:
+  52 → 53, **só ela**, tabelas existentes idênticas, índices e restrições recusando o que devem,
+  migrator idempotente. ⚠️ A primeira rodada desta prova tinha um defeito **meu**: `'a'*32` em
+  JavaScript é `NaN`, e as duas salas saíram iguais, então quem recusava era o índice da sala, e não
+  o de "uma aberta por pedido". Corrigido para `'a'.repeat(32)`, e quem recusa passou a ser o índice
+  certo, `chamadas_atendimento_aberta_unq`.
+- **O que não se prova local:** as telas com login (sem chave do Clerk), o TURN real e dois
+  aparelhos. Isso vai para o pós-deploy (11.4).
+
+### 11.2 Antes do merge (Davi ou Diniz, na VPS e no GitHub)
+
+1. **As chaves que a chamada usa chegam ao processo?** `CLOUDFLARE_TURN_*` **não estão** na lista
+   que o `deploy.yml` grava; só o ambiente guardado pelo PM2 as traria. O bloco só de leitura
+   (entregue no chat) mostra "definido" ou "AUSENTE", sem valor, e foi testado com PM2 simulado,
+   incluindo o aviso `[PM2]` antes do JSON. Se o TURN estiver ausente, a chamada **e a teleconsulta
+   de hoje** funcionam só com conexão direta. A decisão é do Davi: cadastrar os secrets e acrescentá-los
+   ao `deploy.yml`, que é arquivo protegido e pede autorização, ou seguir sem TURN.
+2. **O registro de migrations não mudou desde a medição** (`max(created_at)` = `1790193675250`):
+   refazer a revisão de integridade (entregue no chat) logo antes do merge.
+3. **Backup do banco conferido:** `pg_dump -Fc` na VPS e `pg_restore --list` contando os objetos,
+   como em 21/09/2026.
+4. **Push da branch e PR para a `main`**, com o link desta ADR. O CI roda o portão.
+
+### 11.3 Durante o deploy
+
+Ler o **log do passo**, e não só o ícone (`CLAUDE.md`, seção de deploy):
+`gh run view <id> --log | grep -E "migrar|ELIFECYCLE|error"` deve mostrar `[migrar] ✓ concluído`.
+Acompanhar a home com `curl -o /dev/null -w "%{http_code}"` a cada rodada: tem de continuar 200.
+
+### 11.4 Depois do deploy (em produção, pelo Davi)
+
+1. Refazer a revisão de integridade: `__drizzle_migrations` com **53** linhas e as três tabelas novas.
+2. Paciente de teste no passo a passo: vídeo "em breve", 10 passos, "Atendimento com suporte" →
+   "Recebemos seu pedido" → "Entrar no atendimento".
+3. Admin em `/admin/anvisa`: o pedido aparece; "Entrar no atendimento"; "Ativar procuração"; o
+   paciente vê "Be4Hope faz por mim" e chega à procuração.
+4. **A chamada, com dois aparelhos:** um computador (paciente) e outro aparelho (admin). Voz nos dois
+   sentidos; "Mostrar minha tela" com o aviso; o admin vê a tela; parar e voltar. Depois, repetir com
+   o paciente num celular: o botão de tela não aparece, e o print pelo chat chega ao admin.
+5. Encerrar pelo admin: as duas telas mostram "Atendimento encerrado".
+6. Rejeitar uma autorização de teste: o pedido fica "Rejeitado ANVISA", e a chamada aberta fecha.
+7. Um dos 12 pacientes que já estavam em `representacao` continua vendo o checklist da procuração.
+
+### 11.5 Se precisar desfazer
+
+Reverter o merge na `main` gera um novo deploy com o código anterior. **As tabelas novas ficam**,
+porque são só aditivas e nada antigo as lê. **Não apagar tabela em produção:** apagar é que
+arriscaria dado.
+
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 
 **Versão 1**, escrita a partir da §0.2: quem liberaria a procuração seria um "perfil de
