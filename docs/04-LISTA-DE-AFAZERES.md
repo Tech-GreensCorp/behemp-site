@@ -46,16 +46,19 @@ serviço ao paciente.
 - 🛑 **O módulo `invoices` NÃO serve para isto.** Ele é fatura comercial de importação de
   medicamento, ligada à ANVISA (`db/schema/invoices.ts`: _"documento fiscal para importação de
   medicamento"_), e não NFS-e municipal. **Não reaproveitar.**
-- **O Mercado Pago não tem API pública de emissão fiscal** que se integre ao fluxo de split
-  payments. Isso foi confirmado na documentação oficial de developers.
-  - Existe uma ferramenta de emissão **manual**, dentro da conta do próprio vendedor. Não é API
-    e não emite automaticamente a cada venda.
+- **Nenhuma API pública de emissão fiscal do Mercado Pago** que se integre ao fluxo de split
+  payments foi achada. Não encontrada na documentação oficial de developers — o que não é o
+  mesmo que confirmar ausência.
+  - Existe uma ferramenta de emissão dentro da conta do próprio vendedor. Localizada só por
+    resultado de busca (as páginas do blog retornaram 403, não lidas) — não verificado se é API
+    ou emissão automática por venda.
   - **Não está confirmado** se ela funciona para pessoa física.
 
 ### As 4 perguntas que decidem a arquitetura (jurídico/negócio, não técnicas)
 
 1. **Os médicos emitem como pessoa física (RPA/autônomo) ou como pessoa jurídica (CNPJ)?** A
-   resposta muda tudo: a NFS-e tradicional costuma exigir inscrição municipal, que só existe para PJ.
+   resposta muda tudo. Perguntar junto: a NFS-e do município exige inscrição municipal, e ela é
+   possível para o médico pessoa física ou só para PJ? (Não pesquisado — não é premissa.)
 2. **Em quais municípios os médicos estão inscritos?** A NFS-e é municipal e não tem padrão
    nacional único, exceto onde o município já aderiu à NFS-e Nacional.
 3. **Quem guardaria o certificado digital (A1) de cada médico, se a emissão for automática?** Isso
