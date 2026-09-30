@@ -1,8 +1,15 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
-> **Status da Fase 2.1 (§12):** 🧪 **implementada e provada local, NÃO publicada** — branch
-> `feat/atendimento-camera-e-print`, 30/09/2026. Câmera e tela nos dois lados, e o print ampliado,
-> pedidos por Davi depois de testar a chamada em produção. Deploy só com a ordem dele.
+> **Status da Fase 2.2 (§12.5):** 🧪 **implementada e provada local, NÃO publicada** — branch
+> `feat/atendimento-tela-cheia`, 30/09/2026: miniatura do print no chat, troca do destaque, tela
+> cheia e o erro da câmera com a causa. Deploy só com a ordem de Davi.
+>
+> **Status da Fase 2.1 (§12):** ✅ **EM PRODUÇÃO** — 30/09/2026, 15:52: PR #144, merge `c8dd6b7`,
+> deploy `36761245272`, home 200 durante todo o deploy. Testada por Davi: câmera e tela nos dois
+> lados funcionam.
+>
+> **Status anterior da Fase 2.1:** implementada e provada local, não publicada (branch
+> `feat/atendimento-camera-e-print`).
 >
 > **Status:** ✅ **EM PRODUÇÃO** — 30/09/2026, 14:28 (Brasília): PR #141, merge `2160936`, deploy
 > `36751041870`. O log mostrou `[migrar] ✓ concluído`, `behemp-site` e `behemp-filas` online e
@@ -63,6 +70,10 @@ As decisões têm ID no catálogo: `DO-69` a `DO-77` (`docs/02-CATALOGO-DE-REGRA
 | 25  | _"mas só existe do lado do paciente e não do admin também"_ · e, perguntado, _"Sim, os dois podem mostrar"_                                                                                                                                                                                                                                                                       | o admin também mostra a tela (`DO-80`)                                                                                                                                                                                                           |
 | 26  | perguntado se quer câmera: _"Sim, câmera nos dois lados"_                                                                                                                                                                                                                                                                                                                         | câmera nos dois lados, cada um liga e desliga a sua (`DO-79`); retifica a D-15                                                                                                                                                                   |
 | 27  | perguntado se o "Silenciar" funcionou: _"Funcionou dos dois lados"_                                                                                                                                                                                                                                                                                                               | o microfone não muda                                                                                                                                                                                                                             |
+| 28  | _"o problema da câmera acho que é porque eu tô usando a mesma câmera em ambos… as 2 funcionam e 1 fica travada, se eu paro uma e tento outra funciona"_                                                                                                                                                                                                                           | medido por ele: uma câmera atende um programa por vez. A mensagem de erro passa a dizer isso (D-27)                                                                                                                                              |
+| 29  | _"eu consegui transmitir a tela do admin mas só quando eu selecionei um aplicativo, mas o guia do Chrome não"_                                                                                                                                                                                                                                                                    | o Chrome não lista a aba da própria chamada; o aviso de tela diz isso (D-27)                                                                                                                                                                     |
+| 30  | _"deve dar pra alterar e dar tela cheia tanto na câmera ou transmissão da tela do pc"_                                                                                                                                                                                                                                                                                            | trocar o destaque e tela cheia (`DO-82`, D-25, D-26)                                                                                                                                                                                             |
+| 31  | _"em mensagens é pra continuar mostrando a imagem enviada, só que quando clica nela tem o mesmo comportamento atual"_                                                                                                                                                                                                                                                             | a miniatura aparece no chat e o clique abre o modal (`DO-83`); retifica a D-23                                                                                                                                                                   |
 
 ## §1 — O que existe hoje, medido no código (`origin/main` `7a2f5d9`)
 
@@ -850,6 +861,40 @@ vez (§0, linha 20).
 ⚠️ **Sem TURN (`DO-78`)**, cada vídeo a mais disputa a mesma conexão direta. A câmera sai em
 resolução contida (640×360) por isso. Se a conexão falhar em alguma rede, a causa provável é essa,
 e não a câmera.
+
+### 12.5 Fase 2.2: miniatura do print, troca do destaque e tela cheia (30/09/2026)
+
+Davi testou a Fase 2.1 em produção (§0, linhas 28 a 31).
+
+**D-25. Trocar o destaque (`DO-82`).** Com a câmera e a tela do outro lado ligadas, a preferida fica
+grande e a outra vai à miniatura; clicar na miniatura troca. A regra é `lib/atendimento/destaque.ts`,
+pura, e o guarda a **executa** (não lê o JSX), com 3 sabotagens acusadas.
+
+**D-26. Tela cheia (`DO-82`).** Um botão "Tela cheia" no destaque põe o **vídeo** em tela cheia
+(`requestFullscreen`; no iPhone, `webkitEnterFullscreen`), e o navegador o encaixa na tela. Sai com
+Esc ou pelo próprio navegador.
+
+**D-27. O erro da câmera diz a causa, e o aviso de tela ajuda no Chrome.** Pelo nome do erro de
+`getUserMedia`: permissão negada, câmera **em uso por outro programa** (o caso que Davi mediu, com a
+mesma câmera nas duas janelas) e câmera ausente. E o aviso de tela diz que, no Chrome, a aba da
+própria chamada não aparece na lista: escolher uma janela ou a tela inteira.
+⚠️ **O que falta medir:** que o travamento acaba aí. O teste decisivo é com **dois aparelhos**; a
+prova no Chromium rodou os quatro vídeos juntos, mas com câmeras falsas independentes.
+
+**Retificação da D-23 (`DO-83`).** A D-23 buscava a imagem **só no clique**, para a auditoria
+registrar "alguém olhou". Davi decidiu que o print **aparece** no chat. Agora a miniatura é buscada
+**uma vez**, quando entra na área visível do chat, e a miniatura e o modal usam a **mesma cópia**
+(`URL.createObjectURL`, liberada ao sair). Cada linha de auditoria passa a significar "o print foi
+exibido nesta tela", e nenhuma exibição gera duas. A visibilidade também protege o limite da rota
+(60 por minuto): um chat com muitos prints não busca os que ninguém rolou até ver. Se falhar, o print
+mostra "tentar de novo".
+
+**Provas (30/09/2026):** guarda `a-chamada-de-atendimento-nao-grava-e-nao-vaza` com **55 casos**, os
+novos vermelhos antes da implementação; **9 sabotagens** acusadas (print buscado duas vezes, cópia
+nunca liberada, erro genérico, sem tela cheia, aviso sem "nada é gravado", clique que não troca,
+preferência ignorada, miniatura repetindo o destaque, busca sem esperar visibilidade). Um caso antigo
+foi **retificado** por medir forma: contava a frase "Nada é gravado" numa linha só, e ela quebrou de
+linha sem mudar. `pnpm test` 1861/1861, `pnpm build` ok. A tela, de novo, só se vê em produção.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 

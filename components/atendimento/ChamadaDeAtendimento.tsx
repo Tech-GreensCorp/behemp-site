@@ -20,6 +20,7 @@ import type { Channel, Members, PresenceChannel } from 'pusher-js';
 import {
   ArrowLeft,
   Loader2,
+  Maximize,
   Mic,
   MicOff,
   MonitorUp,
@@ -35,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { entrarNoAtendimento, encerrarAtendimento } from '@/app/_actions/chamada-de-atendimento';
 import { canalDoAtendimento, type PapelNaChamada } from '@/lib/atendimento/canal';
+import { escolherDestaque } from '@/lib/atendimento/destaque';
 import {
   aceitarResposta,
   criarFilaDeCandidatos,
@@ -79,6 +81,22 @@ const sinalizarNaSala = (sala: string | null, tipo: string, payload: object) =>
       socketId: getPusherClient().connection.socket_id,
     }),
   }).catch(() => {});
+
+/**
+ * O que dizer quando a câmera não abre, pelo nome do erro do navegador (`getUserMedia`, MDN). Medido
+ * por Davi em 30/09/2026: com a MESMA câmera nas duas janelas, a segunda não abre, ou uma trava. A
+ * câmera atende um programa por vez, e a tela tem de dizer isso em vez de um "não conseguimos".
+ */
+function motivoDaCamera(erro: unknown): string {
+  const nome = erro instanceof DOMException ? erro.name : '';
+  if (nome === 'NotAllowedError')
+    return 'O navegador não deu permissão para a câmera. Libere no cadeado ao lado do endereço.';
+  if (nome === 'NotReadableError' || nome === 'AbortError')
+    return 'A câmera está em uso por outro programa ou outra janela. Feche o outro uso e tente de novo.';
+  if (nome === 'NotFoundError' || nome === 'OverconstrainedError')
+    return 'Não encontramos uma câmera neste aparelho.';
+  return 'Não conseguimos usar a sua câmera.';
+}
 
 /**
  * Um `<video>` para um fluxo. O `srcObject` é posto num efeito porque o elemento pode remontar
@@ -126,6 +144,8 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const [ligandoCamera, setLigandoCamera] = useState(false);
   const [midiaRemota, setMidiaRemota] = useState<EstadoDaMidia>({ camera: false, tela: false });
   const [cameraRemota, setCameraRemota] = useState<MediaStream | null>(null);
+  /** Com câmera E tela do outro lado, qual fica grande. Clicar na miniatura troca (D-25). */
+  const [destaquePreferido, setDestaquePreferido] = useState<'tela' | 'camera'>('tela');
   const [telaRemota, setTelaRemota] = useState<MediaStream | null>(null);
   const [avisoDeTela, setAvisoDeTela] = useState(false);
   const [podeMostrarTela, setPodeMostrarTela] = useState(false);
@@ -147,6 +167,7 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const ice = useRef<ConfigIce | null>(null);
   const canal = useRef<Channel | null>(null);
   const audioRemoto = useRef<HTMLAudioElement>(null);
+  const palco = useRef<HTMLDivElement>(null);
 
   const acrescentar = useCallback((m: MensagemDoChat) => {
     setMensagens((atual) => (atual.some((x) => x.id === m.id) ? atual : [...atual, m]));
@@ -429,8 +450,8 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
       setCameraLocal(new MediaStream([faixa]));
       if (pc.current) await trocarCamera(pc.current, faixa).catch(() => false);
       avisarMidia();
-    } catch {
-      toast.error('Não conseguimos usar a sua câmera. A voz e as mensagens continuam.');
+    } catch (erro) {
+      toast.error(`${motivoDaCamera(erro)} A voz e as mensagens continuam.`);
     } finally {
       setLigandoCamera(false);
     }
@@ -487,6 +508,18 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
     avisarMidia();
   };
 
+  /** D-26: tela cheia no vídeo em destaque. O vídeo sozinho, para o navegador o encaixar na tela. */
+  const telaCheia = () => {
+    const video = palco.current?.querySelector('video') as
+      | (HTMLVideoElement & { webkitEnterFullscreen?: () => void })
+      | null
+      | undefined;
+    if (!video) return;
+    if (video.requestFullscreen) void video.requestFullscreen().catch(() => {});
+    // Safari do iPhone não tem `requestFullscreen` em vídeo, só o próprio dele.
+    else video.webkitEnterFullscreen?.();
+  };
+
   const encerrar = async () => {
     if (!sala) return;
     const r = await encerrarAtendimento({ sala }).catch(() => null);
@@ -530,14 +563,23 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   };
 
   const outro = papel === 'admin' ? 'O paciente' : 'A equipe';
-  // O destaque é a tela do outro lado, se ele está mostrando; senão, a câmera dele.
-  const destaque =
-    midiaRemota.tela && telaRemota
-      ? { fluxo: telaRemota, rotulo: `Tela mostrada por ${outro.toLowerCase()}` }
-      : midiaRemota.camera && cameraRemota
-        ? { fluxo: cameraRemota, rotulo: `Câmera de ${outro.toLowerCase()}` }
-        : null;
-  const cameraRemotaNaMiniatura = midiaRemota.tela && midiaRemota.camera && cameraRemota;
+  // O destaque é a tela do outro lado, se ele está mostrando; senão, a câmera dele. Com as duas, a
+  // outra vai para a miniatura, e clicar nela troca (D-25).
+  const remotos = {
+    tela:
+      midiaRemota.tela && telaRemota
+        ? { fluxo: telaRemota, rotulo: `Tela mostrada por ${outro.toLowerCase()}`, nome: 'a tela' }
+        : null,
+    camera:
+      midiaRemota.camera && cameraRemota
+        ? { fluxo: cameraRemota, rotulo: `Câmera de ${outro.toLowerCase()}`, nome: 'a câmera' }
+        : null,
+  };
+  const {
+    destaque,
+    miniatura: miniaturaRemota,
+    aoClicarNaMiniatura,
+  } = escolherDestaque(remotos, destaquePreferido);
 
   return (
     <div className="grid gap-4 md:grid-cols-[20rem_1fr]">
@@ -576,13 +618,25 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
 
         {fase !== 'encerrada' && !repetida && (
           <div className="space-y-2">
-            <div className="border-border overflow-hidden rounded-2xl border">
+            <div ref={palco} className="border-border relative overflow-hidden rounded-2xl border">
               {destaque ? (
-                <VideoDoFluxo
-                  fluxo={destaque.fluxo}
-                  rotulo={destaque.rotulo}
-                  className="aspect-video w-full"
-                />
+                <>
+                  <VideoDoFluxo
+                    fluxo={destaque.fluxo}
+                    rotulo={destaque.rotulo}
+                    className="aspect-video w-full"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={telaCheia}
+                    aria-label="Tela cheia"
+                    className="absolute top-2 right-2 gap-1.5 bg-white/90"
+                  >
+                    <Maximize className="h-4 w-4" /> Tela cheia
+                  </Button>
+                </>
               ) : (
                 // Até 30/09/2026 isto era um quadro preto, que parecia câmera quebrada.
                 <div className="bg-muted/40 flex aspect-video flex-col items-center justify-center gap-2 p-6 text-center">
@@ -596,17 +650,24 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
                 </div>
               )}
             </div>
-            {(cameraRemotaNaMiniatura || cameraLocal || compartilhando) && (
+            {(miniaturaRemota || cameraLocal || compartilhando) && (
               <div className="flex flex-wrap items-end gap-2">
-                {cameraRemotaNaMiniatura && (
-                  <figure className="w-36 space-y-1">
+                {miniaturaRemota && (
+                  <button
+                    type="button"
+                    onClick={() => setDestaquePreferido(aoClicarNaMiniatura)}
+                    aria-label={`Pôr ${miniaturaRemota.nome} de ${outro.toLowerCase()} em destaque`}
+                    className="w-36 cursor-pointer space-y-1 text-left"
+                  >
                     <VideoDoFluxo
-                      fluxo={cameraRemota}
-                      rotulo={`Câmera de ${outro.toLowerCase()}`}
+                      fluxo={miniaturaRemota.fluxo}
+                      rotulo={miniaturaRemota.rotulo}
                       className="border-border aspect-video w-full rounded-lg border"
                     />
-                    <figcaption className="text-muted-foreground text-xs">{outro}</figcaption>
-                  </figure>
+                    <span className="text-muted-foreground block text-xs">
+                      {outro} · clique para trocar
+                    </span>
+                  </button>
                 )}
                 {cameraLocal && (
                   <figure className="w-36 space-y-1">
@@ -664,13 +725,15 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
             {papel === 'admin' ? (
               <p className="text-xs leading-relaxed text-amber-700">
                 O paciente vai ver o que aparece na sua tela enquanto você compartilhar. Feche antes
-                tudo que tiver dado de outros pacientes, e prefira mostrar só uma janela. Não mostre
-                senhas. Nada é gravado: nem a voz, nem a tela.
+                tudo que tiver dado de outros pacientes, e prefira mostrar só uma janela (no Chrome,
+                a aba desta chamada não aparece na lista). Não mostre senhas. Nada é gravado: nem a
+                voz, nem a tela.
               </p>
             ) : (
               <p className="text-xs leading-relaxed text-amber-700">
-                A equipe vai ver o que aparece na sua tela enquanto você compartilhar. Não mostre
-                senhas. Nada é gravado: nem a voz, nem a tela.
+                A equipe vai ver o que aparece na sua tela enquanto você compartilhar. No Chrome,
+                escolha uma janela ou a tela inteira: a aba desta chamada não aparece na lista. Não
+                mostre senhas. Nada é gravado: nem a voz, nem a tela.
               </p>
             )}
             <div className="flex gap-2">
