@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,6 +127,8 @@ function InfoItem({ label, value }: { label: string; value: string | null | unde
 
 export default function PacienteDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  // A mesma tela serve /admin/pacientes/[id]: "Voltar" fica na área de quem está vendo.
+  const listaHref = usePathname().startsWith('/admin/') ? '/admin/pacientes' : '/medico/pacientes';
   const [paciente, setPaciente] = useState<PacienteCompleto | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [editando, setEditando] = useState(false);
@@ -192,7 +195,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <p className="text-lg font-medium">Paciente não encontrado</p>
-        <Link href="/medico/pacientes" className="mt-4">
+        <Link href={listaHref} className="mt-4">
           <Button variant="outline" nativeButton={false}>Voltar</Button>
         </Link>
       </div>
@@ -203,7 +206,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="space-y-6">
-      <Link href="/medico/pacientes">
+      <Link href={listaHref}>
         <Button variant="ghost" size="sm" className="gap-1.5" nativeButton={false}>
           <ChevronLeft size={16} />
           Pacientes
