@@ -19,6 +19,25 @@
 
 ---
 
+## 🟠 Item 63 — MEDIDO, 30/09/2026: produção roda sem TURN — teleconsulta e chamada de atendimento
+
+**Status:** medido por Davi na VPS, **não corrigido** — decisão dele (`DO-78`): _"sobre isso faremos
+depois"_.
+
+[medido] No processo `behemp-site` e no `.next/standalone/.env`: `CLOUDFLARE_TURN_KEY_ID` e
+`CLOUDFLARE_TURN_API_TOKEN` **ausentes** nos dois. `BLOB_TOKEN_PRIVADO` e `PUSHER_SECRET` definidos no
+processo. As duas chaves do TURN também **não estão** na lista `gravar` do `.github/workflows/deploy.yml`.
+
+**Consequência:** a rota de ICE devolve só STUN (`turnDisponivel: false`), e a tela avisa. A conexão
+direta funciona na maioria das redes; em NAT restritivo (parte do 4G, redes corporativas) a voz e a
+tela não completam. Vale para a teleconsulta de hoje e para a chamada nova. O site não cai por isso.
+
+**Para corrigir (quando decidido):** cadastrar os dois secrets no GitHub e acrescentá-los à lista
+`gravar` do `deploy.yml`. É arquivo protegido e pede autorização; o guarda
+`o-segredo-cadastrado-chega-ao-servidor` passaria a varrer `lib/webrtc/`, onde a leitura mora.
+
+---
+
 ## 🔴 Item 60 — CATALOGADO, 30/09/2026: o anexo do chat vai para store público, sem conferir participação
 
 **Status:** catalogado, **não corrigido**. Achado ao investigar a Fase 2 da ADR-0029.

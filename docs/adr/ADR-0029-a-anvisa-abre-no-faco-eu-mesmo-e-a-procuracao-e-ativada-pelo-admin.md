@@ -683,6 +683,9 @@ _"o importante é o site não cair"_. Quem faz deploy: Davi, Dryelle ou Gabriel.
    incluindo o aviso `[PM2]` antes do JSON. Se o TURN estiver ausente, a chamada **e a teleconsulta
    de hoje** funcionam só com conexão direta. A decisão é do Davi: cadastrar os secrets e acrescentá-los
    ao `deploy.yml`, que é arquivo protegido e pede autorização, ou seguir sem TURN.
+   **[medido] 30/09/2026, por Davi:** `CLOUDFLARE_TURN_KEY_ID` e `CLOUDFLARE_TURN_API_TOKEN`
+   **AUSENTES** no processo e no `.env`; `BLOB_TOKEN_PRIVADO` e `PUSHER_SECRET` definidos no processo.
+   **Decisão (`DO-78`):** _"sobre isso faremos depois"_. O deploy segue sem TURN (`docs/04`, Item 63).
 2. **O registro de migrations não mudou desde a medição** (`max(created_at)` = `1790193675250`):
    refazer a revisão de integridade (entregue no chat) logo antes do merge.
 3. **Backup do banco conferido:** `pg_dump -Fc` na VPS e `pg_restore --list` contando os objetos,
