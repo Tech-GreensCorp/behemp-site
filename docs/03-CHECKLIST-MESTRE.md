@@ -421,6 +421,17 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] ⚪ **Item 56 — CATALOGADO, 30/09/2026 (baixa prioridade): o Brick promete "Parcelamento
+      disponível" num pagamento só à vista.** Medido no Payment Brick real (chave `TEST-`,
+      Chrome headless): com `minInstallments: 1` e `maxInstallments: 1`, o seletor de parcelas
+      **some** (o controle com 12 o mostra), mas o selo verde sob "Cartão de crédito" continua.
+      A doc tem a chave — `texts.paymentMethods.creditCardValueProp` — e ela **não está tipada**
+      no `@mercadopago/sdk-react@1.0.7` (os textos do Payment só cobrem pagador e endereço); a
+      doc diz ainda que texto vazio é ignorado. **Decisão do dono, 30/09: sem cast neste SDK.**
+      Caminhos: atualizar o SDK se uma versão tipar a chave, e trocar o texto (ex.: "À vista").
+      Nenhuma opção `hide*` tipada cobre o selo. O servidor já recusa mais de 1 parcela
+      (`app/(public)/_actions/pagamento.ts:38`), e o `formData` chega com `installments: 1`
+      (`number`) — medido submetendo com cartão de teste.
 - [ ] 🟠 **Item 55 — CORRIGIDO no código em 28/09/2026 · ⏳ falta a prova manual**: **todo
       pagamento com cartão parava antes do servidor.** O Brick envia
       `selectedPaymentMethod: 'credit_card'` (enum `dm` do bundle servido em `http2.mlstatic.com`),
