@@ -19,6 +19,20 @@
 
 ---
 
+## ⚪ Item 59 — CATALOGADO, 30/09/2026: o clique em "Be4Hope faz por mim" é auditado sem quem clicou
+
+**Status:** catalogado, **não corrigido** — Davi, 30/09/2026 (`DO-77`): _"se ainda não existe,
+futuramente vamos criar"_.
+
+`definirModalidadeAnvisa` (`app/(paciente)/_actions/anvisa.ts`, no fim da função) grava
+`logs_auditoria` com `acao: 'DEFINIR_MODALIDADE'`, a entidade e o id, mas **sem `userId`** e **sem
+`dadosAntes`/`dadosDepois`**. E o `.catch(() => {})` descarta a falha em silêncio. O resto do
+caminho já tem rastreio completo: pedir, ativar, desativar e listar (ADR-0029 D-02 a D-04).
+**Perigo de mexer:** baixo, quatro linhas na mesma action, que a autorização de 30/09 já cobre;
+o guarda `o-pedido-de-atendimento-abre-a-procuracao` passaria a exigir os três campos.
+
+---
+
 ## ⚪ Item 58 — CATALOGADO, 30/09/2026: enviar documento no checklist devolve o paciente ao passo a passo
 
 **Status:** catalogado, **não corrigido**. Anterior à ADR-0029; achado na revisão independente dela.
@@ -97,9 +111,11 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
   suporte e procuração no fim, e a seção de pedidos no admin;
 - ✅ revisão independente: 1 achado **alto** (a rota que gera a procuração contornava a trava),
   2 médios e 2 baixos, **corrigidos** e provados. Ver ADR-0029 §9;
-- ⏳ **não implementado:** o aviso do painel voltar a oferecer a procuração depois da ativação
-  (D-10, terceiro ponto). São duas linhas em `app/(paciente)/paciente/page.tsx`, fora da
-  autorização. E a pergunta aberta: autorização **rejeitada** conclui o pedido?
+- ✅ respondidas por Davi em 30/09: rejeitada vira `rejeitado_anvisa` (`DO-76`, implementado, 0050
+  gerada de novo e provada de novo); o aviso do painel não volta a oferecer a procuração, e o botão
+  é o único lugar (`DO-77`, retifica a D-10). Rastreio do clique: Item 59, para depois;
+- ⏳ **pré-deploy:** Davi, 30/09: _"quando tivermos aptos, testados e comprovados vamos fazer os
+  procedimentos pré-deploy"_. As telas só se conferem em produção (§0.20).
 - ⚠️ as telas **não foram vistas rodando**: sem chave do Clerk local, toda rota dá 500.
 
 **Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e

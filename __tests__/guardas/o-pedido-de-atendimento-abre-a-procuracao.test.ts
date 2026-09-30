@@ -42,7 +42,7 @@ const ler = (p: string) => semComentarios(readFileSync(join(RAIZ, p), 'utf8'));
 
 const ACTIONS = ler('app/_actions/pedido-atendimento-assistido.ts');
 const ROTA_DE_STATUS = ler('app/api/anvisa/atualizar-status/route.ts');
-const CONCLUIR = ler('lib/anvisa/concluir-pedido-de-atendimento.ts');
+const ENCERRAR = ler('lib/anvisa/encerrar-pedido-de-atendimento.ts');
 const ACTIONS_DO_PACIENTE = ler('app/(paciente)/_actions/anvisa.ts');
 
 /** O corpo de uma função nomeada — da chave que termina a assinatura até a que a fecha. */
@@ -60,21 +60,28 @@ function corpoDe(fonte: string, nome: string): string {
 
 // Derivado do ENUM do banco, não de uma lista paralela: status novo entra na varredura sozinho.
 const STATUS = pedidoAtendimentoStatusEnum.enumValues as readonly StatusDoPedido[];
-const ACOES: AcaoNoPedido[] = ['ativar', 'desativar', 'concluir'];
+const ACOES: AcaoNoPedido[] = ['ativar', 'desativar', 'concluir', 'rejeitar'];
 
 describe('a regra de transição do pedido — EXECUTADA', () => {
   it.each<[StatusDoPedido, AcaoNoPedido, boolean, ReturnType<typeof transicionar>]>([
     ['aguardando_ativacao', 'ativar', false, { ok: true, novo: 'pendente_autorizacao' }],
     ['pendente_autorizacao', 'ativar', false, { ok: false, motivo: 'ja_ativado' }],
-    ['concluido', 'ativar', false, { ok: false, motivo: 'pedido_concluido' }],
+    ['concluido', 'ativar', false, { ok: false, motivo: 'pedido_encerrado' }],
+    ['rejeitado_anvisa', 'ativar', false, { ok: false, motivo: 'pedido_encerrado' }],
     ['pendente_autorizacao', 'desativar', false, { ok: true, novo: 'aguardando_ativacao' }],
     // DO-72: "pode" desativar — mas só antes de o paciente assinar.
     ['pendente_autorizacao', 'desativar', true, { ok: false, motivo: 'procuracao_assinada' }],
     ['aguardando_ativacao', 'desativar', false, { ok: false, motivo: 'nao_ativado' }],
-    ['concluido', 'desativar', false, { ok: false, motivo: 'pedido_concluido' }],
+    ['concluido', 'desativar', false, { ok: false, motivo: 'pedido_encerrado' }],
+    ['rejeitado_anvisa', 'desativar', false, { ok: false, motivo: 'pedido_encerrado' }],
     ['aguardando_ativacao', 'concluir', false, { ok: true, novo: 'concluido' }],
     ['pendente_autorizacao', 'concluir', true, { ok: true, novo: 'concluido' }],
-    ['concluido', 'concluir', false, { ok: false, motivo: 'pedido_concluido' }],
+    ['concluido', 'concluir', false, { ok: false, motivo: 'pedido_encerrado' }],
+    // DO-76: "ele fica como rejeitado anvisa".
+    ['aguardando_ativacao', 'rejeitar', false, { ok: true, novo: 'rejeitado_anvisa' }],
+    ['pendente_autorizacao', 'rejeitar', false, { ok: true, novo: 'rejeitado_anvisa' }],
+    ['concluido', 'rejeitar', false, { ok: false, motivo: 'pedido_encerrado' }],
+    ['rejeitado_anvisa', 'concluir', false, { ok: false, motivo: 'pedido_encerrado' }],
   ])('%s + %s (assinada=%s)', (atual, acao, assinada, esperado) => {
     expect(transicionar(atual, acao, { procuracaoAssinada: assinada })).toEqual(esperado);
   });
@@ -115,6 +122,7 @@ describe('quem pode entrar na procuração — EXECUTADO', () => {
     ['pediu, e o admin ainda não ativou', 'guiada', 'aguardando_ativacao', false],
     ['o admin ativou', 'guiada', 'pendente_autorizacao', true],
     ['pedido concluído não reabre a procuração', 'guiada', 'concluido', false],
+    ['pedido rejeitado pela ANVISA não reabre a procuração', 'guiada', 'rejeitado_anvisa', false],
     // Os 12 medidos em produção em 30/09: já em `representacao`, sem pedido. D-08: seguem como estão.
     ['já estava na procuração antes da mudança, sem pedido', 'representacao', null, true],
     [
@@ -211,16 +219,26 @@ describe('as actions do pedido — o papel é conferido no servidor', () => {
   });
 });
 
-describe('a aprovação da ANVISA conclui o pedido', () => {
-  it('a rota de status chama a conclusão quando o status é aprovado', () => {
+describe('a resposta da ANVISA encerra o pedido (DO-72, DO-76)', () => {
+  it('aprovado encerra como concluido', () => {
     const bloco = ROTA_DE_STATUS.slice(
       ROTA_DE_STATUS.search(/if \(status === 'aprovado' && atualizado\?\.pacienteId\)/),
     );
-    expect(bloco.slice(0, 1500)).toMatch(/concluirPedidoDaAutorizacao\(\s*autorizacaoId\s*\)/);
+    expect(bloco.slice(0, 1500)).toMatch(
+      /encerrarPedidoDaAutorizacao\(\s*autorizacaoId,\s*'concluido'\s*\)/,
+    );
   });
 
-  it('a conclusão nunca lança: a aprovação já foi gravada quando ela roda', () => {
-    const corpo = corpoDe(CONCLUIR, 'concluirPedidoDaAutorizacao');
+  it('rejeitado encerra como rejeitado_anvisa', () => {
+    const bloco = ROTA_DE_STATUS.slice(ROTA_DE_STATUS.search(/if \(status === 'rejeitado'\)/));
+    expect(bloco.length).toBeGreaterThan(0);
+    expect(bloco.slice(0, 300)).toMatch(
+      /encerrarPedidoDaAutorizacao\(\s*autorizacaoId,\s*'rejeitado_anvisa'\s*\)/,
+    );
+  });
+
+  it('o encerramento nunca lança: a resposta da ANVISA já foi gravada quando ele roda', () => {
+    const corpo = corpoDe(ENCERRAR, 'encerrarPedidoDaAutorizacao');
     expect(corpo).toMatch(/try\s*\{/);
     expect(corpo).toMatch(/catch/);
     expect(corpo).not.toMatch(/\bthrow\b/);

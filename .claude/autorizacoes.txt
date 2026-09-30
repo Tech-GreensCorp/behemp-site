@@ -944,6 +944,8 @@ path:app/(public)/_actions/pagamento.ts
 # Granularidade deliberada: os arquivos exatos, não `db/migrations/`. O nome sai de
 # `drizzle-kit generate --name pedidos_atendimento_assistido`. ⚠️ Se outra branch gerar a 0050
 # antes, o número muda e esta autorização precisa ser reescrita, não estendida.
+# ⚠️ 30/09/2026: a 0050 foi GERADA DE NOVO nos mesmos três arquivos, depois do DO-76 (rejeitado
+# ANVISA), antes de chegar a produção. Mesma autorização, mesmos caminhos; a prova foi refeita.
 path:db/migrations/0050_pedidos_atendimento_assistido.sql
 path:db/migrations/meta/0050_snapshot.json
 path:db/migrations/meta/_journal.json

@@ -52,7 +52,7 @@ vi.mock('next/navigation', () => ({
 const { db } = await import('@/lib/db');
 const schema = await import('@/db/schema');
 const acoes = await import('@/app/_actions/pedido-atendimento-assistido');
-const { concluirPedidoDaAutorizacao } = await import('@/lib/anvisa/concluir-pedido-de-atendimento');
+const { encerrarPedidoDaAutorizacao } = await import('@/lib/anvisa/encerrar-pedido-de-atendimento');
 const { definirModalidadeAnvisa } = await import('@/app/(paciente)/_actions/anvisa');
 const rotaDaProcuracao = await import('@/app/api/anvisa/procuracao/route');
 
@@ -327,14 +327,40 @@ describe('a ANVISA aprova, e o admin lista', () => {
   it('a aprovação conclui o pedido aberto', async () => {
     como('ck_a', 'paciente');
     await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
-    await concluirPedidoDaAutorizacao('aut_a');
+    await encerrarPedidoDaAutorizacao('aut_a', 'concluido');
     const [p] = await pedidosDe('aut_a');
     expect(p.status).toBe('concluido');
-    expect(p.concluidoEm).toBeInstanceOf(Date);
+    expect(p.encerradoEm).toBeInstanceOf(Date);
+  });
+
+  it('a rejeição encerra o pedido como rejeitado_anvisa, e o paciente pode pedir de novo (DO-76)', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    await encerrarPedidoDaAutorizacao('aut_a', 'rejeitado_anvisa');
+    const [p] = await pedidosDe('aut_a');
+    expect(p.status).toBe('rejeitado_anvisa');
+    expect(p.encerradoEm).toBeInstanceOf(Date);
+
+    // Encerrado sai do índice parcial: um pedido novo vira linha nova, e o antigo fica.
+    const r = await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect(r).toMatchObject({ sucesso: true, dados: { status: 'aguardando_ativacao' } });
+    expect((await pedidosDe('aut_a')).map((x) => x.status).sort()).toEqual([
+      'aguardando_ativacao',
+      'rejeitado_anvisa',
+    ]);
+  });
+
+  it('o admin não ativa um pedido rejeitado', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    const [p] = await pedidosDe('aut_a');
+    await encerrarPedidoDaAutorizacao('aut_a', 'rejeitado_anvisa');
+    como('ck_adm', 'admin');
+    expect((await acoes.ativarProcuracaoAnvisa({ pedidoId: p.id })).sucesso).toBe(false);
   });
 
   it('concluir sem pedido não lança nem cria linha', async () => {
-    await expect(concluirPedidoDaAutorizacao('aut_b')).resolves.toBeUndefined();
+    await expect(encerrarPedidoDaAutorizacao('aut_b', 'concluido')).resolves.toBeUndefined();
     expect(await pedidosDe('aut_b')).toHaveLength(0);
   });
 

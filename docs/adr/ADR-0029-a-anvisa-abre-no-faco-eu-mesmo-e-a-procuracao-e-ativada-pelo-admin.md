@@ -22,7 +22,7 @@
 
 ## §0 — O que foi pedido e respondido, nas palavras de Davi (29/09/2026)
 
-As decisões têm ID no catálogo: `DO-69` a `DO-75` (`docs/02-CATALOGO-DE-REGRAS.md`).
+As decisões têm ID no catálogo: `DO-69` a `DO-77` (`docs/02-CATALOGO-DE-REGRAS.md`).
 
 | #   | literal                                                                                                                                                                                                                                                                                                                                                                           | o que fixa                                                                                                                                                                                                                                       |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -45,6 +45,10 @@ As decisões têm ID no catálogo: `DO-69` a `DO-75` (`docs/02-CATALOGO-DE-REGRA
 | 17  | _"ele pode mandar print no chat que vai ficar na lateral esquerda, em horizontal, ali o paciente pode mandar mensagem ou enviar print"_                                                                                                                                                                                                                                           | a chamada tem um **chat na lateral esquerda**, com mensagem e **print**; é assim que o celular mostra a tela (D-11)                                                                                                                              |
 | 18  | _"sim"_ (sobre o pedido virar "concluído" quando a ANVISA aprova)                                                                                                                                                                                                                                                                                                                 | terceiro status, **`concluido`**, sai dos pendentes e **não é apagado** (D-03)                                                                                                                                                                   |
 | 19  | _"temos que tomar cuidado e fazer testes além de pesquisas de técnicas para conseguirmos fazer isso mantendo a integridade dos dados"_ · _"eu autorizo"_                                                                                                                                                                                                                          | migration **autorizada**, com o roteiro de integridade da D-05 como condição                                                                                                                                                                     |
+| 20  | _"isso vou ter que testar em produção, o importante é o site não cair"_ (sobre ver as telas rodando)                                                                                                                                                                                                                                                                              | as telas se conferem em produção; o pré-deploy prova que **o site não cai**                                                                                                                                                                      |
+| 21  | _"ele fica como rejeitado anvisa"_ (sobre o pedido quando a ANVISA rejeita)                                                                                                                                                                                                                                                                                                       | quinta situação do pedido: `rejeitado_anvisa` (`DO-76`)                                                                                                                                                                                          |
+| 22  | _"aparece um botão logo abaixo da atendimento com suporte essa opção é o último caso, e só ativada pelo botão e em si possui todo seu rastreio nos logs, se ainda não existe futuramente vamos criar"_                                                                                                                                                                            | o aviso do painel não oferece a procuração; o botão é o único lugar (`DO-77`)                                                                                                                                                                    |
+| 23  | _"vamos terminar tudo, testar, e garantir a segurança e compatibilidade e depois nós quando tivermos aptos, testados e comprovados vamos fazer os procedimentos pré-deploy"_                                                                                                                                                                                                      | deploy só depois dos procedimentos de pré-deploy, com tudo provado                                                                                                                                                                               |
 
 ## §1 — O que existe hoje, medido no código (`origin/main` `7a2f5d9`)
 
@@ -143,7 +147,8 @@ componente novo, sem `<Table>`).
 
 - **status do pedido**: `aguardando_ativacao` ao nascer; `pendente_autorizacao` depois que o
   admin ativa (§0.13); de volta a `aguardando_ativacao` se o admin desativar (D-04);
-  `concluido` quando a autorização da ANVISA vira `aprovado` (§0.18). O item **não some** ao ser
+  `concluido` quando a autorização da ANVISA vira `aprovado` (§0.18); `rejeitado_anvisa` quando ela
+  vira `rejeitado` (§0.21, `DO-76`), e o paciente pode pedir de novo. O item **não some** ao ser
   ativado: muda de status e mostra quem ativou e quando. `concluido` sai dos pendentes, e a linha
   **nunca é apagada**;
 - fechado, o item mostra nome do paciente, status do pedido e desde quando ele pediu. Aberto,
@@ -308,6 +313,19 @@ folderMillis`). O enum novo se chamará `pedido_atendimento_status`, e o bloco c
      pessoal e fora do git, que só o `.gitignore` do commit `ac56243` (ainda fora da `main`)
      esconde. Nenhum arquivo desta branch piorou.
 
+   **[medido] A 0050 foi GERADA DE NOVO em 30/09/2026**, depois do `DO-76`, antes de chegar a
+   produção. Não se criou uma segunda migration: uma 0051 com `ALTER TYPE … ADD VALUE` para uma
+   tabela que ainda não existe em lugar nenhum seria ruído no histórico. A versão anterior foi
+   removida e o `drizzle-kit generate` gerou outra, com o mesmo nome; o `diff` entre as duas são
+   **exatamente** as duas mudanças: `rejeitado_anvisa` no enum e `concluido_em` → `encerrado_em`.
+   `when` novo `1790783178259`, ainda maior que o `max(created_at)` de produção. A prova do item 6
+   foi **refeita inteira** contra o registro igual ao de produção: 52 → 53, tabelas existentes
+   idênticas, índice recusando o 2º aberto, aceitando um pedido novo depois de `concluido` **e**
+   depois de `rejeitado_anvisa`, migrator idempotente.
+   ⚠️ O banco local da integração precisou recriar a tabela: `drizzle-kit push` parou numa
+   pergunta interativa (renomear ou criar coluna). **Produção não passa por isso**: aplica pelo
+   `scripts/migrar.mjs`, que roda o SQL gerado.
+
    **O que isso decide para a 0050:** ela entra com `when` maior que `1790193675250`, então o
    migrator a aplica, e **só ela**: a 0038 e a 0039 continuam puladas, como hoje, e as quatro
    extras não são tocadas. Nenhum nome colide. ⚠️ **A prova precisa cobrir o caso das 12:** uma
@@ -459,13 +477,16 @@ não conseguiu ainda.
    `https://*.public.blob.vercel-storage.com`. Um endereço que o CSP bloquearia, como YouTube, cai
    no "vídeo em breve" em vez de um player quebrado. O guarda testa oito entradas, incluindo
    `…vercel-storage.com.evil.com`.
-5. 🔴 **D-10, terceiro ponto, NÃO implementado:** _"com o pedido em `pendente_autorizacao`, o aviso
-   volta a oferecer a procuração"_. O aviso não sabe se a procuração foi ativada: quem sabe é a
-   página do painel (`app/(paciente)/paciente/page.tsx`), protegida e fora da autorização. E o guarda
-   `o-aviso-da-procuracao-chega-a-tela` proíbe, de propósito, que o componente busque dado sozinho.
-   Hoje o aviso mostra o texto aprovado (`DO-73`) nos dois estados. Ele é **verdadeiro** nos dois,
-   porque aponta o passo a passo, onde o botão aparece quando liberado, mas não oferece a procuração
-   de volta. Custa duas linhas naquela página, e pede autorização própria.
+5. **D-10, terceiro ponto — RETIFICADO por Davi em 30/09/2026 (`DO-77`), não é mais pendência.**
+   Ele dizia que o aviso do painel voltaria a oferecer a procuração depois da ativação. Davi decidiu
+   que o **único** lugar dela é o botão logo abaixo de "Atendimento com suporte", liberado só pela
+   ativação: _"essa opção é o último caso, e só ativada pelo botão"_. O aviso fica com o texto
+   aprovado (`DO-73`) em todos os estados, e a página do painel não muda. A versão anterior deste
+   item dizia "NÃO implementado, custa duas linhas": era verdade, e deixou de ser necessário.
+   ⚠️ **O rastreio que ele citou existe em parte:** pedir, ativar, desativar e listar gravam
+   auditoria com quem e o antes e o depois; o clique em "Be4Hope faz por mim" grava
+   `DEFINIR_MODALIDADE` **sem `userId` e sem o antes e o depois**. Davi: _"se ainda não existe,
+   futuramente vamos criar"_. Catalogado como `docs/04`, Item 59.
 6. **Um guarda antigo congelava a frase:** `o-destino-do-paciente-segue-o-que-falta` exigia o literal
    "Fazer a procuração agora". O caso foi **retificado** para conferir o que protege, o aviso
    levar à tela da ANVISA em um clique, com o motivo escrito no próprio teste.
@@ -500,7 +521,11 @@ não conseguiu ainda.
    casava na consulta errada. `pnpm test`: **1735 em 73**; integração: **181 em 16**; `pnpm build`:
    `exit 0`; type-check: 0; lint: **202**, um a menos (o `any` que saiu de `definirModalidadeAnvisa`),
    com o teto apertado em `baseline.json`.
-9. ⚠️ **As telas não foram vistas rodando.** O `standalone` local sobe, mas toda rota responde 500
+   **Depois do `DO-76` (rejeitado ANVISA), no mesmo dia:** guarda com **75 casos**, integração
+   homônima com **27**, **27 sabotagens** acusadas. `pnpm test`: **1743 em 73**; integração inteira:
+   **183 em 16**.
+9. ⚠️ **As telas não foram vistas rodando.** Davi, 30/09/2026: _"isso vou ter que testar em produção,
+   o importante é o site não cair"_ (§0.20). O `standalone` local sobe, mas toda rota responde 500
    com `@clerk/nextjs: Missing publishableKey`: não há chave do Clerk nesta máquina (`grep -c CLERK
 .env` → 0). É a limitação já registrada no `CLAUDE.md`. As telas se conferem depois do deploy,
    ou com uma chave de desenvolvimento local.

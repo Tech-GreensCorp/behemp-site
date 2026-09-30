@@ -20,6 +20,7 @@ import { pedidoAtendimentoStatusEnum } from './enums';
  * As chaves estrangeiras não têm cascata: autorização e paciente têm soft delete, e
  * cascata apagaria histórico.
  */
+// Encerrados: `concluido` ou `rejeitado_anvisa` (DO-76).
 export const pedidosAtendimentoAssistido = pgTable(
   'pedidos_atendimento_assistido',
   {
@@ -36,14 +37,15 @@ export const pedidosAtendimentoAssistido = pgTable(
     ativadoEm: timestamp('ativado_em', { withTimezone: true }),
     desativadoPor: text('desativado_por').references(() => users.id),
     desativadoEm: timestamp('desativado_em', { withTimezone: true }),
-    concluidoEm: timestamp('concluido_em', { withTimezone: true }),
+    // Quando saiu dos pendentes: a ANVISA aprovou (`concluido`) ou rejeitou (`rejeitado_anvisa`).
+    encerradoEm: timestamp('encerrado_em', { withTimezone: true }),
   },
   (t) => [
     index('pedidos_atendimento_paciente_idx').on(t.pacienteId),
     index('pedidos_atendimento_status_idx').on(t.status),
     // Um único pedido ABERTO por autorização, garantido pelo banco (ADR-0029 D-05 item 2):
     // dois cliques simultâneos não criam dois pedidos, mesmo que a checagem da action perca
-    // a corrida. Concluídos ficam fora da trava — pode haver quantos forem.
+    // a corrida. Encerrados (concluídos ou rejeitados) ficam fora da trava.
     uniqueIndex('pedidos_atendimento_aberto_unq')
       .on(t.autorizacaoId)
       .where(sql`${t.status} in ('aguardando_ativacao', 'pendente_autorizacao')`),

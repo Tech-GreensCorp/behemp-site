@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { notificarParceiro } from '@/lib/parceiros/notificar';
 import { avisarAnvisaAprovada } from '@/lib/anvisa/avisar-aprovacao';
-import { concluirPedidoDaAutorizacao } from '@/lib/anvisa/concluir-pedido-de-atendimento';
+import { encerrarPedidoDaAutorizacao } from '@/lib/anvisa/encerrar-pedido-de-atendimento';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
@@ -95,7 +95,15 @@ export async function POST(request: NextRequest) {
      * E o pedido de atendimento assistido, se houver, sai dos pendentes do admin (ADR-0029 D-03,
      * `DO-72`). Nunca lança: a aprovação já foi gravada.
      */
-    await concluirPedidoDaAutorizacao(autorizacaoId);
+    await encerrarPedidoDaAutorizacao(autorizacaoId, 'concluido');
+  }
+
+  /**
+   * A ANVISA rejeitou: o pedido de atendimento fica como `rejeitado_anvisa` (Davi, 30/09/2026,
+   * `DO-76`) e sai dos pendentes. Nunca lança.
+   */
+  if (status === 'rejeitado') {
+    await encerrarPedidoDaAutorizacao(autorizacaoId, 'rejeitado_anvisa');
   }
 
   // Notificar paciente via Pusher

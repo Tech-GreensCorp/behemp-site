@@ -22,6 +22,7 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,6 +50,8 @@ const SITUACAO: Record<StatusDoPedido, { rotulo: string; cor: string }> = {
   aguardando_ativacao: { rotulo: 'Aguardando ativação', cor: 'bg-yellow-100 text-yellow-700' },
   pendente_autorizacao: { rotulo: 'Pendente autorização', cor: 'bg-blue-100 text-blue-700' },
   concluido: { rotulo: 'Concluído', cor: 'bg-green-100 text-green-700' },
+  // DO-76: "ele fica como rejeitado anvisa". Mesma cor que esta tela usa para "Rejeitado".
+  rejeitado_anvisa: { rotulo: 'Rejeitado ANVISA', cor: 'bg-red-100 text-red-700' },
 };
 
 const SITUACAO_DA_AUTORIZACAO: Record<string, string> = {
@@ -132,7 +135,10 @@ export function PedidosDeAtendimento() {
       setAgindoEm(null);
     });
 
-  const abertos = pedidos?.filter((p) => p.status !== 'concluido').length ?? 0;
+  const abertos =
+    pedidos?.filter(
+      (p) => p.status === 'aguardando_ativacao' || p.status === 'pendente_autorizacao',
+    ).length ?? 0;
 
   return (
     <Card>
@@ -254,10 +260,17 @@ export function PedidosDeAtendimento() {
                       </div>
                     )}
 
-                    {p.status === 'concluido' && p.concluidoEm && (
+                    {p.status === 'concluido' && p.encerradoEm && (
                       <p className="flex items-center gap-1.5 text-xs text-green-700">
                         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Concluído em {quando(p.concluidoEm)}, com a autorização aprovada.
+                        Concluído em {quando(p.encerradoEm)}, com a autorização aprovada.
+                      </p>
+                    )}
+
+                    {p.status === 'rejeitado_anvisa' && p.encerradoEm && (
+                      <p className="flex items-center gap-1.5 text-xs text-red-700">
+                        <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                        Encerrado em {quando(p.encerradoEm)}: a ANVISA rejeitou a autorização.
                       </p>
                     )}
                   </AccordionContent>

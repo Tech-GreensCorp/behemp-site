@@ -1,4 +1,4 @@
-CREATE TYPE "public"."pedido_atendimento_status" AS ENUM('aguardando_ativacao', 'pendente_autorizacao', 'concluido');--> statement-breakpoint
+CREATE TYPE "public"."pedido_atendimento_status" AS ENUM('aguardando_ativacao', 'pendente_autorizacao', 'concluido', 'rejeitado_anvisa');--> statement-breakpoint
 CREATE TABLE "pedidos_atendimento_assistido" (
 	"id" text PRIMARY KEY NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE "pedidos_atendimento_assistido" (
 	"ativado_em" timestamp with time zone,
 	"desativado_por" text,
 	"desativado_em" timestamp with time zone,
-	"concluido_em" timestamp with time zone
+	"encerrado_em" timestamp with time zone
 );
 --> statement-breakpoint
 ALTER TABLE "pedidos_atendimento_assistido" ADD CONSTRAINT "pedidos_atendimento_assistido_autorizacao_id_autorizacoes_anvisa_id_fk" FOREIGN KEY ("autorizacao_id") REFERENCES "public"."autorizacoes_anvisa"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

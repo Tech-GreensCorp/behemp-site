@@ -35,6 +35,7 @@ import { dbTransacional } from '@/lib/db/transacional';
 import {
   MENSAGEM_DA_RECUSA,
   STATUS_ABERTOS,
+  STATUS_ENCERRADOS,
   transicionar,
   type StatusDoPedido,
 } from '@/lib/anvisa/pedido-de-atendimento';
@@ -60,7 +61,7 @@ interface PedidoNaLista {
   pedidoEm: string;
   ativadoEm: string | null;
   ativadoPorNome: string | null;
-  concluidoEm: string | null;
+  encerradoEm: string | null;
 }
 
 // `.strict()`: um `pacienteId` enviado pelo navegador é RECUSADO, não ignorado.
@@ -415,7 +416,7 @@ export async function listarPedidosDeAtendimento(): Promise<Resultado<PedidoNaLi
       pedidoEm: pedidosAtendimentoAssistido.pedidoEm,
       ativadoEm: pedidosAtendimentoAssistido.ativadoEm,
       ativadoPorNome: ativador.nome,
-      concluidoEm: pedidosAtendimentoAssistido.concluidoEm,
+      encerradoEm: pedidosAtendimentoAssistido.encerradoEm,
     })
     .from(pedidosAtendimentoAssistido)
     .innerJoin(
@@ -441,13 +442,13 @@ export async function listarPedidosDeAtendimento(): Promise<Resultado<PedidoNaLi
     );
 
   // Abertos primeiro; dentro de cada grupo, o pedido mais recente em cima.
-  const ordem = (s: StatusDoPedido) => (s === 'concluido' ? 1 : 0);
+  const ordem = (s: StatusDoPedido) => (STATUS_ENCERRADOS.includes(s) ? 1 : 0);
   const dados = linhas
     .map((l) => ({
       ...l,
       pedidoEm: l.pedidoEm.toISOString(),
       ativadoEm: l.ativadoEm?.toISOString() ?? null,
-      concluidoEm: l.concluidoEm?.toISOString() ?? null,
+      encerradoEm: l.encerradoEm?.toISOString() ?? null,
     }))
     .sort((a, b) => ordem(a.status) - ordem(b.status));
 

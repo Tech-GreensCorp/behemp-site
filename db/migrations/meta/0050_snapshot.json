@@ -1,5 +1,5 @@
 {
-  "id": "1bce42b3-40ed-45bf-bc45-eb4e1f0c7654",
+  "id": "c37ac34f-5754-43de-b814-df3ac769c96b",
   "prevId": "f4eaed9f-45a7-4e2d-a5c2-cbcace6398a0",
   "version": "7",
   "dialect": "postgresql",
@@ -8127,8 +8127,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "concluido_em": {
-          "name": "concluido_em",
+        "encerrado_em": {
+          "name": "encerrado_em",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -8517,7 +8517,8 @@
       "values": [
         "aguardando_ativacao",
         "pendente_autorizacao",
-        "concluido"
+        "concluido",
+        "rejeitado_anvisa"
       ]
     },
     "public.periodo_contagem": {

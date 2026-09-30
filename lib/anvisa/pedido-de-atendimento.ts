@@ -7,17 +7,27 @@
  *   aguardando_ativacao ──ativar──▶ pendente_autorizacao ──(ANVISA aprova)──▶ concluido
  *            ▲                              │
  *            └──────────desativar───────────┘   (só antes de o paciente assinar a procuração)
+ *
+ *   A ANVISA rejeitou → rejeitado_anvisa (DO-76). Aprovar ou rejeitar encerra também a partir
+ *   de aguardando_ativacao.
  */
 
-export type StatusDoPedido = 'aguardando_ativacao' | 'pendente_autorizacao' | 'concluido';
-export type AcaoNoPedido = 'ativar' | 'desativar' | 'concluir';
+export type StatusDoPedido =
+  | 'aguardando_ativacao'
+  | 'pendente_autorizacao'
+  | 'concluido'
+  | 'rejeitado_anvisa';
+export type AcaoNoPedido = 'ativar' | 'desativar' | 'concluir' | 'rejeitar';
 export type MotivoDaRecusa =
-  | 'pedido_concluido'
+  | 'pedido_encerrado'
   | 'ja_ativado'
   | 'nao_ativado'
   | 'procuracao_assinada'
   | 'procuracao_em_assinatura';
 export type Transicao = { ok: true; novo: StatusDoPedido } | { ok: false; motivo: MotivoDaRecusa };
+
+/** Os status em que o pedido saiu dos pendentes, porque a ANVISA já respondeu. */
+export const STATUS_ENCERRADOS: readonly StatusDoPedido[] = ['concluido', 'rejeitado_anvisa'];
 
 /** Os status que contam como pedido ABERTO — os mesmos do índice único parcial da 0050. */
 export const STATUS_ABERTOS: readonly StatusDoPedido[] = [
@@ -30,7 +40,8 @@ export function transicionar(
   acao: AcaoNoPedido,
   contexto: { procuracaoAssinada: boolean; procuracaoEmAssinatura?: boolean },
 ): Transicao {
-  if (atual === 'concluido') return { ok: false, motivo: 'pedido_concluido' };
+  // Encerrado é encerrado: a ANVISA já respondeu. Um pedido novo pode ser feito (DO-76).
+  if (STATUS_ENCERRADOS.includes(atual)) return { ok: false, motivo: 'pedido_encerrado' };
 
   switch (acao) {
     case 'ativar':
@@ -49,6 +60,8 @@ export function transicionar(
       return { ok: true, novo: 'aguardando_ativacao' };
     case 'concluir':
       return { ok: true, novo: 'concluido' };
+    case 'rejeitar':
+      return { ok: true, novo: 'rejeitado_anvisa' };
   }
 }
 
@@ -70,7 +83,7 @@ export function podeEntrarNaRepresentacao(estado: {
 
 /** O texto que a tela mostra quando a transição é recusada. Sem detalhe interno. */
 export const MENSAGEM_DA_RECUSA: Record<MotivoDaRecusa, string> = {
-  pedido_concluido: 'Este pedido já foi concluído.',
+  pedido_encerrado: 'Este pedido já foi encerrado: a ANVISA já respondeu.',
   ja_ativado: 'A procuração já está ativada para este paciente.',
   nao_ativado: 'A procuração não está ativada.',
   procuracao_assinada: 'O paciente já assinou a procuração. Ela não pode ser desativada por aqui.',
