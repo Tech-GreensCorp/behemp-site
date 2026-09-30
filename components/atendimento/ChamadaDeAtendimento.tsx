@@ -5,8 +5,9 @@
  *
  * Paciente e admin usam a MESMA tela, com o papel vindo do servidor (`entrarNoAtendimento`):
  *   · a voz vai e volta;
- *   · o paciente mostra a tela quando o navegador deixa (computador); no celular o botão não
- *     existe, e o chat com print é o caminho (D-16);
+ *   · os DOIS ligam e desligam a própria câmera (D-21; a câmera começa desligada);
+ *   · os DOIS mostram a tela quando o navegador deixa (computador); no celular o botão não
+ *     existe, e o chat com print é o caminho (D-16, D-22);
  *   · o chat fica à ESQUERDA na tela larga, e primeiro na estreita (D-17);
  *   · nada é gravado: não há `MediaRecorder` aqui (D-19).
  *
@@ -25,18 +26,23 @@ import {
   MonitorX,
   PhoneOff,
   ShieldCheck,
+  Video,
+  VideoOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { entrarNoAtendimento, encerrarAtendimento } from '@/app/_actions/chamada-de-atendimento';
 import { canalDoAtendimento, type PapelNaChamada } from '@/lib/atendimento/canal';
 import {
   aceitarResposta,
   criarFilaDeCandidatos,
   criarOfertaDoAdmin,
+  faixaDoTransceptor,
   podeCompartilharTela,
   responderComoPaciente,
+  trocarCamera,
   trocarTela,
 } from '@/lib/atendimento/negociacao';
 import { getPusherClient } from '@/lib/integrations/pusher/client';
@@ -56,6 +62,56 @@ interface ConfigIce {
   turnDisponivel: boolean;
 }
 
+/** O que cada lado está mandando agora. Vai pela sinalização: a faixa vazia não diz isso sozinha. */
+interface EstadoDaMidia {
+  camera: boolean;
+  tela: boolean;
+}
+
+const sinalizarNaSala = (sala: string | null, tipo: string, payload: object) =>
+  fetch('/api/atendimento/sinalizar', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sala,
+      tipo,
+      payload,
+      socketId: getPusherClient().connection.socket_id,
+    }),
+  }).catch(() => {});
+
+/**
+ * Um `<video>` para um fluxo. O `srcObject` é posto num efeito porque o elemento pode remontar
+ * (a câmera do outro lado passa do destaque para a miniatura quando ele começa a mostrar a tela).
+ * Sem áudio: a voz vai pelo `<audio>` da chamada.
+ */
+function VideoDoFluxo({
+  fluxo,
+  rotulo,
+  espelhar = false,
+  className,
+}: {
+  fluxo: MediaStream;
+  rotulo: string;
+  espelhar?: boolean;
+  className?: string;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.srcObject = fluxo;
+  }, [fluxo]);
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted
+      aria-label={rotulo}
+      className={cn('bg-black object-contain', espelhar && '-scale-x-100', className)}
+    />
+  );
+}
+
 export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const [fase, setFase] = useState<Fase>('entrando');
   const [erro, setErro] = useState<string | null>(null);
@@ -66,6 +122,11 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const [temMicrofone, setTemMicrofone] = useState(false);
   const [mudo, setMudo] = useState(false);
   const [compartilhando, setCompartilhando] = useState(false);
+  const [cameraLocal, setCameraLocal] = useState<MediaStream | null>(null);
+  const [ligandoCamera, setLigandoCamera] = useState(false);
+  const [midiaRemota, setMidiaRemota] = useState<EstadoDaMidia>({ camera: false, tela: false });
+  const [cameraRemota, setCameraRemota] = useState<MediaStream | null>(null);
+  const [telaRemota, setTelaRemota] = useState<MediaStream | null>(null);
   const [avisoDeTela, setAvisoDeTela] = useState(false);
   const [podeMostrarTela, setPodeMostrarTela] = useState(false);
   const [repetida, setRepetida] = useState(false);
@@ -74,10 +135,18 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const fila = useRef<ReturnType<typeof criarFilaDeCandidatos> | null>(null);
   const microfone = useRef<MediaStreamTrack | null>(null);
   const faixaDeTela = useRef<MediaStreamTrack | null>(null);
+  const camera = useRef<MediaStreamTrack | null>(null);
+  /**
+   * A chamada ainda está viva nesta tela? Falso depois de sair, encerrar ou o pedido encerrar. A
+   * permissão de câmera e o seletor de tela esperam o clique da pessoa, e o que chegar depois disso
+   * não pode ficar aceso (revisão de 30/09/2026).
+   */
+  const viva = useRef(false);
+  /** Os avisos de `midia` saem um de cada vez, e cada um lê o estado na hora de sair. */
+  const filaDeAvisos = useRef<Promise<unknown>>(Promise.resolve());
   const ice = useRef<ConfigIce | null>(null);
   const canal = useRef<Channel | null>(null);
   const audioRemoto = useRef<HTMLAudioElement>(null);
-  const telaRemota = useRef<HTMLVideoElement>(null);
 
   const acrescentar = useCallback((m: MensagemDoChat) => {
     setMensagens((atual) => (atual.some((x) => x.id === m.id) ? atual : [...atual, m]));
@@ -95,18 +164,9 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
      */
     let negociacao: string | null = null;
     let repetida = false;
+    viva.current = true;
 
-    const sinalizar = (tipo: string, payload: object) =>
-      fetch('/api/atendimento/sinalizar', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sala: salaAtual,
-          tipo,
-          payload,
-          socketId: getPusherClient().connection.socket_id,
-        }),
-      }).catch(() => {});
+    const sinalizar = (tipo: string, payload: object) => sinalizarNaSala(salaAtual, tipo, payload);
 
     const fecharConexao = () => {
       pc.current?.close();
@@ -114,7 +174,11 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
       fila.current = null;
       faixaDeTela.current?.stop();
       faixaDeTela.current = null;
-      if (ativo) setCompartilhando(false);
+      if (ativo) {
+        setCompartilhando(false);
+        // O outro lado reenvia o que está mandando quando a nova conexão se completa.
+        setMidiaRemota({ camera: false, tela: false });
+      }
     };
 
     const novaConexao = () => {
@@ -131,16 +195,28 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
           });
       };
       conexao.ontrack = (e) => {
-        const fluxo = e.streams[0] ?? new MediaStream([e.track]);
-        if (e.track.kind === 'audio' && audioRemoto.current) audioRemoto.current.srcObject = fluxo;
-        if (e.track.kind === 'video' && telaRemota.current)
-          telaRemota.current.srcObject = new MediaStream([e.track]);
+        const qual = faixaDoTransceptor(conexao, e.transceiver);
+        if (qual === 'audio' && audioRemoto.current)
+          audioRemoto.current.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+        if (!ativo) return;
+        if (qual === 'camera') setCameraRemota(new MediaStream([e.track]));
+        if (qual === 'tela') setTelaRemota(new MediaStream([e.track]));
       };
       conexao.onconnectionstatechange = () => {
         if (!ativo) return;
-        if (conexao.connectionState === 'connected') setFase('conectado');
+        if (conexao.connectionState === 'connected') {
+          setFase('conectado');
+          filaDeAvisos.current = filaDeAvisos.current.then(() =>
+            sinalizar('midia', {
+              camera: camera.current !== null,
+              tela: faixaDeTela.current !== null,
+            }),
+          );
+        }
         if (conexao.connectionState === 'failed') {
           setFase('aguardando');
+          // Sem conexão, o destaque não congela no último quadro.
+          setMidiaRemota({ camera: false, tela: false });
           toast.error('A conexão caiu. Assim que a outra pessoa voltar, ela se refaz.');
         }
       };
@@ -152,7 +228,7 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
       negociacao = crypto.randomUUID();
       const conexao = novaConexao();
       if (ativo) setFase('conectando');
-      const oferta = await criarOfertaDoAdmin(conexao, microfone.current);
+      const oferta = await criarOfertaDoAdmin(conexao, microfone.current, camera.current);
       await sinalizar('offer', { ...oferta, negociacao });
     };
 
@@ -177,7 +253,7 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
       setSala(r.dados.sala);
       setPapel(r.dados.papel);
       setMensagens(r.dados.mensagens);
-      setPodeMostrarTela(r.dados.papel === 'paciente' && podeCompartilharTela());
+      setPodeMostrarTela(podeCompartilharTela());
 
       try {
         const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -251,7 +327,10 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
             conexao,
             { type: dados.type, sdp: dados.sdp },
             microfone.current,
+            camera.current,
           );
+          // A câmera pode ter sido ligada enquanto a resposta se montava: ela entra agora.
+          if (camera.current) await trocarCamera(conexao, camera.current).catch(() => false);
           await fila.current?.esvaziar();
           await sinalizar('answer', { ...resposta, negociacao });
         },
@@ -278,13 +357,21 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
           void fila.current?.receber(dados.candidato);
         },
       );
+      ch.bind('webrtc:midia', (dados: Partial<EstadoDaMidia>) => {
+        if (!ativo || repetida) return;
+        setMidiaRemota({ camera: dados.camera === true, tela: dados.tela === true });
+      });
       ch.bind('chat:mensagem', (m: MensagemDoChat) => {
         if (ativo) acrescentar(m);
       });
       ch.bind('chamada:encerrada', () => {
         if (!ativo) return;
+        viva.current = false;
         fecharConexao();
         microfone.current?.stop();
+        camera.current?.stop();
+        camera.current = null;
+        setCameraLocal(null);
         setTemMicrofone(false);
         setFase('encerrada');
       });
@@ -292,9 +379,12 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
 
     return () => {
       ativo = false;
+      viva.current = false;
       fecharConexao();
       microfone.current?.stop();
       microfone.current = null;
+      camera.current?.stop();
+      camera.current = null;
       if (canal.current && salaAtual) {
         canal.current.unbind_all();
         getPusherClient().unsubscribe(canalDoAtendimento(salaAtual));
@@ -309,24 +399,79 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
     setMudo(!mudo);
   };
 
+  /** Diz ao outro lado o que este está mandando, para ele mostrar o vídeo ou o aviso certo. */
+  const avisarMidia = () => {
+    filaDeAvisos.current = filaDeAvisos.current.then(() =>
+      sinalizarNaSala(sala, 'midia', {
+        camera: camera.current !== null,
+        tela: faixaDeTela.current !== null,
+      }),
+    );
+  };
+
+  const ligarCamera = async () => {
+    setLigandoCamera(true);
+    try {
+      const fluxo = await navigator.mediaDevices.getUserMedia({
+        // Resolução contida: sem servidor de retransmissão, a banda é a da conexão direta.
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
+        audio: false,
+      });
+      const faixa = fluxo.getVideoTracks()[0];
+      if (!faixa) return;
+      // Saiu, ou a chamada encerrou, durante o pedido de permissão: a câmera não pode ficar acesa.
+      if (!viva.current) {
+        fluxo.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      // ANTES de qualquer espera: uma oferta ou resposta em curso a leva junto.
+      camera.current = faixa;
+      setCameraLocal(new MediaStream([faixa]));
+      if (pc.current) await trocarCamera(pc.current, faixa).catch(() => false);
+      avisarMidia();
+    } catch {
+      toast.error('Não conseguimos usar a sua câmera. A voz e as mensagens continuam.');
+    } finally {
+      setLigandoCamera(false);
+    }
+  };
+
+  const desligarCamera = async () => {
+    // `stop`, e não só `enabled = false`: é o que apaga a luz da câmera. E vem ANTES da troca,
+    // para uma troca que falhe não deixar a luz acesa.
+    camera.current?.stop();
+    camera.current = null;
+    setCameraLocal(null);
+    if (pc.current) await trocarCamera(pc.current, null).catch(() => false);
+    avisarMidia();
+  };
+
   const mostrarTela = async () => {
     setAvisoDeTela(false);
     if (!pc.current) {
-      toast.error('Espere a equipe entrar na chamada para mostrar a tela.');
+      toast.error(
+        papel === 'admin'
+          ? 'Espere o paciente entrar na chamada para mostrar a tela.'
+          : 'Espere a equipe entrar na chamada para mostrar a tela.',
+      );
       return;
     }
     try {
       const fluxo = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       const faixa = fluxo.getVideoTracks()[0];
       if (!faixa) return;
-      const trocou = await trocarTela(pc.current, faixa);
+      // A conexão pode ter caído (ou a chamada encerrado) enquanto a pessoa escolhia a tela.
+      const conexao = viva.current ? pc.current : null;
+      const trocou = conexao ? await trocarTela(conexao, faixa).catch(() => false) : false;
       if (!trocou) {
         faixa.stop();
-        toast.error('Não foi possível mostrar a tela nesta chamada. Mande um print pelo chat.');
+        if (viva.current)
+          toast.error('Não foi possível mostrar a tela agora. Tente de novo, ou mande um print.');
         return;
       }
       faixaDeTela.current = faixa;
       setCompartilhando(true);
+      avisarMidia();
       // Parar pelo botão do próprio navegador também para o compartilhamento aqui.
       faixa.onended = () => void pararTela();
     } catch {
@@ -335,19 +480,28 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   };
 
   const pararTela = async () => {
-    if (pc.current) await trocarTela(pc.current, null);
     faixaDeTela.current?.stop();
     faixaDeTela.current = null;
     setCompartilhando(false);
+    if (pc.current) await trocarTela(pc.current, null).catch(() => false);
+    avisarMidia();
   };
 
   const encerrar = async () => {
     if (!sala) return;
     const r = await encerrarAtendimento({ sala }).catch(() => null);
     if (r?.sucesso) {
+      viva.current = false;
       pc.current?.close();
       pc.current = null;
       microfone.current?.stop();
+      camera.current?.stop();
+      camera.current = null;
+      setCameraLocal(null);
+      // Quem encerra pode estar mostrando a tela: a captura para junto, não fica aberta.
+      faixaDeTela.current?.stop();
+      faixaDeTela.current = null;
+      setCompartilhando(false);
       setTemMicrofone(false);
       setFase('encerrada');
     } else toast.error(r?.erro ?? 'Não foi possível encerrar agora.');
@@ -374,6 +528,16 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
     conectado: 'Chamada em andamento',
     encerrada: 'Atendimento encerrado',
   };
+
+  const outro = papel === 'admin' ? 'O paciente' : 'A equipe';
+  // O destaque é a tela do outro lado, se ele está mostrando; senão, a câmera dele.
+  const destaque =
+    midiaRemota.tela && telaRemota
+      ? { fluxo: telaRemota, rotulo: `Tela mostrada por ${outro.toLowerCase()}` }
+      : midiaRemota.camera && cameraRemota
+        ? { fluxo: cameraRemota, rotulo: `Câmera de ${outro.toLowerCase()}` }
+        : null;
+  const cameraRemotaNaMiniatura = midiaRemota.tela && midiaRemota.camera && cameraRemota;
 
   return (
     <div className="grid gap-4 md:grid-cols-[20rem_1fr]">
@@ -410,16 +574,59 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
           </Link>
         </div>
 
-        {papel === 'admin' && (
-          <div className="border-border overflow-hidden rounded-2xl border bg-black">
-            <video
-              ref={telaRemota}
-              autoPlay
-              playsInline
-              muted
-              className="aspect-video w-full object-contain"
-              aria-label="Tela compartilhada pelo paciente"
-            />
+        {fase !== 'encerrada' && !repetida && (
+          <div className="space-y-2">
+            <div className="border-border overflow-hidden rounded-2xl border">
+              {destaque ? (
+                <VideoDoFluxo
+                  fluxo={destaque.fluxo}
+                  rotulo={destaque.rotulo}
+                  className="aspect-video w-full"
+                />
+              ) : (
+                // Até 30/09/2026 isto era um quadro preto, que parecia câmera quebrada.
+                <div className="bg-muted/40 flex aspect-video flex-col items-center justify-center gap-2 p-6 text-center">
+                  <VideoOff className="text-muted-foreground h-6 w-6" aria-hidden="true" />
+                  <p className="text-foreground text-sm font-medium">
+                    {outro} está sem câmera e não está mostrando a tela.
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    A voz e as mensagens funcionam do mesmo jeito.
+                  </p>
+                </div>
+              )}
+            </div>
+            {(cameraRemotaNaMiniatura || cameraLocal || compartilhando) && (
+              <div className="flex flex-wrap items-end gap-2">
+                {cameraRemotaNaMiniatura && (
+                  <figure className="w-36 space-y-1">
+                    <VideoDoFluxo
+                      fluxo={cameraRemota}
+                      rotulo={`Câmera de ${outro.toLowerCase()}`}
+                      className="border-border aspect-video w-full rounded-lg border"
+                    />
+                    <figcaption className="text-muted-foreground text-xs">{outro}</figcaption>
+                  </figure>
+                )}
+                {cameraLocal && (
+                  <figure className="w-36 space-y-1">
+                    <VideoDoFluxo
+                      fluxo={cameraLocal}
+                      rotulo="A sua câmera"
+                      espelhar
+                      className="border-border aspect-video w-full rounded-lg border"
+                    />
+                    <figcaption className="text-muted-foreground text-xs">Você</figcaption>
+                  </figure>
+                )}
+                {compartilhando && (
+                  <p className="border-border bg-muted/40 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs">
+                    <MonitorUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    Você está mostrando a sua tela.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
         {/* A voz da outra pessoa. Sem `controls`: é a chamada, não um arquivo. */}
@@ -446,13 +653,26 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
           </p>
         )}
 
+        {/*
+          D-22: o admin também mostra a tela. O risco muda de lado: a tela da equipe pode ter dado de
+          OUTROS pacientes (a lista da ANVISA, o painel), e o paciente veria. O aviso diz isso.
+        */}
+
         {avisoDeTela && (
           <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-amber-800">Antes de mostrar a sua tela</p>
-            <p className="text-xs leading-relaxed text-amber-700">
-              A equipe vai ver o que aparece na sua tela enquanto você compartilhar. Não mostre
-              senhas. Nada é gravado: nem a voz, nem a tela.
-            </p>
+            {papel === 'admin' ? (
+              <p className="text-xs leading-relaxed text-amber-700">
+                O paciente vai ver o que aparece na sua tela enquanto você compartilhar. Feche antes
+                tudo que tiver dado de outros pacientes, e prefira mostrar só uma janela. Não mostre
+                senhas. Nada é gravado: nem a voz, nem a tela.
+              </p>
+            ) : (
+              <p className="text-xs leading-relaxed text-amber-700">
+                A equipe vai ver o que aparece na sua tela enquanto você compartilhar. Não mostre
+                senhas. Nada é gravado: nem a voz, nem a tela.
+              </p>
+            )}
             <div className="flex gap-2">
               <Button size="sm" onClick={mostrarTela} className="gap-1.5">
                 <MonitorUp className="h-4 w-4" /> Entendi, mostrar a tela
@@ -476,6 +696,26 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
               {mudo ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               {mudo ? 'Ativar microfone' : 'Silenciar'}
             </Button>
+            {cameraLocal ? (
+              <Button variant="outline" size="sm" onClick={desligarCamera} className="gap-1.5">
+                <VideoOff className="h-4 w-4" /> Desligar câmera
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={ligarCamera}
+                disabled={repetida || ligandoCamera}
+                className="gap-1.5"
+              >
+                {ligandoCamera ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Video className="h-4 w-4" />
+                )}
+                Ligar câmera
+              </Button>
+            )}
             {podeMostrarTela &&
               (compartilhando ? (
                 <Button variant="outline" size="sm" onClick={pararTela} className="gap-1.5">

@@ -24,7 +24,13 @@ import {
 const LIMITE = 600;
 const JANELA_EM_SEGUNDOS = 60;
 
-const TIPOS = ['offer', 'answer', 'ice-candidate', 'peer-joined', 'peer-left'] as const;
+const TIPOS = ['offer', 'answer', 'ice-candidate', 'peer-joined', 'peer-left', 'midia'] as const;
+
+/**
+ * ADR-0029 D-21: `midia` diz ao outro lado se a câmera e a tela estão ligadas. É o único tipo cujo
+ * conteúdo se conhece, então ele é conferido por inteiro: dois booleanos, e nada mais.
+ */
+const midiaSchema = z.object({ camera: z.boolean(), tela: z.boolean() }).strict();
 
 const corpoSchema = z
   .object({
@@ -63,6 +69,8 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
 
   const { sala, tipo, payload, socketId } = parsed.data;
+  if (tipo === 'midia' && !midiaSchema.safeParse(payload).success)
+    return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
   const escopo = await garantirParticipanteDaChamada({ sala });
   if (!escopo.ok) return NextResponse.json({ erro: escopo.erro }, { status: escopo.status });
 

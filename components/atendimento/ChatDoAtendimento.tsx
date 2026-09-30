@@ -10,13 +10,24 @@
  * carregar a imagem sozinha gravaria "visualizou" para quem só rolou o chat. É a mesma regra do
  * `VisualizadorDeDocumento`. E o endereço do blob nunca chega aqui: a imagem vem da rota
  * autenticada, pelo id da mensagem.
+ *
+ * Desde 30/09/2026 (D-23) o print abre num modal, com zoom: o chat é estreito, e a miniatura não
+ * deixava ler o que o paciente queria mostrar. A imagem só MONTA com o modal aberto, então cada
+ * abertura continua sendo uma leitura auditada, e nenhuma a mais.
  */
 import Image from 'next/image';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { ImageIcon, Loader2, Send } from 'lucide-react';
+import { ImageIcon, Loader2, Send, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
@@ -43,30 +54,81 @@ interface Props {
 
 const TIPOS_ACEITOS = 'image/png,image/jpeg,image/webp';
 
+/** Os degraus do zoom: 1 é a imagem inteira na largura do modal. */
+const ZOOM = [1, 1.5, 2, 3] as const;
+
 function Print({ id }: { id: string }) {
   const [aberto, setAberto] = useState(false);
-  if (!aberto) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAberto(true)}
-        className="text-primary flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
-      >
-        <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        Print enviado — clique para ver
-      </button>
-    );
-  }
+  const [degrau, setDegrau] = useState(0);
+  const zoom = ZOOM[degrau];
+  const botao = (
+    <button
+      type="button"
+      onClick={() => {
+        setDegrau(0);
+        setAberto(true);
+      }}
+      className="text-primary flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
+    >
+      <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+      Print enviado — clique para ver
+    </button>
+  );
+  // O modal fica montado para devolver o foco ao botão ao fechar; a IMAGEM só monta aberta.
   return (
-    // `unoptimized`: a imagem é autenticada e sem cache, e o otimizador do Next não poderia buscá-la.
-    <Image
-      unoptimized
-      src={`/api/atendimento/print/${id}`}
-      alt="Print enviado no atendimento"
-      width={640}
-      height={360}
-      className="border-border max-h-72 w-full rounded-lg border object-contain"
-    />
+    <>
+      {botao}
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent className="max-h-[92dvh] max-w-5xl gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-border border-b px-5 py-3 pr-12">
+            <DialogTitle className="text-base">Print enviado no atendimento</DialogTitle>
+            <DialogDescription className="text-xs">
+              Clique na imagem para ampliar, ou use os botões.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted/40 max-h-[70dvh] overflow-auto">
+            {/* `unoptimized`: a imagem é autenticada e sem cache, e o otimizador do Next não poderia buscá-la. */}
+            {aberto && (
+              <Image
+                unoptimized
+                src={`/api/atendimento/print/${id}`}
+                alt="Print enviado no atendimento"
+                width={1600}
+                height={900}
+                onClick={() => setDegrau((d) => (d === 0 ? 2 : 0))}
+                style={{ width: `${zoom * 100}%`, maxWidth: 'none', height: 'auto' }}
+                className={cn('mx-auto block', zoom === 1 ? 'cursor-zoom-in' : 'cursor-zoom-out')}
+              />
+            )}
+          </div>
+          <div className="border-border flex items-center justify-center gap-2 border-t px-5 py-3">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDegrau((d) => Math.max(0, d - 1))}
+              disabled={degrau === 0}
+              aria-label="Diminuir"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-muted-foreground w-12 text-center text-xs" aria-live="polite">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDegrau((d) => Math.min(ZOOM.length - 1, d + 1))}
+              disabled={degrau === ZOOM.length - 1}
+              aria-label="Ampliar"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -1,5 +1,9 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
+> **Status da Fase 2.1 (§12):** 🧪 **implementada e provada local, NÃO publicada** — branch
+> `feat/atendimento-camera-e-print`, 30/09/2026. Câmera e tela nos dois lados, e o print ampliado,
+> pedidos por Davi depois de testar a chamada em produção. Deploy só com a ordem dele.
+>
 > **Status:** ✅ **EM PRODUÇÃO** — 30/09/2026, 14:28 (Brasília): PR #141, merge `2160936`, deploy
 > `36751041870`. O log mostrou `[migrar] ✓ concluído`, `behemp-site` e `behemp-filas` online e
 > _"produção está servindo ESTE build, e a home responde 200"_; a home respondeu 200 durante todo o
@@ -55,6 +59,10 @@ As decisões têm ID no catálogo: `DO-69` a `DO-77` (`docs/02-CATALOGO-DE-REGRA
 | 21  | _"ele fica como rejeitado anvisa"_ (sobre o pedido quando a ANVISA rejeita)                                                                                                                                                                                                                                                                                                       | quinta situação do pedido: `rejeitado_anvisa` (`DO-76`)                                                                                                                                                                                          |
 | 22  | _"aparece um botão logo abaixo da atendimento com suporte essa opção é o último caso, e só ativada pelo botão e em si possui todo seu rastreio nos logs, se ainda não existe futuramente vamos criar"_                                                                                                                                                                            | o aviso do painel não oferece a procuração; o botão é o único lugar (`DO-77`)                                                                                                                                                                    |
 | 23  | _"vamos terminar tudo, testar, e garantir a segurança e compatibilidade e depois nós quando tivermos aptos, testados e comprovados vamos fazer os procedimentos pré-deploy"_                                                                                                                                                                                                      | deploy só depois dos procedimentos de pré-deploy, com tudo provado                                                                                                                                                                               |
+| 24  | _"a câmera está preta e só aparece do lado do admin, o print ele não tem como clicar na imagem para ela aparecer na tela podendo dar zoom ou não para ajudar a ler e identificar. não tem um botão de tirar a câmera, transmitir tela funciona, temos que ajustar essas questões"_ (depois de testar a chamada em produção)                                                       | o quadro preto era a área da tela do paciente, vazia; vira aviso (§12). O print abre ampliado, com zoom (`DO-81`)                                                                                                                                |
+| 25  | _"mas só existe do lado do paciente e não do admin também"_ · e, perguntado, _"Sim, os dois podem mostrar"_                                                                                                                                                                                                                                                                       | o admin também mostra a tela (`DO-80`)                                                                                                                                                                                                           |
+| 26  | perguntado se quer câmera: _"Sim, câmera nos dois lados"_                                                                                                                                                                                                                                                                                                                         | câmera nos dois lados, cada um liga e desliga a sua (`DO-79`); retifica a D-15                                                                                                                                                                   |
+| 27  | perguntado se o "Silenciar" funcionou: _"Funcionou dos dois lados"_                                                                                                                                                                                                                                                                                                               | o microfone não muda                                                                                                                                                                                                                             |
 
 ## §1 — O que existe hoje, medido no código (`origin/main` `7a2f5d9`)
 
@@ -593,6 +601,8 @@ deploy.
 e um de **vídeo** só de recebimento. Ao responder, o paciente fica com o envio de vídeo já
 negociado e vazio. Compartilhar a tela é trocar a faixa (`replaceTrack`), sem nova oferta. É o
 mesmo mecanismo que a teleconsulta usa para a tela do médico (`GlobalTeleconsultaHost.tsx:437`).
+⚠️ **Retificada em 30/09/2026 pela D-24 (§12):** há câmera nos dois lados e o admin também mostra a
+tela, com três canais de ida e volta. O princípio, trocar a faixa sem renegociar, continua.
 
 **D-16. O celular fala por voz e mostra a tela pelo print.** Onde o navegador não tem
 `getDisplayMedia`, o botão "Compartilhar tela" **não aparece**, e a tela aponta o chat. Em nenhum
@@ -738,6 +748,108 @@ Acompanhar a home com `curl -o /dev/null -w "%{http_code}"` a cada rodada: tem d
 Reverter o merge na `main` gera um novo deploy com o código anterior. **As tabelas novas ficam**,
 porque são só aditivas e nada antigo as lê. **Não apagar tabela em produção:** apagar é que
 arriscaria dado.
+
+## §12 — Fase 2.1: câmera, tela dos dois lados e print ampliado (30/09/2026)
+
+Davi testou a chamada em produção, com o paciente numa tela e o admin na outra (§0, linhas 24 a 27).
+A chamada conectou, a voz foi e voltou, a tela do paciente chegou e o print chegou. Ele pediu quatro
+ajustes.
+
+### 12.1 O que era o "quadro preto"
+
+[lido] Não era câmera: a chamada não tinha câmera (D-15, voz e tela). Era o `<video>` da tela do
+paciente, desenhado para o admin **sempre**, com fundo preto, inclusive antes de o paciente mostrar
+a tela. Parecia câmera quebrada. **Defeito de desenho meu**, não de rede. Corrigido: sem vídeo do
+outro lado, a área diz _"O paciente está sem câmera e não está mostrando a tela"_ e que a voz
+continua.
+
+### 12.2 Decisões
+
+**D-21. Câmera nos dois lados, e cada um liga e desliga a própria (`DO-79`).** Retifica a D-15, que
+era voz e tela. A câmera **começa desligada**, e só o clique em "Ligar câmera" pede o vídeo ao
+navegador. Desligar para a faixa (`stop`), e não só a desabilita: é o que apaga a luz da câmera.
+Sair, encerrar e o pedido encerrado também a param.
+⚠️ **A câmera começar desligada é escolha minha, não de Davi.** Ele decidiu que há câmera nos dois
+lados; o ponto de partida eu escolhi pela necessidade (`LGPD-08`): a imagem do rosto é dado pessoal,
+e o atendimento funciona sem ela. Se ele preferir que comece ligada, como a teleconsulta
+(`GlobalTeleconsultaHost.tsx:101`), é uma linha, e o guarda que a prende muda junto.
+
+**D-22. O admin também mostra a tela (`DO-80`).** O botão depende só do navegador deixar
+(`podeCompartilharTela`), não mais do papel. **O risco muda de lado:** a tela da equipe pode ter
+dado de **outros** pacientes (a lista da ANVISA, o painel), e o paciente veria. Isso é comunicação
+de dado a quem não é titular (`LGPD-07`, `LGPD-09`). Por isso o aviso do admin, antes de
+compartilhar, diz: _"Feche antes tudo que tiver dado de outros pacientes, e prefira mostrar só uma
+janela."_ O aviso do paciente continua o mesmo.
+Rejeitado: impedir o admin de escolher a tela inteira (`displaySurface`). O navegador trata isso
+como **preferência**, não como trava, e a tela afirmaria uma proteção que não garante.
+
+**D-23. O print abre num modal, com zoom (`DO-81`).** O chat é estreito (20rem), e a miniatura não
+deixava ler. Clicar em "Print enviado" abre o modal com a imagem, com os botões de ampliar e
+diminuir (100%, 150%, 200% e 300%), e o clique na imagem alterna entre 100% e 200%. A imagem só
+**monta** com o modal aberto, então cada abertura é uma leitura auditada, e nenhuma a mais: é a
+regra do `VisualizadorDeDocumento`.
+
+**D-24. A negociação continua sem renegociar, agora com três canais.** O admin oferece áudio,
+vídeo "câmera" e vídeo "tela", os três de ida e volta. Ligar a câmera ou mostrar a tela é
+`replaceTrack` no canal certo. Qual vídeo é qual sai da **ordem** dos transceptores: a especificação
+do WebRTC fixa que `getTransceivers()` devolve na ordem de criação, e quem responde os cria na ordem
+das linhas `m=` da oferta. O primeiro vídeo é a câmera e o segundo é a tela, nos dois lados.
+O **estado** (câmera ligada? tela?) vai pela sinalização, num evento `midia` com dois booleanos. A
+faixa vazia não diz isso sozinha: sem ele, a tela mostraria o último quadro congelado de quem
+desligou. A rota confere o `midia` por inteiro (`{camera, tela}`, booleanos, nada mais), porque é o
+único tipo cujo conteúdo se conhece.
+
+**Achado junto, e corrigido por ser da mesma tela:** "Encerrar atendimento" fechava a conexão sem
+parar a captura de tela. Quando só o paciente mostrava a tela, isso não acontecia com quem encerra
+(o admin); com a D-22, aconteceria. Agora encerrar para a captura.
+
+### 12.3 O que foi provado, local (30/09/2026)
+
+| prova                                                                 | resultado                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium, dois pares reais, `lib/atendimento/negociacao.ts` compilado | **25 de 25 passos**: três linhas `m=` sendrecv; cada lado reconhece áudio, câmera e tela; a câmera do paciente chega na **câmera** do admin e nada na tela; a tela do admin chega na **tela** do paciente; os quatro vídeos ao mesmo tempo; desligar para os quadros sem parar a tela; religar sem nova oferta; **zero** renegociações; câmera ligada antes de a outra pessoa entrar vai junto na oferta e na resposta |
+| a mesma prova, contra 5 sabotagens do módulo                          | **5 de 5 acusadas**: câmera e tela trocadas (só o passo "câmera ligada antes" pega, porque trocar os nomes dos dois lados continua coerente); tela do admin `recvonly`; resposta com a tela `sendonly`; paciente ignorando a câmera já ligada; `trocarCamera` mexendo na tela                                                                                                                                          |
+| guarda `a-chamada-de-atendimento-nao-grava-e-nao-vaza`                | **49 casos** (eram 34). Os 10 da implementação e os 5 da revisão ficaram **vermelhos** contra o código de antes, e verdes no novo. Um caso antigo foi **retificado**: exigia a forma `if (!aberto)`, e a regra (a imagem não monta fechada) continua medida                                                                                                                                                            |
+| o mesmo guarda, contra 11 sabotagens                                  | **11 de 11 acusadas**: câmera nascendo ligada; desligar sem `stop`; encerrar deixando a tela capturando; aviso do admin sem "outros pacientes"; tela de volta só para o paciente; `midia` lido sem coerção; quadro preto de volta; câmera fora da oferta; rota sem conferir `midia`; print sem modal; câmera acesa ao sair                                                                                             |
+| `pnpm test`                                                           | 1850 casos em 77 arquivos, todos verdes                                                                                                                                                                                                                                                                                                                                                                                |
+| lint e type-check dos arquivos tocados                                | limpos                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+**Revisão independente, 30/09/2026, depois da primeira versão.** Achou três defeitos médios, e os
+três deixavam captura **ligada** sem finalidade ou perdiam a câmera. Todos corrigidos e presos no
+guarda, com 5 sabotagens acusadas:
+
+1. câmera liberada **depois** de a pessoa sair ou a chamada encerrar ficava acesa. Agora a tela
+   confere se a chamada ainda está viva e para a faixa;
+2. se a conexão caísse enquanto a pessoa escolhia a tela, a troca lançava erro, o erro era engolido
+   e a captura continuava, sem botão para parar. Agora a faixa é parada em todo caminho de falha;
+   desligar a câmera e parar a tela param a faixa **antes** da troca que pode falhar;
+3. câmera ligada durante a montagem da resposta do paciente não ia para o outro lado, e o outro via
+   vídeo preto. Agora ela entra no estado antes de qualquer espera, e a resposta se reconcilia.
+
+E três baixos, também corrigidos: os avisos de `midia` saem em fila (antes, ligar e desligar rápido
+podia chegar invertido); a conexão caída zera o estado remoto; o modal do print fica montado para
+devolver o foco, e só a imagem monta aberta.
+**Não corrigido, anterior a este diff:** uma segunda aba do paciente faz o admin oferecer de novo, e
+a renegociação corta a tela compartilhada. Catalogado no `docs/04`, Item 66.
+
+⚠️ **O que NÃO foi provado local:** a TELA rodando (os botões, o modal, as miniaturas). Ela exige
+sessão do Clerk, e não há `CLERK_SECRET_KEY` local (o limite de 13/09 no `CLAUDE.md`). A negociação,
+que é a parte que falha em silêncio, está provada; o desenho se confere em produção, como da outra
+vez (§0, linha 20).
+
+### 12.4 Para conferir em produção, depois do deploy
+
+1. Admin e paciente entram: a área grande mostra o aviso, não um quadro preto.
+2. Cada um liga a câmera: o outro vê no destaque, e a própria aparece pequena, como "Você".
+3. O paciente mostra a tela: ela vai ao destaque do admin, e a câmera do paciente vira miniatura.
+4. O admin mostra a tela: o aviso fala de dado de outros pacientes; o paciente vê a tela do admin.
+5. Desligar a câmera apaga a luz dela.
+6. Um print no chat abre ampliado, e o zoom funciona.
+7. Encerrar para câmera, microfone e tela dos dois lados.
+
+⚠️ **Sem TURN (`DO-78`)**, cada vídeo a mais disputa a mesma conexão direta. A câmera sai em
+resolução contida (640×360) por isso. Se a conexão falhar em alguma rede, a causa provável é essa,
+e não a câmera.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 

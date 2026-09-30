@@ -19,6 +19,44 @@
 
 ---
 
+## ⚪ Item 66 — CATALOGADO, 30/09/2026: uma segunda aba do paciente faz o admin renegociar a chamada
+
+**Status:** achado pela revisão da Fase 2.1 (ADR-0029 §12.3). **Anterior** àquele diff; não corrigido.
+
+**O que acontece:** `components/atendimento/ChamadaDeAtendimento.tsx`, `pusher:member_added`: quando
+entra outra aba do paciente, o admin chama `oferecer()` de novo, mesmo com a chamada conectada. A nova
+conexão fecha a anterior (`fecharConexao`), e isso para a tela que alguém estava mostrando. A aba nova
+do paciente se percebe repetida e não responde, então a chamada fica sem voz até alguém sair e voltar.
+
+**Perigo:** baixo; é o paciente com duas abas abertas. Correção provável: o admin só oferece se não
+houver conexão ativa. Mexe na lógica de reconexão, que a prova no Chromium não cobre (ela prova a
+negociação, não a presença), e por isso não entrou junto.
+
+---
+
+## ⚪ Item 65 — CATALOGADO, 30/09/2026: apagar a autorização não encerra o pedido nem a chamada dela
+
+**Status:** achado ao ler o PR #143 (Dryelle, `3a8feef`), antes da Fase 2.1. **Não corrigido**: não é
+escopo do pedido de Davi, e o código é de outra pessoa.
+
+**O que acontece:** `apagarAutorizacaoAnvisaAdmin` (`app/(admin)/_actions/documentos-regulatorios.ts:93`)
+marca `deletedAt` na autorização, mas não chama `encerrarPedidoDaAutorizacao`
+(`lib/anvisa/encerrar-pedido-de-atendimento.ts`). O pedido de atendimento dela fica
+`aguardando_ativacao` ou `pendente_autorizacao`, e uma chamada aberta continua aberta.
+
+**Perigo, medido pela leitura:** baixo. A lista do admin já esconde o pedido de autorização apagada
+(`app/_actions/pedido-atendimento-assistido.ts:439`), e o paciente que pedir de novo, numa autorização
+nova, não é bloqueado pelo índice parcial, que é por `autorizacao_id`. O que sobra é linha aberta
+para sempre, e uma chamada que `garantirAcessoAoPedido` (`lib/auth/escopo-chamada.ts:52`) ainda deixa
+o paciente abrir pelo link, porque confere o paciente arquivado, não a autorização apagada.
+
+**Para corrigir (com autorização):** chamar `encerrarPedidoDaAutorizacao(autorizacaoId, …)` depois do
+`update`, com um desfecho próprio ou `concluido`. A escolha do desfecho é **regra de negócio**, e é
+pergunta para Davi. Um ponto de chamada; teste de integração existe para o encerramento
+(`__tests__/integracao/o-pedido-de-atendimento-abre-a-procuracao.test.ts`).
+
+---
+
 ## 🟠 Item 64 — CATALOGADO, 30/09/2026: o "Registre-se" falha na confirmação do código com `JSON.parse`
 
 **Status:** relatado por Davi em produção (print), **não investigado a fundo e não corrigido** — _"isso
@@ -147,10 +185,11 @@ alterável por terceiro, sem auditoria de quem alterou.
 
 ---
 
-## 🔴 Item 56 — DECIDIDO, 29/09/2026, não implementado: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
+## 🔴 Item 56 — EM PRODUÇÃO desde 30/09/2026 (Fases 1 e 2) · Fase 2.1 na branch: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
 **Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
-**prioridade 1** da nova ordem definida na reunião de 29/09/2026. Nenhuma linha de código.
+**prioridade 1** da nova ordem definida na reunião de 29/09/2026. ⚠️ _Esta linha dizia "nenhuma
+linha de código" e ficou velha: as Fases 1 e 2 estão em produção (PR #141, 30/09/2026)._
 Migration autorizada por escrito (`.claude/autorizacoes.txt`), com o roteiro de integridade da
 ADR-0029 D-05 como condição.
 
@@ -202,8 +241,16 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
   a tela do paciente, o chat lateral com print, as rotas `app/api/atendimento/*`, o ramo novo do
   Pusher e as tabelas da chamada na mesma 0050. Provas e revisão na ADR-0029 §10.4. Catalogados, sem
   correção: Itens 60, 61 e 62.
+- ✅ **em produção**, 30/09/2026, 14:28: PR #141, deploy `36751041870`. Davi testou a chamada: conecta,
+  a voz vai e volta, a tela do paciente e o print chegam.
+- 🧪 **Fase 2.1 (30/09/2026), branch `feat/atendimento-camera-e-print`, sem deploy:** câmera nos dois
+  lados (`DO-79`), o admin também mostra a tela (`DO-80`), o print abre ampliado com zoom (`DO-81`),
+  e o quadro preto do admin vira aviso. Arquivos: `lib/atendimento/negociacao.ts`,
+  `components/atendimento/ChamadaDeAtendimento.tsx`, `components/atendimento/ChatDoAtendimento.tsx`,
+  `app/api/atendimento/sinalizar/route.ts` (o evento `midia`). Provas na ADR-0029 §12.3. O que falta
+  conferir em produção: ADR-0029 §12.4.
 
-**Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
+**Fica para a próxima fatia** _(escrito antes da Fase 2; a chamada foi feita no mesmo deploy)_: a chamada de atendimento com suporte (voz, tela no computador e
 chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**
 compartilha tela (MDN `browser-compat-data`: `false` em Chrome Android, Safari iOS e Firefox
 Android); por isso o chat com print.

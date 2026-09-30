@@ -5,18 +5,23 @@
     responderComoPaciente,
     aceitarResposta,
     trocarTela,
+    trocarCamera,
+    faixaDoTransceptor,
     criarFilaDeCandidatos,
     podeCompartilharTela,
   } from './negociacao.js';
   const r = { passos: [] };
   const passo = (n, ok, extra) => r.passos.push({ n, ok, ...(extra ?? {}) });
   const espera = (ms) => new Promise((s) => setTimeout(s, ms));
-  async function framesDeVideoRecebidos(pc) {
-    const st = await pc.getStats();
+
+  /** Quadros decodificados no receptor que `faixaDoTransceptor` diz ser `qual`. */
+  async function quadros(pc, qual) {
+    const t = pc.getTransceivers().find((x) => faixaDoTransceptor(pc, x) === qual);
+    if (!t) return -1;
+    const st = await t.receiver.getStats();
     let f = 0;
     st.forEach((x) => {
-      if (x.type === 'inbound-rtp' && x.kind === 'video')
-        f = x.framesDecoded ?? x.framesReceived ?? 0;
+      if (x.type === 'inbound-rtp') f = x.framesDecoded ?? x.framesReceived ?? 0;
     });
     return f;
   }
@@ -28,84 +33,153 @@
     });
     return p;
   }
-  try {
-    const micA = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
-    const micB = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
-    const A = new RTCPeerConnection();
-    const B = new RTCPeerConnection();
-    const filaA = criarFilaDeCandidatos(A),
-      filaB = criarFilaDeCandidatos(B);
-    // ICE cruzado, com atraso proposital: candidatos chegam ANTES da descrição remota.
-    A.onicecandidate = (e) => e.candidate && filaB.receber(e.candidate.toJSON());
-    B.onicecandidate = (e) => e.candidate && filaA.receber(e.candidate.toJSON());
-    let renegociacoesB = 0;
-    B.onnegotiationneeded = () => renegociacoesB++;
-    const faixasA = [];
-    A.ontrack = (e) => faixasA.push(e.track.kind);
-    const faixasB = [];
-    B.ontrack = (e) => faixasB.push(e.track.kind);
-
-    const oferta = await criarOfertaDoAdmin(A, micA);
-    passo(
-      'oferta tem audio sendrecv e video recvonly',
-      /m=audio[\s\S]*a=sendrecv/.test(oferta.sdp) && /m=video[\s\S]*a=recvonly/.test(oferta.sdp),
-    );
-    const resposta = await responderComoPaciente(B, oferta, micB);
-    await filaB.esvaziar();
-    passo('resposta tem video sendonly', /m=video[\s\S]*a=sendonly/.test(resposta.sdp));
-    await aceitarResposta(A, resposta);
-    await filaA.esvaziar();
-    for (let i = 0; i < 50 && A.connectionState !== 'connected'; i++) await espera(100);
-    passo('conectou', A.connectionState === 'connected', { estado: A.connectionState });
-    await espera(1500);
-    passo('admin ouve o paciente', (await pacotesDeAudio(A)) > 0, {
-      pacotes: await pacotesDeAudio(A),
-    });
-    passo('paciente ouve o admin', (await pacotesDeAudio(B)) > 0, {
-      pacotes: await pacotesDeAudio(B),
-    });
-    const antes = await framesDeVideoRecebidos(A);
-    passo('sem compartilhar, nenhum quadro de video chega', antes === 0, { quadros: antes });
-
-    // A "tela": um canvas animado, no lugar de getDisplayMedia (que o headless não abre).
+  /** Um canvas animado: faz as vezes de câmera e de getDisplayMedia, que o headless não abre. */
+  function faixaFalsa() {
     const cv = document.createElement('canvas');
     cv.width = 320;
     cv.height = 180;
     const cx = cv.getContext('2d');
     let t = 0;
-    const anim = setInterval(() => {
+    setInterval(() => {
       cx.fillStyle = `hsl(${t++ % 360} 70% 50%)`;
       cx.fillRect(0, 0, 320, 180);
     }, 30);
-    const tela = cv.captureStream(25).getVideoTracks()[0];
-    const renegAntes = renegociacoesB;
-    passo('trocarTela devolve true', await trocarTela(B, tela));
-    await espera(2500);
-    const durante = await framesDeVideoRecebidos(A);
-    passo('compartilhando, o admin recebe quadros', durante > 10, { quadros: durante });
-    passo('compartilhar NAO pediu renegociacao', renegociacoesB === renegAntes, {
-      renegociacoes: renegociacoesB - renegAntes,
-    });
+    return cv.captureStream(25).getVideoTracks()[0];
+  }
+  /** Mede se `qual` em `pc` está crescendo agora (quadros chegando), num intervalo de 1,5 s. */
+  async function crescendo(pc, qual) {
+    const a = await quadros(pc, qual);
+    await espera(1500);
+    const b = await quadros(pc, qual);
+    return { cresce: b - a > 5, delta: b - a };
+  }
+  async function conectar(A, B, camA = null, camB = null) {
+    const micA = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
+    const micB = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
+    const filaA = criarFilaDeCandidatos(A),
+      filaB = criarFilaDeCandidatos(B);
+    A.onicecandidate = (e) => e.candidate && filaB.receber(e.candidate.toJSON());
+    B.onicecandidate = (e) => e.candidate && filaA.receber(e.candidate.toJSON());
+    const oferta = await criarOfertaDoAdmin(A, micA, camA);
+    const resposta = await responderComoPaciente(B, oferta, micB, camB);
+    await filaB.esvaziar();
+    await aceitarResposta(A, resposta);
+    await filaA.esvaziar();
+    for (let i = 0; i < 50 && A.connectionState !== 'connected'; i++) await espera(100);
+    return { oferta, resposta };
+  }
 
-    await trocarTela(B, null);
+  try {
+    const A = new RTCPeerConnection(); // admin
+    const B = new RTCPeerConnection(); // paciente
+    const chegouEmA = [],
+      chegouEmB = [];
+    A.ontrack = (e) => chegouEmA.push(faixaDoTransceptor(A, e.transceiver));
+    B.ontrack = (e) => chegouEmB.push(faixaDoTransceptor(B, e.transceiver));
+    const { oferta, resposta } = await conectar(A, B);
+
+    const linhas = (sdp) =>
+      sdp
+        .split('m=')
+        .slice(1)
+        .map(
+          (m) =>
+            m.split(' ')[0] + ':' + (m.match(/a=(sendrecv|sendonly|recvonly|inactive)/) ?? [])[1],
+        );
+    passo(
+      'oferta: audio, video, video, todos sendrecv',
+      linhas(oferta.sdp).join(',') === 'audio:sendrecv,video:sendrecv,video:sendrecv',
+      { linhas: linhas(oferta.sdp) },
+    );
+    passo(
+      'resposta: audio, video, video, todos sendrecv',
+      linhas(resposta.sdp).join(',') === 'audio:sendrecv,video:sendrecv,video:sendrecv',
+      { linhas: linhas(resposta.sdp) },
+    );
+    passo('conectou', A.connectionState === 'connected', { estado: A.connectionState });
+    passo(
+      'cada lado reconhece audio, camera e tela no que chega',
+      [...chegouEmA].sort().join() === 'audio,camera,tela' &&
+        [...chegouEmB].sort().join() === 'audio,camera,tela',
+      { admin: chegouEmA, paciente: chegouEmB },
+    );
     await espera(1500);
-    const f1 = await framesDeVideoRecebidos(A);
-    await espera(1500);
-    const f2 = await framesDeVideoRecebidos(A);
-    passo('parou de compartilhar: os quadros param de crescer', f2 - f1 <= 2, { delta: f2 - f1 });
-    passo('voltou a compartilhar sem nova oferta', await trocarTela(B, tela));
-    await espera(1500);
-    passo('e os quadros voltam', (await framesDeVideoRecebidos(A)) > f2, {
-      quadros: await framesDeVideoRecebidos(A),
-    });
+    passo('admin ouve o paciente', (await pacotesDeAudio(A)) > 0);
+    passo('paciente ouve o admin', (await pacotesDeAudio(B)) > 0);
+    const nada = [
+      await quadros(A, 'camera'),
+      await quadros(A, 'tela'),
+      await quadros(B, 'camera'),
+      await quadros(B, 'tela'),
+    ];
+    passo(
+      'sem ligar nada, nenhum quadro chega em nenhum video',
+      nada.every((q) => q === 0),
+      {
+        quadros: nada,
+      },
+    );
+
+    let renegociacoes = 0;
+    A.onnegotiationneeded = () => renegociacoes++;
+    B.onnegotiationneeded = () => renegociacoes++;
+
+    const camB = faixaFalsa();
+    passo('paciente liga a camera: trocarCamera devolve true', await trocarCamera(B, camB));
+    const camNoAdmin = await crescendo(A, 'camera');
+    passo('o admin recebe na CAMERA', camNoAdmin.cresce, camNoAdmin);
+    passo('e nada na TELA do admin', (await quadros(A, 'tela')) === 0);
+
+    const telaA = faixaFalsa();
+    passo('admin mostra a tela: trocarTela devolve true', await trocarTela(A, telaA));
+    const telaNoPaciente = await crescendo(B, 'tela');
+    passo('o paciente recebe na TELA', telaNoPaciente.cresce, telaNoPaciente);
+    passo('e nada na CAMERA do paciente', (await quadros(B, 'camera')) === 0);
+
+    const camA = faixaFalsa();
+    await trocarCamera(A, camA);
+    const camNoPaciente = await crescendo(B, 'camera');
+    passo('admin liga a camera: o paciente recebe na CAMERA', camNoPaciente.cresce, camNoPaciente);
+
+    const telaB = faixaFalsa();
+    await trocarTela(B, telaB);
+    const telaNoAdmin = await crescendo(A, 'tela');
+    passo('paciente mostra a tela: o admin recebe na TELA', telaNoAdmin.cresce, telaNoAdmin);
+    const tudo = [
+      await crescendo(A, 'camera'),
+      await crescendo(B, 'tela'),
+      await crescendo(B, 'camera'),
+    ];
+    passo(
+      'os quatro videos ao mesmo tempo',
+      tudo.every((x) => x.cresce),
+      { tudo },
+    );
+
+    await trocarCamera(B, null);
+    await espera(800);
+    const parou = await crescendo(A, 'camera');
+    passo('paciente desliga a camera: os quadros param', parou.delta <= 2, parou);
+    passo('e a tela do paciente continua', (await crescendo(A, 'tela')).cresce);
+    await trocarCamera(B, camB);
+    passo('religou sem nova oferta, e volta', (await crescendo(A, 'camera')).cresce);
+    passo('nada disso pediu renegociacao', renegociacoes === 0, { renegociacoes });
     passo('ainda conectado no fim', A.connectionState === 'connected');
+
+    // Câmera ligada ANTES de a outra pessoa entrar: vai junto na oferta e na resposta.
+    const C = new RTCPeerConnection();
+    const D = new RTCPeerConnection();
+    await conectar(C, D, faixaFalsa(), faixaFalsa());
+    passo('camera ligada antes: chega ao paciente', (await crescendo(D, 'camera')).cresce);
+    passo('camera ligada antes: chega ao admin', (await crescendo(C, 'camera')).cresce);
+
     const semVideo = new RTCPeerConnection();
     passo(
-      'trocarTela sem canal de video devolve false (nao finge)',
-      (await trocarTela(semVideo, tela)) === false,
+      'sem canal negociado, trocarTela e trocarCamera devolvem false (nao fingem)',
+      (await trocarTela(semVideo, telaA)) === false &&
+        (await trocarCamera(semVideo, camA)) === false,
     );
     passo('podeCompartilharTela no desktop', podeCompartilharTela() === true);
-    clearInterval(anim);
   } catch (e) {
     r.erro = String((e && e.stack) || e);
   }

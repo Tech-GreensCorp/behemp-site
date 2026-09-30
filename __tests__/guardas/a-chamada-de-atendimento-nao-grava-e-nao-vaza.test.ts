@@ -11,7 +11,11 @@
  *   6. a imagem do print passar a carregar sozinha (auditoria falsa de "visualizou");
  *   7. a sala voltar a ser previsível (`Math.random`), ou o prefixo do canal ser escrito fora do
  *      módulo único (o `/api/pusher/auth` nega o que não reconhece, e prefixo duplicado diverge);
- *   8. o botão de mostrar a tela aparecer onde o navegador não deixa (D-16).
+ *   8. o botão de mostrar a tela aparecer onde o navegador não deixa (D-16);
+ *   9. a câmera nascer ligada, ou ficar acesa depois de desligar, sair ou encerrar; a tela do admin
+ *      perder o aviso sobre dado de OUTROS pacientes; o sinal `midia` passar sem conferir o formato;
+ *      o quadro vazio voltar a ser um preto que parece câmera quebrada; ou o print perder o modal com
+ *      zoom (D-21 a D-23, `DO-79` a `DO-82`).
  *
  * O que ele NÃO prova: que o fluxo roda. Isso é a integração
  * `a-chamada-de-atendimento-so-tem-duas-pessoas` (banco real) e a prova no Chromium da negociação
@@ -54,6 +58,19 @@ function corpoDe(fonte: string, nome: string): string {
   const i = fonte.search(new RegExp(`function ${nome}\\s*\\(`));
   if (i < 0) return '';
   const abre = fonte.indexOf(' {\n', fonte.indexOf(')', i)) + 1;
+  let nivel = 0;
+  for (let j = abre; j < fonte.length; j++) {
+    if (fonte[j] === '{') nivel++;
+    else if (fonte[j] === '}' && --nivel === 0) return fonte.slice(abre, j + 1);
+  }
+  return '';
+}
+
+/** O corpo de `const nome = async (…) => { … }`: as funções da tela são setas, não `function`. */
+function corpoDaSeta(fonte: string, nome: string): string {
+  const i = fonte.search(new RegExp(`const ${nome} = (async )?\\(`));
+  if (i < 0) return '';
+  const abre = fonte.indexOf('{', fonte.indexOf('=>', i));
   let nivel = 0;
   for (let j = abre; j < fonte.length; j++) {
     if (fonte[j] === '{') nivel++;
@@ -151,12 +168,14 @@ describe('o print (D-18)', () => {
     expect(PRINT).not.toMatch(/status: 403/);
   });
 
+  // Retificado em 30/09/2026: exigia `if (!aberto)`, a FORMA de 29/09. Com o modal (D-23), a proteção
+  // passou a ser `{aberto && (` em volta da imagem. A regra é a mesma: nada busca a imagem fechada.
   it('a imagem só é buscada quando alguém clica para ver', () => {
     const print = corpoDe(CHAT, 'Print');
-    const fechado = print.indexOf('if (!aberto)');
+    const aberto = print.indexOf('{aberto && (');
     const imagem = print.indexOf('/api/atendimento/print/');
-    expect(fechado).toBeGreaterThanOrEqual(0);
-    expect(imagem).toBeGreaterThan(fechado);
+    expect(aberto).toBeGreaterThanOrEqual(0);
+    expect(imagem).toBeGreaterThan(aberto);
   });
 });
 
@@ -226,5 +245,133 @@ describe('a revisão de 30/09/2026 — o que ela achou não volta', () => {
 
   it('fechar a chamada pelo pedido AVISA as telas', () => {
     expect(ENCERRAR_PEDIDO).toMatch(/\.trigger\(canalDoAtendimento\(sala\), 'chamada:encerrada'/);
+  });
+});
+
+describe('a câmera, a tela dos dois lados e o print (D-21 a D-23)', () => {
+  const LIGAR = corpoDaSeta(TELA, 'ligarCamera');
+  const DESLIGAR = corpoDaSeta(TELA, 'desligarCamera');
+  const ENCERRAR = corpoDaSeta(TELA, 'encerrar');
+  const SAIR = TELA.slice(TELA.lastIndexOf('return () => {'));
+  const ENCERRADA = TELA.slice(TELA.indexOf("ch.bind('chamada:encerrada'"));
+
+  it('vacuidade: as funções da câmera existem', () => {
+    expect(LIGAR.length).toBeGreaterThan(0);
+    expect(DESLIGAR.length).toBeGreaterThan(0);
+    expect(ENCERRAR.length).toBeGreaterThan(0);
+  });
+
+  it('a câmera nasce DESLIGADA: só o clique pede vídeo ao navegador', () => {
+    const pedidos = TELA.match(/getUserMedia\(\{[\s\S]*?\}\)/g) ?? [];
+    const comVideo = pedidos.filter((x) => /video:/.test(x));
+    expect(comVideo).toHaveLength(1);
+    expect(LIGAR).toContain(comVideo[0]);
+  });
+
+  it('desligar, sair, encerrar e o pedido encerrado PARAM a câmera (apaga a luz)', () => {
+    expect(DESLIGAR).toMatch(/camera\.current\?\.stop\(\)/);
+    expect(DESLIGAR).toMatch(/trocarCamera\(pc\.current, null\)/);
+    expect(SAIR.slice(0, 400)).toMatch(/camera\.current\?\.stop\(\)/);
+    expect(ENCERRAR).toMatch(/camera\.current\?\.stop\(\)/);
+    expect(ENCERRADA.slice(0, 400)).toMatch(/camera\.current\?\.stop\(\)/);
+  });
+
+  it('encerrar também para a captura de tela de quem encerra', () => {
+    expect(ENCERRAR).toMatch(/faixaDeTela\.current\?\.stop\(\)/);
+  });
+
+  it('a câmera já ligada vai junto na oferta e na resposta', () => {
+    expect(TELA).toMatch(/criarOfertaDoAdmin\(conexao, microfone\.current, camera\.current\)/);
+    expect(TELA).toMatch(/microfone\.current,\s*camera\.current,\s*\)/);
+  });
+
+  it('mostrar a tela depende do navegador, não do papel', () => {
+    expect(TELA).toMatch(/setPodeMostrarTela\(podeCompartilharTela\(\)\)/);
+    expect(TELA).not.toMatch(/papel === 'paciente' && podeCompartilharTela/);
+  });
+
+  it('o aviso do admin fala de dado de OUTROS pacientes, e o do paciente continua', () => {
+    expect(TELA).toMatch(/dado de outros pacientes/);
+    expect(TELA.match(/Nada é gravado: nem a voz, nem a tela\./g) ?? []).toHaveLength(2);
+  });
+
+  it('sem vídeo do outro lado, a tela diz isso em vez de mostrar um quadro preto', () => {
+    expect(TELA).toMatch(/está sem câmera e não está mostrando a tela\./);
+    expect(TELA).not.toMatch(/rounded-2xl border bg-black/);
+  });
+
+  it('o sinal `midia` é conferido por inteiro no servidor, e lido como booleano na tela', () => {
+    expect(SINALIZAR).toMatch(/'midia'\] as const/);
+    expect(SINALIZAR).toMatch(
+      /z\.object\(\{ camera: z\.boolean\(\), tela: z\.boolean\(\) \}\)\.strict\(\)/,
+    );
+    const confere = SINALIZAR.indexOf(
+      "tipo === 'midia' && !midiaSchema.safeParse(payload).success",
+    );
+    expect(confere).toBeGreaterThanOrEqual(0);
+    expect(SINALIZAR.indexOf('.trigger(')).toBeGreaterThan(confere);
+    expect(TELA).toMatch(/camera: dados\.camera === true, tela: dados\.tela === true/);
+  });
+
+  it('o print abre num modal com zoom, e a imagem só monta com ele aberto', () => {
+    const print = corpoDe(CHAT, 'Print');
+    expect(print).toMatch(/<Dialog open=\{aberto\}/);
+    expect(print).toMatch(/aria-label="Ampliar"/);
+    expect(print).toMatch(/aria-label="Diminuir"/);
+    const condicao = print.indexOf('{aberto && (');
+    expect(condicao).toBeGreaterThanOrEqual(0);
+    expect(print.indexOf('/api/atendimento/print/')).toBeGreaterThan(condicao);
+  });
+});
+
+describe('a revisão da Fase 2.1 (30/09/2026) — o que ela achou não volta', () => {
+  const LIGAR = corpoDaSeta(TELA, 'ligarCamera');
+  const DESLIGAR = corpoDaSeta(TELA, 'desligarCamera');
+  const MOSTRAR = corpoDaSeta(TELA, 'mostrarTela');
+  const PARAR = corpoDaSeta(TELA, 'pararTela');
+  const OFERTA = TELA.slice(TELA.indexOf("'webrtc:offer'"), TELA.indexOf("'webrtc:answer'"));
+
+  it('câmera liberada depois de sair ou encerrar é parada, não fica acesa', () => {
+    const confere = LIGAR.indexOf('if (!viva.current)');
+    expect(confere).toBeGreaterThanOrEqual(0);
+    expect(LIGAR.slice(confere, confere + 120)).toMatch(
+      /fluxo\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)/,
+    );
+    expect(LIGAR.indexOf('camera.current = faixa')).toBeGreaterThan(confere);
+    for (const saida of ['return () => {', "ch.bind('chamada:encerrada'"])
+      expect(TELA.slice(TELA.indexOf(saida), TELA.indexOf(saida) + 200)).toMatch(
+        /viva\.current = false/,
+      );
+    expect(corpoDaSeta(TELA, 'encerrar')).toMatch(/viva\.current = false/);
+  });
+
+  it('a câmera entra no ref ANTES de esperar a troca, e a resposta em curso a reconcilia', () => {
+    expect(LIGAR.indexOf('camera.current = faixa')).toBeLessThan(
+      LIGAR.indexOf('await trocarCamera'),
+    );
+    expect(OFERTA).toMatch(/if \(camera\.current\) await trocarCamera\(conexao, camera\.current\)/);
+  });
+
+  it('desligar a câmera e parar a tela param a faixa ANTES da troca que pode falhar', () => {
+    expect(DESLIGAR.indexOf('camera.current?.stop()')).toBeLessThan(
+      DESLIGAR.indexOf('trocarCamera('),
+    );
+    expect(PARAR.indexOf('faixaDeTela.current?.stop()')).toBeLessThan(PARAR.indexOf('trocarTela('));
+  });
+
+  it('a tela escolhida depois de a conexão cair é parada, não fica capturando', () => {
+    expect(MOSTRAR).toMatch(/const conexao = viva\.current \? pc\.current : null;/);
+    expect(MOSTRAR).toMatch(/if \(!trocou\) \{\s*faixa\.stop\(\)/);
+    expect(MOSTRAR).not.toMatch(/trocarTela\(pc\.current, faixa\)/);
+  });
+
+  it('os avisos de mídia saem em fila, e a conexão caída zera o estado remoto', () => {
+    expect(corpoDaSeta(TELA, 'avisarMidia')).toMatch(
+      /filaDeAvisos\.current = filaDeAvisos\.current\.then\(/,
+    );
+    const falhou = TELA.indexOf("conexao.connectionState === 'failed'");
+    expect(TELA.slice(falhou, falhou + 300)).toMatch(
+      /setMidiaRemota\(\{ camera: false, tela: false \}\)/,
+    );
   });
 });
