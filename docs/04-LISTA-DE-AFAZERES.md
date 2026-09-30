@@ -19,6 +19,43 @@
 
 ---
 
+## 🔴 Item 56 — DECIDIDO, 29/09/2026, não implementado: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
+
+**Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
+**prioridade 1** da nova ordem definida na reunião de 29/09/2026. Nenhuma linha de código.
+Migration autorizada por escrito (`.claude/autorizacoes.txt`), com o roteiro de integridade da
+ADR-0029 D-05 como condição.
+
+**Onde mexe, com a evidência:**
+
+| o quê                                                    | onde                                                                    |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| a etapa `escolha` sai do caminho                         | `app/(paciente)/paciente/anvisa/page.tsx:341`, `:447`, `:722`, `:894`   |
+| vídeo, botão de suporte e botão da procuração            | a etapa `guiada`, `app/(paciente)/paciente/anvisa/page.tsx:710-876`     |
+| o paciente não liga `representacao` sozinho              | `app/(paciente)/_actions/anvisa.ts:187-240` (`definirModalidadeAnvisa`) |
+| a lista de pedidos, com `Accordion`                      | `app/(admin)/admin/anvisa/page.tsx:302-318`; `components/ui/accordion.tsx` |
+| o aviso do painel deixa de prometer a procuração         | `components/paciente/AvisoDaProcuracao.tsx:79-90`                       |
+| a tabela nova do pedido                                  | `db/schema/` + `db/migrations/0050_pedidos_atendimento_assistido.sql`   |
+
+**Perigo de mexer, medido:** a tela está em produção e é o destino de três caminhos
+(`lib/parceiros/destino-do-paciente.ts:40`, `app/(auth)/redirect/page.tsx:218` e o aviso do
+painel). Cinco guardas dependem dela (ADR-0029 §2), e dois deles **continuariam verdes** com o
+aviso prometendo uma procuração escondida. A migration é só aditiva, mas este repositório tem
+duas armadilhas medidas: as migrations **não rodam do zero** (`docs/03`, achado de 13/09) e o
+migrator **pula em silêncio** uma migration com `when` antigo (Item 32).
+
+**Medição de produção feita em 30/09/2026 por Davi** (ADR-0029 D-05, item 6): PostgreSQL 17.11,
+cópia da estrutura gerada sem dado, nomes novos livres, `max(created_at)` na 0049. A 0050 aplica
+sozinha. 🔴 **Doze autorizações já estão em `representacao` sem aprovação** (8 pendentes, 4 com
+documentos enviados): a action nova não pode tirar delas o checklist da procuração.
+
+**Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
+chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**
+compartilha tela (MDN `browser-compat-data`: `false` em Chrome Android, Safari iOS e Firefox
+Android); por isso o chat com print.
+
+---
+
 ## 🟠 Item 55 — CORRIGIDO no código, 28/09/2026 · ⏳ falta a prova manual: todo pagamento com cartão parava antes do servidor
 
 **Status:** a causa está corrigida e provada nos testes; **falta a prova real, que é manual** (ver

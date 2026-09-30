@@ -923,3 +923,27 @@ path:app/(paciente)/paciente/agendamento/page.tsx
 # `em_processamento`, medido em 28/09); o Brick passa a oferecer só 1x; um envio com mais
 # parcelas é recusado ANTES de chamar o Mercado Pago. Granularidade: o arquivo exato.
 path:app/(public)/_actions/pagamento.ts
+
+# ── Autorizado por DAVI em 29/09/2026, no chat, ADR-0029 D-05 ──────────────────
+# Palavras dele: "temos que tomar cuidado e fazer testes além de pesquisas de técnicas para
+# conseguirmos fazer isso mantendo a integridade dos dados", e em seguida: "eu autorizo".
+#
+# O QUE MUDA: uma migration SÓ ADITIVA — tabela nova `pedidos_atendimento_assistido` e o enum
+# novo do status. Nenhuma coluna, tabela ou valor de enum EXISTENTE é alterado, e nenhuma
+# linha existente é tocada. Desfazer é apagar a tabela e o tipo novos.
+#
+# PERIGO MEDIDO: BAIXO para os dados que existem, porque nada existente muda. O ponto de
+# atenção é o lock: criar a chave estrangeira pede `SHARE ROW EXCLUSIVE` em
+# `autorizacoes_anvisa` e `pacientes` (doc do PostgreSQL 16, CREATE TABLE), por instantes, no
+# deploy. As condições do Davi viram o roteiro da ADR-0029 D-05, item 6: provar em Postgres de
+# Docker com o schema REAL de produção (as migrations não rodam do zero, achado de 13/09), pelo
+# MESMO migrator (`scripts/migrar.mjs`), medir as tabelas existentes antes e depois (contagem e
+# hash), conferir que o `when` da 0050 supera o max(created_at) de produção (senão o migrator a
+# pula em silêncio, como a 0039), e backup conferido antes do deploy.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`. O nome sai de
+# `drizzle-kit generate --name pedidos_atendimento_assistido`. ⚠️ Se outra branch gerar a 0050
+# antes, o número muda e esta autorização precisa ser reescrita, não estendida.
+path:db/migrations/0050_pedidos_atendimento_assistido.sql
+path:db/migrations/meta/0050_snapshot.json
+path:db/migrations/meta/_journal.json
