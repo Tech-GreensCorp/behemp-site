@@ -690,6 +690,13 @@ _"o importante é o site não cair"_. Quem faz deploy: Davi, Dryelle ou Gabriel.
    refazer a revisão de integridade (entregue no chat) logo antes do merge.
 3. **Backup do banco conferido:** `pg_dump -Fc` na VPS e `pg_restore --list` contando os objetos,
    como em 21/09/2026.
+   **[medido] 30/09/2026, 17:11 (horário da VPS), por Davi:** revisão de integridade logo antes,
+   com `ESTRUTURA IDENTICA A DAS 14:23` e `52|1790193675250`. Backup
+   `~/backup-behemp-20260930-1711.dump`: **35 MB, 420 objetos, 58 tabelas com dado**, impressão
+   `5bd5a7e84c05`, legível só pelo usuário da VPS (`umask 077`). O bloco foi testado antes com
+   restauração num banco limpo, e na falha apaga o arquivo em vez de deixar um backup vazio. ⚠️ Os
+   420 objetos não se comparam com os 424 de 21/09: a contagem de hoje exclui as linhas de
+   comentário da listagem.
 4. **Push da branch e PR para a `main`**, com o link desta ADR. O CI roda o portão.
 
 ### 11.3 Durante o deploy
