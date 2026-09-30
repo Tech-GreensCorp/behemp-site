@@ -6,14 +6,13 @@
  * Texto e print. É por aqui que o paciente no celular mostra a tela, porque o navegador do celular
  * não compartilha tela (§1.11).
  *
- * ⚠️ O print só é BUSCADO quando alguém clica para vê-lo: a rota audita `visualizar` a cada GET, e
- * carregar a imagem sozinha gravaria "visualizou" para quem só rolou o chat. É a mesma regra do
- * `VisualizadorDeDocumento`. E o endereço do blob nunca chega aqui: a imagem vem da rota
- * autenticada, pelo id da mensagem.
+ * ⚠️ O print é buscado UMA vez, quando aparece no chat, e a miniatura e o modal usam a mesma cópia
+ * (`URL.createObjectURL`). A rota audita `visualizar` a cada GET: uma exibição, uma leitura auditada,
+ * nunca duas. Até 30/09/2026 a imagem só era buscada no clique; Davi decidiu que o print aparece no
+ * chat (`DO-83`). E o endereço do blob nunca chega aqui: a imagem vem da rota autenticada, pelo id
+ * da mensagem.
  *
- * Desde 30/09/2026 (D-23) o print abre num modal, com zoom: o chat é estreito, e a miniatura não
- * deixava ler o que o paciente queria mostrar. A imagem só MONTA com o modal aberto, então cada
- * abertura continua sendo uma leitura auditada, e nenhuma a mais.
+ * O modal (D-23) amplia com zoom: o chat é estreito, e a miniatura não deixa ler.
  */
 import Image from 'next/image';
 import { useEffect, useRef, useState, useTransition } from 'react';
@@ -60,7 +59,73 @@ const ZOOM = [1, 1.5, 2, 3] as const;
 function Print({ id }: { id: string }) {
   const [aberto, setAberto] = useState(false);
   const [degrau, setDegrau] = useState(0);
+  const [url, setUrl] = useState<string | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  const [visivel, setVisivel] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
+  const lugar = useRef<HTMLDivElement>(null);
   const zoom = ZOOM[degrau];
+
+  // Só busca quando a miniatura ENTRA na área visível do chat: a auditoria registra o que foi de fato
+  // exibido, e um chat com muitos prints não estoura o limite da rota (60 por minuto).
+  useEffect(() => {
+    const el = lugar.current;
+    if (!el || visivel) return;
+    const observador = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) setVisivel(true);
+    });
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [visivel]);
+
+  useEffect(() => {
+    if (!visivel) return;
+    let vivo = true;
+    let criada: string | null = null;
+    fetch(`/api/atendimento/print/${id}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((b) => {
+        if (!vivo) return;
+        criada = URL.createObjectURL(b);
+        setUrl(criada);
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
+    return () => {
+      vivo = false;
+      if (criada) URL.revokeObjectURL(criada);
+    };
+  }, [id, visivel, tentativa]);
+
+  if (falhou) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setFalhou(false);
+          setTentativa((t) => t + 1);
+        }}
+        className="text-primary flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
+      >
+        <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />O print não carregou — tentar de
+        novo
+      </button>
+    );
+  }
+  if (!url) {
+    return (
+      <div
+        ref={lugar}
+        className="border-border bg-muted/40 flex h-24 w-40 items-center justify-center rounded-lg border"
+      >
+        <Loader2
+          className="text-muted-foreground h-4 w-4 animate-spin"
+          aria-label="Carregando o print"
+        />
+      </div>
+    );
+  }
   const botao = (
     <button
       type="button"
@@ -68,13 +133,21 @@ function Print({ id }: { id: string }) {
         setDegrau(0);
         setAberto(true);
       }}
-      className="text-primary flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
+      aria-label="Ampliar o print"
+      className="border-border block overflow-hidden rounded-lg border bg-white"
     >
-      <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-      Print enviado — clique para ver
+      {/* `unoptimized`: é uma cópia local (blob:), que o otimizador do Next não busca. */}
+      <Image
+        unoptimized
+        src={url}
+        alt="Print enviado no atendimento"
+        width={320}
+        height={180}
+        className="max-h-40 w-auto max-w-full cursor-zoom-in object-contain"
+      />
     </button>
   );
-  // O modal fica montado para devolver o foco ao botão ao fechar; a IMAGEM só monta aberta.
+  // O modal fica montado para devolver o foco à miniatura ao fechar.
   return (
     <>
       {botao}
@@ -87,11 +160,10 @@ function Print({ id }: { id: string }) {
             </DialogDescription>
           </DialogHeader>
           <div className="bg-muted/40 max-h-[70dvh] overflow-auto">
-            {/* `unoptimized`: a imagem é autenticada e sem cache, e o otimizador do Next não poderia buscá-la. */}
             {aberto && (
               <Image
                 unoptimized
-                src={`/api/atendimento/print/${id}`}
+                src={url}
                 alt="Print enviado no atendimento"
                 width={1600}
                 height={900}

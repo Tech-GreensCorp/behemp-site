@@ -26,6 +26,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { escolherDestaque } from '@/lib/atendimento/destaque';
+
 import { semComentarios } from './_apoio/codigo';
 
 const RAIZ = process.cwd();
@@ -168,14 +170,25 @@ describe('o print (D-18)', () => {
     expect(PRINT).not.toMatch(/status: 403/);
   });
 
-  // Retificado em 30/09/2026: exigia `if (!aberto)`, a FORMA de 29/09. Com o modal (D-23), a proteção
-  // passou a ser `{aberto && (` em volta da imagem. A regra é a mesma: nada busca a imagem fechada.
-  it('a imagem só é buscada quando alguém clica para ver', () => {
+  // Retificado DUAS vezes em 30/09/2026. Primeiro exigia `if (!aberto)`; depois `{aberto && (`. Davi
+  // decidiu que o print aparece no chat (DO-83): a imagem é buscada UMA vez ao aparecer, e a miniatura e
+  // o modal usam a mesma cópia. A regra que fica: uma exibição, uma leitura auditada, nunca duas.
+  it('o print é buscado uma vez só, e a miniatura e o modal usam a mesma cópia', () => {
     const print = corpoDe(CHAT, 'Print');
-    const aberto = print.indexOf('{aberto && (');
-    const imagem = print.indexOf('/api/atendimento/print/');
-    expect(aberto).toBeGreaterThanOrEqual(0);
-    expect(imagem).toBeGreaterThan(aberto);
+    expect(print.match(/\/api\/atendimento\/print\//g) ?? []).toHaveLength(1);
+    expect(print).toMatch(/fetch\(`\/api\/atendimento\/print\/\$\{id\}`/);
+    expect(print).toMatch(/URL\.createObjectURL\(/);
+    expect(print).toMatch(/URL\.revokeObjectURL\(/);
+    expect((print.match(/src=\{url\}/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('o print só é buscado quando aparece na área visível do chat', () => {
+    const print = corpoDe(CHAT, 'Print');
+    expect(print).toMatch(/new IntersectionObserver\(/);
+    const efeito = print.slice(print.indexOf('if (!visivel) return;'));
+    expect(print.indexOf('if (!visivel) return;')).toBeGreaterThanOrEqual(0);
+    expect(efeito.indexOf('fetch(')).toBeGreaterThan(0);
+    expect(efeito.indexOf('fetch(')).toBeLessThan(200);
   });
 });
 
@@ -292,7 +305,9 @@ describe('a câmera, a tela dos dois lados e o print (D-21 a D-23)', () => {
 
   it('o aviso do admin fala de dado de OUTROS pacientes, e o do paciente continua', () => {
     expect(TELA).toMatch(/dado de outros pacientes/);
-    expect(TELA.match(/Nada é gravado: nem a voz, nem a tela\./g) ?? []).toHaveLength(2);
+    // Quebra de linha não muda a frase: o Prettier a quebra conforme o texto em volta cresce.
+    const texto = TELA.replace(/\s+/g, ' ');
+    expect(texto.match(/Nada é gravado: nem a voz, nem a tela\./g) ?? []).toHaveLength(2);
   });
 
   it('sem vídeo do outro lado, a tela diz isso em vez de mostrar um quadro preto', () => {
@@ -313,14 +328,11 @@ describe('a câmera, a tela dos dois lados e o print (D-21 a D-23)', () => {
     expect(TELA).toMatch(/camera: dados\.camera === true, tela: dados\.tela === true/);
   });
 
-  it('o print abre num modal com zoom, e a imagem só monta com ele aberto', () => {
+  it('o print abre num modal com zoom', () => {
     const print = corpoDe(CHAT, 'Print');
     expect(print).toMatch(/<Dialog open=\{aberto\}/);
     expect(print).toMatch(/aria-label="Ampliar"/);
     expect(print).toMatch(/aria-label="Diminuir"/);
-    const condicao = print.indexOf('{aberto && (');
-    expect(condicao).toBeGreaterThanOrEqual(0);
-    expect(print.indexOf('/api/atendimento/print/')).toBeGreaterThan(condicao);
   });
 });
 
@@ -373,5 +385,56 @@ describe('a revisão da Fase 2.1 (30/09/2026) — o que ela achou não volta', (
     expect(TELA.slice(falhou, falhou + 300)).toMatch(
       /setMidiaRemota\(\{ camera: false, tela: false \}\)/,
     );
+  });
+});
+
+describe('o destaque, a tela cheia e o erro da câmera (D-25 a D-27)', () => {
+  it('clicar na miniatura troca o que fica em destaque, câmera ou tela (executando a regra)', () => {
+    const T = 'TELA',
+      C = 'CAMERA';
+    // As duas: a preferida no destaque, a outra na miniatura, e o clique troca.
+    expect(escolherDestaque({ tela: T, camera: C }, 'tela')).toEqual({
+      destaque: T,
+      miniatura: C,
+      aoClicarNaMiniatura: 'camera',
+    });
+    expect(escolherDestaque({ tela: T, camera: C }, 'camera')).toEqual({
+      destaque: C,
+      miniatura: T,
+      aoClicarNaMiniatura: 'tela',
+    });
+    // Só uma: ela vai ao destaque, preferida ou não, e não há miniatura.
+    expect(escolherDestaque({ tela: null, camera: C }, 'tela')).toMatchObject({
+      destaque: C,
+      miniatura: null,
+    });
+    expect(escolherDestaque({ tela: T, camera: null }, 'camera')).toMatchObject({
+      destaque: T,
+      miniatura: null,
+    });
+    expect(escolherDestaque({ tela: null, camera: null }, 'tela')).toMatchObject({
+      destaque: null,
+      miniatura: null,
+    });
+    // E a tela usa ESTA regra, e o clique vai para o que ela manda.
+    expect(TELA).toMatch(/escolherDestaque\(remotos, destaquePreferido\)/);
+    expect(TELA).toMatch(/onClick=\{\(\) => setDestaquePreferido\(aoClicarNaMiniatura\)\}/);
+  });
+
+  it('o destaque abre em tela cheia pelo botão', () => {
+    expect(TELA).toMatch(/requestFullscreen\(/);
+    expect(TELA).toMatch(/aria-label="Tela cheia"/);
+  });
+
+  it('o erro da câmera diz a causa: permissão, câmera em uso, câmera ausente', () => {
+    const motivo = corpoDe(TELA, 'motivoDaCamera');
+    for (const nome of ['NotAllowedError', 'NotReadableError', 'NotFoundError'])
+      expect(motivo).toContain(nome);
+    expect(motivo).toMatch(/em uso por outro programa/);
+    expect(corpoDaSeta(TELA, 'ligarCamera')).toMatch(/motivoDaCamera\(/);
+  });
+
+  it('o aviso de tela explica que a aba da própria chamada não aparece no Chrome', () => {
+    expect(TELA).toMatch(/a aba desta chamada não aparece/);
   });
 });
