@@ -185,7 +185,7 @@ alterável por terceiro, sem auditoria de quem alterou.
 
 ---
 
-## 🔴 Item 56 — EM PRODUÇÃO desde 30/09/2026 (Fases 1 e 2) · Fase 2.1 em produção · Fase 2.2 na branch: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
+## ✅ Item 56 — EM PRODUÇÃO, 30/09/2026 (Fases 1, 2, 2.1 e 2.2): a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
 **Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
 **prioridade 1** da nova ordem definida na reunião de 29/09/2026. ⚠️ _Esta linha dizia "nenhuma
@@ -250,7 +250,10 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
   `app/api/atendimento/sinalizar/route.ts` (o evento `midia`). Provas na ADR-0029 §12.3. O que falta
   conferir em produção: ADR-0029 §12.4.
 - ✅ **Fase 2.1 em produção**, 30/09/2026, 15:52 (PR #144). Davi testou: câmera e tela nos dois lados.
-- 🧪 **Fase 2.2**, branch `feat/atendimento-tela-cheia`, sem deploy: miniatura do print (`DO-83`),
+- ✅ **Fase 2.2 em produção**, 30/09/2026, 16:15 (PR #145, deploy `36764049030`). Davi: _"tudo
+  funcionando corretamente"_. **O Item 56 está entregue.** Ficam: os Itens 57 a 66 (catalogados) e as
+  pendências da ADR-0029 §5.
+- (histórico) **Fase 2.2**, branch `feat/atendimento-tela-cheia`, antes do deploy: miniatura do print (`DO-83`),
   troca do destaque e tela cheia (`DO-82`), erro da câmera com a causa. ADR-0029 §12.5. Falta medir,
   com dois aparelhos, que o travamento de vídeo era só a câmera compartilhada.
 

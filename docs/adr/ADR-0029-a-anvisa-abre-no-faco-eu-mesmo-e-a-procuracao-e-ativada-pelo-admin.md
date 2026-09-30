@@ -1,8 +1,14 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
-> **Status da Fase 2.2 (§12.5):** 🧪 **implementada e provada local, NÃO publicada** — branch
-> `feat/atendimento-tela-cheia`, 30/09/2026: miniatura do print no chat, troca do destaque, tela
-> cheia e o erro da câmera com a causa. Deploy só com a ordem de Davi.
+> **Status da Fase 2.2 (§12.5):** ✅ **EM PRODUÇÃO** — 30/09/2026, 16:15: PR #145, merge `6065964`,
+> deploy `36764049030`, home 200 durante todo o deploy. Testada por Davi: _"tudo funcionando
+> corretamente"_. O teste com dois aparelhos (§12.5, D-27) não foi relatado à parte.
+>
+> **Status anterior da Fase 2.2:** implementada e provada local, não publicada (branch
+> `feat/atendimento-tela-cheia`).
+>
+> 🎯 **A ADR-0029 está entregue.** O que ficou de fora dela está na §5, e nenhuma dessas pendências
+> foi escolhida como a próxima: Davi indica a próxima demanda.
 >
 > **Status da Fase 2.1 (§12):** ✅ **EM PRODUÇÃO** — 30/09/2026, 15:52: PR #144, merge `c8dd6b7`,
 > deploy `36761245272`, home 200 durante todo o deploy. Testada por Davi: câmera e tela nos dois
@@ -74,6 +80,7 @@ As decisões têm ID no catálogo: `DO-69` a `DO-77` (`docs/02-CATALOGO-DE-REGRA
 | 29  | _"eu consegui transmitir a tela do admin mas só quando eu selecionei um aplicativo, mas o guia do Chrome não"_                                                                                                                                                                                                                                                                    | o Chrome não lista a aba da própria chamada; o aviso de tela diz isso (D-27)                                                                                                                                                                     |
 | 30  | _"deve dar pra alterar e dar tela cheia tanto na câmera ou transmissão da tela do pc"_                                                                                                                                                                                                                                                                                            | trocar o destaque e tela cheia (`DO-82`, D-25, D-26)                                                                                                                                                                                             |
 | 31  | _"em mensagens é pra continuar mostrando a imagem enviada, só que quando clica nela tem o mesmo comportamento atual"_                                                                                                                                                                                                                                                             | a miniatura aparece no chat e o clique abre o modal (`DO-83`); retifica a D-23                                                                                                                                                                   |
+| 32  | _"tudo funcionando corretamente, agora vamos para a próxima demanda que já está na adr, mas eu vou fazer isso em outro chat"_ (depois do deploy da Fase 2.2)                                                                                                                                                                                                                      | a ADR-0029 está entregue; a próxima demanda começa em outra sessão                                                                                                                                                                               |
 
 ## §1 — O que existe hoje, medido no código (`origin/main` `7a2f5d9`)
 
@@ -444,7 +451,8 @@ entra depois, e esta ADR já fixa o que ela precisa respeitar:
 
 ## §5 — O que fica de fora desta fatia
 
-- a **chamada** de atendimento com suporte (voz e tela), com as regras da D-11, na próxima fatia;
+- ~~a **chamada** de atendimento com suporte (voz e tela), com as regras da D-11, na próxima fatia~~
+  ✅ entregue no mesmo deploy (§10), com câmera, tela dos dois lados e print ampliado (§12);
 - o lugar definitivo do botão "Be4Hope faz por mim" (_"vai ficar em outro lugar, mas por
   enquanto só aí"_);
 - avisar o admin por e-mail ou notificação quando chega um pedido: por ora ele vê na lista;
