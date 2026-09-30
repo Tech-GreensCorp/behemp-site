@@ -102,3 +102,38 @@ describe('estrutura: a flag chega à tela e o acesso segue restrito', () => {
     expect(ler('components/shared/medico-sidebar.tsx')).not.toContain('/admin/');
   });
 });
+
+describe('arquivar paciente (admin): soft delete, nunca apagar', () => {
+  const action = ler('app/_actions/admin-pacientes.ts');
+  const inicio = action.indexOf('export async function arquivarPacienteAdmin');
+  const fn = action.slice(inicio);
+
+  it('é exclusiva do admin e não reaproveita a action que aceita médico sem escopo', () => {
+    expect(fn).toContain('verificarAdmin');
+    expect(fn).not.toContain('verificarMedicoOuAdmin');
+    expect(fn).not.toContain('arquivarPaciente(');
+  });
+
+  it('nunca apaga a linha: só marca status e deletedAt', () => {
+    expect(fn).not.toMatch(/\.delete\(/);
+    expect(fn).toMatch(/status: 'arquivado', deletedAt:/);
+  });
+
+  it('o UPDATE só atinge ficha ainda ativa (cliques simultâneos não arquivam duas vezes)', () => {
+    const update = fn.slice(fn.indexOf('.update(pacientes)'));
+    expect(update.slice(0, update.indexOf('.returning'))).toContain('isNull(pacientes.deletedAt)');
+  });
+
+  it('registra auditoria com o estado anterior e o motivo', () => {
+    expect(fn).toContain('registrarAuditoria');
+    expect(fn).toMatch(/dadosAntes: \{ status: atual\.status \}/);
+    expect(fn).toContain('motivo');
+  });
+
+  it('a tela pede confirmação e o botão não deixa a linha navegar', () => {
+    const tela = ler('app/(admin)/admin/pacientes/page.tsx');
+    expect(tela).toContain('arquivarPacienteAdmin');
+    expect(tela).toContain('AlertDialog');
+    expect(tela).toContain('e.preventDefault()');
+  });
+});
