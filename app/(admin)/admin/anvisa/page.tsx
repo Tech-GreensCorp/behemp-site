@@ -27,6 +27,7 @@ import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, Alert
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
 import { PedidosDeAtendimento } from '@/components/admin/anvisa/PedidosDeAtendimento';
+import { BotaoApagarAutorizacao } from './_components/botao-apagar-autorizacao';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus = 'pendente' | 'documentos_enviados' | 'em_analise' | 'aprovado' | 'pendencia_documental' | 'rejeitado';
@@ -320,6 +321,13 @@ export default function AdminAnvisaPage() {
                   <Button size="sm" variant="outline" onClick={() => abrirDialog(aut)}>
                     Atualizar status
                   </Button>
+                  <BotaoApagarAutorizacao
+                    id={aut.id}
+                    pacienteNome={aut.pacienteNome}
+                    aprovada={aut.status === 'aprovado'}
+                    temProcuracao={!!aut.procuracao}
+                    onApagado={() => void carregar()}
+                  />
                 </div>
 
               </CardContent>
