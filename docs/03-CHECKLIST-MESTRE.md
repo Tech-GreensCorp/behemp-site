@@ -250,6 +250,11 @@ Prettier precisam de teto, porque estão vermelhos por baseline.
       (aceite único × separado), **prazo de retenção**, e se a revogação apaga evolução clínica já
       assinada. **Responsável: dono + Jurídico.** Enquanto não vier, o recurso fica desligado em
       produção por `CONSENTIMENTO_PRONTO_PARA_USO = false`.
+- [ ] ⚖️ **DECISÃO DE NEGÓCIO/JURÍDICA PENDENTE (não é achado técnico) — NFS-e automática para o
+      paciente, em nome de cada médico.** Hoje o sistema não emite nota nenhuma, e o split já está em
+      produção. Faltam 4 respostas: PF ou PJ, municípios, guarda do certificado A1 e nome na nota
+      quando o cartão é de terceiro. **Responsável: Diniz + Jurídico da Greens** (reunião em
+      01/10/2026). 🛑 Nada se implementa antes disso. Ver [04 — NFS-e](04-LISTA-DE-AFAZERES.md).
 - [x] ~~O consentimento LGPD da teleconsulta não é perguntado a ninguém~~ —
       `components/teleconsulta/GlobalTeleconsultaHost.tsx:83` é `useState(true)`, **sem setter
       e sem UI**. O campo existe no schema e é gravado sempre como aceito. A LGPD (art. 5º,

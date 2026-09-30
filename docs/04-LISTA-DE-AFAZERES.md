@@ -19,6 +19,57 @@
 
 ---
 
+## ⚖️ DECISÃO DE NEGÓCIO/JURÍDICA PENDENTE (não é achado técnico) — Nota fiscal automática (NFS-e) para o paciente, em nome do médico
+
+**Catalogado em 30/09/2026.** Fica **fora da numeração dos itens**, de propósito: não é defeito
+de código nem bug do Mercado Pago. É uma decisão de negócio e jurídica que ainda não foi tomada.
+Enquanto ela não sair, **não existe o que implementar**.
+
+### Contexto
+
+Hoje o sistema **não emite nenhum documento fiscal**. O split de pagamento do Mercado Pago está
+em produção e funcionando: cada médico recebe o valor **integralmente e direto na própria conta**,
+sem `application_fee` (`lib/mercadopago/cobranca.ts:5-7`). Por isso a nota fiscal de serviço
+teria de sair **no CPF/CNPJ de cada médico**, já que é ele quem recebe o dinheiro e presta o
+serviço ao paciente.
+
+### Investigação já feita (29–30/09/2026)
+
+- **O cadastro do médico não tem nenhum campo fiscal.** Não há CPF, CNPJ, regime tributário,
+  inscrição municipal nem CNAE, nem em `db/schema/medicos.ts` nem em `db/schema/users.ts`.
+- **O CPF do paciente é opcional, e o documento da cobrança muda conforme o meio de pagamento.**
+  `pacientes.cpf` é nullable (`db/schema/pacientes.ts:30`, sem `.notNull()`).
+  - O **PIX** usa o CPF do cadastro (`lib/mercadopago/cobranca.ts:274-288`).
+  - O **cartão** usa o documento digitado no Brick (`lib/mercadopago/cobranca.ts:294-296`), que
+    pode ser de outra pessoa, e não do paciente.
+- **Ninguém tinha mencionado nota fiscal/NFS-e antes**, em nenhum lugar do repositório nem das docs.
+- 🛑 **O módulo `invoices` NÃO serve para isto.** Ele é fatura comercial de importação de
+  medicamento, ligada à ANVISA (`db/schema/invoices.ts`: _"documento fiscal para importação de
+  medicamento"_), e não NFS-e municipal. **Não reaproveitar.**
+- **O Mercado Pago não tem API pública de emissão fiscal** que se integre ao fluxo de split
+  payments. Isso foi confirmado na documentação oficial de developers.
+  - Existe uma ferramenta de emissão **manual**, dentro da conta do próprio vendedor. Não é API
+    e não emite automaticamente a cada venda.
+  - **Não está confirmado** se ela funciona para pessoa física.
+
+### As 4 perguntas que decidem a arquitetura (jurídico/negócio, não técnicas)
+
+1. **Os médicos emitem como pessoa física (RPA/autônomo) ou como pessoa jurídica (CNPJ)?** A
+   resposta muda tudo: a NFS-e tradicional costuma exigir inscrição municipal, que só existe para PJ.
+2. **Em quais municípios os médicos estão inscritos?** A NFS-e é municipal e não tem padrão
+   nacional único, exceto onde o município já aderiu à NFS-e Nacional.
+3. **Quem guardaria o certificado digital (A1) de cada médico, se a emissão for automática?** Isso
+   tem implicação séria de LGPD e de segurança: é um dado extremamente sensível, e de terceiros.
+4. **A nota sai no nome do paciente ou no do titular do cartão, quando forem pessoas diferentes
+   (cartão de terceiro)?**
+
+### Próximo passo
+
+A decisão é do **Diniz com o jurídico da Greens**, em reunião presencial marcada para
+**01/10/2026**. 🛑 **Nenhuma implementação antes de a decisão de negócio estar fechada.**
+
+---
+
 ## 🟠 Item 55 — CORRIGIDO no código, 28/09/2026 · ⏳ falta a prova manual: todo pagamento com cartão parava antes do servidor
 
 **Status:** a causa está corrigida e provada nos testes; **falta a prova real, que é manual** (ver
