@@ -81,9 +81,16 @@ describe('estrutura: a flag chega à tela e o acesso segue restrito', () => {
   });
 
   it('as telas de detalhe e cadastro existem sob /admin e "voltar" respeita a área', () => {
-    expect(ler('app/(admin)/admin/pacientes/[id]/page.tsx')).toContain('medico/pacientes/[id]/page');
-    expect(ler('app/(admin)/admin/pacientes/novo/page.tsx')).toContain('medico/pacientes/novo/page');
-    for (const p of ['app/(medico)/medico/pacientes/[id]/page.tsx', 'app/(medico)/medico/pacientes/novo/page.tsx']) {
+    expect(ler('app/(admin)/admin/pacientes/[id]/page.tsx')).toContain(
+      'medico/pacientes/[id]/page',
+    );
+    expect(ler('app/(admin)/admin/pacientes/novo/page.tsx')).toContain(
+      'medico/pacientes/novo/page',
+    );
+    for (const p of [
+      'app/(medico)/medico/pacientes/[id]/page.tsx',
+      'app/(medico)/medico/pacientes/novo/page.tsx',
+    ]) {
       const src = ler(p);
       expect(src).toContain("startsWith('/admin/')");
       expect(src).not.toMatch(/href="\/medico\/pacientes"/);

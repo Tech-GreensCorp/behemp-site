@@ -17,10 +17,19 @@ import { verificarAdmin } from '@/lib/auth';
 
 const filtrosSchema = z.object({
   busca: z.string().trim().max(100).optional(),
-  status: z.enum(['todos', 'aguardando_consulta', 'em_tratamento', 'concluido', 'arquivado']).default('todos'),
+  status: z
+    .enum(['todos', 'aguardando_consulta', 'em_tratamento', 'concluido', 'arquivado'])
+    .default('todos'),
   tratamento: z.enum(['todos', 'cbd', 'thc', 'cbd_thc']).default('todos'),
   jornada: z
-    .enum(['todos', 'acolhimento', 'avaliacao_medica', 'burocracia_anvisa', 'logistica', 'acompanhamento_continuo'])
+    .enum([
+      'todos',
+      'acolhimento',
+      'avaliacao_medica',
+      'burocracia_anvisa',
+      'logistica',
+      'acompanhamento_continuo',
+    ])
     .default('todos'),
   pagina: z.number().int().min(1).default(1),
   porPagina: z.number().int().min(1).max(100).default(20),
@@ -38,9 +47,7 @@ export type PacienteDoAdmin = {
   createdAt: Date;
 };
 
-export async function listarPacientesAdmin(
-  entrada?: z.input<typeof filtrosSchema>,
-): Promise<{
+export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchema>): Promise<{
   sucesso: boolean;
   dados?: { pacientes: PacienteDoAdmin[]; total: number; totalPaginas: number };
   erro?: string;
