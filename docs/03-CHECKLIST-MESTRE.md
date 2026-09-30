@@ -8,7 +8,9 @@
 > 3. A **Fila de execução** no rodapé é a ordem oficial. Reordenar é decisão de quem manda.
 > 4. **A fila é atualizada no mesmo commit que conclui o item.**
 
-**Atualizado em 20/08/2026** (execução da Sprint 0). Branch atual: `feat/flow-representatives`.
+**Atualizado em 30/09/2026** (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`.
+
+_Versão anterior deste cabeçalho: "Atualizado em 20/08/2026 (execução da Sprint 0). Branch atual: `feat/flow-representatives`."_
 
 ---
 
