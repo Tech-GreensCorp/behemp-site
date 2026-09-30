@@ -439,6 +439,72 @@ pedido concluído (§0.18) e a migration (§0.19).
   configurado. ⚠️ As telas exigem sessão, e sem `CLERK_SECRET_KEY` local o clique não se vê
   rodando.
 
+## §9 — O que a implementação ensinou (30/09/2026, branch `feat/anvisa-faco-eu-mesmo`)
+
+As decisões da §3 ficam como foram escritas; aqui está onde a implementação as cumpriu, e onde
+não conseguiu ainda.
+
+1. **D-01:** a etapa `escolha` foi **removida** da tela, com o tipo e o JSX. Não ficou código morto
+   que alguém religaria sem ler esta ADR. O guarda proíbe `'escolha'` e "Como prefere fazer" na tela.
+2. **D-02 a D-04:** as actions moram em `app/_actions/pedido-atendimento-assistido.ts`, e a regra pura
+   em `lib/anvisa/pedido-de-atendimento.ts`. Ativar e desativar gravam a mudança **e** a auditoria
+   na mesma transação (`dbTransacional`), com `select … for update`. A trava (D-04.3) está em
+   `definirModalidadeAnvisa` e usa a modalidade **gravada**. Desativar tira do checklist a procuração
+   e o laudo **não enviados**; documento já enviado é do paciente e fica.
+3. **Os componentes novos moram em `components/`**, não em `app/(paciente)/…/_components`: o hook
+   `escopo-autorizado` protege as pastas de rota, e a autorização do Davi cobre três arquivos
+   exatos. Assim as páginas protegidas mudaram pouco: a do admin, **4 linhas**; a do paciente,
+   **+44/−81**, quase todas as removidas sendo o bloco da escolha.
+4. **D-07:** a URL do vídeo passa por `urlDoVideo()`, que só aceita o próprio site ou
+   `https://*.public.blob.vercel-storage.com`. Um endereço que o CSP bloquearia, como YouTube, cai
+   no "vídeo em breve" em vez de um player quebrado. O guarda testa oito entradas, incluindo
+   `…vercel-storage.com.evil.com`.
+5. 🔴 **D-10, terceiro ponto, NÃO implementado:** _"com o pedido em `pendente_autorizacao`, o aviso
+   volta a oferecer a procuração"_. O aviso não sabe se a procuração foi ativada: quem sabe é a
+   página do painel (`app/(paciente)/paciente/page.tsx`), protegida e fora da autorização. E o guarda
+   `o-aviso-da-procuracao-chega-a-tela` proíbe, de propósito, que o componente busque dado sozinho.
+   Hoje o aviso mostra o texto aprovado (`DO-73`) nos dois estados. Ele é **verdadeiro** nos dois,
+   porque aponta o passo a passo, onde o botão aparece quando liberado, mas não oferece a procuração
+   de volta. Custa duas linhas naquela página, e pede autorização própria.
+6. **Um guarda antigo congelava a frase:** `o-destino-do-paciente-segue-o-que-falta` exigia o literal
+   "Fazer a procuração agora". O caso foi **retificado** para conferir o que protege, o aviso
+   levar à tela da ANVISA em um clique, com o motivo escrito no próprio teste.
+7. 🔴 **A revisão independente achou um desvio da trava, e ele foi fechado** (30/09/2026, antes
+   do commit das telas). Condição do Davi: _"com cuidado e revisão"_.
+   - **Alta:** `app/api/anvisa/procuracao/route.ts` gerava a procuração para qualquer autorização
+     do paciente, **sem conferir a modalidade**. Um paciente no passo a passo, sem pedido
+     ativado, chamava a rota direto, e o teste mediu a chamada chegando **até o upload do PDF**.
+     Agora a rota recusa com 409 quem não está em `representacao` gravada, antes de gerar ou
+     enviar qualquer coisa.
+   - **Média:** desativar só travava com a procuração **assinada**. Com o envelope já enviado, o
+     paciente podia assinar pelo e-mail depois da desativação, e o banco ficava incoerente.
+     Agora `procuracao_em_assinatura` também trava (envelope `enviado` ou `visualizado`).
+   - **Média:** `definirModalidadeAnvisa` conferia o pedido e gravava a autorização em passos
+     separados. Agora faz as duas coisas numa transação, com `for update` no pedido, na mesma
+     ordem de trava do desativar. Provado por uma corrida **forçada** no teste de integração.
+   - **Baixa:** ativar não conferia se a autorização foi apagada. Agora confere. E falha de rede
+     não trava mais as duas telas, porque os carregamentos têm `catch`.
+   - **Não corrigido, pergunta ao Davi:** com a autorização **rejeitada**, o pedido fica aberto na
+     lista para sempre. Só a aprovação o conclui (`DO-72`). Rejeitar também conclui? É regra de
+     negócio.
+   - **Não corrigido, aceito:** o paciente só vê "Be4Hope faz por mim" depois de recarregar ou
+     trocar de etapa, porque o status do pedido é lido ao montar a tela. O estado fica atrasado,
+     mas não fica errado.
+   - **Catalogado, anterior a esta branch:** quem está no passo a passo e faz upload no checklist
+     volta para o passo a passo, porque `recarregarAutorizacao` manda `guiada` para `guiada`
+     (`docs/04`, Item 58).
+8. **Prova, depois da revisão:** guarda `o-pedido-de-atendimento-abre-a-procuracao` com **67
+   casos**; integração homônima com **25 casos** contra Postgres real; **23 sabotagens**, todas
+   acusadas por pelo menos um dos dois. Duas sobreviveram na primeira rodada e mudaram o teste: a
+   corrida de cliques, que não se reproduzia, e a trava do pedido (sabotagem 22), que o guarda
+   casava na consulta errada. `pnpm test`: **1735 em 73**; integração: **181 em 16**; `pnpm build`:
+   `exit 0`; type-check: 0; lint: **202**, um a menos (o `any` que saiu de `definirModalidadeAnvisa`),
+   com o teto apertado em `baseline.json`.
+9. ⚠️ **As telas não foram vistas rodando.** O `standalone` local sobe, mas toda rota responde 500
+   com `@clerk/nextjs: Missing publishableKey`: não há chave do Clerk nesta máquina (`grep -c CLERK
+.env` → 0). É a limitação já registrada no `CLAUDE.md`. As telas se conferem depois do deploy,
+   ou com uma chave de desenvolvimento local.
+
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 
 **Versão 1**, escrita a partir da §0.2: quem liberaria a procuração seria um "perfil de

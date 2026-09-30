@@ -22,12 +22,14 @@ import { PageHeader } from '@/components/shared/page-header';
 import {
   ShieldCheck, FileText, Upload, CheckCircle2, Clock, AlertCircle,
   ChevronRight, Loader2, RefreshCw, FileCheck, CircleDot,
-  XCircle, Info, ExternalLink, Users, Navigation
+  XCircle, Info, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsentimentoQueFaltou } from '@/components/paciente/ConsentimentoQueFaltou';
 import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import { documentosDoPacienteAtual } from '@/app/_actions/documentos-do-paciente';
+import { VideoDoPassoAPasso } from '@/components/paciente/anvisa/VideoDoPassoAPasso';
+import { AtendimentoComSuporte } from '@/components/paciente/anvisa/AtendimentoComSuporte';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus =
@@ -338,7 +340,7 @@ export default function AnvisaPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [autorizacao, setAutorizacao] = useState<Autorizacao | null>(null);
-  const [etapa, setEtapa] = useState<'inicio' | 'escolha' | 'checklist' | 'guiada' | 'formulario' | 'acompanhamento'>('inicio');
+  const [etapa, setEtapa] = useState<'inicio' | 'checklist' | 'guiada' | 'formulario' | 'acompanhamento'>('inicio');
   const [carregando, setCarregando] = useState(false);
   const [temPrescricao, setTemPrescricao] = useState<boolean | null>(null); // null = carregando
   const [verificando, setVerificando] = useState(true);
@@ -372,7 +374,7 @@ export default function AnvisaPage() {
         if (ultima.status !== 'pendente') {
           setEtapa('acompanhamento');
         } else if (!ultima.modalidade) {
-          setEtapa('escolha');
+          setEtapa('guiada');
         } else {
           setEtapa(ultima.modalidade === 'guiada' ? 'guiada' : 'checklist');
         }
@@ -423,7 +425,7 @@ export default function AnvisaPage() {
       if (ultima.status !== 'pendente') {
         setEtapa('acompanhamento');
       } else if (!ultima.modalidade) {
-        setEtapa('escolha');
+        setEtapa('guiada');
       } else {
         setEtapa(ultima.modalidade === 'guiada' ? 'guiada' : 'checklist');
       }
@@ -444,7 +446,8 @@ export default function AnvisaPage() {
 
       if (resultado.sucesso && resultado.dados) {
         setAutorizacao(resultado.dados);
-        setEtapa('escolha');
+        // ADR-0029 D-01 (DO-69): o paciente não escolhe mais a modalidade; cai no passo a passo.
+        setEtapa('guiada');
         toast.success('Processo ANVISA iniciado!');
       } else if (resultado.erro === 'sem_prescricao') {
         setTemPrescricao(false);
@@ -453,6 +456,23 @@ export default function AnvisaPage() {
         toast.error(resultado.mensagem ?? resultado.erro ?? 'Erro ao iniciar processo.');
       }
     });
+  };
+
+  /**
+   * O antigo cartão "Be4Hope faz por mim", agora no fim do passo a passo. A resposta do servidor
+   * é lida: `definirModalidadeAnvisa` RECUSA sem o pedido ativado (ADR-0029 D-04.3), e o
+   * paciente precisa saber disso em vez de ver a tela não mudar.
+   */
+  const handleBe4HopeFazPorMim = async () => {
+    if (!autorizacao) return;
+    const res = await definirModalidadeAnvisa(autorizacao.id, 'representacao');
+    if (!res.sucesso) {
+      toast.error(('erro' in res && res.erro) || 'Não foi possível abrir a procuração agora.');
+      return;
+    }
+    setModalidade('representacao');
+    setEtapa('checklist');
+    await recarregarAutorizacao();
   };
 
   const handleConfirmarEnvio = () => {
@@ -491,7 +511,6 @@ export default function AnvisaPage() {
 
   const progresso = (() => {
     if (etapa === 'inicio') return 0;
-    if (etapa === 'escolha') return 20;
     if (etapa === 'guiada') return 60;
     if (etapa === 'checklist') return 50;
     if (etapa === 'formulario') return 75;
@@ -635,77 +654,11 @@ export default function AnvisaPage() {
         </Card>
       )}
 
-      {/* ── ETAPA ESCOLHA — Como prefere fazer? ────────────── */}
-      {etapa === 'escolha' && autorizacao && (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h2 className="font-display font-bold text-xl text-foreground">
-              Como prefere fazer sua Autorização ANVISA?
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Escolha a modalidade que melhor se adapta à sua situação.
-              Você pode alterar essa escolha a qualquer momento.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* OPÇÃO 1 — Guiada */}
-            <button
-              onClick={async () => {
-                await definirModalidadeAnvisa(autorizacao.id, 'guiada');
-                setModalidade('guiada');
-                setEtapa('guiada');
-              }}
-              className="group text-left rounded-2xl border-2 border-border hover:border-primary/50 bg-white p-5 space-y-3 transition-all hover:shadow-md"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <Navigation className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-base text-foreground">
-                  Faço eu mesmo
-                </p>
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                  Te guiamos passo a passo no Gov.br com todos os
-                  dados já preenchidos. Rápido, gratuito e seguro.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                100% online · Gov.br
-              </div>
-            </button>
-
-            {/* OPÇÃO 2 — Representação */}
-            <button
-              onClick={async () => {
-                await definirModalidadeAnvisa(autorizacao.id, 'representacao');
-                setModalidade('representacao');
-                setEtapa('checklist');
-                await recarregarAutorizacao();
-              }}
-              className="group text-left rounded-2xl border-2 border-border hover:border-secondary/50 bg-white p-5 space-y-3 transition-all hover:shadow-md"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary/10">
-                <Users className="h-6 w-6 text-secondary" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-base text-foreground">
-                  Be4Hope faz por mim
-                </p>
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                  Assine a Procuração Específica e nossa equipe
-                  cuida de todo o processo junto à ANVISA por você.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-secondary">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Procuração Específica · Equipe Be4Hope
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
+      {/*
+        ADR-0029 D-01 (DO-69): a etapa "Como prefere fazer?" SAIU. O paciente não escolhe mais a
+        procuração sozinho; ela aparece no fim do passo a passo, depois que o admin ativa o pedido
+        de atendimento (AtendimentoComSuporte).
+      */}
 
       {/* ── ETAPA GUIADA — Passo a passo Gov.br ─────────────── */}
       {etapa === 'guiada' && autorizacao && (
@@ -719,10 +672,10 @@ export default function AnvisaPage() {
                 Siga cada etapa com atenção. Seus dados já estão prontos para copiar.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setEtapa('escolha')}>
-              Voltar
-            </Button>
           </div>
+
+          {/* ADR-0029 D-07: a área grande de vídeo, configurada em lib/anvisa/video-do-passo-a-passo.ts */}
+          <VideoDoPassoAPasso />
 
           {/* Link direto para o Gov.br */}
           <a
@@ -872,6 +825,16 @@ export default function AnvisaPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/*
+            ADR-0029 D-02 e D-06: no fim do passo a passo, o pedido de atendimento e, logo abaixo,
+            "Be4Hope faz por mim" — só depois que o admin ativa (ou para quem já estava nela, D-08).
+          */}
+          <AtendimentoComSuporte
+            autorizacaoId={autorizacao.id}
+            modalidadeAtual={modalidade ?? 'guiada'}
+            onBe4HopeFazPorMim={handleBe4HopeFazPorMim}
+          />
         </div>
       )}
 
@@ -891,7 +854,7 @@ export default function AnvisaPage() {
 
           {/* Botão voltar para modalidade representação */}
           {modalidade === 'representacao' && autorizacao.status === 'pendente' && (
-            <Button variant="outline" size="sm" onClick={() => setEtapa('escolha')} className="mb-2">
+            <Button variant="outline" size="sm" onClick={() => setEtapa('guiada')} className="mb-2">
               Voltar
             </Button>
           )}

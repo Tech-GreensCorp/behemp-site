@@ -15,7 +15,8 @@ export type MotivoDaRecusa =
   | 'pedido_concluido'
   | 'ja_ativado'
   | 'nao_ativado'
-  | 'procuracao_assinada';
+  | 'procuracao_assinada'
+  | 'procuracao_em_assinatura';
 export type Transicao = { ok: true; novo: StatusDoPedido } | { ok: false; motivo: MotivoDaRecusa };
 
 /** Os status que contam como pedido ABERTO — os mesmos do índice único parcial da 0050. */
@@ -27,7 +28,7 @@ export const STATUS_ABERTOS: readonly StatusDoPedido[] = [
 export function transicionar(
   atual: StatusDoPedido,
   acao: AcaoNoPedido,
-  contexto: { procuracaoAssinada: boolean },
+  contexto: { procuracaoAssinada: boolean; procuracaoEmAssinatura?: boolean },
 ): Transicao {
   if (atual === 'concluido') return { ok: false, motivo: 'pedido_concluido' };
 
@@ -40,9 +41,12 @@ export function transicionar(
       if (atual !== 'pendente_autorizacao') return { ok: false, motivo: 'nao_ativado' };
       // DO-72: "pode" desativar — enquanto o paciente não assinou. Assinada, a procuração é um
       // documento jurídico que já existe, e desfazê-la por esta tela apagaria o motivo dela.
-      return contexto.procuracaoAssinada
-        ? { ok: false, motivo: 'procuracao_assinada' }
-        : { ok: true, novo: 'aguardando_ativacao' };
+      if (contexto.procuracaoAssinada) return { ok: false, motivo: 'procuracao_assinada' };
+      // Revisão de 30/09/2026: envelope já ENVIADO também trava. O paciente pode assinar pelo
+      // e-mail depois da desativação, e o banco ficaria com procuração assinada, pedido
+      // aguardando e modalidade `guiada` ao mesmo tempo.
+      if (contexto.procuracaoEmAssinatura) return { ok: false, motivo: 'procuracao_em_assinatura' };
+      return { ok: true, novo: 'aguardando_ativacao' };
     case 'concluir':
       return { ok: true, novo: 'concluido' };
   }
@@ -70,4 +74,6 @@ export const MENSAGEM_DA_RECUSA: Record<MotivoDaRecusa, string> = {
   ja_ativado: 'A procuração já está ativada para este paciente.',
   nao_ativado: 'A procuração não está ativada.',
   procuracao_assinada: 'O paciente já assinou a procuração. Ela não pode ser desativada por aqui.',
+  procuracao_em_assinatura:
+    'A procuração já foi enviada ao paciente para assinatura. Ela não pode ser desativada por aqui.',
 };

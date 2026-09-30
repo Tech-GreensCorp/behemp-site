@@ -710,9 +710,19 @@ describe('P2 — o aviso da procuração avisa, não bloqueia', () => {
     expect(aviso).toContain('if (!precisaDaProcuracao || fechado) return null;');
   });
 
-  it('leva à procuração em um clique', () => {
-    expect(aviso).toContain('/paciente/anvisa');
-    expect(aviso).toMatch(/Fazer a procuração agora/);
+  /**
+   * ⚠️ RETIFICADO EM 30/09/2026 — o caso congelava a FRASE, e a frase mudou por decisão.
+   *
+   * Exigia o literal "Fazer a procuração agora". Davi decidiu (ADR-0029 D-10, `DO-73`) que o aviso
+   * não promete mais a procuração: ela só existe depois que a equipe ativa o pedido de
+   * atendimento, e o texto passou a ser "Ver o passo a passo". O que este caso protege continua
+   * igual — o aviso leva à tela da ANVISA em UM clique —, e é isso que ele passa a conferir.
+   * O texto novo é vigiado pelo guarda `o-pedido-de-atendimento-abre-a-procuracao`.
+   */
+  it('leva à tela da ANVISA em um clique', () => {
+    expect(aviso).toContain("destino = '/paciente/anvisa'");
+    expect(aviso).toMatch(/<Link\s+href=\{destino\}/);
+    expect(aviso).toMatch(/Ver o passo a passo/);
   });
 
   /**

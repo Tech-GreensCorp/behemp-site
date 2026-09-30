@@ -947,3 +947,27 @@ path:app/(public)/_actions/pagamento.ts
 path:db/migrations/0050_pedidos_atendimento_assistido.sql
 path:db/migrations/meta/0050_snapshot.json
 path:db/migrations/meta/_journal.json
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 D-01, D-04.3, D-03 e D-06 ──────────
+# Palavras dele: "pode seguir eu autorizo mas claro com cuidado e revisao".
+#
+# O QUE MUDA, e SÓ ISTO (DO-35: só as linhas do conteúdo, sem formatador no arquivo inteiro):
+#   · app/(paciente)/_actions/anvisa.ts — `definirModalidadeAnvisa` passa a recusar
+#     'representacao' sem pedido de atendimento ativado (`podeEntrarNaRepresentacao`). Quem já
+#     está em 'representacao' (12 em produção, medido em 30/09) segue liberado (D-08);
+#   · app/(paciente)/paciente/anvisa/page.tsx — a etapa 'escolha' sai do caminho; a etapa
+#     'guiada' ganha a área de vídeo, o botão "Atendimento com suporte" (registra o pedido) e,
+#     no fim, "Be4Hope faz por mim" só com o pedido ativado;
+#   · app/(admin)/admin/anvisa/page.tsx — seção nova "Pedidos de atendimento assistido", lista
+#     expansível (Accordion) com Ativar / Desativar. O que já existe na tela não muda.
+#
+# PERIGO MEDIDO: as três estão em produção. A página do paciente tem 1030 linhas e é destino de
+# três caminhos (aviso do painel, destino pós-cadastro, pós-login). A regra do servidor já está
+# provada pelo guarda `o-pedido-de-atendimento-abre-a-procuracao` (33) e pela integração
+# homônima (16), com 9 sabotagens. A condição do Davi, "com cuidado e revisão", vira: build de
+# produção local, os guardas da tela da ANVISA verdes, e revisão do diff antes do commit.
+#
+# Granularidade deliberada: os três arquivos exatos, não as pastas.
+path:app/(paciente)/_actions/anvisa.ts
+path:app/(paciente)/paciente/anvisa/page.tsx
+path:app/(admin)/admin/anvisa/page.tsx

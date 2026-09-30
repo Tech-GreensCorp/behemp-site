@@ -15,6 +15,8 @@
  *   7. ativar, desativar e ativar de novo deixa TRÊS linhas de auditoria: o histórico não se perde
  *   8. a aprovação da ANVISA conclui o pedido
  *   9. a lista do admin traz o nome e nunca CPF nem e-mail; paciente não lista
+ *  10. a TRAVA: sem pedido ativado, o paciente não entra na procuração nem chamando a action
+ *      direto; com o pedido ativado, entra; quem já estava nela (os 12 de produção) segue
  *
  * Rodar:
  *
@@ -51,6 +53,8 @@ const { db } = await import('@/lib/db');
 const schema = await import('@/db/schema');
 const acoes = await import('@/app/_actions/pedido-atendimento-assistido');
 const { concluirPedidoDaAutorizacao } = await import('@/lib/anvisa/concluir-pedido-de-atendimento');
+const { definirModalidadeAnvisa } = await import('@/app/(paciente)/_actions/anvisa');
+const rotaDaProcuracao = await import('@/app/api/anvisa/procuracao/route');
 
 const como = (clerkId: string, role: string) => {
   sessao.clerkId = clerkId;
@@ -347,5 +351,139 @@ describe('a ANVISA aprova, e o admin lista', () => {
     expect(lista[0]).toMatchObject({ pacienteNome: 'Paciente A', status: 'aguardando_ativacao' });
     const texto = JSON.stringify(lista);
     expect(texto).not.toMatch(/111\.111|teste\.invalid/);
+  });
+});
+
+describe('a trava: a procuração só abre depois da ativação (D-04.3)', () => {
+  const modalidadeDe = async (id: string) =>
+    (
+      await db.select().from(schema.autorizacoesAnvisa).where(eq(schema.autorizacoesAnvisa.id, id))
+    )[0].modalidade;
+
+  it('sem pedido, chamar a action direto não abre a procuração', async () => {
+    como('ck_a', 'paciente');
+    const r = await definirModalidadeAnvisa('aut_a', 'representacao');
+    expect(r.sucesso).toBe(false);
+    expect(await modalidadeDe('aut_a')).toBe('guiada');
+  });
+
+  it('com o pedido só aguardando, continua fechada', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect((await definirModalidadeAnvisa('aut_a', 'representacao')).sucesso).toBe(false);
+    expect(await modalidadeDe('aut_a')).toBe('guiada');
+  });
+
+  it('com o pedido ativado pelo admin, abre', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    const [p] = await pedidosDe('aut_a');
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: p.id });
+    como('ck_a', 'paciente');
+    expect((await definirModalidadeAnvisa('aut_a', 'representacao')).sucesso).toBe(true);
+    expect(await modalidadeDe('aut_a')).toBe('representacao');
+  });
+
+  it('quem já estava na procuração, sem pedido, segue com ela', async () => {
+    como('ck_a', 'paciente');
+    expect((await definirModalidadeAnvisa('aut_a_repr', 'representacao')).sucesso).toBe(true);
+    expect(await modalidadeDe('aut_a_repr')).toBe('representacao');
+  });
+
+  it('voltar para o passo a passo nunca é travado', async () => {
+    como('ck_a', 'paciente');
+    expect((await definirModalidadeAnvisa('aut_a_repr', 'guiada')).sucesso).toBe(true);
+  });
+});
+
+/**
+ * Os quatro achados da revisão independente de 30/09/2026 — cada um nasceu vermelho.
+ */
+describe('a revisão de 30/09: os desvios da trava', () => {
+  const modalidadeDe = async (id: string) =>
+    (
+      await db.select().from(schema.autorizacoesAnvisa).where(eq(schema.autorizacoesAnvisa.id, id))
+    )[0].modalidade;
+
+  it('ALTA: a rota que GERA a procuração recusa sem liberação — a trava não se contorna por ela', async () => {
+    como('ck_a', 'paciente');
+    const req = new Request('http://teste.local/api/anvisa/procuracao', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autorizacaoId: 'aut_a' }),
+    });
+    const res = await rotaDaProcuracao.POST(req as never);
+    expect(res.status).toBe(409);
+    expect(await db.select().from(schema.procuracoesEspecificas)).toHaveLength(0);
+  });
+
+  it('MÉDIA: desativar é recusado com o envelope já ENVIADO para assinatura', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a_repr' });
+    const [p] = await pedidosDe('aut_a_repr');
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: p.id });
+    const [aut] = await db
+      .select()
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a_repr'));
+    await db.insert(schema.procuracoesEspecificas).values({
+      pacienteId: aut.pacienteId,
+      autorizacaoId: 'aut_a_repr',
+      nomeCompleto: 'Paciente A',
+      email: 'a@teste.invalid',
+      docusignStatus: 'enviado',
+      docusignEnvelopeId: 'env-teste',
+    });
+    const r = await acoes.desativarProcuracaoAnvisa({ pedidoId: p.id });
+    expect(r.sucesso).toBe(false);
+    expect((await pedidosDe('aut_a_repr'))[0].status).toBe('pendente_autorizacao');
+    expect(await modalidadeDe('aut_a_repr')).toBe('representacao');
+  });
+
+  it('MÉDIA: a corrida forçada — o admin desativa no meio da entrada do paciente, e o paciente NÃO entra', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    const [p] = await pedidosDe('aut_a');
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: p.id });
+
+    // Outra transação faz o que o desativar faz: tranca o pedido e o devolve a "aguardando".
+    const { Client } = await import('pg');
+    const admin = new Client({ connectionString: process.env.DATABASE_URL });
+    await admin.connect();
+    try {
+      await admin.query('begin');
+      await admin.query('select id from pedidos_atendimento_assistido where id = $1 for update', [
+        p.id,
+      ]);
+      await admin.query(
+        "update pedidos_atendimento_assistido set status = 'aguardando_ativacao' where id = $1",
+        [p.id],
+      );
+      como('ck_a', 'paciente');
+      const emCurso = definirModalidadeAnvisa('aut_a', 'representacao');
+      await new Promise((r) => setTimeout(r, 400));
+      await admin.query('commit');
+      expect((await emCurso).sucesso).toBe(false);
+    } finally {
+      await admin.end();
+    }
+    expect(await modalidadeDe('aut_a')).toBe('guiada');
+  });
+
+  it('BAIXA: ativar recusa o pedido de uma autorização apagada', async () => {
+    const [aut] = await db
+      .select()
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a_apagada'));
+    const [p] = await db
+      .insert(schema.pedidosAtendimentoAssistido)
+      .values({ autorizacaoId: 'aut_a_apagada', pacienteId: aut.pacienteId })
+      .returning();
+    como('ck_adm', 'admin');
+    expect((await acoes.ativarProcuracaoAnvisa({ pedidoId: p.id })).sucesso).toBe(false);
+    expect((await pedidosDe('aut_a_apagada'))[0].status).toBe('aguardando_ativacao');
   });
 });

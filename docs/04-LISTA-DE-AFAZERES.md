@@ -19,6 +19,18 @@
 
 ---
 
+## ⚪ Item 58 — CATALOGADO, 30/09/2026: enviar documento no checklist devolve o paciente ao passo a passo
+
+**Status:** catalogado, **não corrigido**. Anterior à ADR-0029; achado na revisão independente dela.
+
+Em `app/(paciente)/paciente/anvisa/page.tsx`, o `onUploaded` do checklist chama
+`recarregarAutorizacao`, que escolhe a etapa pela modalidade: com `guiada`, manda para a etapa
+`guiada`. Quem está no passo a passo, abre o checklist ("Enviar autorização obtida") e envia um
+arquivo é devolvido ao passo a passo a cada envio. **Perigo de mexer:** uma condição em
+`recarregarAutorizacao`, na mesma tela de produção; nenhum dado se perde, é navegação.
+
+---
+
 ## ⚪ Item 57 — CATALOGADO, 30/09/2026: duas actions da ANVISA aceitam autorização de outro paciente
 
 **Status:** catalogado, **não corrigido**. Achado ao ler `app/(paciente)/_actions/anvisa.ts` para a
@@ -80,9 +92,15 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
   `o-pedido-de-atendimento-abre-a-procuracao` (**33 casos**) e integração homônima (**16 casos**),
   provados por **9 sabotagens**. A 9ª sobreviveu na primeira rodada: o teste de "cliques
   simultâneos" não reproduzia a corrida, e ganhou uma versão forçada que a reproduz;
-- ⏳ **falta autorização por escrito** para três arquivos que o hook protege: a trava em
-  `definirModalidadeAnvisa` (`app/(paciente)/_actions/anvisa.ts:188`), a tela do paciente e a tela
-  do admin.
+- ✅ autorização por escrito do Davi (30/09/2026) para os três arquivos protegidos; Grupos 5, 6 e 7
+  implementados: trava em `definirModalidadeAnvisa`, tela do paciente sem a escolha, com vídeo,
+  suporte e procuração no fim, e a seção de pedidos no admin;
+- ✅ revisão independente: 1 achado **alto** (a rota que gera a procuração contornava a trava),
+  2 médios e 2 baixos, **corrigidos** e provados. Ver ADR-0029 §9;
+- ⏳ **não implementado:** o aviso do painel voltar a oferecer a procuração depois da ativação
+  (D-10, terceiro ponto). São duas linhas em `app/(paciente)/paciente/page.tsx`, fora da
+  autorização. E a pergunta aberta: autorização **rejeitada** conclui o pedido?
+- ⚠️ as telas **não foram vistas rodando**: sem chave do Clerk local, toda rota dá 500.
 
 **Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
 chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**

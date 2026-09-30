@@ -17,7 +17,7 @@
  */
 
 import { z } from 'zod';
-import { and, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { revalidatePath } from 'next/cache';
 
@@ -242,6 +242,16 @@ export async function ativarProcuracaoAnvisa(input: unknown): Promise<Resultado>
       .for('update');
     if (!pedido) return { sucesso: false, erro: 'Pedido não encontrado' };
 
+    // Revisão de 30/09/2026: autorização apagada não se ativa — o pedido ficou órfão dela.
+    const [autorizacaoViva] = await tx
+      .select({ id: autorizacoesAnvisa.id })
+      .from(autorizacoesAnvisa)
+      .where(
+        and(eq(autorizacoesAnvisa.id, pedido.autorizacaoId), isNull(autorizacoesAnvisa.deletedAt)),
+      );
+    if (!autorizacaoViva)
+      return { sucesso: false, erro: 'A autorização deste pedido foi apagada.' };
+
     const t = transicionar(pedido.status, 'ativar', { procuracaoAssinada: false });
     if (!t.ok) return { sucesso: false, erro: MENSAGEM_DA_RECUSA[t.motivo] };
 
@@ -292,22 +302,36 @@ export async function desativarProcuracaoAnvisa(input: unknown): Promise<Resulta
       .for('update');
     if (!pedido) return { sucesso: false, erro: 'Pedido não encontrado' };
 
-    const [assinada] = await tx
-      .select({ id: procuracoesEspecificas.id })
+    const procuracoes = await tx
+      .select({
+        status: procuracoesEspecificas.docusignStatus,
+        envelope: procuracoesEspecificas.docusignEnvelopeId,
+        assinadoEm: procuracoesEspecificas.assinadoEm,
+        pdfAssinado: procuracoesEspecificas.urlPdfAssinado,
+      })
       .from(procuracoesEspecificas)
       .where(
         and(
           eq(procuracoesEspecificas.autorizacaoId, pedido.autorizacaoId),
           isNull(procuracoesEspecificas.deletedAt),
-          or(
-            isNotNull(procuracoesEspecificas.assinadoEm),
-            isNotNull(procuracoesEspecificas.urlPdfAssinado),
-          ),
         ),
-      )
-      .limit(1);
+      );
+    const procuracaoAssinada = procuracoes.some(
+      (p) =>
+        p.assinadoEm !== null ||
+        p.pdfAssinado !== null ||
+        p.status === 'assinado' ||
+        p.status === 'concluido',
+    );
+    // Envelope enviado e ainda não recusado nem expirado: o paciente pode assinar a qualquer hora.
+    const procuracaoEmAssinatura = procuracoes.some(
+      (p) => p.envelope !== null && (p.status === 'enviado' || p.status === 'visualizado'),
+    );
 
-    const t = transicionar(pedido.status, 'desativar', { procuracaoAssinada: Boolean(assinada) });
+    const t = transicionar(pedido.status, 'desativar', {
+      procuracaoAssinada,
+      procuracaoEmAssinatura,
+    });
     if (!t.ok) return { sucesso: false, erro: MENSAGEM_DA_RECUSA[t.motivo] };
 
     const [autorizacao] = await tx
