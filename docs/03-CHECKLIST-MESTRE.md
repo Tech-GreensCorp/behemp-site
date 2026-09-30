@@ -823,6 +823,12 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### 🟠 Achado de 30/09/2026 — o "Registre-se" falha na confirmação do código (Item 64)
+
+Relatado por Davi em produção: `JSON.parse: unexpected character…` ao confirmar o código em
+`/registrar-se`. Vem das chamadas ao Clerk; hipóteses e o que medir em [04 — Item 64](04-LISTA-DE-AFAZERES.md).
+**Catalogado, não corrigido.**
+
 ### 🔴 Achado de 30/09/2026 — o anexo do chat vai para store público (Itens 60, 61 e 62)
 
 Três achados do código antigo, ao investigar a chamada da ADR-0029 §10: o anexo do chat sobe para

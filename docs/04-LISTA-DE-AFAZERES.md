@@ -19,6 +19,32 @@
 
 ---
 
+## 🟠 Item 64 — CATALOGADO, 30/09/2026: o "Registre-se" falha na confirmação do código com `JSON.parse`
+
+**Status:** relatado por Davi em produção (print), **não investigado a fundo e não corrigido** — _"isso
+fica documentado"_.
+
+**O que acontece:** em `/registrar-se`, depois de digitar o código de 6 dígitos e clicar em "Confirmar
+Código", a tela mostra `JSON.parse: unexpected character at line 1 column 1 of the JSON data` e não
+avança. É o texto do **Firefox** para uma resposta que devia ser JSON e veio como outra coisa (página
+de erro, HTML).
+
+**Onde:** `app/(auth)/registrar-se/[[...sign-up]]/page.tsx:319-324`. O erro sai do `try` externo, pelo
+`translateClerkError(err)`, então veio de `signUp.attemptEmailAddressVerification` ou de `setActive`,
+as duas chamadas ao Clerk. O `fetch('/redirect')` e o `atualizarPerfilCompletoPaciente` têm `try`
+próprio e não chegariam a essa mensagem. O arquivo não mudou na ADR-0029 (último commit: `6d93b5a`).
+
+**Hipóteses, NÃO medidas:**
+1. O cadastro usou o **mesmo e-mail** de uma conta apagada no Clerk minutos antes (PR #140, 14:23).
+2. A instância do Clerk em produção é de **desenvolvimento** ("Development mode", achado de 13/09),
+   com limites próprios.
+3. Algo entre o navegador e o Clerk (extensão, bloqueio) devolveu HTML.
+
+**Para medir:** repetir com o DevTools aberto (aba Rede) e ver qual chamada ao Clerk respondeu sem JSON,
+com o status e o começo do corpo. Repetir com um e-mail que nunca existiu, para separar a hipótese 1.
+
+---
+
 ## 🟠 Item 63 — MEDIDO, 30/09/2026: produção roda sem TURN — teleconsulta e chamada de atendimento
 
 **Status:** medido por Davi na VPS, **não corrigido** — decisão dele (`DO-78`): _"sobre isso faremos
