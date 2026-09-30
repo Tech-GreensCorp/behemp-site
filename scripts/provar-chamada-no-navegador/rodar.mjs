@@ -20,7 +20,8 @@
  *   node scripts/provar-chamada-no-navegador/rodar.mjs
  *
  * Resultado medido em 30/09/2026: 15 de 15 passos; e duas sabotagens do módulo (vídeo `inactive`,
- * paciente sem microfone) acusadas.
+ * paciente sem microfone) acusadas. Em 30/09/2026, com câmera e tela nos dois sentidos (D-21, D-22),
+ * a prova foi reescrita: ver o resultado no ADR-0029 §12.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,7 +37,9 @@ const saida = fs.mkdtempSync(path.join(os.tmpdir(), 'prova-chamada-'));
 execFileSync(
   path.join(raiz, 'node_modules/.bin/tsc'),
   [
-    'lib/atendimento/negociacao.ts',
+    // NEGOCIACAO=<caminho> roda a MESMA prova contra outra versão do módulo: é assim que se
+    // prova que ela acusa (a versão anterior, ou uma sabotagem).
+    process.env.NEGOCIACAO ?? 'lib/atendimento/negociacao.ts',
     '--target',
     'es2022',
     '--module',
