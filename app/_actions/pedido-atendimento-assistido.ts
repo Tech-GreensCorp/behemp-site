@@ -48,6 +48,8 @@ interface Resultado<T = undefined> {
 }
 
 interface MeuPedido {
+  /** O id do PRÓPRIO pedido: é o que abre a tela do atendimento (ADR-0029 D-12). */
+  pedidoId: string;
   status: StatusDoPedido;
   pedidoEm: string;
 }
@@ -138,9 +140,13 @@ export async function pedirAtendimentoAssistido(input: unknown): Promise<Resulta
   // contaria a quem tenta que aquele id existe.
   if (!autorizacao) return { sucesso: false, erro: 'Autorização não encontrada' };
 
-  const resposta = (p: { status: StatusDoPedido; pedidoEm: Date }): Resultado<MeuPedido> => ({
+  const resposta = (p: {
+    id: string;
+    status: StatusDoPedido;
+    pedidoEm: Date;
+  }): Resultado<MeuPedido> => ({
     sucesso: true,
-    dados: { status: p.status, pedidoEm: p.pedidoEm.toISOString() },
+    dados: { pedidoId: p.id, status: p.status, pedidoEm: p.pedidoEm.toISOString() },
   });
 
   // Idempotente: pedir de novo devolve o pedido que já existe, com a data do primeiro.
@@ -209,6 +215,7 @@ export async function lerMeuPedidoDeAtendimento(
 
   const [ultimo] = await db
     .select({
+      id: pedidosAtendimentoAssistido.id,
       status: pedidosAtendimentoAssistido.status,
       pedidoEm: pedidosAtendimentoAssistido.pedidoEm,
     })
@@ -219,7 +226,9 @@ export async function lerMeuPedidoDeAtendimento(
 
   return {
     sucesso: true,
-    dados: ultimo ? { status: ultimo.status, pedidoEm: ultimo.pedidoEm.toISOString() } : null,
+    dados: ultimo
+      ? { pedidoId: ultimo.id, status: ultimo.status, pedidoEm: ultimo.pedidoEm.toISOString() }
+      : null,
   };
 }
 

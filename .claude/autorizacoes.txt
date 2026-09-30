@@ -973,3 +973,20 @@ path:db/migrations/meta/_journal.json
 path:app/(paciente)/_actions/anvisa.ts
 path:app/(paciente)/paciente/anvisa/page.tsx
 path:app/(admin)/admin/anvisa/page.tsx
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 §10 (Fase 2, a chamada de atendimento) ──
+# Palavras dele: "pode seguir para terminar vai ser tudo no mesmo deploy, teste tudo, temos que
+# fazer com segurança e disciplina… você está autorizado a utilizar todo o CLAUDE.md para terminar
+# isso com um código de qualidade e lógica ideal baseada nos nossos alinhamentos".
+#
+# O QUE MUDA: DUAS páginas NOVAS, finas — cada uma só lê o id do pedido e renderiza o componente
+# `components/atendimento/ChamadaDeAtendimento.tsx`. Nenhum arquivo existente dessas pastas muda.
+# O escopo (paciente dono do pedido ou admin) é conferido no servidor, em `lib/auth/escopo-chamada.ts`.
+#
+# PERIGO MEDIDO: baixo para o que existe — rotas novas, que nada no produto chama até o botão
+# "Entrar no atendimento" existir. A 0050 continua só aditiva e ganhou as duas tabelas da chamada
+# (mesmos três arquivos já autorizados, gerados de novo; a prova da D-05 se refaz).
+#
+# Granularidade deliberada: os dois arquivos exatos.
+path:app/(paciente)/paciente/anvisa/atendimento/[pedidoId]/page.tsx
+path:app/(admin)/admin/anvisa/atendimento/[pedidoId]/page.tsx

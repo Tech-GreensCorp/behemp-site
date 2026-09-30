@@ -812,6 +812,13 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### 🔴 Achado de 30/09/2026 — o anexo do chat vai para store público (Itens 60, 61 e 62)
+
+Três achados do código antigo, ao investigar a chamada da ADR-0029 §10: o anexo do chat sobe para
+store **público** e não confere participação (Item 60); a tela do paciente na teleconsulta liga uma
+gravação sem consentimento (Item 61); o id da sala da teleconsulta sai de `Math.random` (Item 62).
+Diagnóstico e perigo em [04](04-LISTA-DE-AFAZERES.md). **Catalogados, não corrigidos.**
+
 ### ⚪ Achado de 30/09/2026 — enviar documento no checklist devolve o paciente ao passo a passo
 
 Anterior à ADR-0029; achado na revisão independente dela. Navegação, sem perda de dado.

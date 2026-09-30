@@ -19,6 +19,42 @@
 
 ---
 
+## 🔴 Item 60 — CATALOGADO, 30/09/2026: o anexo do chat vai para store público, sem conferir participação
+
+**Status:** catalogado, **não corrigido**. Achado ao investigar a Fase 2 da ADR-0029.
+
+- `enviarArquivoChat` (`app/_actions/chat.ts:608-661`) faz `put` com `access: 'public'` (`:627-629`),
+  **não confere** se quem envia participa do grupo, guarda a URL crua dentro de `conteudo` como
+  `[ARQUIVO:url] nome` (`:632`) e valida só o tamanho (10 MB), sem MIME. É o Item 6 voltando por outro
+  caminho: quem tiver a URL lê o arquivo sem autenticação.
+- `reagirMensagem` (`app/_actions/chat.ts:667`) também não confere participação.
+
+**Perigo de mexer:** o chat está em produção; trocar o store muda a entrega (rota autenticada, como
+`GET /api/atendimento/print/{id}`), e as mensagens antigas guardam a URL pública no texto. A chamada
+de atendimento **não** reusa esta action por isso (ADR-0029 D-18).
+
+---
+
+## 🟠 Item 61 — CATALOGADO, 30/09/2026: a tela do paciente na teleconsulta liga uma gravação sem condição
+
+**Status:** catalogado, **não corrigido**. `app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:176-196`
+cria um `MediaRecorder` no `ontrack` **sem conferir consentimento** e sem enviar o resultado a lugar
+nenhum: gravação local, sem uso e sem gate. O lado do médico só grava com o aceite dos dois
+(ADR-0007). **Perigo de mexer:** baixo (o arquivo não sai do navegador), mas é captura de áudio e
+vídeo sem a base que a ADR-0007 exige; tela clínica em produção, travada por guardas de layout.
+
+---
+
+## ⚪ Item 62 — CATALOGADO, 30/09/2026: o id da sala da teleconsulta é previsível
+
+**Status:** catalogado, **não corrigido**. `criarSalaTeleconsulta`
+(`app/(medico)/_actions/teleconsulta.ts:30`) gera o `roomId` com `Math.random` e 6 caracteres. O
+escopo da sala é conferido no servidor (`garantirDonoDaSala`), então o id sozinho não abre a sala;
+mas id previsível é convite para quem tenta adivinhar. A chamada de atendimento usa
+`crypto.randomUUID` (ADR-0029 D-13).
+
+---
+
 ## ⚪ Item 59 — CATALOGADO, 30/09/2026: o clique em "Be4Hope faz por mim" é auditado sem quem clicou
 
 **Status:** catalogado, **não corrigido** — Davi, 30/09/2026 (`DO-77`): _"se ainda não existe,
@@ -117,6 +153,10 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
 - ⏳ **pré-deploy:** Davi, 30/09: _"quando tivermos aptos, testados e comprovados vamos fazer os
   procedimentos pré-deploy"_. As telas só se conferem em produção (§0.20).
 - ⚠️ as telas **não foram vistas rodando**: sem chave do Clerk local, toda rota dá 500.
+- ✅ **Fase 2 implementada (30/09/2026), no mesmo deploy, por decisão do Davi:** a chamada de voz com
+  a tela do paciente, o chat lateral com print, as rotas `app/api/atendimento/*`, o ramo novo do
+  Pusher e as tabelas da chamada na mesma 0050. Provas e revisão na ADR-0029 §10.4. Catalogados, sem
+  correção: Itens 60, 61 e 62.
 
 **Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
 chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**

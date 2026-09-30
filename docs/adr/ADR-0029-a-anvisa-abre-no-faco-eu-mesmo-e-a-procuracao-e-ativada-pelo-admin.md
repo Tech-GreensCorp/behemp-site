@@ -530,6 +530,131 @@ não conseguiu ainda.
 .env` → 0). É a limitação já registrada no `CLAUDE.md`. As telas se conferem depois do deploy,
    ou com uma chave de desenvolvimento local.
 
+## §10 — Fase 2: a chamada de atendimento com suporte (decidida em 30/09/2026)
+
+Davi, 30/09/2026: _"vai ser tudo no mesmo deploy, teste tudo, temos que fazer com segurança e
+disciplina… você está autorizado a utilizar todo o CLAUDE.md para terminar isso com um código de
+qualidade e lógica ideal baseada nos nossos alinhamentos"_. As regras de negócio abaixo saem das
+falas dele, citadas; as técnicas saem da investigação medida em 30/09.
+
+### 10.1 O que existe, medido
+
+- **A sala da teleconsulta não serve como está:** `teleconsultas.medicoId` é `notNull`
+  (`db/schema/teleconsultas.ts:19`), só o médico cria a sala
+  (`app/(medico)/_actions/teleconsulta.ts:15`), e o código da chamada vive **misturado** com
+  prontuário, prescrição, copiloto e transcrição (`components/teleconsulta/GlobalTeleconsultaHost.tsx`,
+  732 linhas). Não existe hook de WebRTC reutilizável.
+- **O que É reutilizável:** o TURN contratado da Cloudflare, com credencial efêmera e TTL de 2 h
+  (ADR-0008, `app/api/teleconsulta/ice-servers/route.ts`); a sinalização pelo servidor, com Zod e
+  `pusher.trigger` (`app/api/teleconsulta/sinalizar/route.ts`); a autorização de canal por ramo e
+  negando por padrão (`app/api/pusher/auth/route.ts:114`); o store privado
+  (`lib/documentos/store-privado.ts:66`); e o limite de requisição
+  (`lib/seguranca/limite-de-requisicao.ts`).
+- 🔴 **Não reutilizável, e catalogado:** o anexo do chat (`enviarArquivoChat`,
+  `app/_actions/chat.ts:608`) sobe para store **público** e não confere participação (Item 60).
+  O id da sala da teleconsulta sai de `Math.random` com 6 caracteres
+  (`app/(medico)/_actions/teleconsulta.ts:30`). A tela do paciente na teleconsulta liga uma
+  **gravação local sem condição** (`app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:176-196`).
+  Nenhum dos três se repete aqui.
+- **Celular:** o navegador não compartilha a tela (§1.11, MDN).
+
+### 10.2 Decisões
+
+**D-12. Quem atende é o admin, e quem abre a sala é o paciente.** `DO-70` fez do admin o perfil do
+atendimento. E a fala original (§0.5) diz que o botão _"vai dar para uma outra tela"_. Então, ao
+pedir, o paciente ganha **"Entrar no atendimento"**, que abre a tela da chamada, onde ele espera. Na
+lista de pedidos, o admin ganha **"Entrar no atendimento"** no item. Qualquer admin pode atender,
+porque a lista é do papel e não de uma pessoa. A sala é do **pedido**: só existe com pedido
+**aberto**, e fecha quando o admin encerra ou o pedido se encerra.
+
+**D-13. A chamada tem tabela própria, e não usa a da teleconsulta.** `chamadas_de_atendimento`
+(pedido, `sala` aleatória de 32 caracteres de `crypto.randomUUID`, aberta e encerrada, com quem) e
+`mensagens_de_atendimento` (chamada, autor, texto, e o print guardado no store privado). As duas
+entram na **mesma 0050**, que ainda não chegou a produção.
+Rejeitado: pôr o admin na sala médica (`teleconsultas`), porque quebraria o escopo que o guarda
+`autorizacao-tem-escopo-de-objeto` prova e obrigaria a tabela a aceitar sala sem médico.
+
+**D-14. A voz e a tela passam pelo mesmo caminho seguro da teleconsulta, sem mexer nela.** Rotas
+próprias em `app/api/atendimento/` (sinalizar e ICE), canal Pusher próprio
+`presence-atendimento-{sala}`, com ramo próprio no `/api/pusher/auth`. O escopo é conferido **no
+servidor** em todas elas: paciente dono do pedido, ou admin. A credencial de TURN usa a mesma conta
+Cloudflare com a mesma TTL, e **só** para quem está na sala, porque TURN é recurso pago.
+Rejeitado: reescrever a teleconsulta para extrair um hook comum agora. É o módulo mais delicado em
+produção, e travado por guardas de layout. Fica catalogado como limpeza futura, não entra no mesmo
+deploy.
+
+**D-15. Negociação sem renegociar.** O admin faz a oferta com um canal de **áudio** de ida e volta
+e um de **vídeo** só de recebimento. Ao responder, o paciente fica com o envio de vídeo já
+negociado e vazio. Compartilhar a tela é trocar a faixa (`replaceTrack`), sem nova oferta. É o
+mesmo mecanismo que a teleconsulta usa para a tela do médico (`GlobalTeleconsultaHost.tsx:437`).
+
+**D-16. O celular fala por voz e mostra a tela pelo print.** Onde o navegador não tem
+`getDisplayMedia`, o botão "Compartilhar tela" **não aparece**, e a tela aponta o chat. Em nenhum
+caso aparece um botão que não funciona.
+
+**D-17. O chat fica na lateral esquerda** (Davi: _"na lateral esquerda, em horizontal, ali o paciente
+pode mandar mensagem ou enviar print"_). Na tela larga, o chat é a coluna da esquerda e a chamada
+fica à direita. Na tela estreita, as duas se empilham, com o chat primeiro.
+
+**D-18. O print é arquivo sensível.** Imagem PNG, JPEG ou WebP de até 8 MB, conferida **no servidor**.
+Guardada por `guardarDocumentoPrivado`, e entregue só pela rota autenticada
+`GET /api/atendimento/print/{mensagemId}`: escopo de objeto (admin ou o paciente do pedido), 404
+igual para negado e inexistente, `visualizar` auditado, limite de requisição e `no-store`. A URL do
+blob **nunca** vai ao navegador nem ao Pusher: o evento leva só o id da mensagem.
+
+**D-19. Nada é gravado, e tudo é auditado.** Não há `MediaRecorder` nem transcrição. Abrir, entrar,
+encerrar e cada mensagem ficam em `logs_auditoria` ou na própria tabela, com quem e quando. Antes de
+compartilhar a tela, o paciente lê o aviso: _"a equipe vai ver sua tela; não mostre senhas; nada é
+gravado"_. O compartilhamento só começa pelo gesto dele, porque o navegador exige.
+
+**D-20. Retenção:** `retencao_ate` anulável e **vazio** nas duas tabelas, porque o prazo é decisão
+do Jurídico (`.claude/rules/seguranca-lgpd.md`; mesmo padrão de
+`db/schema/rascunhos-revisao-ia.ts:58`).
+
+### 10.3 Como se prova sem Clerk local
+
+Guarda e integração, como nas fases anteriores, para as regras do servidor. Para a **chamada em
+si**, o Chromium headless do projeto roda dois pares WebRTC com mídia falsa numa página de teste
+local: a negociação (áudio de ida e volta, tela trocada sem renegociar) é o mesmo módulo que as
+telas usam, executado de verdade. O que só produção prova: o TURN real e dois dispositivos
+diferentes. Por isso a lista de pós-deploy inclui uma chamada real entre dois aparelhos.
+
+### 10.4 O que a implementação provou (30/09/2026)
+
+- **A negociação no Chromium** (`scripts/provar-chamada-no-navegador/`): **15 de 15** passos. Voz nos
+  dois sentidos (80 pacotes de áudio de cada lado); nenhum quadro de vídeo antes de compartilhar; 63
+  quadros compartilhando, **sem nenhuma renegociação**; os quadros param ao parar e voltam ao
+  compartilhar de novo. Duas sabotagens do módulo acusadas: vídeo `inactive` (0 quadros) e paciente
+  sem microfone (0 pacotes). Uma terceira pareceu sobreviver e **não tinha sido aplicada**: o `sed`
+  não achou o texto que o `tsc` quebrou em duas linhas. Refeita sobre a linha real, foi acusada.
+- **Integração** `a-chamada-de-atendimento-so-tem-duas-pessoas`, com **21 casos** contra Postgres real,
+  executando actions **e** rotas (sinalizar, TURN, canal Pusher, entrega do print). Guarda
+  `a-chamada-de-atendimento-nao-grava-e-nao-vaza`, com **34 casos**. **20 sabotagens**, todas acusadas
+  por pelo menos um dos dois. Duas sobreviveram na primeira rodada:
+  - **F2-6** é **mutante equivalente**, e não teste fraco. A conferência da assinatura do arquivo só
+    aceita PNG, JPEG e WebP, então tirar a conferência do tipo não muda nenhum resultado possível. São
+    camadas redundantes de propósito;
+  - **F2-14** era real: a corrida ao entrar não se reproduzia, **o mesmo defeito de teste da Fase 1**.
+    Ganhou uma corrida forçada, que a reproduz.
+- **Um guarda antigo estava cego:** `todo-ramo-do-pusher-autoriza-no-proprio-ramo` só reconhecia
+  `startsWith('literal')`. O ramo novo usa uma constante, e o anterior "engolia" o bloco novo, com o
+  guarda verde. Foi retificado e ganhou uma contagem cruzada.
+- **Os guardas `sem-relay-de-terceiro-na-teleconsulta` e `as-rotas-sensiveis-tem-limite`** passaram a
+  cobrir a tela e as três rotas novas.
+- 🔴 **Revisão independente, antes do commit:** nenhum furo de escopo. Achou três médios e quatro
+  baixos, **todos corrigidos e protegidos**:
+  - fechar a chamada pelo pedido **não avisava as telas**, e a voz seguia ponto a ponto;
+  - duas abas, ou dois admins, disputavam a chamada, e o primeiro caía em silêncio. Agora cada oferta
+    tem um **id de negociação**, e a aba repetida fica só com as mensagens;
+  - sair durante a permissão deixava o **microfone aceso**;
+  - o microfone ficava ligado depois de encerrar;
+  - depois de 200 mensagens, recarregar mostrava as primeiras;
+  - canal recusado deixava a tela em "Entrando…";
+  - entrar não tinha limite;
+  - o **id interno do usuário** ia ao canal. Agora vai um id opaco e por aba.
+- ⚠️ **Não provado local, e só produção prova:** a tela inteira com login (sem chave do Clerk local),
+  o TURN real e dois aparelhos diferentes. A lista de pós-deploy cobre isso (§11).
+
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 
 **Versão 1**, escrita a partir da §0.2: quem liberaria a procuração seria um "perfil de

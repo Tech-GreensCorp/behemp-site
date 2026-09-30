@@ -12,11 +12,13 @@
  * ⚠️ A liberação que vale é a do SERVIDOR (`definirModalidadeAnvisa` confere de novo). Esconder o
  * botão aqui é só para não oferecer o que o servidor vai recusar.
  */
+import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { CheckCircle2, Headphones, Loader2, ShieldCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   lerMeuPedidoDeAtendimento,
   pedirAtendimentoAssistido,
@@ -36,6 +38,7 @@ export function AtendimentoComSuporte({
   onBe4HopeFazPorMim,
 }: Props) {
   const [status, setStatus] = useState<StatusDoPedido | null>(null);
+  const [pedidoId, setPedidoId] = useState<string | null>(null);
   const [carregou, setCarregou] = useState(false);
   const [enviando, iniciarEnvio] = useTransition();
   const [abrindo, iniciarAbertura] = useTransition();
@@ -44,7 +47,10 @@ export function AtendimentoComSuporte({
     let ativo = true;
     lerMeuPedidoDeAtendimento({ autorizacaoId })
       .then((r) => {
-        if (ativo && r.sucesso) setStatus(r.dados?.status ?? null);
+        if (ativo && r.sucesso) {
+          setStatus(r.dados?.status ?? null);
+          setPedidoId(r.dados?.pedidoId ?? null);
+        }
       })
       // Rede caída não pode deixar o botão desabilitado para sempre: o pedido se tenta no clique,
       // e o servidor é idempotente — pedir de novo devolve o pedido que já existir.
@@ -70,6 +76,7 @@ export function AtendimentoComSuporte({
       }));
       if (r.sucesso && r.dados) {
         setStatus(r.dados.status);
+        setPedidoId(r.dados.pedidoId);
         toast.success('Recebemos seu pedido. Nossa equipe vai entrar em contato.');
       } else {
         toast.error(r.erro ?? 'Não conseguimos registrar seu pedido. Tente de novo.');
@@ -103,7 +110,18 @@ export function AtendimentoComSuporte({
               Recebemos seu pedido. Nossa equipe vai entrar em contato.
             </p>
           </div>
-        ) : (
+        ) : null}
+
+        {/* ADR-0029 D-12: o pedido aberto leva à tela da chamada, onde o paciente espera a equipe. */}
+        {pedidoAberto && pedidoId ? (
+          <Link
+            href={`/paciente/anvisa/atendimento/${pedidoId}`}
+            className={cn(buttonVariants(), 'w-full gap-2')}
+          >
+            <Headphones className="h-4 w-4" />
+            Entrar no atendimento
+          </Link>
+        ) : pedidoAberto ? null : (
           <Button onClick={pedir} disabled={!carregou || enviando} className="w-full gap-2">
             {enviando ? (
               <Loader2 className="h-4 w-4 animate-spin" />

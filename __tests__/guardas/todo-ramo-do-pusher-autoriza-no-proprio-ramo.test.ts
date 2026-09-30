@@ -29,7 +29,9 @@ function ramos(fonte: string): { cabecalho: string; corpo: string }[] {
   // genérico casava também o `if (canalUserId !== user.id)` de DENTRO do ramo e o partia em
   // dois — o caso de vacuidade pegou, em 28/09/2026.
   const marcas = [
-    ...fonte.matchAll(/(?:\} else )?if \((canal(?:\.startsWith\('[^']+'\)| === [A-Z_]+))\) \{/g),
+    ...fonte.matchAll(
+      /(?:\} else )?if \((canal(?:\.startsWith\((?:'[^']+'|[A-Z_]+)\)| === [A-Z_]+))\) \{/g,
+    ),
   ];
   const fimDaCadeia = fonte.indexOf("{ erro: 'Canal não reconhecido' }");
   return marcas.map((m, i) => ({
@@ -47,10 +49,24 @@ describe('todo ramo do Pusher autoriza no próprio ramo', () => {
       "canal.startsWith('private-chat-')",
       'canal === CANAL_SALA_DE_ESPERA',
       "canal.startsWith('presence-sala-')",
+      'canal.startsWith(PREFIXO_DO_CANAL)',
     ]);
     expect(rota).toMatch(
       /return NextResponse\.json\(\{ erro: 'Canal não reconhecido' \}, \{ status: 403 \}\);/,
     );
+  });
+
+  /**
+   * ⚠️ RETIFICADO EM 30/09/2026 — o detector era CEGO para prefixo em constante.
+   *
+   * Ele só reconhecia `startsWith('literal')`. O ramo da chamada de atendimento (ADR-0029 D-14)
+   * usa `startsWith(PREFIXO_DO_CANAL)`, e ficou fora da verificação: pior, o ramo anterior passou a
+   * "engolir" o bloco novo como se fosse seu, e o guarda seguiu verde. A contagem cruzada abaixo
+   * impede a próxima forma de escrever um ramo de ficar invisível do mesmo jeito.
+   */
+  it('⚠️ CONTAGEM CRUZADA: todo `if (canal` de ramo é reconhecido pelo detector', () => {
+    const cabecalhos = [...rota.matchAll(/(?:\} else )?if \(canal[.\s=]/g)].length;
+    expect(ramos(rota)).toHaveLength(cabecalhos);
   });
 
   it('⚠️ VACUIDADE: o detector acusa um ramo que só recusa', () => {

@@ -13,6 +13,7 @@
  * ⚠️ Os quatro estados são diferentes e aparecem diferentes: carregando, ERRO, vazio e lista.
  * Erro exibido como "nenhum pedido" faria o admin concluir que ninguém pediu ajuda.
  */
+import Link from 'next/link';
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import {
   AlertCircle,
@@ -33,7 +34,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -224,6 +225,18 @@ export function PedidosDeAtendimento() {
                           ? `por ${p.ativadoPorNome} `
                           : ''}em {quando(p.ativadoEm)}
                       </p>
+                    )}
+
+                    {(p.status === 'aguardando_ativacao' ||
+                      p.status === 'pendente_autorizacao') && (
+                      // ADR-0029 D-12: o admin entra na chamada do pedido, onde o paciente espera.
+                      <Link
+                        href={`/admin/anvisa/atendimento/${p.pedidoId}`}
+                        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
+                      >
+                        <Headphones className="h-4 w-4" />
+                        Entrar no atendimento
+                      </Link>
                     )}
 
                     {p.status === 'aguardando_ativacao' && (
