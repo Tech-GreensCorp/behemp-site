@@ -1,6 +1,12 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
-> **Status:** ✅ **aceita por Davi**, 29/09/2026, com as respostas da §0, linhas 9 a 19. Escrita
+> **Status:** ✅ **EM PRODUÇÃO** — 30/09/2026, 14:28 (Brasília): PR #141, merge `2160936`, deploy
+> `36751041870`. O log mostrou `[migrar] ✓ concluído`, `behemp-site` e `behemp-filas` online e
+> _"produção está servindo ESTE build, e a home responde 200"_; a home respondeu 200 durante todo o
+> deploy. [medido por Davi na VPS] `__drizzle_migrations` = `53|1790784182806` e as tabelas novas
+> existem. ⚠️ **As telas ainda não foram testadas em produção** (roteiro na §11.4).
+>
+> **Status anterior:** ✅ **aceita por Davi**, 29/09/2026, com as respostas da §0, linhas 9 a 19. Escrita
 > antes do código. **Não há implementação.** A migration está autorizada por escrito em
 > `.claude/autorizacoes.txt`, com a condição de seguir o roteiro de integridade da D-05.
 >
@@ -715,6 +721,7 @@ Acompanhar a home com `curl -o /dev/null -w "%{http_code}"` a cada rodada: tem d
 ### 11.4 Depois do deploy (em produção, pelo Davi)
 
 1. Refazer a revisão de integridade: `__drizzle_migrations` com **53** linhas e as três tabelas novas.
+   ✅ **[medido] 30/09/2026, por Davi:** `53|1790784182806`, e as tabelas existem.
 2. Paciente de teste no passo a passo: vídeo "em breve", 10 passos, "Atendimento com suporte" →
    "Recebemos seu pedido" → "Entrar no atendimento".
 3. Admin em `/admin/anvisa`: o pedido aparece; "Entrar no atendimento"; "Ativar procuração"; o
