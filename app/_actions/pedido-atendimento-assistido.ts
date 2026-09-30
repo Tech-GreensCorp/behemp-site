@@ -435,7 +435,8 @@ export async function listarPedidosDeAtendimento(): Promise<Resultado<PedidoNaLi
     .innerJoin(pacientes, eq(pacientes.id, pedidosAtendimentoAssistido.pacienteId))
     .innerJoin(users, eq(users.id, pacientes.userId))
     .leftJoin(ativador, eq(ativador.id, pedidosAtendimentoAssistido.ativadoPor))
-    .where(isNull(autorizacoesAnvisa.deletedAt))
+    // Paciente arquivado (PR #140, `deletedAt`) sai da lista: não há atendimento a fazer por ele.
+    .where(and(isNull(autorizacoesAnvisa.deletedAt), isNull(pacientes.deletedAt)))
     .orderBy(desc(pedidosAtendimentoAssistido.pedidoEm));
 
   await db

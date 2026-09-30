@@ -675,6 +675,13 @@ _"o importante é o site não cair"_. Quem faz deploy: Davi, Dryelle ou Gabriel.
 - **O que não se prova local:** as telas com login (sem chave do Clerk), o TURN real e dois
   aparelhos. Isso vai para o pós-deploy (11.4).
 
+**Segunda integração da `main`, antes do push (30/09/2026):** entrou o PR #140 da Dryelle (apagar e
+editar usuário, arquivar paciente), sem migration e sem conflito. Ele apaga por **soft delete**, e
+nada quebra nas chaves sem cascata. Mas criou uma interação de regra, **ajustada e testada**: o
+pedido de paciente arquivado sai da lista do admin, e a chamada recusa agir sobre paciente arquivado
+("Este paciente foi arquivado."). O print já enviado continua legível para quem estava lá. Depois
+disso: `pnpm test` **1826 em 76**; integração **206 em 17**; build e Chromium ok.
+
 ### 11.2 Antes do merge (Davi ou Diniz, na VPS e no GitHub)
 
 1. **As chaves que a chamada usa chegam ao processo?** `CLOUDFLARE_TURN_*` **não estão** na lista

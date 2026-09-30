@@ -208,6 +208,32 @@ describe('só duas pessoas entram', () => {
   });
 });
 
+describe('paciente arquivado (PR #140, soft delete)', () => {
+  it('ninguém abre nem continua o atendimento de paciente arquivado; o print segue legível', async () => {
+    const { dados } = await entrarComo('ck_a', 'paciente');
+    const form = new FormData();
+    form.set('sala', dados!.sala);
+    form.set('arquivo', new File([PNG], 'tela.png', { type: 'image/png' }));
+    const { dados: m } = await chamada.enviarPrintNoAtendimento(form);
+
+    const [ua] = await db.select().from(schema.users).where(eq(schema.users.clerkId, 'ck_a'));
+    await db
+      .update(schema.pacientes)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.pacientes.userId, ua.id));
+
+    const admin = await entrarComo('ck_adm', 'admin');
+    expect(admin).toEqual({ sucesso: false, erro: 'Este paciente foi arquivado.' });
+    expect(
+      (await chamada.enviarMensagemNoAtendimento({ sala: dados!.sala, texto: 'oi' })).sucesso,
+    ).toBe(false);
+    const ver = await rotaPrint.GET(pedir(`/api/atendimento/print/${m!.id}`), {
+      params: Promise.resolve({ mensagemId: m!.id }),
+    });
+    expect(ver.status).toBe(200);
+  });
+});
+
 describe('o chat e o print', () => {
   it('mensagem de participante vira linha e evento, com o PAPEL e sem ids', async () => {
     const { dados } = await entrarComo('ck_a', 'paciente');

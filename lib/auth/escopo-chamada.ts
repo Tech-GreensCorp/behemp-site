@@ -56,6 +56,22 @@ async function papelNoPedido(
   return dono ? 'paciente' : null;
 }
 
+/**
+ * O paciente do pedido foi ARQUIVADO (soft delete da tela de Pacientes, PR #140)? Só se pergunta
+ * depois de provado o acesso: aqui já não é oráculo. Atendimento com paciente arquivado não se abre
+ * nem se continua; o que já foi dito continua legível (`exigirAberta: false`).
+ */
+async function pacienteArquivado(pacienteId: string): Promise<boolean> {
+  const [p] = await db
+    .select({ id: pacientes.id })
+    .from(pacientes)
+    .where(and(eq(pacientes.id, pacienteId), isNull(pacientes.deletedAt)))
+    .limit(1);
+  return !p;
+}
+
+const ARQUIVADO: Recusa = { ok: false, status: 409, erro: 'Este paciente foi arquivado.' };
+
 /** Para ENTRAR: o pedido tem de existir, ser do paciente (ou o chamador ser admin) e estar aberto. */
 export async function garantirAcessoAoPedido(pedidoId: string): Promise<
   | {
@@ -82,6 +98,8 @@ export async function garantirAcessoAoPedido(pedidoId: string): Promise<
 
   const papel = await papelNoPedido(usuario, pedido.pacienteId);
   if (!papel) return NAO_ENCONTRADO;
+
+  if (await pacienteArquivado(pedido.pacienteId)) return ARQUIVADO;
 
   // Só depois de provar o acesso se diz que o pedido fechou: aqui já não é oráculo.
   if (!STATUS_ABERTOS.includes(pedido.status)) {
@@ -129,6 +147,8 @@ export async function garantirParticipanteDaChamada(opcoes: {
   const papel = await papelNoPedido(usuario, linha.pacienteId);
   if (!papel) return NAO_ENCONTRADO;
 
+  if ((opcoes.exigirAberta ?? true) && (await pacienteArquivado(linha.pacienteId)))
+    return ARQUIVADO;
   if ((opcoes.exigirAberta ?? true) && linha.encerradaEm) {
     return { ok: false, status: 409, erro: 'Este atendimento já foi encerrado.' };
   }

@@ -364,6 +364,20 @@ describe('a ANVISA aprova, e o admin lista', () => {
     expect(await pedidosDe('aut_b')).toHaveLength(0);
   });
 
+  it('paciente arquivado (PR #140) sai da lista do admin', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    const [ua] = await db.select().from(schema.users).where(eq(schema.users.clerkId, 'ck_a'));
+    await db
+      .update(schema.pacientes)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.pacientes.userId, ua.id));
+    como('ck_adm', 'admin');
+    const r = await acoes.listarPedidosDeAtendimento();
+    expect(r.sucesso).toBe(true);
+    expect(r.dados).toHaveLength(0);
+  });
+
   it('o admin vê o nome e nunca CPF nem e-mail; o paciente não lista', async () => {
     como('ck_a', 'paciente');
     await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
