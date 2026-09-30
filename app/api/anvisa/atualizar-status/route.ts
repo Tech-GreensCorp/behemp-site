@@ -5,7 +5,7 @@ import { encerrarPedidoDaAutorizacao } from '@/lib/anvisa/encerrar-pedido-de-ate
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPusherServer } from '@/lib/integrations/pusher/server';
 import { addYears, format } from 'date-fns';
@@ -64,8 +64,17 @@ export async function POST(request: NextRequest) {
   const [atualizado] = await db
     .update(autorizacoesAnvisa)
     .set(dadosUpdate)
-    .where(eq(autorizacoesAnvisa.id, autorizacaoId))
+    .where(and(eq(autorizacoesAnvisa.id, autorizacaoId), isNull(autorizacoesAnvisa.deletedAt)))
     .returning({ pacienteId: autorizacoesAnvisa.pacienteId });
+
+  // Autorização apagada (ou inexistente) não muda de status: uma aba antiga poderia
+  // "aprovar" o que foi apagado, e o motor de alertas não filtra `deletedAt`.
+  if (!atualizado) {
+    return NextResponse.json(
+      { sucesso: false, erro: 'Autorização não encontrada ou apagada' },
+      { status: 404 },
+    );
+  }
 
   /**
    * 🔴 AVISA O PARCEIRO QUE A AUTORIZAÇÃO SAIU (ADR-0016 D-09).

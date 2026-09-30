@@ -2,7 +2,8 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { procuracoesEspecificas, users } from '@/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, isNull } from 'drizzle-orm';
+import { BotaoApagarProcuracao } from './_components/botao-apagar-procuracao';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ export default async function AdminProcuracoesPage() {
       assinadoEm: procuracoesEspecificas.assinadoEm,
     })
     .from(procuracoesEspecificas)
+    .where(isNull(procuracoesEspecificas.deletedAt))
     .orderBy(desc(procuracoesEspecificas.createdAt));
 
   const totalConcluidas = procuracoes.filter(p => p.status === 'concluido').length;
@@ -147,6 +149,11 @@ export default async function AdminProcuracoesPage() {
                         PDF Assinado
                       </a>
                     )}
+                    <BotaoApagarProcuracao
+                      id={proc.id}
+                      nome={proc.nomeCompleto}
+                      assinada={proc.status === 'assinado' || proc.status === 'concluido'}
+                    />
                   </>
                 }
               />
