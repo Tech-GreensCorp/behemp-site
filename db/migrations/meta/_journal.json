@@ -351,6 +351,13 @@
       "when": 1790193675250,
       "tag": "0049_laudo_medico_no_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790779511501,
+      "tag": "0050_pedidos_atendimento_assistido",
+      "breakpoints": true
     }
   ]
 }

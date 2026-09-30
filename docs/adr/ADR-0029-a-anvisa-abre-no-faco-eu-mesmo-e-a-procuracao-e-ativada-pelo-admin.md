@@ -286,6 +286,28 @@ folderMillis`). O enum novo se chamará `pedido_atendimento_status`, e o bloco c
    que a 0050 toca, e a prova do item 6 roda contra ele. As tabelas que só existem em produção
    (`produtos`, `produto_arquivos`) não são referenciadas pela 0050.
 
+   **[medido] A 0050 provada em 30/09/2026**, na branch `feat/anvisa-faco-eu-mesmo`, em
+   PostgreSQL 17 descartável montado com o schema da `origin/main` (as quatro tabelas que
+   batem com produção) e o registro de migrations **igual ao de produção**: 52 linhas, sem a
+   0038 e a 0039, com as quatro extras. Gerada por `drizzle-kit generate --name
+   pedidos_atendimento_assistido`, `when` `1790779511501`, só `CREATE TYPE`, `CREATE TABLE`,
+   as quatro chaves e os três índices da tabela nova. Aplicada por `scripts/migrar.mjs`:
+   - o registro foi de **52 para 53**: aplicou **só** a 0050; a 0038 e a 0039 continuaram puladas;
+   - `users`, `pacientes`, `autorizacoes_anvisa`, `procuracoes_especificas` e `logs_auditoria`
+     com a **mesma contagem e a mesma impressão** (md5 das linhas) antes e depois;
+   - índice parcial: o 2º pedido aberto é **recusado** (`23505`), também com o 1º em
+     `pendente_autorizacao`; um pedido novo depois de `concluido` é **aceito**; outra
+     autorização, em paralelo, é aceita;
+   - chaves: autorização inexistente e `ativado_por` inexistente **recusados** (`23503`); status
+     fora do enum recusado (`22P02`);
+   - o migrator rodado **de novo** não fez nada (continuou em 53);
+   - duas sabotagens do índice: **único sem o filtro** passou a recusar o pedido novo depois do
+     concluído, e **sem índice** passou a aceitar dois abertos. O teste pegou as duas.
+     `pnpm test`: **1668 casos em 72 arquivos**, verdes. Portão de baseline: type-check 0; Prettier
+     318 contra teto 317, e o arquivo a mais é `.claude/rules/ponte-enderecamento-dos-prompts.md`,
+     pessoal e fora do git, que só o `.gitignore` do commit `ac56243` (ainda fora da `main`)
+     esconde. Nenhum arquivo desta branch piorou.
+
    **O que isso decide para a 0050:** ela entra com `when` maior que `1790193675250`, então o
    migrator a aplica, e **só ela**: a 0038 e a 0039 continuam puladas, como hoje, e as quatro
    extras não são tocadas. Nenhum nome colide. ⚠️ **A prova precisa cobrir o caso das 12:** uma
