@@ -1,0 +1,351 @@
+/**
+ * O pedido de atendimento assistido, EXECUTADO contra um Postgres de verdade (ADR-0029).
+ *
+ * 🔴 ISTO NÃO É GUARDA ESTRUTURAL. Este roda as actions e olha as linhas que sobraram no banco.
+ *
+ * ## O que ele prova
+ *
+ *   1. o paciente pede só para a PRÓPRIA autorização; pedir de novo não duplica nem muda a data
+ *   2. pedido para autorização de outro paciente, ou apagada, não vira linha
+ *   3. só admin ativa; paciente chamando a ativação não muda nada
+ *   4. ativar grava quem e quando, e deixa o antes e o depois em `logs_auditoria`
+ *   5. desativar antes da assinatura volta o pedido, a modalidade para `guiada` e tira do checklist
+ *      a procuração que ainda não foi enviada — tudo junto, numa transação
+ *   6. desativar depois da procuração assinada é recusado, e nada muda
+ *   7. ativar, desativar e ativar de novo deixa TRÊS linhas de auditoria: o histórico não se perde
+ *   8. a aprovação da ANVISA conclui o pedido
+ *   9. a lista do admin traz o nome e nunca CPF nem e-mail; paciente não lista
+ *
+ * Rodar:
+ *
+ *   docker start behemp-pg || docker run -d --name behemp-pg \
+ *     -e POSTGRES_PASSWORD=local -e POSTGRES_DB=behemp -p 5544:5432 postgres:16
+ *   DATABASE_URL=postgresql://postgres:local@localhost:5544/behemp npx drizzle-kit push --force
+ *   DATABASE_URL=postgresql://postgres:local@localhost:5544/behemp \
+ *     npx vitest run --config vitest.integracao.mts \
+ *     __tests__/integracao/o-pedido-de-atendimento-abre-a-procuracao.test.ts
+ */
+
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { and, eq } from 'drizzle-orm';
+
+/** O duplo do Clerk: quem está logado e com que papel. */
+const sessao = { clerkId: null as string | null, role: 'paciente' as string };
+
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: async () => ({
+    userId: sessao.clerkId,
+    sessionClaims: { metadata: { role: sessao.role } },
+  }),
+  currentUser: async () => ({ id: sessao.clerkId }),
+  clerkClient: async () => ({ users: {} }),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+vi.mock('next/navigation', () => ({
+  redirect: (url: string) => {
+    throw new Error('REDIRECT ' + url);
+  },
+}));
+
+const { db } = await import('@/lib/db');
+const schema = await import('@/db/schema');
+const acoes = await import('@/app/_actions/pedido-atendimento-assistido');
+const { concluirPedidoDaAutorizacao } = await import('@/lib/anvisa/concluir-pedido-de-atendimento');
+
+const como = (clerkId: string, role: string) => {
+  sessao.clerkId = clerkId;
+  sessao.role = role;
+};
+
+async function limpar() {
+  await db.delete(schema.logsAuditoria);
+  await db.delete(schema.pedidosAtendimentoAssistido);
+  await db.delete(schema.procuracoesEspecificas);
+  await db.delete(schema.autorizacoesAnvisa);
+  await db.delete(schema.pacientes);
+  await db.delete(schema.users);
+}
+
+let adminId = '';
+
+/** Paciente A (com três autorizações), paciente B (com uma) e um admin. */
+async function cenario() {
+  const [ua, ub, ad] = await db
+    .insert(schema.users)
+    .values([
+      { clerkId: 'ck_a', email: 'a@teste.invalid', nome: 'Paciente A', role: 'paciente' },
+      { clerkId: 'ck_b', email: 'b@teste.invalid', nome: 'Paciente B', role: 'paciente' },
+      { clerkId: 'ck_adm', email: 'adm@teste.invalid', nome: 'Admin Teste', role: 'admin' },
+    ])
+    .returning({ id: schema.users.id });
+  adminId = ad.id;
+  const [pa, pb] = await db
+    .insert(schema.pacientes)
+    .values([
+      { userId: ua.id, cpf: '111.111.111-11' },
+      { userId: ub.id, cpf: '222.222.222-22' },
+    ])
+    .returning({ id: schema.pacientes.id });
+  const docs = [
+    { tipo: 'receita_medica', enviado: true, validado: false, urlBlob: null, nomeArquivo: null },
+    {
+      tipo: 'procuracao_especifica',
+      enviado: false,
+      validado: false,
+      urlBlob: null,
+      nomeArquivo: null,
+    },
+    { tipo: 'laudo_medico', enviado: false, validado: false, urlBlob: null, nomeArquivo: null },
+  ];
+  await db.insert(schema.autorizacoesAnvisa).values([
+    { id: 'aut_a', pacienteId: pa.id, modalidade: 'guiada' },
+    { id: 'aut_a_apagada', pacienteId: pa.id, modalidade: 'guiada', deletedAt: new Date() },
+    { id: 'aut_a_repr', pacienteId: pa.id, modalidade: 'representacao', documentos: docs },
+    { id: 'aut_b', pacienteId: pb.id, modalidade: 'guiada' },
+  ]);
+  return { pa: pa.id, pb: pb.id };
+}
+
+const pedidosDe = (autorizacaoId: string) =>
+  db
+    .select()
+    .from(schema.pedidosAtendimentoAssistido)
+    .where(eq(schema.pedidosAtendimentoAssistido.autorizacaoId, autorizacaoId));
+
+beforeEach(async () => {
+  await limpar();
+  await cenario();
+});
+afterAll(limpar);
+
+describe('o paciente pede atendimento', () => {
+  it('pede para a própria autorização, e pedir de novo não duplica nem muda a data', async () => {
+    como('ck_a', 'paciente');
+    const r1 = await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect(r1).toMatchObject({ sucesso: true, dados: { status: 'aguardando_ativacao' } });
+    const [antes] = await pedidosDe('aut_a');
+
+    const r2 = await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect(r2).toMatchObject({ sucesso: true, dados: { status: 'aguardando_ativacao' } });
+    const depois = await pedidosDe('aut_a');
+    expect(depois).toHaveLength(1);
+    expect(depois[0].pedidoEm.getTime()).toBe(antes.pedidoEm.getTime());
+  });
+
+  it('dois pedidos ao mesmo tempo viram UM (o banco segura a corrida)', async () => {
+    como('ck_a', 'paciente');
+    const rs = await Promise.all(
+      [1, 2, 3].map(() => acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' })),
+    );
+    expect(rs.every((r) => r.sucesso)).toBe(true);
+    expect(await pedidosDe('aut_a')).toHaveLength(1);
+  });
+
+  /**
+   * ⚠️ O caso acima NÃO reproduz a corrida: a sabotagem que tirou o tratamento do `23505`
+   * sobreviveu a ele (30/09/2026), porque as três chamadas acabavam em série. Este força a
+   * corrida: outra transação ocupa a vaga do índice parcial SEM confirmar; a action não a vê na
+   * checagem, esbarra no índice ao inserir e espera; a outra confirma, e a action recebe o 23505.
+   */
+  it('a corrida forçada: quem perde para o índice devolve o pedido que venceu', async () => {
+    const [aut] = await db
+      .select({ pacienteId: schema.autorizacoesAnvisa.pacienteId })
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a'));
+    const { Client } = await import('pg');
+    const outra = new Client({ connectionString: process.env.DATABASE_URL });
+    await outra.connect();
+    try {
+      await outra.query('begin');
+      await outra.query(
+        "insert into pedidos_atendimento_assistido (id, autorizacao_id, paciente_id) values ('venceu', 'aut_a', $1)",
+        [aut.pacienteId],
+      );
+      como('ck_a', 'paciente');
+      const emCurso = acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+      await new Promise((r) => setTimeout(r, 400));
+      await outra.query('commit');
+      expect(await emCurso).toMatchObject({
+        sucesso: true,
+        dados: { status: 'aguardando_ativacao' },
+      });
+    } finally {
+      await outra.end();
+    }
+    const linhas = await pedidosDe('aut_a');
+    expect(linhas.map((l) => l.id)).toEqual(['venceu']);
+  });
+
+  it('pedido para a autorização de OUTRO paciente é recusado e não vira linha', async () => {
+    como('ck_a', 'paciente');
+    const r = await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_b' });
+    expect(r.sucesso).toBe(false);
+    expect(await pedidosDe('aut_b')).toHaveLength(0);
+  });
+
+  it('pedido para autorização apagada é recusado', async () => {
+    como('ck_a', 'paciente');
+    const r = await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a_apagada' });
+    expect(r.sucesso).toBe(false);
+    expect(await pedidosDe('aut_a_apagada')).toHaveLength(0);
+  });
+
+  it('entrada inválida é recusada antes do banco', async () => {
+    como('ck_a', 'paciente');
+    expect((await acoes.pedirAtendimentoAssistido({ autorizacaoId: '' })).sucesso).toBe(false);
+    expect(
+      (await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a', pacienteId: 'x' })).sucesso,
+    ).toBe(false);
+  });
+
+  it('o paciente lê o próprio pedido, e não o de outro', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect(await acoes.lerMeuPedidoDeAtendimento({ autorizacaoId: 'aut_a' })).toMatchObject({
+      sucesso: true,
+      dados: { status: 'aguardando_ativacao' },
+    });
+    como('ck_b', 'paciente');
+    expect((await acoes.lerMeuPedidoDeAtendimento({ autorizacaoId: 'aut_a' })).sucesso).toBe(false);
+  });
+});
+
+describe('o admin ativa e desativa', () => {
+  async function pedidoAberto(autorizacaoId = 'aut_a') {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId });
+    const [p] = await pedidosDe(autorizacaoId);
+    return p.id;
+  }
+
+  it('paciente chamando a ativação não muda nada', async () => {
+    const id = await pedidoAberto();
+    como('ck_a', 'paciente');
+    const r = await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    expect(r.sucesso).toBe(false);
+    expect((await pedidosDe('aut_a'))[0].status).toBe('aguardando_ativacao');
+  });
+
+  it('ativar grava quem e quando, com o antes e o depois na auditoria', async () => {
+    const id = await pedidoAberto();
+    como('ck_adm', 'admin');
+    const r = await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    expect(r.sucesso).toBe(true);
+    const [p] = await pedidosDe('aut_a');
+    expect(p.status).toBe('pendente_autorizacao');
+    expect(p.ativadoPor).toBe(adminId);
+    expect(p.ativadoEm).toBeInstanceOf(Date);
+    const logs = await db
+      .select()
+      .from(schema.logsAuditoria)
+      .where(
+        and(
+          eq(schema.logsAuditoria.entidadeId, id),
+          eq(schema.logsAuditoria.acao, 'ATIVAR_PROCURACAO'),
+        ),
+      );
+    expect(logs).toHaveLength(1);
+    expect(logs[0].userId).toBe(adminId);
+    expect(logs[0].dadosAntes).toMatchObject({ status: 'aguardando_ativacao' });
+    expect(logs[0].dadosDepois).toMatchObject({ status: 'pendente_autorizacao' });
+  });
+
+  it('ativar o que já está ativo é recusado', async () => {
+    const id = await pedidoAberto();
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    const r = await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    expect(r.sucesso).toBe(false);
+  });
+
+  it('desativar antes da assinatura volta pedido, modalidade e checklist, juntos', async () => {
+    const id = await pedidoAberto('aut_a_repr');
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    const r = await acoes.desativarProcuracaoAnvisa({ pedidoId: id });
+    expect(r.sucesso).toBe(true);
+    const [p] = await pedidosDe('aut_a_repr');
+    expect(p.status).toBe('aguardando_ativacao');
+    expect(p.desativadoPor).toBe(adminId);
+    const [aut] = await db
+      .select()
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a_repr'));
+    expect(aut.modalidade).toBe('guiada');
+    const tipos = (aut.documentos as { tipo: string }[]).map((d) => d.tipo);
+    expect(tipos).toEqual(['receita_medica']);
+  });
+
+  it('desativar depois da procuração ASSINADA é recusado, e nada muda', async () => {
+    const id = await pedidoAberto('aut_a_repr');
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    const [pac] = await db
+      .select()
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a_repr'));
+    await db.insert(schema.procuracoesEspecificas).values({
+      pacienteId: pac.pacienteId,
+      autorizacaoId: 'aut_a_repr',
+      nomeCompleto: 'Paciente A',
+      email: 'a@teste.invalid',
+      assinadoEm: new Date(),
+    });
+    const r = await acoes.desativarProcuracaoAnvisa({ pedidoId: id });
+    expect(r.sucesso).toBe(false);
+    expect((await pedidosDe('aut_a_repr'))[0].status).toBe('pendente_autorizacao');
+    const [aut] = await db
+      .select()
+      .from(schema.autorizacoesAnvisa)
+      .where(eq(schema.autorizacoesAnvisa.id, 'aut_a_repr'));
+    expect(aut.modalidade).toBe('representacao');
+  });
+
+  it('ativar, desativar e ativar de novo deixa as três vezes na auditoria', async () => {
+    const id = await pedidoAberto();
+    como('ck_adm', 'admin');
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    await acoes.desativarProcuracaoAnvisa({ pedidoId: id });
+    await acoes.ativarProcuracaoAnvisa({ pedidoId: id });
+    const logs = await db
+      .select()
+      .from(schema.logsAuditoria)
+      .where(eq(schema.logsAuditoria.entidadeId, id));
+    const atos = logs
+      .map((l) => l.acao)
+      .filter((a) => a !== 'PEDIR_ATENDIMENTO_ASSISTIDO')
+      .sort();
+    expect(atos).toEqual(['ATIVAR_PROCURACAO', 'ATIVAR_PROCURACAO', 'DESATIVAR_PROCURACAO']);
+  });
+});
+
+describe('a ANVISA aprova, e o admin lista', () => {
+  it('a aprovação conclui o pedido aberto', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    await concluirPedidoDaAutorizacao('aut_a');
+    const [p] = await pedidosDe('aut_a');
+    expect(p.status).toBe('concluido');
+    expect(p.concluidoEm).toBeInstanceOf(Date);
+  });
+
+  it('concluir sem pedido não lança nem cria linha', async () => {
+    await expect(concluirPedidoDaAutorizacao('aut_b')).resolves.toBeUndefined();
+    expect(await pedidosDe('aut_b')).toHaveLength(0);
+  });
+
+  it('o admin vê o nome e nunca CPF nem e-mail; o paciente não lista', async () => {
+    como('ck_a', 'paciente');
+    await acoes.pedirAtendimentoAssistido({ autorizacaoId: 'aut_a' });
+    expect((await acoes.listarPedidosDeAtendimento()).sucesso).toBe(false);
+
+    como('ck_adm', 'admin');
+    const r = await acoes.listarPedidosDeAtendimento();
+    expect(r.sucesso).toBe(true);
+    const lista = r.dados ?? [];
+    expect(lista).toHaveLength(1);
+    expect(lista[0]).toMatchObject({ pacienteNome: 'Paciente A', status: 'aguardando_ativacao' });
+    const texto = JSON.stringify(lista);
+    expect(texto).not.toMatch(/111\.111|teste\.invalid/);
+  });
+});

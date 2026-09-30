@@ -812,6 +812,13 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### 🔴 Achado de 30/09/2026 — duas actions da ANVISA aceitam autorização de outro paciente
+
+`salvarFormulario8833` e `confirmarEnvioAnvisa` gravam pelo `autorizacaoId` vindo do navegador,
+sem conferir o paciente da sessão (OWASP API1). Diagnóstico e perigo medido em
+[04 — Item 57](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido**: fora do escopo da ADR-0029,
+e a correção pede autorização própria.
+
 ### ⚪ Achado de 30/09/2026 — produção tem 4 migrations que a `main` não conhece
 
 **[medido]** pela medição da ADR-0029 D-05, rodada por Davi na VPS: `drizzle.__drizzle_migrations`

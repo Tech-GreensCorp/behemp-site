@@ -19,6 +19,27 @@
 
 ---
 
+## ⚪ Item 57 — CATALOGADO, 30/09/2026: duas actions da ANVISA aceitam autorização de outro paciente
+
+**Status:** catalogado, **não corrigido**. Achado ao ler `app/(paciente)/_actions/anvisa.ts` para a
+ADR-0029.
+
+- `salvarFormulario8833` (`app/(paciente)/_actions/anvisa.ts:265`) confere o papel
+  `paciente` e grava `formulario8833` com `.where(eq(autorizacoesAnvisa.id, parsed.data.autorizacaoId))`,
+  **sem** `pacienteId` nem `deletedAt`. Um paciente logado que saiba o id da autorização de outro
+  sobrescreve o formulário 8833 dele;
+- `confirmarEnvioAnvisa` (mesmo arquivo, linha 282) faz o mesmo com `status`,
+  `dataEnvio` e `prazoEstimado`: um paciente pode marcar como "documentos enviados" a autorização
+  de outro.
+
+É OWASP API1 (BOLA). **Perigo de mexer, medido:** uma linha em cada action (acrescentar o filtro
+pelo paciente da sessão, como `definirModalidadeAnvisa` já faz, linhas 201-211); as duas são
+chamadas só pela tela `/paciente/anvisa`; o id é CUID2, então explorar exige conhecer o id de
+outro paciente. Nenhum teste prova o antes e o depois. **Custo de deixar:** dado regulatório
+alterável por terceiro, sem auditoria de quem alterou.
+
+---
+
 ## 🔴 Item 56 — DECIDIDO, 29/09/2026, não implementado: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
 **Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
@@ -48,6 +69,20 @@ migrator **pula em silêncio** uma migration com `when` antigo (Item 32).
 cópia da estrutura gerada sem dado, nomes novos livres, `max(created_at)` na 0049. A 0050 aplica
 sozinha. 🔴 **Doze autorizações já estão em `representacao` sem aprovação** (8 pendentes, 4 com
 documentos enviados): a action nova não pode tirar delas o checklist da procuração.
+
+**Andamento, 30/09/2026, branch `feat/anvisa-faco-eu-mesmo`:**
+
+- ✅ Grupo 3, banco: tabela e migration 0050 (commit `231a100`), provada contra o registro de
+  produção;
+- ✅ Grupo 4, servidor, sem as telas: `app/_actions/pedido-atendimento-assistido.ts` (pedir, ler o
+  próprio, ativar, desativar, listar), `lib/anvisa/pedido-de-atendimento.ts` (a regra pura) e
+  `lib/anvisa/concluir-pedido-de-atendimento.ts`, chamado pela rota de status no `aprovado`. Guarda
+  `o-pedido-de-atendimento-abre-a-procuracao` (**33 casos**) e integração homônima (**16 casos**),
+  provados por **9 sabotagens**. A 9ª sobreviveu na primeira rodada: o teste de "cliques
+  simultâneos" não reproduzia a corrida, e ganhou uma versão forçada que a reproduz;
+- ⏳ **falta autorização por escrito** para três arquivos que o hook protege: a trava em
+  `definirModalidadeAnvisa` (`app/(paciente)/_actions/anvisa.ts:188`), a tela do paciente e a tela
+  do admin.
 
 **Fica para a próxima fatia:** a chamada de atendimento com suporte (voz, tela no computador e
 chat com print na lateral), ADR-0029 D-11. 🔴 Achado ao desenhar: o navegador do celular **não**

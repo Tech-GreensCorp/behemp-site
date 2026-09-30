@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { notificarParceiro } from '@/lib/parceiros/notificar';
 import { avisarAnvisaAprovada } from '@/lib/anvisa/avisar-aprovacao';
+import { concluirPedidoDaAutorizacao } from '@/lib/anvisa/concluir-pedido-de-atendimento';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
@@ -89,6 +90,12 @@ export async function POST(request: NextRequest) {
       pacienteId: atualizado.pacienteId,
       numeroProcesso: numeroProcesso ?? null,
     });
+
+    /**
+     * E o pedido de atendimento assistido, se houver, sai dos pendentes do admin (ADR-0029 D-03,
+     * `DO-72`). Nunca lança: a aprovação já foi gravada.
+     */
+    await concluirPedidoDaAutorizacao(autorizacaoId);
   }
 
   // Notificar paciente via Pusher
