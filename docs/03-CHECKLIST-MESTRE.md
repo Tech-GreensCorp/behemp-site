@@ -823,6 +823,46 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### 🔴 Achado de 30/09/2026 — o anexo do chat vai para store público (Itens 60, 61 e 62)
+
+Três achados do código antigo, ao investigar a chamada da ADR-0029 §10: o anexo do chat sobe para
+store **público** e não confere participação (Item 60); a tela do paciente na teleconsulta liga uma
+gravação sem consentimento (Item 61); o id da sala da teleconsulta sai de `Math.random` (Item 62).
+Diagnóstico e perigo em [04](04-LISTA-DE-AFAZERES.md). **Catalogados, não corrigidos.**
+
+### ⚪ Achado de 30/09/2026 — enviar documento no checklist devolve o paciente ao passo a passo
+
+Anterior à ADR-0029; achado na revisão independente dela. Navegação, sem perda de dado.
+Diagnóstico em [04 — Item 58](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido.**
+
+### 🔴 Achado de 30/09/2026 — duas actions da ANVISA aceitam autorização de outro paciente
+
+`salvarFormulario8833` e `confirmarEnvioAnvisa` gravam pelo `autorizacaoId` vindo do navegador,
+sem conferir o paciente da sessão (OWASP API1). Diagnóstico e perigo medido em
+[04 — Item 57](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido**: fora do escopo da ADR-0029,
+e a correção pede autorização própria.
+
+### ⚪ Achado de 30/09/2026 — produção tem 4 migrations que a `main` não conhece
+
+**[medido]** pela medição da ADR-0029 D-05, rodada por Davi na VPS: `drizzle.__drizzle_migrations`
+tem **52** linhas para **50** entradas no journal. Quatro linhas não correspondem a nada da
+`main`:
+
+- `1786630506718`, `1786634498375` e `1786643162091` são as migrations 0018, 0019 e 0020 da branch
+  `origin/feature/product-catalog-v2` (commit `7f6c682`, Dryelle, 13/08/2026). O banco de produção
+  tem as tabelas `produtos` e `produto_arquivos` e o enum `produto_arquivo_categoria`, que o schema
+  da `main` não declara;
+- `1787338669959` (21/08/2026 18:57 UTC) **não está em nenhuma branch remota**. Origem
+  desconhecida.
+
+**Perigo de hoje:** nenhum para o migrator, porque o `max(created_at)` continua sendo o da 0049.
+**Perigo latente:** o `drizzle-kit` compara com o snapshot, não com o banco. Se alguém um dia
+declarar `produtos` na `main` com outra forma, a migration gerada vai tentar criar o que já existe.
+E um `drizzle-kit push` contra produção proporia **apagar** as duas tabelas.
+
+**Não corrigido, não é escopo da ADR-0029.** Pergunta para a Dryelle: o catálogo de produtos está em
+uso em produção? E a quarta linha, de onde veio?
+
 ### 🔴 Achado de 22/09/2026 — a lição mais cara da semana: sintoma funcionando não prova schema
 
 Em 21/09, o Desktop e este Code concluíram que a `0039` **estava aplicada** em produção. O
@@ -1133,18 +1173,19 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 
 ### 🎯 A fazer, nesta ordem
 
-| #        | item                                                                                                                                 | sprint                                                                                     | bloqueado por                                                                  |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| ~~8~~ ✅ | **E3 da S4** — divergir com "por que a IA errou" (opcional) + medicamento a prescrever, alimentando o RAG                            | S4 · [ADR-0011](adr/ADR-0011-a-divergencia-do-medico-alimenta-o-rag.md)                    | `GAP-16` bloqueia só a **ingestão**, não os campos                             |
-| ~~9~~ ✅ | **E7 da S4** — rascunho da revisão **no servidor**, com histórico                                                                    | S4 · ADR-0011 D-03/D-04                                                                    | prazo de retenção = Jurídico (campo fica vazio)                                |
-| 10       | **E8 da S4** — urgência na tela, 4 níveis, com o mapa **7→4 escrito antes**. É gatilho contra medicamento errado (`DO-42`, `CAN-05`) | S4                                                                                         | escrever o mapa 7→4                                                            |
-| 11       | **Análise assistida como ABA do sidebar da teleconsulta**, etapas dentro dela                                                        | S1/S4 · [ADR-0010](adr/ADR-0010-analise-assistida-e-uma-aba-do-sidebar-da-teleconsulta.md) | rótulo e posição da aba = perguntar ao dono                                    |
-| 12       | **Área do paciente** — diário, dose, resumo                                                                                          | [S6](sprints/SPRINT-6-area-do-paciente.md)                                                 | `GAP-12` · **exige a S5 pronta** (entregável 7 dela)                           |
-| 13       | **Exames** — anexar, ver, vincular. A última da Metade 1                                                                             | [S7](sprints/SPRINT-7-exames.md)                                                           | 🔴 conversa do dono com o chefe (`DO-13`)                                      |
-| 14       | **Metade 2** — motor, RAG, corpus, exames com IA                                                                                     | S8–S12                                                                                     | 🔴 AWS (`GAP-11`) · Jurídico (`CF-01`, `GAP-06`, `GAP-16`)                     |
-| 15       | **Item 6** — store privado nos 10+ uploads existentes                                                                                | —                                                                                          | autorização                                                                    |
-| 16       | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                   | —                                                                                          | ler a RDC 873/2024 primeiro · autorização                                      |
-| 17       | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)   | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR |
+| #        | item                                                                                                                                                                                                                                                                                                       | sprint                                                                                         | bloqueado por                                                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| ~~8~~ ✅ | **E3 da S4** — divergir com "por que a IA errou" (opcional) + medicamento a prescrever, alimentando o RAG                                                                                                                                                                                                  | S4 · [ADR-0011](adr/ADR-0011-a-divergencia-do-medico-alimenta-o-rag.md)                        | `GAP-16` bloqueia só a **ingestão**, não os campos                                                |
+| ~~9~~ ✅ | **E7 da S4** — rascunho da revisão **no servidor**, com histórico                                                                                                                                                                                                                                          | S4 · ADR-0011 D-03/D-04                                                                        | prazo de retenção = Jurídico (campo fica vazio)                                                   |
+| 10       | **E8 da S4** — urgência na tela, 4 níveis, com o mapa **7→4 escrito antes**. É gatilho contra medicamento errado (`DO-42`, `CAN-05`)                                                                                                                                                                       | S4                                                                                             | escrever o mapa 7→4                                                                               |
+| 11       | **Análise assistida como ABA do sidebar da teleconsulta**, etapas dentro dela                                                                                                                                                                                                                              | S1/S4 · [ADR-0010](adr/ADR-0010-analise-assistida-e-uma-aba-do-sidebar-da-teleconsulta.md)     | rótulo e posição da aba = perguntar ao dono                                                       |
+| 12       | **Área do paciente** — diário, dose, resumo                                                                                                                                                                                                                                                                | [S6](sprints/SPRINT-6-area-do-paciente.md)                                                     | `GAP-12` · **exige a S5 pronta** (entregável 7 dela)                                              |
+| 13       | **Exames** — anexar, ver, vincular. A última da Metade 1                                                                                                                                                                                                                                                   | [S7](sprints/SPRINT-7-exames.md)                                                               | 🔴 conversa do dono com o chefe (`DO-13`)                                                         |
+| 14       | **Metade 2** — motor, RAG, corpus, exames com IA                                                                                                                                                                                                                                                           | S8–S12                                                                                         | 🔴 AWS (`GAP-11`) · Jurídico (`CF-01`, `GAP-06`, `GAP-16`)                                        |
+| 15       | **Item 6** — store privado nos 10+ uploads existentes                                                                                                                                                                                                                                                      | —                                                                                              | autorização                                                                                       |
+| 16       | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                                                                                                                                                                                         | —                                                                                              | ler a RDC 873/2024 primeiro · autorização                                                         |
+| 17       | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                                                                                                                                                                                      | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR                    |
+| 18       | 🔴 **Item 56** — **prioridade 1 definida por Davi em 29/09/2026**: a ANVISA abre no "Faço eu mesmo", vídeo, pedido de atendimento assistido, a procuração ativada pelo admin. Implementado **inteiro** (Fases 1 e 2) na branch `feat/anvisa-faco-eu-mesmo` (30/09), sem deploy; pré-deploy na ADR-0029 §11 | [ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | medir na VPS o schema, o `max(created_at)` e as linhas de `__drizzle_migrations` (D-05, item 6.1) |
 
 ### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
 

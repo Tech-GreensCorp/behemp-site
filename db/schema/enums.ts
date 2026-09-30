@@ -443,3 +443,16 @@ export const chatproDiretorioTipoEnum = pgEnum('chatpro_diretorio_tipo', [
   'departamento',
   'motivo_encerramento',
 ]);
+
+/**
+ * Situação do pedido de atendimento assistido da ANVISA (ADR-0029 D-03, `DO-72`, `DO-76`).
+ * aguardando_ativacao → pendente_autorizacao (o admin ativou a procuração) → concluido (a ANVISA
+ * aprovou) ou rejeitado_anvisa (a ANVISA rejeitou). Desativar volta para aguardando_ativacao.
+ * O pedido nunca é apagado.
+ */
+export const pedidoAtendimentoStatusEnum = pgEnum('pedido_atendimento_status', [
+  'aguardando_ativacao',
+  'pendente_autorizacao',
+  'concluido',
+  'rejeitado_anvisa',
+]);

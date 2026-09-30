@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { ShieldCheck, RefreshCw, Loader2, FileSearch, Clock, CheckCircle2, AlertCircle, XCircle, FileCheck, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { PedidosDeAtendimento } from '@/components/admin/anvisa/PedidosDeAtendimento';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus = 'pendente' | 'documentos_enviados' | 'em_analise' | 'aprovado' | 'pendencia_documental' | 'rejeitado';
@@ -167,6 +168,9 @@ export default function AdminAnvisaPage() {
           </Button>
         }
       />
+
+      {/* ADR-0029 D-03: quem pediu atendimento assistido, com Ativar / Desativar a procuração */}
+      <PedidosDeAtendimento />
 
       {/* Filtros */}
       <div className="flex gap-2 flex-wrap">

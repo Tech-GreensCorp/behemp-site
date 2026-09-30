@@ -8,6 +8,21 @@
 > **A fonte dos fluxos é o dono. A fonte do estado é o código.** Nenhuma linha da coluna
 > "estado" entra sem ter sido medida.
 
+## ⚠️ 30/09/2026 — o que a ADR-0029 muda nos passos da procuração
+
+O texto dos fluxos abaixo é o do dono e **não foi reescrito**. Mas, desde a ADR-0029 (Davi,
+29/09/2026, `DO-69` a `DO-73`), todo passo que diz _"direcionado para a procuração"_ ou _"aviso com
+botão para a procuração"_ funciona assim:
+
+- o destino continua sendo `/paciente/anvisa`, e ela abre no **passo a passo do Gov.br**, com vídeo;
+- a procuração ("Be4Hope faz por mim") **só aparece depois que o admin ativa** o pedido de
+  atendimento que o paciente faz pelo botão "Atendimento com suporte";
+- o aviso do painel deixou de prometer a procuração pronta: diz _"Veja o passo a passo para fazer
+  pelo Gov.br. Se precisar de ajuda, peça atendimento com suporte."_ (`DO-73`);
+- quem já estava na procuração antes da mudança (12 em produção, medido em 30/09) segue com ela.
+
+Se o dono mandar uma versão nova dos fluxos com isso escrito, esta nota sai.
+
 ## Como ler
 
 | marca | quer dizer                                 |

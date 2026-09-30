@@ -18,6 +18,7 @@ import { receituarioTemplates } from './receituario-templates';
 import { teleconsultas, transcricoes } from './teleconsultas';
 import { autorizacoesAnvisa } from './autorizacoes-anvisa';
 import { procuracoesEspecificas } from './procuracoes-especificas';
+import { pedidosAtendimentoAssistido } from './pedidos-atendimento-assistido';
 import { pagamentos } from './pagamentos';
 import { medicosPagamentoConfig } from './medicos-pagamento-config';
 import { medicosMercadopagoConta } from './medicos-mercadopago-conta';
@@ -83,6 +84,7 @@ export const pacientesRelations = relations(pacientes, ({ one, many }) => ({
   recompras: many(recompras),
   prescricoes: many(prescricoes),
   procuracoesEspecificas: many(procuracoesEspecificas),
+  pedidosAtendimentoAssistido: many(pedidosAtendimentoAssistido),
 }));
 
 // ── Documentos ────────────────────────────────────────────────
@@ -344,3 +346,14 @@ export const procuracoesEspecificasRelations = relations(procuracoesEspecificas,
   }),
 }));
 
+// ── Pedidos de atendimento assistido (ADR-0029) ───────────────
+export const pedidosAtendimentoAssistidoRelations = relations(pedidosAtendimentoAssistido, ({ one }) => ({
+  autorizacao: one(autorizacoesAnvisa, {
+    fields: [pedidosAtendimentoAssistido.autorizacaoId],
+    references: [autorizacoesAnvisa.id],
+  }),
+  paciente: one(pacientes, {
+    fields: [pedidosAtendimentoAssistido.pacienteId],
+    references: [pacientes.id],
+  }),
+}));

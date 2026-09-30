@@ -36,6 +36,9 @@ const TELAS_DE_CHAMADA = [
   'components/teleconsulta/GlobalTeleconsultaHost.tsx',
   'app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx',
   'app/(medico)/medico/teleconsulta/page.tsx',
+  // ADR-0029 §10 (30/09/2026): a chamada de atendimento com suporte. A mídia dela também não pode
+  // atravessar relay gratuito de terceiro: o TURN vem da mesma conta contratada, pelo servidor.
+  'components/atendimento/ChamadaDeAtendimento.tsx',
 ];
 
 /**

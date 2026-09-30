@@ -1,0 +1,113 @@
+<!doctype html><meta charset="utf-8" /><title>prova</title>
+<script type="module">
+  import {
+    criarOfertaDoAdmin,
+    responderComoPaciente,
+    aceitarResposta,
+    trocarTela,
+    criarFilaDeCandidatos,
+    podeCompartilharTela,
+  } from './negociacao.js';
+  const r = { passos: [] };
+  const passo = (n, ok, extra) => r.passos.push({ n, ok, ...(extra ?? {}) });
+  const espera = (ms) => new Promise((s) => setTimeout(s, ms));
+  async function framesDeVideoRecebidos(pc) {
+    const st = await pc.getStats();
+    let f = 0;
+    st.forEach((x) => {
+      if (x.type === 'inbound-rtp' && x.kind === 'video')
+        f = x.framesDecoded ?? x.framesReceived ?? 0;
+    });
+    return f;
+  }
+  async function pacotesDeAudio(pc) {
+    const st = await pc.getStats();
+    let p = 0;
+    st.forEach((x) => {
+      if (x.type === 'inbound-rtp' && x.kind === 'audio') p = x.packetsReceived ?? 0;
+    });
+    return p;
+  }
+  try {
+    const micA = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
+    const micB = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks()[0];
+    const A = new RTCPeerConnection();
+    const B = new RTCPeerConnection();
+    const filaA = criarFilaDeCandidatos(A),
+      filaB = criarFilaDeCandidatos(B);
+    // ICE cruzado, com atraso proposital: candidatos chegam ANTES da descrição remota.
+    A.onicecandidate = (e) => e.candidate && filaB.receber(e.candidate.toJSON());
+    B.onicecandidate = (e) => e.candidate && filaA.receber(e.candidate.toJSON());
+    let renegociacoesB = 0;
+    B.onnegotiationneeded = () => renegociacoesB++;
+    const faixasA = [];
+    A.ontrack = (e) => faixasA.push(e.track.kind);
+    const faixasB = [];
+    B.ontrack = (e) => faixasB.push(e.track.kind);
+
+    const oferta = await criarOfertaDoAdmin(A, micA);
+    passo(
+      'oferta tem audio sendrecv e video recvonly',
+      /m=audio[\s\S]*a=sendrecv/.test(oferta.sdp) && /m=video[\s\S]*a=recvonly/.test(oferta.sdp),
+    );
+    const resposta = await responderComoPaciente(B, oferta, micB);
+    await filaB.esvaziar();
+    passo('resposta tem video sendonly', /m=video[\s\S]*a=sendonly/.test(resposta.sdp));
+    await aceitarResposta(A, resposta);
+    await filaA.esvaziar();
+    for (let i = 0; i < 50 && A.connectionState !== 'connected'; i++) await espera(100);
+    passo('conectou', A.connectionState === 'connected', { estado: A.connectionState });
+    await espera(1500);
+    passo('admin ouve o paciente', (await pacotesDeAudio(A)) > 0, {
+      pacotes: await pacotesDeAudio(A),
+    });
+    passo('paciente ouve o admin', (await pacotesDeAudio(B)) > 0, {
+      pacotes: await pacotesDeAudio(B),
+    });
+    const antes = await framesDeVideoRecebidos(A);
+    passo('sem compartilhar, nenhum quadro de video chega', antes === 0, { quadros: antes });
+
+    // A "tela": um canvas animado, no lugar de getDisplayMedia (que o headless não abre).
+    const cv = document.createElement('canvas');
+    cv.width = 320;
+    cv.height = 180;
+    const cx = cv.getContext('2d');
+    let t = 0;
+    const anim = setInterval(() => {
+      cx.fillStyle = `hsl(${t++ % 360} 70% 50%)`;
+      cx.fillRect(0, 0, 320, 180);
+    }, 30);
+    const tela = cv.captureStream(25).getVideoTracks()[0];
+    const renegAntes = renegociacoesB;
+    passo('trocarTela devolve true', await trocarTela(B, tela));
+    await espera(2500);
+    const durante = await framesDeVideoRecebidos(A);
+    passo('compartilhando, o admin recebe quadros', durante > 10, { quadros: durante });
+    passo('compartilhar NAO pediu renegociacao', renegociacoesB === renegAntes, {
+      renegociacoes: renegociacoesB - renegAntes,
+    });
+
+    await trocarTela(B, null);
+    await espera(1500);
+    const f1 = await framesDeVideoRecebidos(A);
+    await espera(1500);
+    const f2 = await framesDeVideoRecebidos(A);
+    passo('parou de compartilhar: os quadros param de crescer', f2 - f1 <= 2, { delta: f2 - f1 });
+    passo('voltou a compartilhar sem nova oferta', await trocarTela(B, tela));
+    await espera(1500);
+    passo('e os quadros voltam', (await framesDeVideoRecebidos(A)) > f2, {
+      quadros: await framesDeVideoRecebidos(A),
+    });
+    passo('ainda conectado no fim', A.connectionState === 'connected');
+    const semVideo = new RTCPeerConnection();
+    passo(
+      'trocarTela sem canal de video devolve false (nao finge)',
+      (await trocarTela(semVideo, tela)) === false,
+    );
+    passo('podeCompartilharTela no desktop', podeCompartilharTela() === true);
+    clearInterval(anim);
+  } catch (e) {
+    r.erro = String((e && e.stack) || e);
+  }
+  window.resultado = r;
+</script>
