@@ -6,6 +6,7 @@ import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { verificarAdmin } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
  * Listagem de pacientes para o admin (sidebar do admin → Pacientes).
@@ -108,5 +109,84 @@ export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchem
   } catch (error) {
     console.error('[Action] Erro ao listar pacientes (admin):', error);
     return { sucesso: false, erro: 'Erro ao listar pacientes' };
+  }
+}
+
+const arquivarSchema = z.object({
+  pacienteId: z.string().min(1).max(64),
+  motivo: z.string().trim().max(300).optional(),
+});
+
+/**
+ * Arquiva um paciente (soft delete) — só admin.
+ *
+ * Some da lista e deixa de contar como paciente (a flag das triagens exige ficha ativa,
+ * `deletedAt IS NULL`). NÃO apaga: a linha, o histórico clínico e os blobs ficam, e a
+ * auditoria registra quem arquivou, quando, o estado anterior e o motivo (AGENTS.md:
+ * entidade clínica preserva histórico). Não há "desarquivar" nesta versão.
+ *
+ * Não mexe em `users`/Clerk: a conta de acesso continua existindo.
+ *
+ * Por que não reaproveitar `arquivarPaciente` (pacientes.ts): aquela aceita médico e não
+ * confere se o paciente é dele. Esta é exclusiva do admin, então não abre escopo entre médicos.
+ */
+export async function arquivarPacienteAdmin(
+  entrada: z.input<typeof arquivarSchema>,
+): Promise<{ sucesso: boolean; erro?: string }> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado || !auth.clerkId) {
+      return { sucesso: false, erro: auth.erro ?? 'Sem permissão' };
+    }
+
+    const parsed = arquivarSchema.safeParse(entrada);
+    if (!parsed.success) {
+      return { sucesso: false, erro: 'Dados inválidos' };
+    }
+    const { pacienteId, motivo } = parsed.data;
+
+    const [atual] = await db
+      .select({ id: pacientes.id, status: pacientes.status })
+      .from(pacientes)
+      .where(and(eq(pacientes.id, pacienteId), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (!atual) {
+      return { sucesso: false, erro: 'Paciente não encontrado ou já arquivado' };
+    }
+
+    const agora = new Date();
+    // `deletedAt IS NULL` no UPDATE também: dois cliques simultâneos não arquivam duas vezes.
+    const arquivados = await db
+      .update(pacientes)
+      .set({ status: 'arquivado', deletedAt: agora })
+      .where(and(eq(pacientes.id, pacienteId), isNull(pacientes.deletedAt)))
+      .returning({ id: pacientes.id });
+
+    if (arquivados.length === 0) {
+      return { sucesso: false, erro: 'Paciente não encontrado ou já arquivado' };
+    }
+
+    const [admin] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId))
+      .limit(1);
+
+    if (admin) {
+      await registrarAuditoria({
+        userId: admin.id,
+        acao: 'deletar',
+        entidade: 'pacientes',
+        entidadeId: pacienteId,
+        dadosAntes: { status: atual.status },
+        dadosDepois: { status: 'arquivado', motivo: motivo ?? null },
+      });
+    }
+
+    return { sucesso: true };
+  } catch (error) {
+    console.error('[Action] Erro ao arquivar paciente (admin):', error);
+    return { sucesso: false, erro: 'Erro ao arquivar paciente' };
   }
 }

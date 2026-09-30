@@ -13,13 +13,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { listarPacientesAdmin, type PacienteDoAdmin } from '@/app/_actions/admin-pacientes';
+import {
+  listarPacientesAdmin,
+  arquivarPacienteAdmin,
+  type PacienteDoAdmin,
+} from '@/app/_actions/admin-pacientes';
 import { importarPacientesCSV, exportarPacientesCSV } from '@/app/_actions/pacientes';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Archive,
   ChevronRight,
   Download,
   Loader2,
@@ -74,6 +89,9 @@ export default function AdminPacientesPage() {
   const [versao, setVersao] = useState(0);
   const [importando, setImportando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [paraArquivar, setParaArquivar] = useState<PacienteDoAdmin | null>(null);
+  const [motivoArquivo, setMotivoArquivo] = useState('');
+  const [arquivando, setArquivando] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,6 +230,32 @@ export default function AdminPacientesPage() {
     } finally {
       setImportando(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  // ── Arquivar paciente (soft delete, só admin) ─────────────────
+  async function handleArquivar() {
+    if (!paraArquivar) return;
+    setArquivando(true);
+    try {
+      const resultado = await arquivarPacienteAdmin({
+        pacienteId: paraArquivar.id,
+        motivo: motivoArquivo || undefined,
+      });
+      if (resultado.sucesso) {
+        toast.success(`${paraArquivar.nome} foi arquivado e saiu da lista de pacientes.`);
+        // Era o único da última página? Volta uma página em vez de mostrar página vazia.
+        if (pacientes.length === 1 && pagina > 1) setPagina(pagina - 1);
+        else setVersao((v) => v + 1);
+        setParaArquivar(null);
+        setMotivoArquivo('');
+      } else {
+        toast.error(resultado.erro || 'Erro ao arquivar paciente');
+      }
+    } catch {
+      toast.error('Erro ao arquivar paciente');
+    } finally {
+      setArquivando(false);
     }
   }
 
@@ -444,6 +488,22 @@ export default function AdminPacientesPage() {
                         {statusConfig.label}
                       </Badge>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Arquivar paciente"
+                      aria-label={`Arquivar ${paciente.nome}`}
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        // A linha inteira é um link: o clique aqui não pode navegar.
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setMotivoArquivo('');
+                        setParaArquivar(paciente);
+                      }}
+                    >
+                      <Archive size={16} />
+                    </Button>
                     <ChevronRight size={16} className="text-muted-foreground shrink-0" />
                   </>
                 }
@@ -465,6 +525,46 @@ export default function AdminPacientesPage() {
           pageSizeOptions={POR_PAGINA_OPCOES}
         />
       )}
+
+      <AlertDialog
+        open={!!paraArquivar}
+        onOpenChange={(aberto) => {
+          if (!aberto && !arquivando) setParaArquivar(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Arquivar paciente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{paraArquivar?.nome}</strong> sai da lista de pacientes e deixa de contar como
+              paciente (nas triagens volta a aparecer como &quot;Não paciente&quot;). O histórico
+              clínico é preservado e a ação fica registrada na auditoria. Não há como desfazer por
+              esta tela.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            placeholder="Motivo (opcional)"
+            maxLength={300}
+            value={motivoArquivo}
+            onChange={(e) => setMotivoArquivo(e.target.value)}
+            disabled={arquivando}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={arquivando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // só fecha quando a action responder
+                handleArquivar();
+              }}
+              disabled={arquivando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+            >
+              {arquivando ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+              {arquivando ? 'Arquivando...' : 'Sim, arquivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
