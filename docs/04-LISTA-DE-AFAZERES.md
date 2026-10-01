@@ -19,7 +19,7 @@
 
 ---
 
-## ✅ Item 80 — CORRIGIDO, 01/10/2026 (local): a câmera do paciente ficava por baixo da espera da teleconsulta
+## ✅ Item 80 — EM PRODUÇÃO, 01/10/2026 (PR #149): a câmera do paciente ficava por baixo da espera da teleconsulta
 
 **Status:** achado ao medir a D-30 no Chromium; corrigido a pedido de Davi (_"o funcionamento tem que ser
 normal"_). Em [ADR-0029 §12.8](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
@@ -33,7 +33,7 @@ z-index entre 1 e 10.
 
 ---
 
-## ✅ Item 79 — FEITO, 01/10/2026 (local): a espera da teleconsulta
+## ✅ Item 79 — EM PRODUÇÃO, 01/10/2026 (PR #149): a espera da teleconsulta
 
 **Status:** pedido de Davi (`DO-88`), decisão em
 [ADR-0029 §12.8, D-30](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
@@ -52,7 +52,7 @@ sinalização. A sala real (Pusher, TURN, dois aparelhos) só produção prova.
 **Status:** relatado por Davi com seis capturas de produção (Chrome e Firefox lado a lado).
 Corrigido e provado local; decisão em
 [ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)
-(`DO-87`). Commit, PR e deploy esperam ordem com nome.
+(`DO-87`). **Em produção** pelo PR #148 (`39d1508`), testado e aprovado por Davi em 01/10/2026.
 
 **Causa medida:** o palco usava `md:aspect-video` com `overflow-hidden` e altura fixa pela largura.
 Em ~820 px de janela, 16:9 dava ~260 px, menos que o conteúdo da espera: a orbe saía cortada e a dica
@@ -89,11 +89,11 @@ nos dois lados (`.ts` e `.sh`, `DO-19`).
 
 ---
 
-## ✅ Item 76 — FEITO, 01/10/2026 (local, sem commit): a espera da chamada não diz mais "sem câmera" a quem nem chegou
+## ✅ Item 76 — EM PRODUÇÃO, 01/10/2026 (PR #147): a espera da chamada não diz mais "sem câmera" a quem nem chegou
 
 **Status:** implementado e provado local, aprovado por Davi (`DO-86`). Decisão e provas em
 [ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
-Commit, PR e deploy esperam ordem com nome.
+**Em produção** pelo PR #147 (`3a464f2`), testado e aprovado por Davi em 01/10/2026.
 
 **O defeito:** `components/atendimento/ChamadaDeAtendimento.tsx:640-651` (antes da mudança) dizia
 _"{outro} está sem câmera e não está mostrando a tela"_ em toda fase sem destaque, inclusive antes de o

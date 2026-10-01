@@ -1,12 +1,18 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
+> **Status das Fases 2.3 a 2.5 (01/10/2026):** ✅ **TESTADAS E APROVADAS POR DAVI**, em produção:
+> _"perfeito, vamos agora atualizar as documentações, implementações testadas e aprovadas"_.
+>
+> **Status da Fase 2.5 (§12.8, D-30):** ✅ **EM PRODUÇÃO** — 01/10/2026, 14:24 (Brasília): PR #149, merge
+> `cdbfd47`, deploy `36898791759`. Home 200 nas 16 leituras durante o deploy; o portão imprimiu
+> _"produção está servindo ESTE build, e a home responde 200"_; `[migrar] ✓ concluído`, sem migration
+> nova [medido]. A espera na teleconsulta (médico e paciente), e a câmera do paciente por cima dela.
+> **Antes:** implementada e provada local.
+>
 > **Status da Fase 2.3 (§12.6, D-28):** ✅ **EM PRODUÇÃO** — 01/10/2026, 12:41 (Brasília): PR #147
 > (leva o #146), merge `3a464f2`, deploy `36885740541`. Home 200 durante todo o deploy; o portão
 > imprimiu _"produção está servindo ESTE build, e a home responde 200"_; `[migrar] ✓ concluído`, sem
-> migration nova [medido]. Aprovada e mesclada por **Davi** (`DO-86`). Falta o teste com dois aparelhos.
->
-> **Status da Fase 2.5 (§12.8, D-30):** 🟡 **implementada e provada local** — 01/10/2026. A espera na
-> teleconsulta (médico e paciente), e a câmera do paciente de volta por cima da espera.
+> migration nova [medido]. Aprovada e mesclada por **Davi** (`DO-86`).
 >
 > **Status da Fase 2.4 (§12.7, D-29):** ✅ **EM PRODUÇÃO** — 01/10/2026, PR #148, merge `39d1508`, deploy
 > `36894503274`; home 200 em todas as leituras. **Antes:** implementada e provada local, sem commit.
@@ -1089,6 +1095,10 @@ saiu da tela, e continuaria verde por um comentário que o cita. Retificado para
 | `pnpm test` · `pnpm build` · lint                                                                                                                   | **1893/1893** · exit 0 · os 5 achados de lint dos dois arquivos são os mesmos da `main`                                                                                                                                                                                                                                                              |
 
 ⚠️ **Não provado local:** a sala real com Pusher, TURN e dois aparelhos.
+
+**Em produção (01/10/2026):** PR #149, merge `cdbfd47`, deploy `36898791759`; testada e aprovada por Davi.
+Safari (iPhone) e Firefox seguem sem medição própria; a defesa para o áudio suspenso ficou para depois
+desse teste, por decisão de Davi, e vale para a espera **e** para a teleconsulta.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 

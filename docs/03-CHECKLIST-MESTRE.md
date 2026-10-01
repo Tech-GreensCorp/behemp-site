@@ -8,7 +8,9 @@
 > 3. A **Fila de execução** no rodapé é a ordem oficial. Reordenar é decisão de quem manda.
 > 4. **A fila é atualizada no mesmo commit que conclui o item.**
 
-**Atualizado em 01/10/2026** (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`.
+**Atualizado em 01/10/2026, fim da tarde** (ADR-0029 D-28 a D-30 em produção, testadas e aprovadas por Davi; Itens 76, 78, 79 e 80 fechados; Item 77 catalogado). Produção: `main` `cdbfd47`.
+
+_Versão anterior: "Atualizado em 01/10/2026 (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`."_
 
 _Versão anterior: "Atualizado em 30/09/2026 (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`."_
 
@@ -838,18 +840,18 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
       lado entrar. Agora, antes de conectar, mostra a espera do canvas aprovado por Davi (`DO-86`), com
       as barras do microfone medindo a voz de verdade e o contador contando. 01/10/2026, worktree da
       branch `docs/fase-2-2-em-producao`. [ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
-      [04 — Item 76](04-LISTA-DE-AFAZERES.md). **Falta:** commit, PR e deploy, com ordem e nome.
+      [04 — Item 76](04-LISTA-DE-AFAZERES.md). **Em produção** (PR #147), testado e aprovado por Davi.
 
 - [x] **Item 78** — conectado sem vídeo vira "os dois, ligados" no padrão da espera, e o palco deixa
-      de quebrar em janela estreita (relatado por Davi com capturas de produção). 01/10/2026, local, sem
-      commit. [ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      de quebrar em janela estreita (relatado por Davi com capturas de produção). 01/10/2026, em produção
+      (PR #148). [ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
       [04 — Item 78](04-LISTA-DE-AFAZERES.md).
 
 - [x] **Item 79** — a espera na teleconsulta, no escuro, com textos de médico e paciente (`DO-88`).
-      01/10/2026, local. [ADR-0029 §12.8, D-30](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      01/10/2026, em produção (PR #149), testado e aprovado por Davi. [ADR-0029 §12.8, D-30](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
       [04 — Item 79](04-LISTA-DE-AFAZERES.md).
 - [x] **Item 80** — a câmera do paciente ficava por baixo da espera da teleconsulta desde 13/08. Corrigida
-      (`z-10`) a pedido de Davi, com guarda. [04 — Item 80](04-LISTA-DE-AFAZERES.md).
+      (`z-10`) a pedido de Davi, com guarda. Em produção (PR #149). [04 — Item 80](04-LISTA-DE-AFAZERES.md).
 
 ### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
 
@@ -1252,7 +1254,7 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | ~~18~~ ✅ | **Item 56** — prioridade 1 definida por Davi em 29/09/2026: a ANVISA abre no "Faço eu mesmo", vídeo, pedido de atendimento assistido, a procuração ativada pelo admin, e a chamada com câmera, tela dos dois lados e print. **Tudo em produção** (PRs #141, #144 e #145, 30/09/2026); Davi: _"tudo funcionando corretamente"_ | [ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | o que ficou de fora está na ADR-0029 §5; a próxima demanda, Davi indica        |
 | 19 ✅     | **Item 76** — a espera da chamada (ADR-0029 D-28, `DO-86`, aprovada por Davi em 01/10/2026). **Em produção** (PR #147, 01/10/2026)                                                                                                                                                                                            | [§12.6](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | fora: a moldura do palco, os botões e o `<p>` justificado no celular (D-28)    |
 | 20 ✅     | **Item 78** — conectado sem vídeo, "os dois, ligados", e o palco em janela estreita (D-29, `DO-87`). Em produção (PR #148)                                                                                                                                                                                                    | [§12.7](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | Firefox e Safari não medidos                                                   |
-| 21 🟡     | **Itens 79 e 80** — a espera na teleconsulta (D-30, `DO-88`) e a câmera do paciente por cima. Feito local                                                                                                                                                                                                                     | [§12.8](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | sem "conectando" na teleconsulta                                               |
+| 21 ✅     | **Itens 79 e 80** — a espera na teleconsulta (D-30, `DO-88`) e a câmera do paciente por cima. Em produção (PR #149)                                                                                                                                                                                                           | [§12.8](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | sem "conectando" na teleconsulta                                               |
 
 ### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
 
