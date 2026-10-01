@@ -691,6 +691,10 @@
     height: 2px;
     background: repeating-linear-gradient(90deg, #d6cdbf 0 4px, transparent 4px 9px);
   }
+  /* D-29: conectado, a linha fica contínua; os pontos seguem indo e vindo. */
+  .espera-track.espera-ligado {
+    background: #2d4f3c;
+  }
   .espera-pkt {
     position: absolute;
     top: -3px;

@@ -51,7 +51,7 @@ import {
 import { getPusherClient } from '@/lib/integrations/pusher/client';
 
 import { ChatDoAtendimento, type MensagemDoChat } from './ChatDoAtendimento';
-import { EsperaDaChamada } from './EsperaDaChamada';
+import { ChamadaSemVideo, EsperaDaChamada } from './EsperaDaChamada';
 
 type Fase = 'entrando' | 'aguardando' | 'conectando' | 'conectado' | 'encerrada' | 'erro';
 
@@ -671,14 +671,13 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
               )}
               {noPalco === 'sem-camera' && (
                 // Até 30/09/2026 isto era um quadro preto, que parecia câmera quebrada.
-                <div className="bg-muted/40 animate-in fade-in flex aspect-video flex-col items-center justify-center gap-2 p-6 text-center duration-200 motion-reduce:animate-none">
-                  <VideoOff className="text-muted-foreground h-6 w-6" aria-hidden="true" />
-                  <p className="text-foreground text-sm font-medium">
-                    {outro} está sem câmera e não está mostrando a tela.
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    A voz e as mensagens funcionam do mesmo jeito.
-                  </p>
+                // Desde 01/10/2026 (D-29), "os dois, ligados", no padrão da espera.
+                <div className="animate-in fade-in duration-200 motion-reduce:animate-none">
+                  <ChamadaSemVideo
+                    papel={papel}
+                    titulo={`${outro} está sem câmera e não está mostrando a tela.`}
+                    detalhe="A voz e as mensagens funcionam do mesmo jeito."
+                  />
                 </div>
               )}
             </div>

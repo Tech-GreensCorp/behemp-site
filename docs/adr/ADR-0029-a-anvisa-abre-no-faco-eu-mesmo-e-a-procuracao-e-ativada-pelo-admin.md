@@ -1,8 +1,14 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
-> **Status da Fase 2.3 (§12.6, D-28):** 🟡 **implementada e provada local, sem commit** — 01/10/2026,
-> branch `docs/fase-2-2-em-producao` (worktree). Aprovada por **Davi** (`DO-86`). Commit, PR e deploy
-> esperam ordem com nome.
+> **Status da Fase 2.3 (§12.6, D-28):** ✅ **EM PRODUÇÃO** — 01/10/2026, 12:41 (Brasília): PR #147
+> (leva o #146), merge `3a464f2`, deploy `36885740541`. Home 200 durante todo o deploy; o portão
+> imprimiu _"produção está servindo ESTE build, e a home responde 200"_; `[migrar] ✓ concluído`, sem
+> migration nova [medido]. Aprovada e mesclada por **Davi** (`DO-86`). Falta o teste com dois aparelhos.
+>
+> **Status da Fase 2.4 (§12.7, D-29):** 🟡 **implementada e provada local, sem commit** — 01/10/2026.
+> Conectado sem vídeo vira "os dois, ligados", e o palco deixa de quebrar em janela estreita.
+>
+> **Status anterior da Fase 2.3:** implementada e provada local, sem commit (01/10/2026, worktree).
 >
 > **Status da Fase 2.2 (§12.5):** ✅ **EM PRODUÇÃO** — 30/09/2026, 16:15: PR #145, merge `6065964`,
 > deploy `36764049030`, home 200 durante todo o deploy. Testada por Davi: _"tudo funcionando
@@ -975,10 +981,64 @@ nomes `bh-*` nos keyframes, junto com o bloco de `prefers-reduced-motion` do can
   `a-chamada-de-atendimento-nao-grava-e-nao-vaza`, que deriva um caso por arquivo da chamada);
   `pnpm build` com exit 0.
 
+- **O `AudioContext` e a política de autoplay** (pergunta do Claude Desktop, medida em 01/10/2026,
+  Chromium 151, `--autoplay-policy=document-user-activation-required`, carga direta, sem clique).
+  Numa página mínima, o contexto criado **antes** de capturar o microfone nasce `suspended`, e o
+  `resume()` fica **pendente** (não resolve nem rejeita). O criado **depois** de o `getUserMedia` dar
+  certo fica `running`. A espera cria o contexto só depois de a faixa existir (o indicador só monta
+  com `microfone`), e na tela real mediu `running`, com 149 alturas distintas de barra em 3 s.
+  ⚠️ **Ressalva (Claude Desktop, aceita):** as 149 alturas, sozinhas, não provam nada, porque sob o
+  Playwright o `evaluate` conta como gesto. O que prova é o **contraste** na mesma página: o contexto
+  criado antes da captura fica `suspended`, e o criado depois fica `running`.
+  **Não foi preciso mudar o código.** ⚠️ O `navigator.userActivation.hasBeenActive` volta `true`
+  sob o Playwright mesmo sem clique, porque o `evaluate` roda como gesto; não serve de medida.
+  ⚠️ **Safari e Firefox não foram medidos** (só há Chromium no cache local). Se um deles mantiver o
+  contexto suspenso, a falha é benigna em direção: barras paradas com "microfone ligado", nunca
+  barras que se mexem sem som. A defesa proposta (sem barras enquanto `state !== 'running'`) espera
+  decisão.
+
 ⚠️ **O que NÃO foi provado local:** a tela com login do Clerk e o Pusher real (não há
 `CLERK_SECRET_KEY` local), e dois aparelhos. No Chromium de desktop com 390 px o botão "Mostrar minha
 tela" aparece, porque o navegador tem `getDisplayMedia`; num celular real, `podeCompartilharTela()`
 o esconde, como no quadro `-4`. As capturas ficaram fora do repositório, no scratchpad da sessão.
+
+### 12.7 Fase 2.4: conectado sem vídeo, e a janela estreita (01/10/2026)
+
+Davi testou a Fase 2.3 em produção, com o Chrome e o Firefox lado a lado no mesmo monitor, e mandou
+seis capturas. Dois problemas:
+
+1. **Conectado sem vídeo ficava estático.** O bloco _"{outro} está sem câmera"_ não tinha as animações
+   dos outros quadros. O canvas não tinha quadro para esse estado, e por isso ele ficou como era.
+2. **Janela estreita quebrava o palco.** Acima de 768 px o palco seguia a proporção 16:9 da largura,
+   com `overflow-hidden`; numa janela de ~820 px ele ficava com ~260 px de altura, menor que o
+   conteúdo. A orbe saía cortada no topo, e a dica ficava por baixo do "Você · microfone ligado".
+   ⚠️ **Defeito meu:** o harness da §12.6 mediu 1280 e 390 px, e não a faixa do meio.
+
+**D-29. Conectado sem vídeo é "os dois, ligados"** (`DO-87`, escolhido por Davi entre duas opções, e
+_"faça esse desenho no mesmo padrão dos outros"_). Os mesmos rostos do `conectando`, com a linha
+**contínua** (`.espera-ligado`, a cor `moss` que já existe) e os pontos indo e vindo: a voz passando.
+Mesma tipografia, mesma entrada (`espera-rise`), mesmo palco (`ChamadaSemVideo` em
+`EsperaDaChamada.tsx`). O texto continua na `ChamadaDeAtendimento`, e o esmaecimento de 200 ms também.
+Rejeitada: a orbe com a câmera desligada no centro, que Davi não escolheu.
+
+**E o palco passa a crescer com o conteúdo.** `overflow-clip` em vez de `overflow-hidden` (só um
+contêiner de rolagem perde o tamanho mínimo pelo conteúdo) e `md:min-h-auto` (um mínimo explícito
+substitui o automático: a primeira tentativa, com `min-h-[300px]` valendo também na tela larga,
+continuou falhando, e o estilo computado mostrou a altura presa em 300 px). Espaço de 60 px em cima e
+embaixo para o contador e o indicador, que ficam em `absolute`. O trilho encolhe (`min-w-8 shrink`) e
+os rostos não. Em 1280 px nada muda: a orbe fica no mesmo lugar medido na §12.6.
+
+**Provas (01/10/2026, locais):**
+
+| prova                                                                                                                        | resultado                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| harness por largura (`medir-largura.mjs`): orbe inteira, dica acima do microfone, rostos dentro do palco, "os dois, ligados" | **antes: 9 falhas** em 800, 900 e 1024 px (e a linha ligada ausente em todas); **depois: tudo OK** em 390, 600, 800, 900, 1024 e 1280 px                                                                                                                  |
+| sequência de duas abas (`rodar.mjs`)                                                                                         | **44 de 44**, com o passo `conectado` exigindo a linha ligada                                                                                                                                                                                             |
+| guarda `a-espera-da-chamada-diz-a-verdade`                                                                                   | **22 casos** (eram 18); os 4 novos **vermelhos contra o código em produção**; **6 de 6 sabotagens** acusadas (bloco estático de volta, linha sem ligar, `overflow-hidden`, mínimo explícito na tela larga, trilho sem encolher, cor da linha fora do CSS) |
+| `pnpm test` · `pnpm build`                                                                                                   | **1885/1885** em 78 arquivos · exit 0                                                                                                                                                                                                                     |
+
+⚠️ O guarda lê a forma do palco (classes); quem prova o efeito é o harness por largura, que executa
+a tela no Chromium. Firefox e Safari não foram medidos.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 

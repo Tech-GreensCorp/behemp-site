@@ -835,6 +835,11 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
       branch `docs/fase-2-2-em-producao`. [ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
       [04 — Item 76](04-LISTA-DE-AFAZERES.md). **Falta:** commit, PR e deploy, com ordem e nome.
 
+- [x] **Item 78** — conectado sem vídeo vira "os dois, ligados" no padrão da espera, e o palco deixa
+      de quebrar em janela estreita (relatado por Davi com capturas de produção). 01/10/2026, local, sem
+      commit. [ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      [04 — Item 78](04-LISTA-DE-AFAZERES.md).
+
 ### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
 
 Os dois hooks se localizam pelo `git rev-parse` do diretório atual (`.claude/settings.json:9`, `:20`).
@@ -1234,7 +1239,8 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | 16        | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                                                                                                                                                                                                            | —                                                                                              | ler a RDC 873/2024 primeiro · autorização                                      |
 | 17        | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                                                                                                                                                                                                         | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR |
 | ~~18~~ ✅ | **Item 56** — prioridade 1 definida por Davi em 29/09/2026: a ANVISA abre no "Faço eu mesmo", vídeo, pedido de atendimento assistido, a procuração ativada pelo admin, e a chamada com câmera, tela dos dois lados e print. **Tudo em produção** (PRs #141, #144 e #145, 30/09/2026); Davi: _"tudo funcionando corretamente"_ | [ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | o que ficou de fora está na ADR-0029 §5; a próxima demanda, Davi indica        |
-| 19 🟡     | **Item 76** — a espera da chamada (ADR-0029 D-28, `DO-86`, aprovada por Davi em 01/10/2026). **Feita e provada local**; falta commit, PR e deploy, que esperam ordem com nome                                                                                                                                                 | [§12.6](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | fora: a moldura do palco, os botões e o `<p>` justificado no celular (D-28)    |
+| 19 ✅     | **Item 76** — a espera da chamada (ADR-0029 D-28, `DO-86`, aprovada por Davi em 01/10/2026). **Em produção** (PR #147, 01/10/2026)                                                                                                                                                                                            | [§12.6](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | fora: a moldura do palco, os botões e o `<p>` justificado no celular (D-28)    |
+| 20 🟡     | **Item 78** — conectado sem vídeo, "os dois, ligados", e o palco em janela estreita (D-29, `DO-87`). Feito local; falta commit e deploy                                                                                                                                                                                       | [§12.7](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | Firefox e Safari não medidos                                                   |
 
 ### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
 

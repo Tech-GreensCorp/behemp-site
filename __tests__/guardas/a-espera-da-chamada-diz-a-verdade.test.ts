@@ -13,6 +13,9 @@
  *      indicador (ponto em `aguardando`, reticências em `conectando`);
  *   6. uma animação da espera ficar fora do bloco de `prefers-reduced-motion` (derivado do CSS);
  *   7. a dica deixar de esperar os 6 s decididos.
+ *   8. conectado sem vídeo voltar ao bloco estático, em vez de "os dois, ligados" (D-29);
+ *   9. o palco voltar a ter a altura presa nos 16:9, cortando a orbe e pondo a dica por baixo do
+ *      microfone numa janela estreita (medido por Davi em 01/10/2026, Firefox na metade da tela).
  *
  * O que ele NÃO prova: o desenho. Esse foi conferido no Chromium contra o canvas aprovado
  * (`docs/decisoes-visuais/teleconsulta-1..4.html`), e a sequência com login só produção mostra.
@@ -146,6 +149,41 @@ describe('as barras do microfone (executando a regra)', () => {
     expect(ESPERA).not.toMatch(
       /\bfetch\(|sinalizar|getPusherClient|MediaRecorder|\.connect\(\s*contexto\.destination/,
     );
+  });
+});
+
+describe('conectado sem vídeo e a janela estreita (D-29)', () => {
+  const SEM_CAMERA = TELA.slice(
+    TELA.indexOf("noPalco === 'sem-camera'"),
+    TELA.indexOf("noPalco === 'sem-camera'") + 700,
+  );
+
+  it('conectado sem vídeo é "os dois, ligados", no padrão da espera', () => {
+    expect(SEM_CAMERA).toMatch(/<ChamadaSemVideo/);
+    expect(SEM_CAMERA).not.toMatch(/<VideoOff/);
+    expect(ESPERA).toMatch(/export function ChamadaSemVideo/);
+    expect(ESPERA).toMatch(/<OsDois admin=\{papel === 'admin'\} ligados \/>/);
+    expect(ESPERA).toMatch(/ligados && 'espera-ligado'/);
+    expect(CSS).toMatch(/\.espera-track\.espera-ligado\s*\{[^}]*background:/);
+  });
+
+  it('a espera e o conectado usam o MESMO palco', () => {
+    expect(ESPERA.match(/className=\{PALCO\}/g) ?? []).toHaveLength(2);
+  });
+
+  it('o palco cresce com o conteúdo: clip (não hidden) e sem mínimo explícito na tela larga', () => {
+    const palco = ESPERA.match(/const PALCO =\s*'([^']+)'/)?.[1] ?? '';
+    expect(palco).toMatch(/\boverflow-clip\b/);
+    expect(palco).not.toMatch(/\boverflow-hidden\b/);
+    expect(palco).toMatch(/md:aspect-video/);
+    expect(palco).toMatch(/md:min-h-auto/);
+    // O espaço de cima e de baixo é o do contador e do microfone, que ficam em `absolute`.
+    expect(palco).toMatch(/md:py-\[60px\]/);
+  });
+
+  it('o trilho encolhe, e os rostos não', () => {
+    expect(ESPERA).toMatch(/espera-track mb-\[26px\] w-40 min-w-8 shrink/);
+    expect(ESPERA).toMatch(/flex shrink-0 flex-col items-center gap-2\.5/);
   });
 });
 

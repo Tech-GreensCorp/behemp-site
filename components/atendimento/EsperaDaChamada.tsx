@@ -12,9 +12,10 @@
  * medido AQUI (um `AnalyserNode` local; nada sai do aparelho), paradas sem som ou silenciado; e o
  * contador conta. Ele começa do zero porque a tela monta este componente com `key={fase}`.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Headphones, MessageCircle, MonitorUp, User } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import type { PapelNaChamada } from '@/lib/atendimento/canal';
 import {
   alturasDasBarras,
@@ -148,7 +149,7 @@ function Pessoa({
   sombra: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2.5">
+    <div className="flex shrink-0 flex-col items-center gap-2.5">
       <div
         className="espera-face relative flex size-[72px] items-center justify-center rounded-full bg-white"
         style={{ boxShadow: `0 0 0 6px ${sombra}, 0 18px 40px -20px rgba(26,22,18,.45)` }}
@@ -156,6 +157,83 @@ function Pessoa({
         <Icone size={28} color={cor} strokeWidth={1.6} aria-hidden="true" />
       </div>
       <span className="text-xs font-medium text-[#4A423A]">{rotulo}</span>
+    </div>
+  );
+}
+
+/**
+ * Você e o outro lado, lado a lado. Em `conectando` o trilho é pontilhado; em `conectado`, sem vídeo
+ * do outro lado, ele fica contínuo, e os pontos continuam indo e vindo: a voz passando (Davi,
+ * 01/10/2026). O trilho encolhe em janela estreita, para os dois rostos não saírem do palco.
+ */
+function OsDois({ admin, ligados }: { admin: boolean; ligados: boolean }) {
+  return (
+    <div className="espera-rise flex w-full max-w-[348px] items-center justify-center gap-[22px]">
+      <Pessoa
+        rotulo="Você"
+        icone={admin ? Headphones : User}
+        cor="#2D4F3C"
+        sombra="rgba(45,79,60,.10)"
+      />
+      <div className={cn('espera-track mb-[26px] w-40 min-w-8 shrink', ligados && 'espera-ligado')}>
+        <span className="espera-pkt" />
+        <span className="espera-pkt espera-back" />
+      </div>
+      <Pessoa
+        rotulo={admin ? 'Paciente' : 'Equipe'}
+        icone={admin ? User : Headphones}
+        cor="#EA5429"
+        sombra="rgba(234,84,41,.10)"
+      />
+    </div>
+  );
+}
+
+/**
+ * O palco. A altura é a do canvas (16:9 na tela larga, 300 px no celular), mas CRESCE com o conteúdo
+ * quando a janela fica estreita: `overflow-clip`, e não `overflow-hidden`, porque só um contêiner de
+ * rolagem perde o tamanho mínimo pelo conteúdo; e `md:min-h-auto`, porque um mínimo explícito
+ * substitui o automático, e a altura ficava presa nos 16:9 (medido no Chromium, 01/10/2026). O espaço de cima e de baixo é o do contador e do
+ * indicador do microfone, que ficam por cima, em `absolute`. Antes, numa janela de ~820 px, a orbe
+ * saía cortada e a dica ficava por baixo do microfone (medido por Davi, 01/10/2026).
+ */
+const PALCO =
+  'espera-palco relative box-border flex min-h-[300px] flex-col items-center justify-center gap-[22px] overflow-clip px-5 py-[52px] md:aspect-video md:min-h-auto md:gap-[26px] md:px-6 md:py-[60px]';
+
+function Textos({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex flex-col items-center gap-1.5 text-center md:gap-2"
+    >
+      <p className="espera-rise espera-d1 font-heading text-foreground m-0 text-center! text-lg font-semibold md:text-[21px] md:tracking-[-0.01em]">
+        {titulo}
+      </p>
+      <p className="espera-rise espera-d2 m-0 text-center! text-[13px] leading-[1.45] text-[#6B6259] md:max-w-[420px] md:text-sm md:leading-normal">
+        {children}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Conectado, e o outro lado sem câmera e sem tela: o quadro "os dois, ligados" (ADR-0029 D-29). O
+ * texto vem da tela da chamada, que é quem sabe quem é o outro.
+ */
+export function ChamadaSemVideo({
+  papel,
+  titulo,
+  detalhe,
+}: {
+  papel: PapelNaChamada | null;
+  titulo: string;
+  detalhe: string;
+}) {
+  return (
+    <div className={PALCO}>
+      <OsDois admin={papel === 'admin'} ligados />
+      <Textos titulo={titulo}>{detalhe}</Textos>
     </div>
   );
 }
@@ -183,59 +261,29 @@ export function EsperaDaChamada({ papel, fase, microfone, mudo }: Props) {
         : 'Você já está na sala';
 
   return (
-    <div className="espera-palco relative box-border flex h-[300px] flex-col items-center justify-center gap-[22px] overflow-hidden p-5 md:aspect-video md:h-auto md:gap-[26px] md:p-6">
+    <div className={PALCO}>
       {fase === 'aguardando' && <TempoNaSala />}
 
-      {fase === 'conectando' ? (
-        <div className="espera-rise flex items-center gap-[22px]">
-          <Pessoa
-            rotulo="Você"
-            icone={admin ? Headphones : User}
-            cor="#2D4F3C"
-            sombra="rgba(45,79,60,.10)"
-          />
-          <div className="espera-track mb-[26px] w-16 md:w-40">
-            <span className="espera-pkt" />
-            <span className="espera-pkt espera-back" />
-          </div>
-          <Pessoa
-            rotulo={admin ? 'Paciente' : 'Equipe'}
-            icone={admin ? User : Headphones}
-            cor="#EA5429"
-            sombra="rgba(234,84,41,.10)"
-          />
-        </div>
-      ) : (
-        <Orbe papel={papel} />
-      )}
+      {fase === 'conectando' ? <OsDois admin={admin} ligados={false} /> : <Orbe papel={papel} />}
 
       {fase !== 'entrando' && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex flex-col items-center gap-1.5 text-center md:gap-2"
-        >
-          <p className="espera-rise espera-d1 font-heading text-foreground m-0 text-center! text-lg font-semibold md:text-[21px] md:tracking-[-0.01em]">
-            {titulo}
-          </p>
-          <p className="espera-rise espera-d2 m-0 text-center! text-[13px] leading-[1.45] text-[#6B6259] md:max-w-[420px] md:text-sm md:leading-normal">
-            {fase === 'conectando' ? (
-              'Ligando a voz. Leva só alguns segundos.'
-            ) : admin ? (
-              'A chamada começa sozinha quando ele abrir este atendimento. O que você escrever no chat agora fica à espera dele.'
-            ) : (
-              <>
-                <span className="md:hidden">
-                  A chamada começa sozinha quando alguém da equipe entrar.
-                </span>
-                <span className="hidden md:inline">
-                  Assim que alguém da equipe entrar, a chamada começa sozinha. Não precisa
-                  recarregar a página.
-                </span>
-              </>
-            )}
-          </p>
-        </div>
+        <Textos titulo={titulo}>
+          {fase === 'conectando' ? (
+            'Ligando a voz. Leva só alguns segundos.'
+          ) : admin ? (
+            'A chamada começa sozinha quando ele abrir este atendimento. O que você escrever no chat agora fica à espera dele.'
+          ) : (
+            <>
+              <span className="md:hidden">
+                A chamada começa sozinha quando alguém da equipe entrar.
+              </span>
+              <span className="hidden md:inline">
+                Assim que alguém da equipe entrar, a chamada começa sozinha. Não precisa recarregar
+                a página.
+              </span>
+            </>
+          )}
+        </Textos>
       )}
 
       {fase === 'conectando' && (
