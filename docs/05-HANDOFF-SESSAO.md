@@ -19,6 +19,15 @@
 >   (DO-86, Itens 76 e 77, a linha da 0029 no índice, `decisoes-visuais` com 6 arquivos). **Não fazer `git add .`**:
 >   separar por arquivo e, nos compartilhados, por trecho.
 > - Commit, PR e deploy: **esperam ordem com nome** (Davi, Dryelle ou Gabriel).
+> - **Depois:** Davi autorizou o commit `ee09960`, o push e o **PR #147** (leva o #146 junto). Portão do CI
+>   verde nas duas rodadas. **Mesclado por Davi** (`3a464f2`) e **em produção** pelo deploy `36885740541`
+>   (home 200 o tempo todo, portão "servindo ESTE build", sem migration). Falta o teste com dois aparelhos, um iPhone. Medido depois do commit, e ainda **sem commit**: o
+>   `AudioContext` da espera nasce `running` no Chromium porque é criado depois da captura do
+>   microfone; Safari e Firefox não medidos (ADR-0029 §12.6).
+> - **Depois do deploy (D-29, Item 78, local, sem commit):** Davi mandou capturas de produção. Conectado sem
+>   vídeo virou "os dois, ligados" no padrão da espera (`DO-87`), e o palco deixou de cortar a orbe em janela
+>   estreita (Chrome e Firefox lado a lado). Suíte 1885/1885, guarda 22 casos, harness OK de 390 a 1280 px.
+>   Esperando ordem para commit e deploy.
 > - Novo achado: fora do repositório, os hooks travam a sessão (Item 77). **Nunca dê `cd` para o
 >   scratchpad**; use caminhos absolutos a partir da raiz.
 

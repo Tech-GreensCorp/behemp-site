@@ -19,6 +19,26 @@
 
 ---
 
+## ✅ Item 78 — FEITO, 01/10/2026 (local, sem commit): conectado sem vídeo estático, e o palco quebrando em janela estreita
+
+**Status:** relatado por Davi com seis capturas de produção (Chrome e Firefox lado a lado).
+Corrigido e provado local; decisão em
+[ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)
+(`DO-87`). Commit, PR e deploy esperam ordem com nome.
+
+**Causa medida:** o palco usava `md:aspect-video` com `overflow-hidden` e altura fixa pela largura.
+Em ~820 px de janela, 16:9 dava ~260 px, menos que o conteúdo da espera: a orbe saía cortada e a dica
+ficava por baixo do indicador do microfone. Reproduzido no Chromium em 800, 900 e 1024 px antes da
+correção. O "sem câmera" de `conectado` era o bloco estático de 30/09, fora do canvas.
+
+**O que mudou:** `components/atendimento/EsperaDaChamada.tsx` (`PALCO`, `OsDois`, `Textos`,
+`ChamadaSemVideo`), `ChamadaDeAtendimento.tsx` (o ramo `sem-camera` usa `ChamadaSemVideo`),
+`app/globals.css` (+4: `.espera-track.espera-ligado`), guarda com +4 casos.
+
+**O que ficou:** Firefox e Safari não medidos; o harness roda só Chromium.
+
+---
+
 ## 🟠 Item 77 — CATALOGADO, 01/10/2026: com a sessão fora do repositório, os dois hooks bloqueiam tudo
 
 **Status:** achado durante a D-28 da ADR-0029. **Não corrigido: hook é área protegida, e mexer pede
