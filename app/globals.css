@@ -686,6 +686,18 @@
     transform-origin: center;
     transform: scaleY(0.25);
   }
+  /* D-30: no fundo escuro da teleconsulta, a barra no verde que a sala já usa para "conectado". */
+  .espera-eq.espera-eq-escuro i {
+    background: var(--color-emerald-400);
+  }
+  /* D-30: o palco escuro da teleconsulta, nas cores que a sala já usa. */
+  .espera-palco-escuro {
+    background: radial-gradient(
+      ellipse 60% 70% at 50% 40%,
+      var(--color-slate-800) 0%,
+      var(--color-slate-900) 70%
+    );
+  }
   .espera-track {
     position: relative;
     height: 2px;

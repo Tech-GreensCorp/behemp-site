@@ -13,6 +13,16 @@
  * ⚠️ O overlay PRECISA cobrir em `lobby` — lá ele é a tela: card "Pronto para iniciar?",
  * consentimento da ADR-0007 e o botão de iniciar. O que não pode é cobrir DEPOIS de iniciar.
  * Por isso o guarda exige z-index CONDICIONAL, não z-index baixo.
+ *
+ * E O LADO DO PACIENTE (01/10/2026, ADR-0029 D-30): a mesma classe de erro existia na tela dele,
+ * desde 13/08 (`8ee8e5c`). A espera tem `z-[1]` e a câmera do próprio paciente não tinha z-index,
+ * então ficava por baixo: medido no Chromium, `elementFromPoint` no centro da câmera devolvia a
+ * espera. Davi: "isso era um bug que eu já tinha resolvido" — o que estava resolvido era o lado do
+ * médico. O caso abaixo compara os DOIS z-index, em vez de exigir um valor.
+ *
+ * ⚠️ RETIFICAÇÃO, 01/10/2026: a vacuidade exigia o TEXTO "Aguardando paciente entrar na sala", e o
+ * texto saiu da tela com a D-30. O guarda lê o arquivo cru, então continuaria verde por um
+ * COMENTÁRIO que cita o texto antigo: menção confundida com uso. Agora exige o componente.
  */
 
 import { readFileSync } from 'node:fs';
@@ -32,7 +42,7 @@ function blocoDoOverlay(): string {
 
 describe('o overlay de espera não cobre os controles depois de iniciar', () => {
   it('o overlay existe (vacuidade — sem ele o resto não testa nada)', () => {
-    expect(codigo).toContain('Aguardando paciente entrar na sala');
+    expect(codigo).toMatch(/<EsperaDaTeleconsulta\s/);
     expect(codigo).toContain('!remoteConnected &&');
   });
 
@@ -81,5 +91,38 @@ describe('controle — o guarda não pode acusar inocente', () => {
   it('a fase de lobby e a de sala continuam sendo estados distintos', () => {
     expect(codigo).toContain("setPhase('room')");
     expect(codigo).toMatch(/setPhase\(["']lobby["']\)/);
+  });
+});
+
+describe('a espera do paciente não cobre a câmera dele', () => {
+  const PACIENTE = readFileSync(
+    path.join(process.cwd(), 'app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx'),
+    'utf8',
+  );
+  /** O primeiro `z-N` ou `z-[N]` da primeira div depois do marcador. */
+  const zDepoisDe = (marcador: string): number | null => {
+    const i = PACIENTE.indexOf(marcador);
+    expect(i, marcador).toBeGreaterThan(-1);
+    const classe = PACIENTE.slice(i).match(/className="([^"]*)"/)?.[1] ?? '';
+    const z = classe.match(/(?:^|\s)z-(?:\[(\d+)\]|(\d+))(?:\s|$)/);
+    return z ? Number(z[1] ?? z[2]) : null;
+  };
+
+  it('vacuidade: a espera e a câmera existem na tela do paciente', () => {
+    expect(PACIENTE).toMatch(/<EsperaDaTeleconsulta\s/);
+    expect(PACIENTE).toContain('{!remoteConnected && (');
+    expect(PACIENTE).toMatch(/bottom-6 right-6/);
+  });
+
+  it('a câmera do paciente fica ACIMA da espera', () => {
+    const espera = zDepoisDe('{!remoteConnected && (');
+    // A câmera é a div cuja classe tem `bottom-6 right-6`, em qualquer ordem de classe.
+    const classeDaCamera =
+      PACIENTE.match(/className="([^"]*\bbottom-6 right-6\b[^"]*)"/)?.[1] ?? '';
+    const z = classeDaCamera.match(/(?:^|\s)z-(?:\[(\d+)\]|(\d+))(?:\s|$)/);
+    const camera = z ? Number(z[1] ?? z[2]) : null;
+    expect(espera, 'a espera precisa de z-index explícito').not.toBeNull();
+    expect(camera, 'sem z-index, a câmera fica por baixo da espera').not.toBeNull();
+    expect(camera!).toBeGreaterThan(espera!);
   });
 });

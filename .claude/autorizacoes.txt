@@ -990,3 +990,18 @@ path:app/(admin)/admin/anvisa/page.tsx
 # Granularidade deliberada: os dois arquivos exatos.
 path:app/(paciente)/paciente/anvisa/atendimento/[pedidoId]/page.tsx
 path:app/(admin)/admin/anvisa/atendimento/[pedidoId]/page.tsx
+
+# ── Autorizado por Davi em 01/10/2026 ───────────────────────────────────────────
+# A espera da teleconsulta (ADR-0029 D-30). Davi escolheu, entre opções: "Autorizo esse arquivo",
+# depois de pedir "vamos aplicar as mesmas telas de animações que montamos aqui na teleconsulta,
+# só que personalizado o texto para médico paciente".
+#
+# O QUE MUDA: no lado do paciente, o bloco "Aguardando médico..." (spinner) vira a espera da
+# chamada, no fundo escuro; e a faixa do microfone passa a existir em estado, para o indicador.
+# Não mudam: a negociação, a sinalização, o consentimento, a sala de espera de antes de entrar.
+#
+# PERIGO MEDIDO: baixo. O bloco trocado só aparece com `!remoteConnected`; o arquivo está fora do
+# Prettier e não será formatado (DO-35); só as linhas do conteúdo mudam.
+#
+# Granularidade deliberada: o arquivo exato.
+path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
