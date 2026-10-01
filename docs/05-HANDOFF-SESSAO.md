@@ -3,38 +3,34 @@
 > 🔴 **Leia antes de agir.** Se não ler, você refaz o que já foi feito, repete um erro que já
 > custou caro, ou reabre uma decisão que já foi tomada.
 
-> 🟡 **Acréscimo de 01/10/2026, sobre o estado de agora** (não é a reescrita da `/metodo-handoff`).
-> A demanda nova veio: a **espera da chamada de atendimento** (ADR-0029 §12.6, **D-28**, `DO-86`),
-> aprovada por **Davi**, a partir do canvas `docs/decisoes-visuais/teleconsulta-1..4.html`.
+> ✅ **Estado em 01/10/2026, fim da tarde** (acréscimo; não é a reescrita da `/metodo-handoff`).
+> **Produção: `main` `cdbfd47`.** Três entregas da ADR-0029 subiram hoje, todas **testadas e aprovadas
+> por Davi**: _"implementações testadas e aprovadas"_.
 >
-> - **Feita e provada local, SEM commit**, na worktree da `docs/fase-2-2-em-producao`. Arquivos:
->   `lib/atendimento/espera.ts` (novo), `components/atendimento/EsperaDaChamada.tsx` (novo),
->   `components/atendimento/ChamadaDeAtendimento.tsx` (+42 / −10), `app/globals.css` (+283, no fim),
->   `__tests__/guardas/a-espera-da-chamada-diz-a-verdade.test.ts` (novo, 18 casos, 11 sabotagens).
-> - `pnpm test` com **1881 casos em 78 arquivos**; `pnpm build` com exit 0; Chromium com a tela real em duas abas,
->   **44 de 44 passos** nos três modos. Portão de baseline: o Prettier acusa **+1**, que é a
->   `.claude/rules/ponte-enderecamento-dos-prompts.md` (pessoal do Davi, não rastreada), não um arquivo desta entrega.
-> - ⚠️ A worktree já tinha, **antes** desta entrega, mudanças de outra sessão em `docs/00`, `02`, `03`, `04`,
->   `adr/README.md`, a ADR-0030 e `docs/levantamentos/`. Esta entrega **acrescentou** nesses arquivos
->   (DO-86, Itens 76 e 77, a linha da 0029 no índice, `decisoes-visuais` com 6 arquivos). **Não fazer `git add .`**:
->   separar por arquivo e, nos compartilhados, por trecho.
-> - Commit, PR e deploy: **esperam ordem com nome** (Davi, Dryelle ou Gabriel).
-> - **Depois:** Davi autorizou o commit `ee09960`, o push e o **PR #147** (leva o #146 junto). Portão do CI
->   verde nas duas rodadas. **Mesclado por Davi** (`3a464f2`) e **em produção** pelo deploy `36885740541`
->   (home 200 o tempo todo, portão "servindo ESTE build", sem migration). Falta o teste com dois aparelhos, um iPhone. Medido depois do commit, e ainda **sem commit**: o
->   `AudioContext` da espera nasce `running` no Chromium porque é criado depois da captura do
->   microfone; Safari e Firefox não medidos (ADR-0029 §12.6).
-> - **Depois do deploy (D-29, Item 78, local, sem commit):** Davi mandou capturas de produção. Conectado sem
->   vídeo virou "os dois, ligados" no padrão da espera (`DO-87`), e o palco deixou de cortar a orbe em janela
->   estreita (Chrome e Firefox lado a lado). Suíte 1885/1885, guarda 22 casos, harness OK de 390 a 1280 px.
->   Esperando ordem para commit e deploy.
-> - **A D-29 subiu** (PR #148, `39d1508`, deploy `36894503274`, home 200 o tempo todo).
-> - **D-30 e Item 80 (local, branch `feat/teleconsulta-espera`):** a mesma espera na teleconsulta, no
->   escuro, com textos de médico e paciente (`DO-88`); e a câmera do paciente, que ficava por baixo da
->   espera desde 13/08, de volta por cima. O arquivo do paciente foi autorizado por Davi em
->   `.claude/autorizacoes.txt`. Suíte 1893/1893; as duas telas reais rodaram no Chromium.
-> - Novo achado: fora do repositório, os hooks travam a sessão (Item 77). **Nunca dê `cd` para o
->   scratchpad**; use caminhos absolutos a partir da raiz.
+> | entrega             | PR · merge · deploy                            | o quê                                                                                         |
+> | ------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+> | D-28, Item 76       | #147 (leva o #146) · `3a464f2` · `36885740541` | a espera da chamada de atendimento, do canvas `docs/decisoes-visuais/teleconsulta-1..4.html`  |
+> | D-29, Item 78       | #148 · `39d1508` · `36894503274`               | "os dois, ligados" sem vídeo, e o palco que não quebra em janela estreita                     |
+> | D-30, Itens 79 e 80 | #149 · `cdbfd47` · `36898791759`               | a mesma espera na teleconsulta, no escuro; e a câmera do paciente de volta por cima da espera |
+>
+> Os três deploys: home 200 em todas as leituras, portão "servindo ESTE build", sem migration nova.
+> `pnpm test` 1893/1893 na `main`.
+>
+> **O que fica para a próxima sessão:**
+>
+> - **iPhone (Safari) e Firefox** não foram medidos (só há Chromium local). Se as barras do microfone não se
+>   mexerem com voz no iPhone, entra a defesa "sem barras enquanto o áudio não destravar", **na espera e na
+>   teleconsulta** (decisão de Davi: depois do teste). Medição do autoplay na ADR-0029 §12.6.
+> - **Item 77:** com a sessão fora do repositório, os hooks recusam todo `Bash` e `Write`. Catalogado.
+>   **Nunca dê `cd` para o scratchpad**; use caminhos absolutos a partir da raiz.
+> - **Tabela de guardas do `CLAUDE.md`:** 17 guardas sem linha, e as linhas da espera e da sala com contagens
+>   antigas (22 e 8; são 28 e 10). Anotado no próprio `CLAUDE.md`.
+> - **A teleconsulta não tem "conectando" nem aviso de câmera desligada.** Criar exige mexer na sinalização
+>   dela; não foi pedido.
+> - `.claude/rules/ponte-enderecamento-dos-prompts.md` segue pessoal e não rastreado: **nada de `git add .`**.
+>
+> _Versão anterior deste bloco: o acréscimo de 01/10/2026 que descrevia a D-28 como "feita e provada local, SEM
+> commit", depois o PR #147, a D-29 local e a D-30 local, em ordem de sessão._
 
 **Escrito em 30/09/2026, fim da tarde**, ao fim da sessão que entregou a **ADR-0029 inteira** (a
 aba ANVISA no "Faço eu mesmo", o pedido de atendimento assistido, a procuração ativada pelo admin e
