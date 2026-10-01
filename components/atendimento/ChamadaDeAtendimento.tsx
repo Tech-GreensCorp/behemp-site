@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { entrarNoAtendimento, encerrarAtendimento } from '@/app/_actions/chamada-de-atendimento';
 import { canalDoAtendimento, type PapelNaChamada } from '@/lib/atendimento/canal';
 import { escolherDestaque } from '@/lib/atendimento/destaque';
+import { oQueOPalcoMostra } from '@/lib/atendimento/espera';
 import {
   aceitarResposta,
   criarFilaDeCandidatos,
@@ -50,6 +51,7 @@ import {
 import { getPusherClient } from '@/lib/integrations/pusher/client';
 
 import { ChatDoAtendimento, type MensagemDoChat } from './ChatDoAtendimento';
+import { EsperaDaChamada } from './EsperaDaChamada';
 
 type Fase = 'entrando' | 'aguardando' | 'conectando' | 'conectado' | 'encerrada' | 'erro';
 
@@ -138,6 +140,8 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const [mensagens, setMensagens] = useState<MensagemDoChat[]>([]);
   const [semMicrofone, setSemMicrofone] = useState(false);
   const [temMicrofone, setTemMicrofone] = useState(false);
+  /** A mesma faixa de `microfone`, em estado: a espera mede o nível dela (D-28). */
+  const [faixaDoMicrofone, setFaixaDoMicrofone] = useState<MediaStreamTrack | null>(null);
   const [mudo, setMudo] = useState(false);
   const [compartilhando, setCompartilhando] = useState(false);
   const [cameraLocal, setCameraLocal] = useState<MediaStream | null>(null);
@@ -285,6 +289,7 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
         }
         microfone.current = fluxo.getAudioTracks()[0] ?? null;
         setTemMicrofone(microfone.current !== null);
+        setFaixaDoMicrofone(microfone.current);
       } catch {
         // Sem microfone, o chat continua valendo: o atendimento não para por isso.
         if (ativo) setSemMicrofone(true);
@@ -557,7 +562,7 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
   const estado: Record<Exclude<Fase, 'erro'>, string> = {
     entrando: 'Entrando no atendimento…',
     aguardando: papel === 'admin' ? 'Aguardando o paciente entrar' : 'Aguardando a equipe entrar',
-    conectando: 'Conectando a chamada…',
+    conectando: 'Conectando a chamada',
     conectado: 'Chamada em andamento',
     encerrada: 'Atendimento encerrado',
   };
@@ -580,6 +585,8 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
     miniatura: miniaturaRemota,
     aoClicarNaMiniatura,
   } = escolherDestaque(remotos, destaquePreferido);
+  // D-28: antes de conectar, o outro lado ainda não chegou, e o palco é a espera.
+  const noPalco = oQueOPalcoMostra(fase, destaque !== null);
 
   return (
     <div className="grid gap-4 md:grid-cols-[20rem_1fr]">
@@ -602,11 +609,21 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
 
       <div className="space-y-4">
         <div className="border-border flex items-center justify-between gap-3 rounded-2xl border bg-white p-4">
-          <div className="flex items-center gap-2" role="status">
-            {(fase === 'entrando' || fase === 'conectando') && (
+          <div className="flex items-center gap-2.5" role="status">
+            {fase === 'entrando' && (
               <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden="true" />
             )}
-            <p className="text-foreground text-sm font-semibold">{estado[fase]}</p>
+            {fase === 'aguardando' && <span className="espera-ping" aria-hidden="true" />}
+            <p className="text-foreground inline-flex items-center text-sm font-semibold">
+              {estado[fase]}
+              {fase === 'conectando' && (
+                <span className="espera-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              )}
+            </p>
           </div>
           <Link
             href={voltarPara}
@@ -618,9 +635,23 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
 
         {fase !== 'encerrada' && !repetida && (
           <div className="space-y-2">
-            <div ref={palco} className="border-border relative overflow-hidden rounded-2xl border">
-              {destaque ? (
-                <>
+            <div
+              ref={palco}
+              className="border-border espera-palco relative overflow-hidden rounded-2xl border"
+            >
+              {noPalco === 'espera' &&
+                (fase === 'entrando' || fase === 'aguardando' || fase === 'conectando') && (
+                  <EsperaDaChamada
+                    key={fase}
+                    papel={papel}
+                    fase={fase}
+                    microfone={semMicrofone ? null : faixaDoMicrofone}
+                    mudo={mudo}
+                  />
+                )}
+              {/* A passagem para conectado: ~200 ms de esmaecimento, por cima do fundo da espera. */}
+              {noPalco === 'destaque' && destaque && (
+                <div className="animate-in fade-in duration-200 motion-reduce:animate-none">
                   <VideoDoFluxo
                     fluxo={destaque.fluxo}
                     rotulo={destaque.rotulo}
@@ -636,10 +667,11 @@ export function ChamadaDeAtendimento({ pedidoId, voltarPara }: Props) {
                   >
                     <Maximize className="h-4 w-4" /> Tela cheia
                   </Button>
-                </>
-              ) : (
+                </div>
+              )}
+              {noPalco === 'sem-camera' && (
                 // Até 30/09/2026 isto era um quadro preto, que parecia câmera quebrada.
-                <div className="bg-muted/40 flex aspect-video flex-col items-center justify-center gap-2 p-6 text-center">
+                <div className="bg-muted/40 animate-in fade-in flex aspect-video flex-col items-center justify-center gap-2 p-6 text-center duration-200 motion-reduce:animate-none">
                   <VideoOff className="text-muted-foreground h-6 w-6" aria-hidden="true" />
                   <p className="text-foreground text-sm font-medium">
                     {outro} está sem câmera e não está mostrando a tela.

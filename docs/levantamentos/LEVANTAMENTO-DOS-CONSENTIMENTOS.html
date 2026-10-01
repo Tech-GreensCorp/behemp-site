@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consentimentos da Be4Hope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Epilogue:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: #f5f2ed;
+        --foreground: #1a1612;
+        --card: #ffffff;
+        --primary: #ea5429;
+        --primary-suave: #fbe3da;
+        --secondary: #2d4f3c;
+        --secondary-suave: #dfe8e2;
+        --muted: #ede8e1;
+        --accent: #e8e2da;
+        --border: #ddd8d1;
+        --destructive: #dc2626;
+        --destructive-suave: #fbe1e1;
+        --suave: #5c544b;
+      }
+      @page {
+        size: A4;
+        margin: 15mm 14mm 17mm;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          9.6pt/1.5 'Epilogue',
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 182mm;
+        margin: 0 auto;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Outfit', system-ui, sans-serif;
+        line-height: 1.15;
+      }
+      h1 {
+        font-size: 26pt;
+        font-weight: 700;
+        margin: 0 0 6pt;
+        letter-spacing: -0.015em;
+      }
+      h2 {
+        font-size: 15pt;
+        font-weight: 600;
+        margin: 18pt 0 6pt;
+        padding-top: 7pt;
+        border-top: 2px solid var(--primary);
+        break-after: avoid;
+      }
+      h2 .num {
+        color: var(--primary);
+        margin-right: 4pt;
+      }
+      h3 {
+        font-size: 11pt;
+        font-weight: 600;
+        margin: 11pt 0 4pt;
+        color: var(--secondary);
+        break-after: avoid;
+      }
+      p {
+        margin: 0 0 6pt;
+      }
+      b {
+        font-weight: 600;
+      }
+      code,
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 7.6pt;
+      }
+      code {
+        background: var(--muted);
+        padding: 0 3px;
+        border-radius: 3px;
+        overflow-wrap: anywhere;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 4pt 0 10pt;
+        font-size: 8.5pt;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 4pt 6pt;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        background: var(--accent);
+        font-size: 8.4pt;
+      }
+      tr {
+        break-inside: avoid;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      ul,
+      ol {
+        margin: 0 0 7pt;
+        padding-left: 14pt;
+      }
+      li {
+        margin-bottom: 2pt;
+      }
+
+      /* capa */
+      .capa {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 14pt;
+        align-items: start;
+        border-left: 5px solid var(--primary);
+        padding: 4pt 0 4pt 13pt;
+        margin-bottom: 12pt;
+      }
+      .capa img {
+        width: 26mm;
+        height: auto;
+      }
+      .sobretitulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--primary);
+        margin-bottom: 3pt;
+      }
+      .sub {
+        color: var(--suave);
+        font-size: 10.5pt;
+        max-width: 140mm;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5pt;
+        margin-top: 9pt;
+      }
+      .tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 7.4pt;
+        background: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1pt 7pt;
+        white-space: nowrap;
+      }
+      .tag.status {
+        background: var(--secondary);
+        color: #fff;
+        border-color: var(--secondary);
+      }
+
+      /* números */
+      .numeros {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6pt;
+        margin: 8pt 0 10pt;
+      }
+      .numero {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7pt 8pt 6pt;
+        break-inside: avoid;
+      }
+      .numero .valor {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 24pt;
+        line-height: 1;
+        color: var(--secondary);
+      }
+      .numero.laranja .valor {
+        color: var(--primary);
+      }
+      .numero.vermelho .valor {
+        color: var(--destructive);
+      }
+      .numero .legenda {
+        font-size: 8pt;
+        color: var(--suave);
+        margin-top: 3pt;
+        line-height: 1.3;
+      }
+
+      /* caixas */
+      .caixa {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 8px;
+        padding: 8pt 10pt;
+        margin: 6pt 0 10pt;
+        break-inside: avoid;
+      }
+      .caixa.alerta {
+        border-left: 4px solid var(--destructive);
+      }
+      .caixa.verde {
+        border-left: 4px solid var(--secondary);
+      }
+      .caixa.laranja {
+        border-left: 4px solid var(--primary);
+      }
+      .rotulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.4pt;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--suave);
+        margin-bottom: 3pt;
+      }
+      blockquote {
+        margin: 3pt 0 5pt;
+        padding: 3pt 8pt;
+        border-left: 3px solid var(--secondary);
+        background: var(--muted);
+        font-style: italic;
+      }
+
+      /* ficha de cada consentimento */
+      .ficha {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: 4px solid var(--secondary);
+        border-radius: 8px;
+        padding: 8pt 10pt 6pt;
+        margin: 8pt 0 10pt;
+        break-inside: avoid;
+      }
+      .ficha.laranja {
+        border-top-color: var(--primary);
+      }
+      .ficha.cinza {
+        border-top-color: var(--suave);
+      }
+      .ficha-topo {
+        display: flex;
+        justify-content: space-between;
+        gap: 8pt;
+        align-items: baseline;
+        margin-bottom: 4pt;
+      }
+      .ficha-topo h3 {
+        margin: 0;
+        color: var(--foreground);
+        font-size: 11.5pt;
+      }
+      .ficha-topo .id {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 8pt;
+        color: var(--suave);
+        white-space: nowrap;
+      }
+      .ficha dl {
+        display: grid;
+        grid-template-columns: 30mm 1fr;
+        gap: 2pt 8pt;
+        margin: 0;
+      }
+      .ficha dt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.4pt;
+        color: var(--suave);
+      }
+      .ficha dd {
+        margin: 0;
+      }
+      .ficha .ref {
+        margin-top: 5pt;
+        padding-top: 4pt;
+        border-top: 1px dashed var(--border);
+        color: var(--suave);
+      }
+
+      /* selos */
+      .selo {
+        display: inline-block;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 7.6pt;
+        border-radius: 4px;
+        padding: 0.5pt 5pt;
+        white-space: nowrap;
+      }
+      .selo.ok {
+        background: var(--secondary-suave);
+        color: var(--secondary);
+      }
+      .selo.off {
+        background: var(--muted);
+        color: var(--suave);
+      }
+      .selo.ruim {
+        background: var(--destructive-suave);
+        color: var(--destructive);
+      }
+      .selo.atencao {
+        background: var(--primary-suave);
+        color: #b8401c;
+      }
+
+      /* mapa por perfil */
+      .perfis {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7pt;
+        margin: 6pt 0 10pt;
+      }
+      .perfil {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7pt 8pt;
+        break-inside: avoid;
+      }
+      .perfil h4 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10.5pt;
+        margin: 0 0 4pt;
+        padding-bottom: 3pt;
+        border-bottom: 2px solid var(--secondary);
+      }
+      .perfil.paciente h4 {
+        border-bottom-color: var(--primary);
+      }
+      .perfil ul {
+        padding-left: 11pt;
+        margin: 0;
+        font-size: 8.4pt;
+      }
+      .perfil li {
+        margin-bottom: 4pt;
+      }
+      .perfil .rota {
+        display: block;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 7.2pt;
+        color: var(--suave);
+      }
+
+      /* o que desbloqueia */
+      .desbloqueios {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 5pt;
+        margin: 6pt 0 10pt;
+      }
+      .desbloqueio {
+        display: grid;
+        grid-template-columns: 9mm 52mm 1fr 30mm;
+        gap: 8pt;
+        align-items: center;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6pt 8pt;
+        break-inside: avoid;
+      }
+      .desbloqueio .n {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16pt;
+        color: var(--primary);
+        text-align: center;
+      }
+      .desbloqueio .chave {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 9pt;
+        line-height: 1.25;
+      }
+      .desbloqueio .chave small {
+        display: block;
+        font-family: 'Epilogue', sans-serif;
+        font-weight: 400;
+        font-size: 7.8pt;
+        color: var(--suave);
+      }
+      .desbloqueio .seta {
+        font-size: 8.6pt;
+      }
+      .desbloqueio .seta::before {
+        content: '→ ';
+        color: var(--secondary);
+        font-weight: 700;
+      }
+      .desbloqueio .estado {
+        text-align: right;
+      }
+
+      .quebra {
+        break-before: page;
+      }
+      .duas {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8pt;
+      }
+      footer {
+        margin-top: 16pt;
+        padding-top: 6pt;
+        border-top: 1px solid var(--border);
+        color: var(--suave);
+        font-size: 7.8pt;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- ═══════════════════════════ CAPA ═══════════════════════════ -->
+      <div class="capa">
+        <div>
+          <div class="sobretitulo">Levantamento · LGPD e CFM</div>
+          <h1>Os consentimentos da Be4Hope</h1>
+          <div class="sub">
+            Onde a plataforma pede aceite, autorização ou consentimento: em que tela, de qual
+            perfil, com que propósito e, principalmente, <b>o que cada um destrava no sistema</b>.
+          </div>
+          <div class="meta">
+            <span class="tag status">LEVANTAMENTO · lido no código</span>
+            <span class="tag">01/10/2026</span>
+            <span class="tag">código da main 6065964 (= produção)</span>
+            <span class="tag">ADR-0007 · ADR-0021 · ADR-0029</span>
+            <span class="tag">CFM-01 · LGPD-01 a 05</span>
+          </div>
+        </div>
+        <img
+          src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXQAAAFACAYAAACsiIfoAAAACXBIWXMAAAsSAAALEgHS3X78AAAgAElEQVR4nO3dPXbbSJsF4Os5ndMTICY7RSL1CkSvQOoAseAVWL0C0SswvQJRMYKWV2BoBaYSpE3GCMZcgSaoFzYtkxR+6h/3OUen5xtZQAkCLgsvClVvnp+f0UedpXMA814/bE+ZFFXpuhFERDb8MeBn5wBuNbXDpNJ1A4iIbPgf1w0gIiI9GOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUiT9cNyAmdZbO5f88B/B271vzF/90DeD7gf+9SYpqY6h55KE6S2cAZvI/5y++vf+9xstzZyNfSIqq1Nk2Cg8DvYc6S99CXXzn8t8ZgGmHTVyc2DYAPEFdpGsAJYB1UlTfj/0M+a/O0nOo82WGfudM47VzZwd13mzkv2sG/Xi8eX5+7vWDdZYuANxqbY1+H5OiWujYkFyQOdTFeKZjmx09QYX7Ay9Q/8ndWvN1NIQtas6fEkDJDkKc2EM/YS/Er9CvN6XTmXx9qLN0B+ABKtwf3DaLgB93bVfyNQcwcdqg3/04fwCgztJH/DyHNg7bRRox0A+oszQHcAM3PfE2JgCuAVzXWboFsAKw4oVp14sQv3TcnK4u5OtTnaVP+HkOseceMJZc9kiQL+C+N97XPdRFWbpuSMzkzu0GKsh964kPxXMoYOyhI4ogbzS99kcAC16Uesl5ksOPmrgp+3d+i6SoVo7bQx2MOtDlwdUS/pZW+roA8FWCPWcpZpiIPvC7mAK4kzvxFYAlyzH+G+WLRXWWvq2zdAngK+IL830XAP6rs3Qp9V7qoM7SvM7SDYA7jCvM902hSqsb+WAjj40u0KVXvoY87R+JD1AX5JXrhoSgztJ5naUlxh3kL02geuw8jzw2qkCX28evGOdFOgHwb52lD+ytHyZ3biuocyTmOvkQU6jzqJS3XMkjowh0uVBL+D8qx4ZLsLf+GzkeG6iHgvS6ppy3cN0Q+in6QJchZmuwx7Wv6a0vXTfENfmwfwDwL+IbgmjDbZ2la7nOyLHYA/0c6lXnMZZY2vggt86jLMHs9cpDeynIN2cAyjpLb1w3ZOxiD/RLsNf1mgsAo+thyd0Je+X6TKDeOuUzGodiD3RqZwrVw4o+1Peep4xplJNNlxjJueQjBjo1JlAXYu66IabweYo1TQmGoW4ZA532NWONc9cN0U3CpQSfp9gyAfAtxnPJZwx0OiSqUJff5RtYL3chqnPJdwx0OmYZwy2zhMmd63aMHEPdEgY6HdPU1IMNdYa5VxjqFjDQ6ZQJgCCHoTHMvcRQN4yBTq+ZQj1MDIbcVTDM/XTHaSfMYaBTG2ehTBOwN5qF/LUKuZTnMwY6tfXB956VlIYewNEsvgu2lOc7Bjp1sfJ8ytQHcJx5KKZQfy/SiIFOXUygliPzjpSE+AZoWC44/a5eDHTq6sK3WfVkFSrOzRKmW/n7kQYMdOpj4UvpZa9uTuFasZ6uBwOd+pgA8GXUywp8CBq6KYCF60bEgIFOfV26vlWWUTdcnCIOH1yfTzFgoNMQznrpcou+crV/MmLlugGhY6DTEGcOX+VegKWW2Ew56mUYBjoNtbC9Q3nLkKNa4nTDB6T9MdBpqKmDXrovD2RJP58euAfnD9cNoCgsYKn+KQ/OYn6BaAe1TN4awPcj/2YOYIZ434q9rrN0kRTVxnVDQsNAJx2mdZbmSVGtLOxrYWEftj1CjaV/6BJi8i7AHECMo30WAHLHbQjOm+fn514/KA8vbrW2hkL2lBSV0Rn0pHf+1eQ+LNpB3dUsdfREpe58AxWCsfTc/2QvvRvW0EmXMwvjiBeGt2/LZwCzpKhudAVWUlTfk6JaJEU1A/AR6gMjdAvXDQgNA510yk1tOJLa+ROAvyTIj9XHB0uKagHgHKqUE7IrjnjphoHe3RNUD+sfAO/k68+kqN4kRfUGwP/u/f/fQ/WWHhFHj+k11wYvwNzQdm25BzBPimptY2dJUW2SoppDnaehmkCVkaglPhRt5x7qoVX5Ws9Kvl8e+p6Mn86hHmLFUud86QqaR7zIh8S1zm1a9k9SVE6G4iVFtayzdI1wF/7IwdJLa+yhH7eF6t38b1JUeVJUD0Nvk5OiWsvt9gzA3wj/lvgQEz2q3MA2bXnvKswbSVGVUKNhQrxLnPq+UpZPGOi/20H1qGZJUS1N1TrlA2IOVZrZmtiHI2cGptYN9bb7vaWhnK+SUs8cYYY6A70lBvqvvkCNPrDWo0qKqtwbmRALbReglKlCLE/d+xLmDQn13HU7ejD5bCYqDHRlB9WbujI5+uAUGZnwDmH2oF6aa9xWrnFbtjwlRZW7bsQhSVE9IMzOA3vpLTDQVYDOfehNSa1zBjWSJmSXGntUoV3IO3jeZuk8hHaOeX1MfTH2QH8CcG5rKFkbcocwR3gX3EvzoRuQWnxo5ZZQ5iDJXTego9imNjBizIG+heqZb1w35KVIQn2uYRuh9cq2rke0tCWdmKBKLxzt8rqxBvoOgLN6eRsRhPrck23YlLtuQEdLhPXMZu66Ab4ba6Bf+VRmOUZCPUdYF13jTMM25hq2YcuTPAMJhpxfQdxRiLnrBvhujIH+MaQLTz54ghyHPWSyLhmuGNKbjSEF476V6wZ0cMbhi6eNLdCf5Al/UGQETohvlQ6ZTneuqxEW7HwYJdWHPEO6d92ODuauG+CzsQV67roBA+SuG9DDkECf6WqEBSvXDRjowXUDOjA6537oxjQ5130IdfNjkqLa1Fn6EWEtKjIb8LMhXbgbC3PBm+Tt4IAD5q4b4LMxBfrCdQM0WCKsQB8yf3lIc59/ct2AEZm5boDPxlJy+eLjePOuZFRCSPVO9HmIZWByL4pHaC+aWTWWQF+5boBGoY2m6FM6meluBMUj8PKWUWMI9J1MSBQFeQ4Q0nS7fYaZzXQ3gqLCoYtHjCHQownzPSH9Tuyhk24hPTC3agyBXrpugAGl6wYQkX8Y6GEKafjlrMfPsAdGp8xdN8BX0Qd6DKNbXpLfKZT5XWY9foY1UqIeYg/0EF+XbyukXjoRWRB7oMcspLf7iHRiSe6I2AM95l5szL8b0SkhzcJpVeyBzl4sEY1G7IFORDQaDHQiokgw0ImIIhF7oM9cN8AgjtUmol8w0MPFoVtE9AsGerjYQyeiX8Qe6DFPhn/mugEGla4bQF6L+Q3wQWIP9Cgnw6+zNKRyS+m6AURjEX2gI86Z2eauG2AYXwgj6mEMgX7lugEGzF03oIM+4cxpDegUnh9HjCHQz2JadFgWXb503Y4O+lx87KHTKTw/jhhDoANx9dJD+106X3yybirRMTw/jvjDdQMsuQGwdN0ITW5cN6CLAeH8hLhH8lB/zgJd7vb3vw7ZyNc6KSqrdxNjCfRpnaV5UlQr1w0ZQkbshBRy2wE/u0E4v+sXxNNh8J7NVcgkwK+gnlvN0XHq3jpLt1AfQA8AHkwH/FgCHQAWAFaO2zDUwnUDOtoM+Nk1wnlWcJ4UVem6EaRPnaU5gBzAxcBNTeXrEsBdnaVfAKySonoYuN2DxlJDB1QvfeG6EX3JCTb05LKtdPSztk3rLA3t2QYdUGdpXmfpBsAdzFxvlwD+rbN0I9e0VmMKdAC4DeylHAA/RraEeEu/GfCzoT34CurZBv2qztJ5naVrqCC38Yb5FKrHXurMpLEFOgCsJCBDskKYy26VfX9Qao1P+ppi3EWMbyWPgdy5f4WbZzYXAL7VWaqlQzDGQD9DQL1dOdlCqSXv22l4eFVqaIdNwZxXpO586ywtAdy6bguAT3WWPgztbI4x0AHgus7SletGvEZqbD6cbH2UnmzDpjNdPS0yS0avlPDrudQlgHJIqI810AHPQ13C/M51OwYoh25ARgLshjfFqkVMbybvq7M0it9NatZr+Dks9gwDQn3MgQ54GuoRhDmgr3etazu2TKDGHEdFrpNbAOsQBxY0JChX8PuZVO9QH3ugAyrUB9eudJGaeehhvtX4+n6I4XjmY0ehL/ldruV/TqDCJnfWoGFK+Nkzf+kMPc59BrpyCdXzmLtqgGcPaIYqNW4rxLILoDoKQdfT987J6xffmkANucutN2qAOkuXCCPMGxfS5tYY6D9NAXyts3Rpu7cuF8YGfj2gGUJbr1qGL4bYSwfUyIXcdSP62Ksznzon70K5E5EXvz64bkcPH7p0NBnov/sAYCMPgIwG+4u30nyu6XWxM/Ba80rz9my669rLck3Kft/Q7gUbr0qWh+zVzUPV+t0ZBvphE6jSx6bO0pXOh0B1ls7qLL3ZC/LY1j3V3puWeVKGTPTl2gffQw9QvXJ5W7Jr2W/wcDvDbhB2h2mKlm8iv3l+fu61B/kUj6He29YWqjZcQk2L2eqhnwzzOsfP2dpCquH18c7ERFWRjPzZAsh9m8hrb2qJl7XyrrYArnyaz15+tw3CDnRAPUeavTZbIwN9mC2Oz1fyFvGH90vbpKhmJjYc0YUJAJ8BLGzPlf2SHNMb6O3B7qBCvdS0vUEiy6mPSVEtTv0DllyGmUI9NDr0NbYwBwy++i7hF1Qt+gRrz2kOkbLfEuoD8hZ6PyQnUIMLco3bHCLokUYvvPq7MNBJp5Xh7S8R5hDGQ/af0yxNv4EpQxDzOksfAPwH9aFi8m7nzvV01TKyJYY7usbktWmaGeiky73pEkJkvfTGBCpc/6uzdC0PzLU8hJeHnDcS4v8H9QzC5kRvt46HNcY4R/3J32lMKxaRWQtL+1ki/FELx5wB+AQAdZYCwCPUWPDveP1lrbdQD9+b//ryTsO1fEDNHTwzGF2g86Eo6XCfFFVua2eRjHgZmyeoh6UbGzuTEtZ/NvblwF/HRhKx5EI6LGzuTBb7frS5TxrsDHYn9gp2ArEWjv5uDHQa6t7mKux7Yhq9MBbNxF42SiExB/rs2DcY6DTUwsVO5Zbzo4t90yATqEWSc8P7iTnQ58e+wUCnIT476p03lghr3VH6yfTEXr5OQ2AUA5362sFR77whoyZyl22gQa5lrqRRhq8JDHTq68b1q+vAj9LLP67bQb1dw++JvXx0dEgqA536eJSRJl5IimoJ4IvrdlBvtkfARIuBTl3t4GeZIwfr6SGbQvXUGeqvOzqVNAOdulo4fhB60F49PZa5XsZoAuCbRxN7+Wpz7BsMdOriUcobXpJ6eoyve4/NXejrsbrCQKe2dgggLGUe7veu20GD7DB8oXFvFtkwYHPsGwx0auvKh1EtbcgDW4Z6uG40rHq00dEQT22OfYOBTm2892UFmrYk1O9dt4M6e69pBFXMPfTy2DcY6PSae5+GKHYhM0Ay1MOwA/C3rnMttA5IR0c/rBjodIrVaXFNkPZzzhe/7aDmS3/QvN0YZ+R8OlX6ZKDTMU+IZEZDWViXNXU/NWFuokSi+wPCB+WpbzLQ6ZAnuFlhxhg+KPXSE4CZoTAH4gz0k8OGGej0UnRh3pBQ/wt8+cgH9zB8nskLcDFNCfH42kt9DHTa94hIw7whvcFzcJoAl/5Jiiq3dJ55+yJcD6/+Lgx0atwnRRV1mDeklzMHR8DYtoVaD9NayMpolxgejj62eWgce6Dz1rqdj6GPZukqKarv8jv/A54nNnwGcG6wXn7KwsE+dVu0+UexB/oS7IWd0oz9XbhuiCvSW5yDJRhTtgDeJUXlbP586aV/drFvTe7bjquPPdA5Dvm45uFnjCMBOkmKap0U1Tl4nujW9MpL1w2B6uEenXbWY1t0GD4cfaADP8Yh/w3eWjc+J0Xl6vbXW3Ke/IU4aq4uPULVyr1Y1Qr4Mb3yFcLLgE5zKI0i0AFAeqJjH93w4/bXdUN8Jb31OdSY9dAufte2UCU8Uy8KDSJtCuncf9/1OI4m0AE1umHEt9Yf4c/tr/dkzPoM6rgx2E/bQoXPzPcSXkAvmPWapGxUgd4Y2a31I4A/k6Ja+HL7GwoZCbMAg/2Y/SBfuW5MWwGEeu8ZJ0cZ6MBvt9YhPix5zSNUeWXu45JxIWGw/+YRqrQSVJDv2wt13/6Wg6YPHm2gN+TgNWUY3/64fewHeem6MTF5EezvMa7nMTuoIcB/yrnldWmlDbn25/CjQ9e8dLUaspE3z8/PvX6wztIFgNshO7fgY5cx1nWWvoV6aJJDrUIeknsAK4a4XbJK/Q3UCIqJ4+aY8AXAQ6g98Tbkul8A+OCoCV8AaJkKgYF+hKw8fgXgUmeDNHsCsIIKctbHHauz9ArqnAk93L9AzVT4MKbzqs7SOVSwX1ja5RPUcnulrg32DvSxqLN0BnWB5gDOnDZGaUL8gbVxf0nP/Qrqlt5WQPT1BDXPdhlDKWUo+WC+gbm/2yNUJ2yle8MM9A7k1qy5SOewU5b5cbFBXXCj6THFRHp/51DnzQzuOgdbqCXM1lDn1Jrn1GHSmbuB+psN/Xs11/HSZEeMgT6ABPy5fM3kv2/R/Y+/w891AkuoVb03rIfHTUK+OYea/0L+O6Rk0wzH3cjXGsB3nk/9Sbif7329hbrmX3bqtlDH/Dt+fnCubd1NM9ANk4v2kA1LJtSGlG/eHvs+g5oaDHQiokiMfhw6EVEsGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEk/nDdgFDJ/MgzjZvkQgNENAgDvb8cetdUfQe1uAURUS8suRARRYKBTkQUCW9LLnWW3uDEslsDlVy2i4hi42Wg11l6BeCT4d2UhrdPRGSVdyUXGT2yctwMIqLgeBfoUGE+cd0IIqLQeBXoUje/cN0OIqIQeRPoUmpZOG4GEVGwvAl0sNRCRDSIF4HOUgsR0XDOA52lFiIiPZwHOoAHsNRCRDSY00Cvs3QB4MxlG4iIYuEs0OssPYfe2QqJiEbNZQ995XDfRETRcRLoLLUQEelnPdBZaiEiMsNqoNdZ+hYstRARGWG7h74ASy1EREZYC/Q6S+cAPtjaHxHR2FgJdJZaiIjMs9VDXwCYWtoXEdEoGV+CjqUWs+Tu5/zIt9dJUX232R7bXvn9gREcg6Fk5Nmh9Xs3SVFtLDfHuRPHA/D8mBgNdJZa9JLjOZevc7SYobLOUgB4BLCGWke1DDXgpHPQfM3Q8q5PjsETgA3kOIx1kXAJqyv8PIdOzqMkx26LX8+ftdFGWiITA86hjkPz9eq8UnvHZIOfx6Q00siO3jw/PxvbeJ2lDwAuje2gv49JUS2GbEBejtI5nv7dsZNCgiwHcK1pX18ALH05CY+RD7Ar+TJxHn2BmhzuwcWHXJ2lOdTfVZebQ2ErwdXsS0fpcwvVUVv53Fs9RI7FDVSQ6x5x5/R8Agz20OssNXURjoYE+QL654q/BHBZZ+kWQO5bsBv4ADvmUr6W0vlYWA6oGfT+bX8pE8gH4hL6j+MUqjNzW2fpPVTnwOte+96Hp8l1F1yfT2YeirLUMkydpW/lhPgKsyfgFMDXOksf5G/mVJ2l8zpLS6jf23SY75vI/v6rs3QlvbigyaIxG5g/jtcAvvl63Ooszess3QC4g71FdJydT6ZGuazAOc57kd7pBnbvbi4BbKS+al2dpTNLH2BtNBfiwocPua6kM1AC+AS71+A1gLV8kDhXZ+m5HIc7uB1h15xPSxvnk/ZAZ6mlP7kt/Ao3H4YTqJ5WbnOnEgBr+HfO3EIF1Nx1Qzo4h+oMuPpQnAD45PqOr87SJYBvcN852PcBqtN0ZXInWgPdUKllp3l7vlpC9SZcu7MR6ntlJds9yS6aktTCdUNa8uVYXgIobd/xyZ3eGv4Ok54A+Fc+cIzQ3UPXvZzcE1TQjYFPc9zcmeyZyoXuY6/8mFuphQZXgnHoDBZDXc7XNfy6jo75UGdpaeJ80hbocuus+xYn17w9as/IbbNc4CXCe3P4GiqgGOrtTWAh1B2XKvu6gIHzSUugy1PchY5t7fno+1CoyE2g7ri02QvzkC68fU2vk6HeXhPqMxMblzD3oVTZh/bzSVcPfQXNpZahL/6QFhe6HuJEEOYNhnp3Exi445MyS6hh3tB6Pg0OdJZaojf4GYacrCXCD/PGGfieRVdn0Pg8TDoIWu8gHdJ2bAYFOkstozDVMOpF98NyH1wGNPrFF9c67vj2RtPFdE5d6xjDP7SHvgJLLWPQ+yKU0PNpPLBOt4GNU/eBjtFCC4QxmqWrxdBnDb0D3dCFmmveHulx2eciHMmC4BzO2M0EanKsXiKfjnuCgaW8XoFu6EJlqcVvfXrpY3iHYAr9ZcfY3Q7oia40tsNHF0NKnH176Ku+OzyCpRb/zbv8Y6mVxlpqeemDjxNTeW7R9Qck6Gy9v7CDWkdg/8uWRd8f7Dx9rpRadNevcs3bI/26vhwyht75vgV4HndxXWfpTcd5wxemGiN2UOftw7FqgXRUrmB2FstpnaV5UlSrrj/YqYfOUsuotf4Ql5M+tDdBh7pmL72zvO0/tNA7/wxglhTV4lQeJUX1kBRVDuAvqKlJTFn0+aGuPfRVn52cwFLL65rVYX5b5mpvCS0rM1zWWTprOWG/rSlUn6COzfrAsdlfrs/WB8wCfvfSf5xLeLHWav1zbdamB2rjeN2g/Z2cqXNqB7XIS6cx7RL653WWrmCmtz6ts3TedfGZ1oEuM4TpLrV4MXeyp3ZQS4qtjv0DCdcV1EiLc/m/TQ7nmkFNz3qUfMiYrp0/Qq0GUx77BxJWD/J1Iz28JcyOXTY6NeoAT1DnUnnsH8jxKuWrOV4LmA32aZ2l56/docu5beq8ng+pECRFlddqjVEToZ5D/T1aa1VyMTRU6LNvS5955Anq9m/V9gfkpJwDuDfUprZMh9o/SVF17rnIsZxBrftoysT2fPItfEyK6rzn8TqH+fOpzfmSG9r3ex3lXinBmHhoet11SOyrgW5ojvMtONTrmCeoXkOXh0UAVC9LTi6Ttb3X5Ia2uwPwd1JUvR+2yvG5gtmQmhvcdlfvh5Q0986nf7S16HdtAt1EJ+Gxz0PHE65gZu2GeZd/3KaHvoD+267c1arYntuhZ5i/4OTWXz78Td0a33Stcx4jIWUq1H0pu7zXFVjyIfpZx7YOOHm+SAnPRNkn17kxuWZNjOzqdD6dDHSWWqxb6Pigk9q6i9LL3NB2P2ruTcHgnczE1dqsez4bOF43MDQW+5XpE059r68vLR/ud7WE/l76vMs/PvpQlKUW63bQe7yXML/i+0smgmxrcCRUDrX2pG7NikwumLzGcgD/GdhuM7Xyse/pZnKt2DX0DgqY1ln6tm1H79QolyVYarHpQeexSYpqXWfpFnbHg5u4+BYGtgngxzG6h/4Pvpnm7XWh5S7vkKSoNg6Ol4lz6hZhzTF06gPvFwdLLvJiiO4/Gkstp5no0W0MbPMU3ZNU7WB+zmsT258b2GZbpo/XysA2T4X2zMD+QtP6Q+23QGepxRkTgW77tl/3+PPS9B2drgetnvhi4XiVMDOa45ixvXF8SOuO0qGSywr6X76YAvg/GYDvg9s6S0/dcr2L5G4i9PKWrQ+kR+j9MJpp3FYXto6X7jqx64fIvmsd6L/00KXUYvwVcqKWSkv70R2ErnqVNgNdp5hWHjKhd8llpbcdREEI/U6mYev3iOV4RedloPMPRUQUqJeBHtMDIiKiUXkZ6KWLRhAdYeth2Vzz9myOAtln63jxIaanfgn0yIZwUfhsBcdM8/ZcvSUaaqDbXN4tRJu2//DQi0UmpxeluG01b2+ueXu/kXlXYhnrPDe9A4OTZR3DsB8Y6KW2ZtDYbDRvb2pwzo1GbmCbrnroUxl6bFJuYJsbA9uMyabtPzz0YtEDgE/amkJjovuFE0C9YTzXvE0AP96Kzg1semNgm23dwNDgBjleJlYZ25z4Xgn959Q9whqi3bqD8FugywQ8tid1ojiY6Jle1Fl6Zej5zgpmXmpx1UMHzB6vBewfLxPHci7TJ0fn2HzofDhKfZSGtruS2q02slSckbeiPZg2YqV7TnYp5eheG6FxKrRLA/uberhUoBbHAr202QiKgywaoPvBKKB6hQ9d11c8Ri7mOx3bOsCHh3gTAKWuUN9bgNyE7anFJmSyMRMLkSx1nU+n1Fn61sJzjR8OBjqHL9IAps6dM6iFCQaFlOEwB/y5u9US6hJGJczNt1K2+DcrA/udwPDfSu4qSwD/1llq4tnDb04tQcfhi9SHyYtkCuBbnaWLrr2rOktndZY+wGyYA/4EOqBCq+/xeltn6RLAvzA7eVab42XqmF7UWboysWEZnbXGzzVTP5na175TgV6a3jnFR+rHJsou+24BbOosXb7WA62z9EoupP9gfiZRU2tVDtXleM3leG1grmbe2LWpBsgxNVXKuq6ztNRYzms+CL/i9w9Crfs65NQSdBy+SH0tYf7cmUAFzgeZZ//lBf8Wr6wob8DK8v66eO14AfqHB76mS897CXPtu4D6wLvpu7j23pDOG5y+o7mAKoXNTSxGcjTQOXyRBljB3BC3Y2yH0UvbwJ49uT5egArpVpKiejCcRxMAd3WWLqRdD23utuQZQ/PV9nw/g/oAmSdFpXVY5qkeOqA+QU3fdlFkkqL6LredIS3EO9TCdQMC89gjzHKoUoZJU6i7y0/yAbLB7+Xnc6g7wCEfis1D6yudw1zbBLrrmdVm0P+p3PyhjuG88MMt8frtZywe+96qj9ii6w8kRVXWWap7ucBTpvJlan8TAF/rLH2v6/w5GYYSUgkAAANgSURBVOjyyTHXsaO+5BZId09vlRTVQvM2aY/00nOoURKxszIkLSKPA3qlOdTokZg6Cnd1lp4nRTX4PDo1yoVoEKkp+/CijUkfdddBRyDv+4NS147xA/SDjmGNDHQy7QruFnww7ZF3ep19HDq0U8oT91pa45frOkvXQ4Y1MtDJKBmaZe3VZ4u2iPP3MulJ4wfgDcxMCeDaGdTD0lmfH2agk3FSL33vuh0a7QBcmRhHHLEdNE5VLMd+jjhDfd33LoaBTlbIbfJn1+3QYAc1/Srr5t3kuo/Z3t1fTCW9ewx4RsBAJ2vkKX7Ioc4w7+e9qZeupCc7Qxw99fukqPIhd34MdLJKQj3E8gvDvB9tY6yPiaT88lHHohsMdLJOLvB3COdW+QnAjGHemfEwbyRF9T0pqnOEN/plB+CdrofFDHRyQh6UnsP/ceqfk6I6D+QBqC9TXjchtbK9Y+nl/o0wOgtfoDoKpa4NMtDJmaSoNklRzQH8A/8uwC1UKIX0EssSqpzl8lg+QnNIdSX1+hn8+YB7qTm3tI+UYqCTc0lRLaEuQB8emO6g6plOQ6kv6RW7uPPZQZVYjEwL25WUYK6gSnu+3AVuoY6RsXOLgU5ekAvwBsCfUMFuu5e5BfARqne5sLxvrfbufN7D/GIjO/w8bivD++osKapSjoXLYH/EzyBfmdzRa7MtElnVzNUhk7I180ybXGnoC9Tc1yuD+3BCfqeVTJK2gN5ZS7dQJZ6VDz3y1zQTDcobmLl8mVzrYQs1W+3S5ipWb56fn23ti6gXmdviCmpo2jmGrUT0BDW/dQmgdBlGBmYSfXfqVl6Wn8uhjmOfY/gIddweYhjxI+G+f14NCfgt1LFZo+XiGCYw0ClIsggv0G565xLAd99CyHagH9j/HOrZxezEP1sD2Ph27EyRY/IW7daBKIEfvX8vMNCJHHEd6BQfPhQlIooEA52IKBIMdCKiSDDQiYgiwUAnIooEA52IKBIMdCKiSDDQiYgiwUAnIooEA52IKBIMdCKiSDDQiYgiwUAnIooEA52IKBIMdCKiSDDQiYgiwUAnIooEA52IKBIMdCKiSDDQiYgiwUWiiYgiwR46EVEkGOhERJFgoBMRRYKBTkQUCQY6EVEkGOhERJFgoBMRRYKBTkQUif8H7FVPcPihkn4AAAAASUVORK5CYII="
+          alt="be.4hope"
+        />
+      </div>
+
+      <div class="numeros">
+        <div class="numero">
+          <div class="valor">6</div>
+          <div class="legenda">aceites ou autorizações <b>gravados</b> no banco</div>
+        </div>
+        <div class="numero laranja">
+          <div class="valor">7</div>
+          <div class="legenda">funcionalidades que só existem <b>com</b> um deles</div>
+        </div>
+        <div class="numero">
+          <div class="valor">11</div>
+          <div class="legenda">lugares onde algum aceite aparece, nos três perfis</div>
+        </div>
+        <div class="numero vermelho">
+          <div class="valor">2</div>
+          <div class="legenda">consentimentos <b>desligados</b> em produção, de propósito</div>
+        </div>
+      </div>
+
+      <div class="caixa laranja">
+        <div class="rotulo">Resumo em uma página</div>
+        <ul>
+          <li>
+            A plataforma tem <b>três consentimentos de verdade</b> (o titular diz sim a uma
+            finalidade, e isso fica gravado com versão e data): a <b>consulta por vídeo</b>, o
+            <b>resumo automático por IA</b> e o <b>compartilhamento com a Greens</b>. Ao lado deles
+            há <b>três autorizações</b> que também ficam gravadas: a
+            <b>procuração ANVISA</b> assinada pelo paciente e o <b>Google Agenda</b> e o
+            <b>Mercado Pago</b> conectados pelo médico.
+          </li>
+          <li>
+            Juntos, os seis destravam <b>sete funcionalidades</b>: entrar na consulta por vídeo,
+            transcrever e resumir a consulta, enviar o cadastro à Greens, avisar a Greens da receita
+            e da ANVISA, a Be4Hope representar o paciente na ANVISA, criar o Google Meet da consulta
+            e o paciente agendar com o médico.
+          </li>
+          <li>
+            <b>Os dois consentimentos da teleconsulta estão desligados em produção</b> até o
+            Jurídico revisar os textos e alguém preencher a razão social, o CNPJ, o encarregado
+            (DPO) e o prazo de guarda. O de IA desliga e a consulta segue. O de vídeo é o problema:
+            <b>pela leitura do código, o paciente fica sem botão para entrar na consulta</b> (§6,
+            achado 1).
+          </li>
+          <li>
+            Das <b>três finalidades</b> do compartilhamento com a Greens,
+            <b>só uma destrava algo</b> (o retorno à Greens). A "avaliação médica" diz na tela
+            <i>"sem isto não conseguimos agendar a sua consulta"</i>, e
+            <b>nada no sistema faz isso</b>. Texto que promete o que o sistema não faz é o que a
+            LGPD chama de enganoso (<code>LGPD-02</code>).
+          </li>
+          <li>
+            O <b>"Li e concordo"</b> do cadastro em <code>/registrar-se</code> é só visual: não é
+            gravado, e quem entra <b>pelo Google</b> nem passa por ele.
+          </li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════ 1 ═══════════════════════════ -->
+      <h2><span class="num">1.</span>Como ler este levantamento</h2>
+      <p>
+        Cada item foi achado no código por busca ampla (consentimento, aceite, autorizo, termo,
+        concordo, ciente, OAuth, permissão do navegador) e depois <b>lido</b> no arquivo. Os pontos
+        mais sérios foram reconferidos linha a linha antes de entrar aqui. O código lido é o da
+        <code>main</code> em <code>6065964</code>, que é o que está em produção.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 24%">classe</th>
+          <th>o que significa</th>
+          <th style="width: 10%">quantos</th>
+        </tr>
+        <tr>
+          <td><span class="selo ok">consentimento</span></td>
+          <td>
+            o titular dos dados diz sim a uma finalidade. Fica gravado
+            <b>quem, quando e a que versão do texto</b>, e pode ser retirado
+          </td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td><span class="selo ok">autorização gravada</span></td>
+          <td>
+            assinatura ou conexão de conta que fica registrada e destrava algo, mas não é
+            consentimento LGPD sobre dado de saúde (procuração, OAuth)
+          </td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td><span class="selo atencao">aceite só na tela</span></td>
+          <td>caixa, aviso ou frase de concordância que <b>não grava nada</b></td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td><span class="selo off">permissão do navegador</span></td>
+          <td>microfone, câmera e tela: quem pergunta é o navegador, não a plataforma</td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td><span class="selo off">ato registrado</span></td>
+          <td>
+            decisão humana gravada que não é aceite: a revisão da IA pelo médico
+            (<code>DO-29</code>) e a emergência médica
+          </td>
+          <td>2</td>
+        </tr>
+      </table>
+      <p>
+        <b>O que não está aqui, porque não foi medido:</b> o valor real das chaves de ambiente em
+        produção (§5) e quantas linhas existem hoje em cada tabela. Isso só o banco e o servidor
+        respondem, e só o Davi ou o Diniz alcançam.
+      </p>
+
+      <!-- ═══════════════════════════ 2 ═══════════════════════════ -->
+      <h2><span class="num">2.</span>O mapa, por perfil e por tela</h2>
+      <div class="perfis">
+        <div class="perfil paciente">
+          <h4>Paciente · 7 lugares</h4>
+          <ul>
+            <li>
+              <b>Antes de entrar na teleconsulta</b>: autorização da consulta por vídeo e do resumo
+              por IA, uma abaixo da outra
+              <span class="rota">/paciente/teleconsulta/[roomId]</span>
+            </li>
+            <li>
+              <b>Cadastro por link, etapa "Autorização"</b>: compartilhamento com a Greens, três
+              caixas desmarcadas
+              <span class="rota">/cadastro/[token]</span>
+            </li>
+            <li>
+              <b>Menu Configurações › Privacidade</b>: revê e retira o compartilhamento
+              <span class="rota">/paciente/privacidade</span>
+            </li>
+            <li>
+              <b>ANVISA</b>: o bloco "o que faltou autorizar" e a assinatura da procuração
+              <span class="rota">/paciente/anvisa</span>
+            </li>
+            <li>
+              <b>Criar conta</b>: "Li e concordo" (só na tela)
+              <span class="rota">/registrar-se</span>
+            </li>
+            <li>
+              <b>Chamada de atendimento</b>: aviso antes de mostrar a tela (só na tela) e as
+              permissões do navegador
+              <span class="rota">chamada da ADR-0029</span>
+            </li>
+            <li>
+              <b>Termos, Política e Acesso Solidário</b>: concordância declarada no texto, sem
+              registro
+              <span class="rota"
+                >/termos-de-uso · /politica-de-privacidade · /programa-acesso-solidario</span
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="perfil">
+          <h4>Médico · 3 lugares</h4>
+          <ul>
+            <li>
+              <b>"Pronto para iniciar?"</b>, a tela de abertura da teleconsulta: o aceite do médico
+              para o resumo por IA
+              <span class="rota">GlobalTeleconsultaHost, em toda a área do médico</span>
+            </li>
+            <li>
+              <b>Perfil</b>: conectar o Google Agenda
+              <span class="rota">/medico/perfil</span>
+            </li>
+            <li>
+              <b>Pagamentos › Configuração</b>: conectar o Mercado Pago
+              <span class="rota">/medico/pagamentos/config</span>
+            </li>
+          </ul>
+          <p style="font-size: 8pt; color: var(--suave); margin: 6pt 0 0">
+            E a <b>revisão humana da IA</b> (anamnese e painel lateral da teleconsulta), que é ato
+            registrado e não aceite.
+          </p>
+        </div>
+        <div class="perfil">
+          <h4>Admin · 1 lugar</h4>
+          <ul>
+            <li>
+              <b>ANVISA › Pedidos de atendimento</b>: o botão <b>Ativar</b>, que libera para o
+              paciente a procuração "Be4Hope faz por mim" (<code>DO-77</code>)
+              <span class="rota">/admin/anvisa</span>
+            </li>
+          </ul>
+          <p style="font-size: 8pt; color: var(--suave); margin: 6pt 0 0">
+            <b>Nenhuma tela do admin ou do médico mostra os consentimentos do paciente.</b> Só o
+            próprio paciente os vê, em Privacidade. A Greens recebe o registro dentro do envio do
+            cadastro.
+          </p>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════ 3 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">3.</span>Os três consentimentos</h2>
+
+      <div class="ficha laranja">
+        <div class="ficha-topo">
+          <h3>C1 · Autorização para consulta por telemedicina</h3>
+          <span class="id">CFM-01 · CFM 2.314/2022, Art. 15</span>
+        </div>
+        <dl>
+          <dt>Propósito</dt>
+          <dd>
+            O paciente autoriza que a consulta aconteça <b>a distância</b> e que sua imagem, voz e
+            dados de saúde sejam transmitidos ao médico. A norma do CFM exige essa autorização, e
+            diz que ela faz parte do prontuário.
+          </dd>
+          <dt>Quem aceita</dt>
+          <dd>Só o <b>paciente</b>. O médico não aceita nem vê o estado na tela dele.</dd>
+          <dt>Onde</dt>
+          <dd>
+            Na tela antes de entrar na sala, acima do botão "Entrar na Consulta". A recusa é dita
+            como direito:
+            <i
+              >"A recusa não impede seu atendimento: ela apenas impede que ele aconteça por
+              vídeo"</i
+            >.
+          </dd>
+          <dt>Destrava</dt>
+          <dd>
+            <b>A entrada do paciente na consulta por vídeo.</b> Sem o aceite, o botão fica
+            desabilitado com o texto "Autorize acima para entrar". A conferência está
+            <b>só no navegador</b>: nenhuma rota do servidor confere o aceite antes de deixar o
+            paciente na sala.
+          </dd>
+          <dt>Exceção</dt>
+          <dd>
+            <b>Emergência médica</b>, a única que a norma admite: o médico declara, com motivo de
+            pelo menos 10 caracteres, e o aceite fica dispensado e registrado.
+            <b>A função existe e nenhuma tela a chama.</b>
+          </dd>
+          <dt>Grava</dt>
+          <dd>
+            quem, quando e a versão do texto, na própria teleconsulta. <b>Não há como retirar</b>:
+            não existe campo nem função de revogação.
+          </dd>
+          <dt>Em produção</dt>
+          <dd>
+            <span class="selo ruim">desligado, e trava a entrada</span> O texto é rascunho e o
+            portão de produção está fechado. Ver §6, achado 1.
+          </dd>
+        </dl>
+        <div class="ref mono">
+          lib/lgpd/consentimento.ts:79-105 · app/_actions/consentimento-teleconsulta.ts:197-301 ·
+          components/teleconsulta/Consentimento.tsx:146-226 ·
+          app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:353-375 ·
+          lib/auth/escopo-sala.ts:129-132
+        </div>
+      </div>
+
+      <div class="ficha laranja">
+        <div class="ficha-topo">
+          <h3>C2 · Autorização para o resumo automático da consulta (IA)</h3>
+          <span class="id">LGPD-05 · LGPD art. 11, I</span>
+        </div>
+        <dl>
+          <dt>Propósito</dt>
+          <dd>
+            Transformar o que foi falado em resumo clínico escrito. O áudio vai ao
+            <b>Google Speech-to-Text</b> e o texto ao <b>Gemini</b>, os dois com servidores fora do
+            Brasil. O áudio <b>não é guardado</b>, e o texto passa por uma máscara de CPF, RG,
+            telefone e e-mail antes de ir ao Gemini. A máscara só pega formatos fixos: telefone sem
+            parênteses, RG sem pontos e número por extenso passam
+            (<code>transcrever/route.ts:194-199</code>). O texto da tela diz tudo isso, inclusive
+            que o áudio vai <b>sem</b> essa remoção.
+          </dd>
+          <dt>Quem aceita</dt>
+          <dd>
+            <b>Paciente e médico, os dois.</b> Cada um vê se o outro já aceitou. O admin não aceita.
+          </dd>
+          <dt>Onde</dt>
+          <dd>
+            Paciente: na mesma tela antes de entrar, abaixo da C1. Médico: na tela "Pronto para
+            iniciar?".
+          </dd>
+          <dt>Destrava</dt>
+          <dd>
+            <b>Gravar o áudio, transcrever e gerar o resumo.</b> Aqui o portão está
+            <b>no servidor</b>: a rota de transcrição responde 403 sem os dois aceites na versão
+            atual. É opcional: <b>a consulta acontece sem ele</b>, e o médico escreve à mão.
+          </dd>
+          <dt>Grava</dt>
+          <dd>
+            os dois aceites (quem e quando), a versão do texto e a revogação.
+            <b>A função de retirar existe, e nenhuma tela a chama.</b>
+          </dd>
+          <dt>Em produção</dt>
+          <dd>
+            <span class="selo off">desligado, como planejado</span> A tela mostra "Resumo automático
+            indisponível" e a consulta segue.
+          </dd>
+        </dl>
+        <div class="ref mono">
+          lib/lgpd/consentimento.ts:118-142 · app/_actions/consentimento-teleconsulta.ts:99-176 ·
+          app/api/teleconsulta/transcrever/route.ts:44-51 ·
+          components/teleconsulta/GlobalTeleconsultaHost.tsx:218,374,555-578
+        </div>
+      </div>
+
+      <div class="ficha">
+        <div class="ficha-topo">
+          <h3>C3 · Compartilhamento entre Be4Hope e Greens Corp</h3>
+          <span class="id">LGPD-05 · ADR-0021 D-02 · versão 2026-09-10.v1</span>
+        </div>
+        <dl>
+          <dt>Propósito</dt>
+          <dd>
+            O paciente autoriza o compartilhamento de seus dados e documentos com a Be4Hope, e que a
+            Be4Hope informe à Greens os documentos que emitir. O texto veio do formulário da Greens,
+            a pedido do dono em 10/09.
+          </dd>
+          <dt>Quem aceita</dt>
+          <dd>Só o <b>paciente</b>, e só ele vê.</dd>
+          <dt>Onde</dt>
+          <dd>
+            <b>Três telas</b>, com o mesmo componente: a etapa "Autorização" do cadastro por link
+            (todo mundo que abre o link), o menu <b>Privacidade</b> (rever e retirar) e o bloco "o
+            que faltou autorizar" da tela ANVISA (para quem veio da Greens ou do WhatsApp). As
+            caixas nascem <b>desmarcadas</b>, e cada finalidade diz o que acontece se recusada.
+          </dd>
+          <dt>Grava</dt>
+          <dd>
+            <b>uma linha por finalidade</b>, com a versão, o idioma, o <b>texto exato lido</b>, a
+            data e a tela de origem (<code>cadastro_por_link</code>,
+            <code>painel_privacidade</code>, <code>tela_anvisa</code>). Retirar só marca a data, sem
+            apagar.
+          </dd>
+          <dt>É pedágio?</dt>
+          <dd><b>Não.</b> O cadastro conclui com as três caixas vazias.</dd>
+        </dl>
+        <table style="margin-top: 7pt">
+          <tr>
+            <th style="width: 23%">finalidade</th>
+            <th style="width: 34%">a tela diz, se recusar</th>
+            <th>o que destrava de fato</th>
+          </tr>
+          <tr>
+            <td><b>Retorno ao parceiro</b><br /><code>retorno_ao_parceiro</code></td>
+            <td><i>"O seu pedido na Greens não avança sozinho: você levaria os documentos."</i></td>
+            <td>
+              <span class="selo ok">destrava 2</span> o envio do cadastro com os documentos à
+              Greens, e os avisos de receita emitida e ANVISA aprovada. O envio
+              <b>relê o consentimento</b> no momento de sair. Se foi retirado, o envio é cancelado e
+              não se repete.
+            </td>
+          </tr>
+          <tr>
+            <td><b>Apoio na ANVISA</b><br /><code>apoio_anvisa</code></td>
+            <td><i>"Você continua podendo pedir a autorização por conta própria."</i></td>
+            <td>
+              <span class="selo off">nada</span> só decide se o bloco "o que faltou autorizar"
+              aparece na tela ANVISA. Não condiciona procuração nem formulário.
+            </td>
+          </tr>
+          <tr>
+            <td><b>Avaliação médica</b><br /><code>avaliacao_medica</code></td>
+            <td><i>"Sem isto não conseguimos agendar a sua consulta."</i></td>
+            <td>
+              <span class="selo ruim">nada, e a tela promete</span> nenhum portão lê esta
+              finalidade. O agendamento acontece igual. Ver §6, achado 3.
+            </td>
+          </tr>
+        </table>
+        <div class="ref mono">
+          lib/parceiros/consentimento.ts:28-105 · db/schema/consentimentos.ts ·
+          components/paciente/ConsentimentoDoCompartilhamento.tsx ·
+          lib/parceiros/pode-transferir.ts:28-46 · lib/parceiros/consentimento-ainda-vale.ts:43-47 ·
+          lib/parceiros/enviador.ts:196-205
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════ 4 ═══════════════════════════ -->
+      <h2><span class="num">4.</span>As três autorizações gravadas</h2>
+
+      <div class="ficha">
+        <div class="ficha-topo">
+          <h3>A1 · Procuração específica ANVISA (DocuSign)</h3>
+          <span class="id">ADR-0029 · DO-77</span>
+        </div>
+        <dl>
+          <dt>Propósito</dt>
+          <dd>
+            O paciente autoriza a Be4Hope a fazer o processo da ANVISA <b>em nome dele</b>
+            ("Be4Hope faz por mim").
+          </dd>
+          <dt>Quem</dt>
+          <dd>
+            Dois passos de dois perfis. O <b>paciente</b> pede o atendimento com suporte, o
+            <b>admin</b> clica em <b>Ativar</b>, e só então o paciente vê e <b>assina</b> a
+            procuração no DocuSign, dentro da própria tela.
+          </dd>
+          <dt>Destrava</dt>
+          <dd>
+            a <b>representação</b>: o checklist ganha a procuração e o laudo, o PDF da procuração
+            pode ser gerado, e, com a assinatura, o checklist se completa e libera "Confirmar Envio
+            à ANVISA". Nada sai sozinho para a ANVISA: quem protocola é o admin.
+          </dd>
+          <dt>Grava</dt>
+          <dd>
+            o pedido, quem ativou e quando, o estado da assinatura e o PDF assinado, com auditoria.
+          </dd>
+          <dt>Em produção</dt>
+          <dd>
+            <span class="selo ok">ativo</span> Provado por Davi em 30/09. O ambiente do DocuSign
+            (sandbox ou produção) não foi medido.
+          </dd>
+        </dl>
+        <div class="ref mono">
+          app/_actions/pedido-atendimento-assistido.ts:118-297 ·
+          lib/anvisa/pedido-de-atendimento.ts:52-82 · app/(paciente)/_actions/anvisa.ts:229-438 ·
+          app/api/anvisa/procuracao/route.ts:88-93
+        </div>
+      </div>
+
+      <div class="duas">
+        <div class="ficha cinza">
+          <div class="ficha-topo">
+            <h3>A2 · Google Agenda</h3>
+            <span class="id">médico · OAuth</span>
+          </div>
+          <dl>
+            <dt>Onde</dt>
+            <dd>Perfil do médico, "Conectar Google Calendar".</dd>
+            <dt>Destrava</dt>
+            <dd>
+              o evento com <b>Google Meet</b> criado sozinho quando a consulta é paga. Com ele a
+              consulta fica <i>confirmada</i>; sem ele, <i>agendada</i> e sem Meet. Não bloqueia a
+              agenda.
+            </dd>
+            <dt>Grava</dt>
+            <dd>o token de acesso no cadastro do médico.</dd>
+          </dl>
+          <div class="ref mono">
+            lib/integrations/google-calendar/index.ts:70-81 · app/api/auth/google/callback/route.ts
+            · lib/agendamento/confirmar-consulta-paga.ts:151-175
+          </div>
+        </div>
+        <div class="ficha cinza">
+          <div class="ficha-topo">
+            <h3>A3 · Mercado Pago</h3>
+            <span class="id">médico · OAuth</span>
+          </div>
+          <dl>
+            <dt>Onde</dt>
+            <dd>Pagamentos › Configuração.</dd>
+            <dt>Destrava</dt>
+            <dd>
+              o paciente <b>agendar e pagar</b> com aquele médico. Só trava se a chave
+              <code>MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO</code> estiver em <code>ativo</code>; o
+              valor em produção não foi medido.
+            </dd>
+            <dt>Grava</dt>
+            <dd>a conta conectada, com a credencial cifrada (ADR-0024).</dd>
+          </dl>
+          <div class="ref mono">
+            lib/mercadopago/conta.ts:87-219 · app/(public)/_actions/agendamento.ts:147,1059
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════ 5 ═══════════════════════════ -->
+      <h2><span class="num">5.</span>O que cada um destrava: as sete funcionalidades</h2>
+      <p>
+        Esta é a pergunta central. Cada linha é uma funcionalidade que <b>não existe</b> sem o
+        aceite ou a autorização à esquerda. O estado à direita é o de produção, como o código o
+        decide.
+      </p>
+      <div class="desbloqueios">
+        <div class="desbloqueio">
+          <div class="n">1</div>
+          <div class="chave">
+            C1 · consulta por vídeo<small>paciente, ou emergência declarada</small>
+          </div>
+          <div class="seta">o paciente <b>entra na teleconsulta</b> por vídeo</div>
+          <div class="estado"><span class="selo ruim">travado</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">2</div>
+          <div class="chave">C2 · resumo por IA<small>paciente e médico, os dois</small></div>
+          <div class="seta">gravar o áudio, <b>transcrever</b> e gerar o <b>resumo clínico</b></div>
+          <div class="estado"><span class="selo off">desligado</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">3</div>
+          <div class="chave">
+            C3 · retorno ao parceiro<small>paciente, mais a chave de ambiente</small>
+          </div>
+          <div class="seta"><b>enviar o cadastro e os documentos</b> à Greens</div>
+          <div class="estado"><span class="selo atencao">a medir</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">4</div>
+          <div class="chave">C3 · retorno ao parceiro<small>paciente</small></div>
+          <div class="seta">avisar a Greens de <b>receita emitida</b> e <b>ANVISA aprovada</b></div>
+          <div class="estado"><span class="selo atencao">a medir</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">5</div>
+          <div class="chave">A1 · procuração ANVISA<small>admin ativa, paciente assina</small></div>
+          <div class="seta">a Be4Hope <b>representar o paciente na ANVISA</b></div>
+          <div class="estado"><span class="selo ok">ativo</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">6</div>
+          <div class="chave">A2 · Google Agenda<small>médico</small></div>
+          <div class="seta">criar o <b>Google Meet</b> e confirmar a consulta paga</div>
+          <div class="estado"><span class="selo atencao">a medir</span></div>
+        </div>
+        <div class="desbloqueio">
+          <div class="n">7</div>
+          <div class="chave">A3 · Mercado Pago<small>médico, mais a chave de ambiente</small></div>
+          <div class="seta">o paciente <b>agendar e pagar</b> com aquele médico</div>
+          <div class="estado"><span class="selo atencao">a medir</span></div>
+        </div>
+      </div>
+
+      <div class="caixa verde">
+        <div class="rotulo">E o que não destrava nada</div>
+        <ul>
+          <li>
+            <b>Avaliação médica</b> e <b>apoio na ANVISA</b>, duas das três finalidades da C3: são
+            gravadas e nenhuma funcionalidade depende delas.
+          </li>
+          <li>
+            <b>"Li e concordo"</b> do <code>/registrar-se</code>: trava só o botão do formulário, e
+            não o do Google.
+          </li>
+          <li>
+            <b>Revisão humana da IA</b>: grava quem decidiu e o que decidiu, inclusive quando
+            diverge. De propósito, nenhuma prescrição depende dela:
+            <i>"não há caminho de um clique"</i>
+            (proibição nº 2 do projeto).
+          </li>
+        </ul>
+      </div>
+
+      <div class="caixa laranja">
+        <div class="rotulo">O que só a produção responde</div>
+        <p style="margin-bottom: 3pt">
+          O código diz <b>como</b> cada portão decide. O <b>valor</b> que ele lê vem do ambiente do
+          servidor, e por isso quatro estados acima ficam como "a medir":
+        </p>
+        <ul style="margin-bottom: 0">
+          <li>
+            <code>PARCEIRO_TRANSFERENCIA_ATIVA</code>: o <code>deploy.yml</code> diz "ligada por
+            decisão do dono em 11/09/2026"; a ADR-0026, de 23/09, diz "ela continua fora".
+            <b>As duas fontes divergem.</b>
+          </li>
+          <li>
+            <code>MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO</code>, se o Google está configurado, e se
+            o endereço e o segredo da Greens estão no servidor (sem eles, os avisos de receita e
+            ANVISA não saem).
+          </li>
+          <li>
+            Se já existe alguma teleconsulta com a C1 gravada, ou alguma linha na tabela de
+            consentimentos (a ADR-0022 mediu zero, numa data anterior).
+          </li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════ 6 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">6.</span>O que o levantamento achou</h2>
+      <p>
+        Nada abaixo foi corrigido. A regra do projeto é <b>catalogar com o perigo medido</b> e
+        corrigir só com autorização, em trabalho próprio. Os achados entraram no
+        <code>docs/04-LISTA-DE-AFAZERES.md</code> como Itens 67 a 73.
+      </p>
+
+      <div class="caixa alerta">
+        <div class="rotulo">Achado 1 · Item 67 · o mais grave</div>
+        <p>
+          <b
+            >Pela leitura do código, em produção o paciente não consegue entrar na consulta por
+            vídeo.</b
+          >
+          O portão de produção dos consentimentos está fechado de propósito, porque o texto é
+          rascunho. A caixa da C1 então mostra "Consulta por vídeo indisponível" e não pede aceite.
+          Mas o botão "Entrar na Consulta" continua esperando esse aceite, e fica desabilitado com
+          "Autorize acima para entrar". A pessoa lê "autorize acima" e, acima, não há o que
+          autorizar. A saída prevista em norma, a emergência, não tem botão.
+        </p>
+        <p style="margin: 0">
+          <b>Não foi medido.</b> Só produção diz se há consultas por vídeo acontecendo, ou se elas
+          acontecem por outro caminho (o Google Meet da A2). Essa é a primeira pergunta para o Davi.
+          <span class="mono"
+            >Consentimento.tsx:163,213 · page.tsx:368-375 · consentimento.ts:164,191-196</span
+          >
+        </p>
+      </div>
+
+      <table>
+        <tr>
+          <th style="width: 6%">#</th>
+          <th style="width: 30%">achado</th>
+          <th>o que acontece, e para quem</th>
+          <th style="width: 10%">perigo</th>
+        </tr>
+        <tr>
+          <td>2<br /><span class="mono">68</span></td>
+          <td>O aceite da IA libera o navegador do médico antes do paciente aceitar</td>
+          <td>
+            Ao aceitar, a tela avisa "liberado" sem conferir o outro lado, e não relê depois. O
+            navegador do médico pode começar a gravar sem o aceite do paciente, ou não gravar depois
+            que ele aceita. <b>O servidor continua barrando o envio</b>, então nada é transcrito.
+            Hoje está desligado em produção.
+          </td>
+          <td><span class="selo atencao">médio</span></td>
+        </tr>
+        <tr>
+          <td>3<br /><span class="mono">69</span></td>
+          <td>"Avaliação médica" promete o que o sistema não faz</td>
+          <td>
+            A tela diz que sem ela "não conseguimos agendar a sua consulta", e nada no sistema
+            condiciona o agendamento a ela. O bloco "o que faltou autorizar" ainda mostra as três
+            caixas, embora só confira duas. É o tipo de informação que pode anular o consentimento
+            (<code>LGPD-02</code>). <b>Corrigir é decidir:</b> implementar o efeito ou mudar o
+            texto, e mudar o texto exige versão nova.
+          </td>
+          <td><span class="selo atencao">médio</span></td>
+        </tr>
+        <tr>
+          <td>4<br /><span class="mono">70</span></td>
+          <td>"Li e concordo" não é gravado, e o Google pula</td>
+          <td>
+            Não fica registrado <b>quem</b> aceitou os Termos e a Política, nem <b>qual versão</b>.
+            Quem cria a conta pelo botão do Google não passa pela caixa. Os Termos dizem que o "uso
+            continuado" é aceite, e nada prova isso.
+          </td>
+          <td><span class="selo atencao">médio</span></td>
+        </tr>
+        <tr>
+          <td>5<br /><span class="mono">71</span></td>
+          <td>A conexão do Google Agenda não confere quem está conectando</td>
+          <td>
+            A rota de retorno do Google grava o token no médico cujo id vem na própria URL, sem
+            conferir a sessão nem uma assinatura. Quem souber o id de um médico e montar a URL pode
+            ligar a própria agenda Google ao cadastro dele, e os Meets das consultas dele passam a
+            nascer nessa agenda.
+          </td>
+          <td><span class="selo ruim">alto</span></td>
+        </tr>
+        <tr>
+          <td>6<br /><span class="mono">72</span></td>
+          <td>
+            A procuração pode ser "cumprida" sem DocuSign, e o retorno do DocuSign não é assinado
+          </td>
+          <td>
+            O retorno automático do DocuSign aceita qualquer chamada: a validação de assinatura é um
+            <code>TODO</code>. E o envio de documento da ANVISA aceita qualquer tipo, inclusive
+            <code>procuracao_especifica</code>: subir um arquivo qualquer marca a procuração como
+            enviada. A tela ainda sugere "baixe, assine e envie".
+          </td>
+          <td><span class="selo ruim">alto</span></td>
+        </tr>
+        <tr>
+          <td>7<br /><span class="mono">73</span></td>
+          <td>Retirar e emergência existem sem tela, e há sobras antigas</td>
+          <td>
+            Não há botão para o paciente retirar a autorização da IA, nem para o médico declarar
+            emergência. A C1 nem tem como ser retirada. Duas colunas antigas
+            (<code>consentimento_lgpd</code>, <code>consentimento_obtido</code>) não decidem nada. E
+            a ADR-0007 ainda diz que a tela da C1 e a emergência não existem, e as duas existem.
+          </td>
+          <td><span class="selo off">baixo</span></td>
+        </tr>
+      </table>
+
+      <div class="caixa">
+        <div class="rotulo">Já catalogados antes, e que este levantamento reencontrou</div>
+        <ul style="margin: 0">
+          <li>
+            <b>Item 61</b>: a tela do paciente na teleconsulta liga uma gravação local sem
+            consentimento, que não sai do navegador.
+          </li>
+          <li>
+            O pedido de envio à ANVISA não confere de quem é a autorização (<code>docs/03</code>,
+            achado do
+            <code>confirmarEnvioAnvisa</code>).
+          </li>
+          <li>
+            Os textos C1 e C2 aguardam o Jurídico, o CNPJ, o encarregado e o prazo de guarda
+            (handoff, §4).
+          </li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════ 7 ═══════════════════════════ -->
+      <h2><span class="num">7.</span>O que não existe na plataforma</h2>
+      <table>
+        <tr>
+          <th style="width: 32%">o quê</th>
+          <th>o que o código mostra</th>
+        </tr>
+        <tr>
+          <td>Banner de cookies</td>
+          <td>
+            Não há analytics, pixel nem rastreamento no código. A Política diz que não usa cookies
+            de rastreamento, e o código confirma. Se o banner é exigido mesmo assim, é pergunta para
+            o Jurídico: não pesquisei a norma.
+          </td>
+        </tr>
+        <tr>
+          <td>Opt-in de comunicação</td>
+          <td>
+            Não há preferência de comunicação nem descadastro. O Brevo envia e-mails (lembretes de
+            recompra, avisos) sem conferir opt-in. O ChatPro não envia por iniciativa da plataforma:
+            só responde ao bot.
+          </td>
+        </tr>
+        <tr>
+          <td>Triagem pública e e-book</td>
+          <td>
+            A triagem recolhe dado de saúde com a frase "protegidas pela LGPD", sem caixa, e copia
+            as respostas (CPF, diagnóstico, medicamentos, renda) para uma planilha Google
+            (<code>lib/integrations/google-sheets/index.ts</code>). O e-book grava nome, e-mail e
+            telefone sem consentimento.
+            <b>A base legal é pergunta para o Jurídico.</b>
+          </td>
+        </tr>
+        <tr>
+          <td>Consentimento do responsável por menor</td>
+          <td>
+            A Política exige "consentimento expresso do responsável legal". Nenhum registro desse
+            consentimento foi achado.
+          </td>
+        </tr>
+        <tr>
+          <td>Aceite na receita ou no pagamento</td>
+          <td>
+            Nenhum. A assinatura ICP-Brasil ainda é stub, e o pagamento mostra só o texto de
+            cancelamento.
+          </td>
+        </tr>
+        <tr>
+          <td>Aceite na chamada de atendimento</td>
+          <td>
+            Nenhum, de propósito: nada é gravado (ADR-0029). Há o aviso antes de mostrar a tela e as
+            permissões do navegador. O microfone é pedido ao entrar; a câmera começa desligada.
+          </td>
+        </tr>
+      </table>
+
+      <!-- ═══════════════════════════ 8 ═══════════════════════════ -->
+      <h2><span class="num">8.</span>Próximos passos, e de quem é cada um</h2>
+      <ol>
+        <li>
+          <b>Medir o achado 1</b> (Davi ou Diniz, na VPS): se há teleconsultas por vídeo acontecendo
+          em produção. Eu preparo o bloco de leitura, testado num banco descartável, quando pedirem.
+        </li>
+        <li>
+          <b>Decidir o desfecho do achado 1</b> (dono): esperar os textos revisados ou destravar a
+          entrada por vídeo enquanto isso. É regra de negócio e norma (<code>CFM-01</code>), e não
+          se presume.
+        </li>
+        <li>
+          <b>Jurídico</b>: revisar C1 e C2, fornecer razão social, CNPJ, encarregado (DPO) e prazo
+          de guarda, e dizer a base legal da triagem pública e do e-book.
+        </li>
+        <li>
+          <b>Decidir a "avaliação médica"</b> (dono): implementar o efeito que a tela promete ou
+          reescrever o texto com versão nova.
+        </li>
+        <li>
+          <b>Autorizar a correção dos achados 5 e 6</b>, os de perigo alto, cada um em trabalho
+          próprio e com guarda.
+        </li>
+        <li>
+          <b>Alinhar a fonte da chave de transferência</b>: o <code>deploy.yml</code> e a ADR-0026
+          dizem coisas opostas.
+        </li>
+      </ol>
+
+      <footer>
+        Escrito por Claude Code Be4Hope em 01/10/2026, a pedido do Davi. Levantamento por leitura do
+        código da <code>main</code> <code>6065964</code>; nada foi executado contra produção. Os
+        fundamentos citam os IDs do <code>docs/02-CATALOGO-DE-REGRAS.md</code>. O art. 8º §5º da
+        LGPD (revogação "a qualquer momento") é citado pelo código e ainda não tem ID próprio no
+        catálogo. Fonte deste PDF:
+        <code>docs/levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.html</code>.
+      </footer>
+    </main>
+  </body>
+</html>

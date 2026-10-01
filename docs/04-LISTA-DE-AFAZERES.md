@@ -19,6 +19,193 @@
 
 ---
 
+## 🟠 Item 77 — CATALOGADO, 01/10/2026: com a sessão fora do repositório, os dois hooks bloqueiam tudo
+
+**Status:** achado durante a D-28 da ADR-0029. **Não corrigido: hook é área protegida, e mexer pede
+autorização.**
+
+`.claude/settings.json:9` e `:20` rodam
+`python3 "$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/<hook>.py"`. A raiz
+sai do **diretório atual** do shell. Um `cd` para fora do repositório (no caso, o scratchpad da
+sessão, que é o lugar recomendado para arquivo temporário) faz o `git rev-parse` falhar, o
+`|| echo .` aponta para o próprio scratchpad, o `python3` não acha o arquivo, e **todo** `Bash` e
+todo `Write` passam a ser recusados, inclusive o `cd` de volta. A sessão só voltou com o dono
+digitando `! cd /home/DK/Developer/Projects/behemp-site`.
+
+O defeito falha **fechado**, o que é o lado seguro: nada passou sem o hook. O custo é travar a sessão.
+**Correção provável:** ancorar no `$CLAUDE_PROJECT_DIR`, que a doc de hooks do Claude Code expõe para
+isso, com o `git rev-parse` como reserva. [inferência: não li a doc nesta sessão; conferir antes].
+**Perigo de mexer:** baixo no código (duas linhas de configuração), mas o guarda
+`hooks-de-escopo` precisa ganhar um caso que rode o hook com o diretório atual fora do repositório,
+nos dois lados (`.ts` e `.sh`, `DO-19`).
+
+---
+
+## ✅ Item 76 — FEITO, 01/10/2026 (local, sem commit): a espera da chamada não diz mais "sem câmera" a quem nem chegou
+
+**Status:** implementado e provado local, aprovado por Davi (`DO-86`). Decisão e provas em
+[ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
+Commit, PR e deploy esperam ordem com nome.
+
+**O defeito:** `components/atendimento/ChamadaDeAtendimento.tsx:640-651` (antes da mudança) dizia
+_"{outro} está sem câmera e não está mostrando a tela"_ em toda fase sem destaque, inclusive antes de o
+outro lado entrar.
+
+**O que mudou:** `lib/atendimento/espera.ts` (a regra do palco, a altura das barras e o contador,
+puros); `components/atendimento/EsperaDaChamada.tsx` (novo); `app/globals.css` (+283 linhas, no fim,
+com o prefixo `espera-`); `ChamadaDeAtendimento.tsx` (+42 / −10: o palco pela regra, o cabeçalho, e a
+faixa do microfone em estado). Guarda `__tests__/guardas/a-espera-da-chamada-diz-a-verdade.test.ts`.
+
+**O que ficou:**
+
+- a tela com login e o Pusher real só se veem em produção (sem `CLERK_SECRET_KEY` local);
+- a regra global de `app/globals.css:381-389` justifica todo `<p>` no celular. O texto "sem câmera"
+  de `conectado`, que já existia, continua justificado no celular. Não corrigi: é anterior e fora do
+  escopo;
+- a moldura do palco, o cabeçalho e os botões diferem do canvas no raio, na borda e no formato. A
+  tabela está na D-28. Mexer neles é pedido próprio.
+
+---
+
+## 🟠 Item 75 — CATALOGADO, 01/10/2026: a Política de Privacidade não lista quem recebe dados do paciente
+
+**Status:** achado ao preparar o documento do Jurídico
+([`levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf`](levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf),
+perguntas J-15 a J-17). **Não corrigido: o texto é decisão do Jurídico.**
+
+`app/(public)/politica-de-privacidade/page.tsx:197-205` lista Neon, Clerk, Brevo, Pusher, médicos e
+Anvisa, e afirma que _"todos os terceiros mencionados possuem contratos de proteção de dados"_. Não
+lista a Greens Corp (`lib/parceiros/`), o Google Speech-to-Text e o Gemini (`app/api/teleconsulta/transcrever/route.ts`),
+o DocuSign, o Mercado Pago, o WhatsApp/ChatPro, a AWS nem o armazenamento da Vercel. Última
+atualização declarada: 11/05/2026 (`:404-405`). Os Termos não têm data nem versão. O controlador
+também diverge entre fontes: `CONTROLADOR` está `[PENDENTE]` em `lib/lgpd/consentimento.ts:44-50`, a
+procuração nomeia a Associação Behemp, CNPJ 07.578.940/0001-01 (`lib/receituario/procuracao-pdf.tsx:165-167`),
+e a Política dá `privacidade@be4hope.org` como canal do encarregado (`page.tsx:466-468`). **Perigo de
+mexer:** baixo no código; a mudança de texto pode exigir aviso a quem já aceitou (J-15).
+
+---
+
+## 🟠 Item 74 — CATALOGADO, 01/10/2026: "Excluir Minha Conta" promete apagar todos os dados e mantém
+
+**Status:** catalogado, **não corrigido**; pergunta J-12 do documento do Jurídico.
+
+A tela pergunta _"Você realmente deseja excluir permanentemente sua conta e todos os dados associados a
+ela?"_ (`app/(paciente)/paciente/perfil/page.tsx:950`). `excluirMinhaConta`
+(`app/_actions/perfil-paciente.ts:234-266`) apaga o usuário no Clerk e faz **soft delete** de `users` e
+`pacientes`. Documentos, consentimentos, prontuário e o que foi à Greens ficam. Manter pode ser o
+certo (prontuário tem guarda mínima por norma do CFM), mas o texto promete o contrário: risco de
+`LGPD-02`. **Perigo de mexer:** baixo no texto; o que a exclusão deve fazer é decisão jurídica.
+
+---
+
+## 🔴 Item 67 — CATALOGADO, 01/10/2026: em produção, o botão "Entrar na Consulta" do paciente espera um aceite que a tela não pede
+
+**Status:** achado no levantamento dos consentimentos pedido por Davi
+([`levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf`](levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf)).
+**Lido, não medido**, e não corrigido.
+
+**O que acontece, pela leitura:** `CONSENTIMENTO_PRONTO_PARA_USO = false` (`lib/lgpd/consentimento.ts:164`)
+faz `consentimentoPodeSerColetado()` devolver `false` em produção (`:191-196`). O componente
+`components/teleconsulta/Consentimento.tsx` então mostra "Consulta por vídeo indisponível" (`:213-226`),
+mas antes já chamou `onMudanca?.(d.autorizado)` (`:163`) com `autorizado = consentTeleconsultaOk`, que é
+`false` sem aceite gravado e sem emergência (`lib/auth/escopo-sala.ts:129-132`). O botão
+`app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:368-375` fica desabilitado com "Autorize acima
+para entrar". `declararEmergenciaMedica` (`app/_actions/consentimento-teleconsulta.ts:246`), que dispensa o
+aceite, **não tem chamador**. O portão é só no navegador: nenhuma rota do servidor confere a C1.
+
+**A medir (só Davi ou Diniz):** se há teleconsultas por vídeo acontecendo em produção, ou se o
+atendimento passa pelo Google Meet do Google Agenda. **Perigo de mexer:** médio. Tela clínica em
+produção, decisão de norma (`CFM-01`) e de negócio: esperar o texto revisado ou destravar antes. Não se
+presume.
+
+---
+
+## 🟠 Item 68 — CATALOGADO, 01/10/2026: o aceite da IA libera o navegador antes de o outro lado aceitar
+
+**Status:** catalogado, **não corrigido**. Hoje desligado em produção (Item 67, mesmo portão).
+
+`components/teleconsulta/Consentimento.tsx:193-195`: depois de `registrarConsentimentoIa`, chama
+`onMudanca?.(true)` sem conferir se o outro lado aceitou, e o estado só é lido uma vez (`:146-178`). No
+médico, isso liga `consentimentoIaLiberadoRef`, e o `MediaRecorder` nasce (`GlobalTeleconsultaHost.tsx:218`)
+e envia (`:374`) sem o aceite do paciente; ou nunca liga, se o paciente aceitar depois. O servidor
+continua barrando: `app/api/teleconsulta/transcrever/route.ts:44-51` responde 403 sem os dois aceites.
+**Perigo:** médio; captura local de áudio sem a base da ADR-0007, sem envio. Vizinho do Item 61.
+
+---
+
+## 🟠 Item 69 — CATALOGADO, 01/10/2026: a finalidade "avaliação médica" promete na tela um efeito que não existe
+
+**Status:** catalogado, **não corrigido**; desfecho é decisão do dono.
+
+`lib/parceiros/consentimento.ts:94-97` diz, se recusada: _"Sem isto não conseguimos agendar a sua
+consulta."_ Nenhum portão lê `avaliacao_medica` (medido com `rg`: só listas, rótulos e Zod; os outros
+resultados são o enum de **jornada**). `apoio_anvisa` só decide se `ConsentimentoQueFaltou` aparece
+(`lib/parceiros/consentimento-pendente.ts:43-44`), e esse bloco mostra as **três** caixas
+(`components/paciente/ConsentimentoQueFaltou.tsx:95`). Texto que promete o que o sistema não faz é o
+risco de `LGPD-02`. **Perigo de mexer:** baixo no código, mas mudar o texto exige **versão nova**
+(`VERSAO_DO_CONSENTIMENTO`, `:28`) e muda o que a Greens recebe no S2: atravessa a Ponte.
+
+---
+
+## 🟠 Item 70 — CATALOGADO, 01/10/2026: o "Li e concordo" do `/registrar-se` não é gravado, e o Google não passa por ele
+
+**Status:** catalogado, **não corrigido**.
+
+`app/(auth)/registrar-se/[[...sign-up]]/page.tsx:277-279` recusa sem `aceitouTermos`, mas
+`signUp.create` (`:291-298`) não leva o aceite, e nenhuma tabela o guarda: não se prova quem aceitou nem
+qual versão dos Termos. `handleGoogleSignUp` (`:378-392`) não confere a caixa. Os Termos dizem que o "uso
+continuado" é aceite (`app/(public)/termos-de-uso/page.tsx:325-326`). **Perigo:** médio; a mesma tela do
+Item 64, que ninguém mediu ainda.
+
+---
+
+## 🔴 Item 71 — CATALOGADO, 01/10/2026: o retorno do OAuth do Google Agenda grava o token no médico que a URL disser
+
+**Status:** catalogado, **não corrigido**.
+
+`app/api/auth/google/callback/route.ts:21` lê `state` como `medicoId`, sem assinatura, e `:38` faz
+`update(medicos).set({ googleRefreshToken }).where(eq(medicos.id, state))` **sem conferir a sessão**.
+Quem souber o id de um médico pode concluir o OAuth com a própria conta Google e ligar a própria agenda
+ao cadastro dele: os Meets das consultas pagas nascem nela (`lib/agendamento/confirmar-consulta-paga.ts:151-175`).
+É OWASP API1 (escopo de objeto) e CSRF de OAuth. A rota redireciona para `/medico/configuracoes`, e a
+tela que conecta é `/medico/perfil`. Há um segundo callback, `app/api/webhooks/google/callback/route.ts`,
+com TODO e sem gravar nada. **Perigo de mexer:** baixo (uma rota, um chamador); exige `state` assinado e
+sessão do médico.
+
+---
+
+## 🔴 Item 72 — CATALOGADO, 01/10/2026: a procuração pode ser marcada como enviada sem DocuSign, e o retorno do DocuSign não é assinado
+
+**Status:** catalogado, **não corrigido**.
+
+- `app/api/webhooks/docusign/route.ts:18-21`: a validação HMAC é `TODO`. Qualquer chamada muda o
+  estado da assinatura.
+- `app/api/anvisa/upload-documento/route.ts:16`, `:72-79`: o `tipo` vem do formulário sem lista, e
+  `procuracao_especifica` entra como `enviado: true` com um arquivo qualquer. A dica da tela manda
+  "baixe, assine e envie" (`app/(paciente)/paciente/anvisa/page.tsx:136`).
+
+O mesmo upload já está no Item 6 (store público), e o `confirmarEnvioAnvisa` sem escopo já está no
+`03`. **Perigo de mexer:** médio; fluxo ANVISA em produção provado por Davi em 30/09, com 12
+autorizações em `representacao`.
+
+---
+
+## ⚪ Item 73 — CATALOGADO, 01/10/2026: retirar a IA e declarar emergência existem sem tela, e há sobras antigas
+
+**Status:** catalogado, **não corrigido**.
+
+- `revogarConsentimentoIa` (`app/_actions/consentimento-teleconsulta.ts:152`) e `declararEmergenciaMedica`
+  (`:246`) não têm chamador. A C1 não tem coluna nem função de revogação (`db/schema/teleconsultas.ts:60-62`).
+- `registrarConsentimentoLgpd` (`app/(medico)/_actions/teleconsulta.ts:63`) não tem chamador, e
+  `teleconsultas.consentimento_lgpd` não decide nada; `transcricoes.consentimento_obtido` é gravado `true`
+  depois do portão e não é lido.
+- A ADR-0007 (`:193`, `:196`) ainda diz que a tela da C1 está "não construída" e a emergência "não
+  modelada". As duas existem.
+
+**Perigo:** baixo.
+
+---
+
 ## ⚪ Item 66 — CATALOGADO, 30/09/2026: uma segunda aba do paciente faz o admin renegociar a chamada
 
 **Status:** achado pela revisão da Fase 2.1 (ADR-0029 §12.3). **Anterior** àquele diff; não corrigido.
@@ -185,7 +372,7 @@ alterável por terceiro, sem auditoria de quem alterou.
 
 ---
 
-## 🔴 Item 56 — EM PRODUÇÃO desde 30/09/2026 (Fases 1 e 2) · Fase 2.1 em produção · Fase 2.2 na branch: a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
+## ✅ Item 56 — EM PRODUÇÃO, 30/09/2026 (Fases 1, 2, 2.1 e 2.2): a ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
 **Status:** decidido por **Davi** ([ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)),
 **prioridade 1** da nova ordem definida na reunião de 29/09/2026. ⚠️ _Esta linha dizia "nenhuma
@@ -250,7 +437,10 @@ documentos enviados): a action nova não pode tirar delas o checklist da procura
   `app/api/atendimento/sinalizar/route.ts` (o evento `midia`). Provas na ADR-0029 §12.3. O que falta
   conferir em produção: ADR-0029 §12.4.
 - ✅ **Fase 2.1 em produção**, 30/09/2026, 15:52 (PR #144). Davi testou: câmera e tela nos dois lados.
-- 🧪 **Fase 2.2**, branch `feat/atendimento-tela-cheia`, sem deploy: miniatura do print (`DO-83`),
+- ✅ **Fase 2.2 em produção**, 30/09/2026, 16:15 (PR #145, deploy `36764049030`). Davi: _"tudo
+  funcionando corretamente"_. **O Item 56 está entregue.** Ficam: os Itens 57 a 66 (catalogados) e as
+  pendências da ADR-0029 §5.
+- (histórico) **Fase 2.2**, branch `feat/atendimento-tela-cheia`, antes do deploy: miniatura do print (`DO-83`),
   troca do destaque e tela cheia (`DO-82`), erro da câmera com a causa. ADR-0029 §12.5. Falta medir,
   com dois aparelhos, que o travamento de vídeo era só a câmera compartilhada.
 

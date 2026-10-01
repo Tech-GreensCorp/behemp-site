@@ -6,7 +6,7 @@
 🔴 **Toda ADR nova entra nesta tabela NO MESMO COMMIT que a cria. Índice atrasado é defeito,
 não atraso.**
 
-**Atualizado em 29/09/2026 — 29 ADRs, medidas em `docs/adr/`.** (era _"28/09/2026 — 28 ADRs"_)
+**Atualizado em 01/10/2026 — 30 ADRs, medidas em `docs/adr/`.** (era _"29/09/2026 — 29 ADRs"_; antes, _"28/09/2026 — 28 ADRs"_)
 
 ⚠️ **Retificação, 19/09/2026.** O cabeçalho anterior dizia _"as 7 ADRs abaixo"_ e a tabela
 listava 10; hoje existem **23**. A nota _"quatro estão como proposta"_ contradizia a própria
@@ -53,7 +53,12 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0026](ADR-0026-o-laudo-medico-e-documento-da-be4hope.md)                              | O laudo médico é documento da Be4Hope, e continua sem viajar de volta                                           | 📋 proposta                                | 23/09/2026 |
 | [0027](ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md)                | O worker das filas roda no PM2, e o cron do GitHub vira rede de segurança                                       | ✅ aceita (não em produção)                | 24/09/2026 |
 | [0028](ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | A identidade se confere na etapa 1 do cadastro, e a tela não vira oráculo                                       | ✅ aceita e implementada (não em produção) | 28/09/2026 |
-| [0029](ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin                                           | ✅ aceita por Davi (não implementada)      | 29/09/2026 |
+| [0029](ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin                                           | ✅ em produção; Fase 2.3 só local          | 29/09/2026 |
+| [0030](ADR-0030-o-que-depende-da-ti-no-levantamento-dos-consentimentos.md)             | O que depende só da TI no levantamento dos consentimentos fica aqui, para depois                                | 📋 proposta                                | 01/10/2026 |
+
+⚠️ **Acréscimo, 01/10/2026.** Entrou a 0030 como 📋 proposta (`DO-84`). As contagens por status abaixo **não foram refeitas** nesta entrada: a da 0029 já diverge entre esta tabela e o arquivo dela, e alinhar é trabalho de quem mexer na 0029.
+
+⚠️ **Acréscimo, 01/10/2026 (D-28).** A linha da 0029 foi alinhada com o arquivo dela: Fases 1 a 2.2 em produção (PRs #141, #144, #145) e a Fase 2.3 (§12.6, a espera da chamada) provada local, sem commit. O status antigo da tabela era _"aceita por Davi (não implementada)"_. As contagens abaixo continuam **não refeitas**.
 
 **Contagem, por status literal do arquivo:** ✅ aprovada 5 · 📋 proposta 14 · ✅ decidida pelo
 dono 2 · ✅ aceita 3 · ✅ aceita e implementada 1 · aceita 1 = **26**.

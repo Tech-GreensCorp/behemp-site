@@ -1,8 +1,18 @@
 # ADR-0029 — A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin
 
-> **Status da Fase 2.2 (§12.5):** 🧪 **implementada e provada local, NÃO publicada** — branch
-> `feat/atendimento-tela-cheia`, 30/09/2026: miniatura do print no chat, troca do destaque, tela
-> cheia e o erro da câmera com a causa. Deploy só com a ordem de Davi.
+> **Status da Fase 2.3 (§12.6, D-28):** 🟡 **implementada e provada local, sem commit** — 01/10/2026,
+> branch `docs/fase-2-2-em-producao` (worktree). Aprovada por **Davi** (`DO-86`). Commit, PR e deploy
+> esperam ordem com nome.
+>
+> **Status da Fase 2.2 (§12.5):** ✅ **EM PRODUÇÃO** — 30/09/2026, 16:15: PR #145, merge `6065964`,
+> deploy `36764049030`, home 200 durante todo o deploy. Testada por Davi: _"tudo funcionando
+> corretamente"_. O teste com dois aparelhos (§12.5, D-27) não foi relatado à parte.
+>
+> **Status anterior da Fase 2.2:** implementada e provada local, não publicada (branch
+> `feat/atendimento-tela-cheia`).
+>
+> 🎯 **A ADR-0029 está entregue.** O que ficou de fora dela está na §5, e nenhuma dessas pendências
+> foi escolhida como a próxima: Davi indica a próxima demanda.
 >
 > **Status da Fase 2.1 (§12):** ✅ **EM PRODUÇÃO** — 30/09/2026, 15:52: PR #144, merge `c8dd6b7`,
 > deploy `36761245272`, home 200 durante todo o deploy. Testada por Davi: câmera e tela nos dois
@@ -74,6 +84,7 @@ As decisões têm ID no catálogo: `DO-69` a `DO-77` (`docs/02-CATALOGO-DE-REGRA
 | 29  | _"eu consegui transmitir a tela do admin mas só quando eu selecionei um aplicativo, mas o guia do Chrome não"_                                                                                                                                                                                                                                                                    | o Chrome não lista a aba da própria chamada; o aviso de tela diz isso (D-27)                                                                                                                                                                     |
 | 30  | _"deve dar pra alterar e dar tela cheia tanto na câmera ou transmissão da tela do pc"_                                                                                                                                                                                                                                                                                            | trocar o destaque e tela cheia (`DO-82`, D-25, D-26)                                                                                                                                                                                             |
 | 31  | _"em mensagens é pra continuar mostrando a imagem enviada, só que quando clica nela tem o mesmo comportamento atual"_                                                                                                                                                                                                                                                             | a miniatura aparece no chat e o clique abre o modal (`DO-83`); retifica a D-23                                                                                                                                                                   |
+| 32  | _"tudo funcionando corretamente, agora vamos para a próxima demanda que já está na adr, mas eu vou fazer isso em outro chat"_ (depois do deploy da Fase 2.2)                                                                                                                                                                                                                      | a ADR-0029 está entregue; a próxima demanda começa em outra sessão                                                                                                                                                                               |
 
 ## §1 — O que existe hoje, medido no código (`origin/main` `7a2f5d9`)
 
@@ -444,7 +455,8 @@ entra depois, e esta ADR já fixa o que ela precisa respeitar:
 
 ## §5 — O que fica de fora desta fatia
 
-- a **chamada** de atendimento com suporte (voz e tela), com as regras da D-11, na próxima fatia;
+- ~~a **chamada** de atendimento com suporte (voz e tela), com as regras da D-11, na próxima fatia~~
+  ✅ entregue no mesmo deploy (§10), com câmera, tela dos dois lados e print ampliado (§12);
 - o lugar definitivo do botão "Be4Hope faz por mim" (_"vai ficar em outro lugar, mas por
   enquanto só aí"_);
 - avisar o admin por e-mail ou notificação quando chega um pedido: por ora ele vê na lista;
@@ -895,6 +907,78 @@ nunca liberada, erro genérico, sem tela cheia, aviso sem "nada é gravado", cli
 preferência ignorada, miniatura repetindo o destaque, busca sem esperar visibilidade). Um caso antigo
 foi **retificado** por medir forma: contava a frase "Nada é gravado" numa linha só, e ela quebrou de
 linha sem mudar. `pnpm test` 1861/1861, `pnpm build` ok. A tela, de novo, só se vê em produção.
+
+### 12.6 Fase 2.3: a espera da chamada (01/10/2026)
+
+**Aprovado por Davi em 01/10/2026** (`DO-86`), a partir do canvas do Claude Desktop, salvo em
+`docs/decisoes-visuais/teleconsulta-1.html` (paciente aguardando), `-2` (admin aguardando), `-3`
+(conectando) e `-4` (celular).
+
+**O defeito.** O palco mostrava _"{outro} está sem câmera e não está mostrando a tela"_ sempre que
+não havia destaque, inclusive em `entrando`, `aguardando` e `conectando`, quando o outro lado nem
+estava na sala (`ChamadaDeAtendimento.tsx:640-651` antes da mudança, dentro de
+`fase !== 'encerrada' && !repetida`, linha 619).
+
+**D-28. Antes de conectar, o palco é a espera.** A regra é `oQueOPalcoMostra` em
+`lib/atendimento/espera.ts`, pura e executada pelo guarda: `entrando`, `aguardando` e `conectando`
+mostram `EsperaDaChamada`, mesmo com um vídeo velho no estado; o "sem câmera" sai **só** de
+`conectado`. No cabeçalho, o `Loader2` fica só em `entrando`, o ponto pulsante vai para `aguardando`
+e as reticências para `conectando`. A passagem para `conectado` é um esmaecimento de 200 ms
+(`animate-in fade-in`, do `tw-animate-css` que o projeto já usa) por cima do fundo da espera. As
+animações são as do canvas, copiadas para `app/globals.css` com o prefixo `espera-` nas classes e os
+nomes `bh-*` nos keyframes, junto com o bloco de `prefers-reduced-motion` do canvas.
+
+**As duas exceções aprovadas:**
+
+1. **As barras do microfone seguem a voz.** Um `AnalyserNode` sobre a faixa do microfone, só no
+   aparelho: nada vai para `destination` nem para fora. Cada barra é uma faixa de frequência da voz
+   (`alturasDasBarras`). Abaixo do limiar de ruído e com o microfone silenciado, a barra fica parada.
+   O `bh-eq` do canvas **não entrou**, porque mexia com ou sem voz. Silenciado, o texto vira
+   _"Você · microfone silenciado"_; sem microfone, o indicador não aparece.
+2. **O contador conta.** Ele é medido dentro do componente desde que a fase começou, e zera porque
+   a tela monta a espera com `key={fase}`. ⚠️ **Diferença do pedido:** o Desktop pediu uma prop
+   `desde`. Calculá-la no pai exigiria `setState` em efeito (proibido no `CLAUDE.md`) ou mexer nos
+   `setFase` da negociação, o que a tarefa vedou.
+
+**Outras diferenças em relação ao canvas, e o motivo de cada uma:**
+
+| diferença                                                                           | motivo                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fontes **Sora/Jakarta**, não Outfit/Epilogue                                        | as telas reais estão dentro de `.ambar-scope` (`app/(paciente)/layout.tsx:19`, `app/globals.css` `.ambar-scope`), que troca as fontes. O palco usa `font-heading` e herda o resto, para não destoar da página. Voltar a Outfit é uma classe |
+| `entrando` mostra só a orbe, sem texto                                              | o canvas não tem esse quadro; o cabeçalho já diz "Entrando no atendimento…"                                                                                                                                                                 |
+| admin em `conectando`: "O paciente chegou", "Você" com fone e "Paciente" com pessoa | o canvas só desenha o lado do paciente; é o espelho dele                                                                                                                                                                                    |
+| sem dica no celular, em todas as fases                                              | o quadro do celular não tem dica, e "o chat ao lado" seria falso: no celular o chat fica acima                                                                                                                                              |
+| trilho de `conectando` com 64 px no celular, e 160 px a partir de `md`              | 72 + 160 + 72 px não cabem no palco de 390 px                                                                                                                                                                                               |
+| as barras continuam medindo com movimento reduzido                                  | são instrumento, não enfeite; pará-las esconderia se o microfone funciona                                                                                                                                                                   |
+| `text-center!` no título e no subtítulo                                             | uma regra global antiga (`app/globals.css:381-389`) justifica todo `<p>` abaixo de 768 px, e vence o centralizado herdado                                                                                                                   |
+| moldura do palco, cabeçalho, botões e chat continuam os de hoje                     | fora das tarefas; raio de 21,6 px (`rounded-2xl`) contra 18 px, borda `--border` contra `#E7E1D8`, botões arredondados do `.ambar-scope`                                                                                                    |
+
+**Provas (01/10/2026, locais):**
+
+- guarda novo `a-espera-da-chamada-diz-a-verdade`, com **18 casos**: 7 vermelhos contra o código
+  anterior e **11 de 11 sabotagens acusadas** (o "sem câmera" de volta em `aguardando`, as barras
+  ignorando o silenciado, ruído mexendo as barras, as barras como animação de CSS, o contador sem
+  `key`, o `Loader2` de volta em `conectando`, uma animação fora do movimento reduzido, a dica em 10 s,
+  um segundo ramo com "sem câmera", o nível indo ao alto-falante, o indicador sem microfone);
+- **Chromium, a `ChamadaDeAtendimento` real em duas abas**, com WebRTC real e mídia falsa. Só a
+  action de entrar, o Pusher (trocado por `BroadcastChannel` entre as abas), o `next/link` e o
+  `next/image` foram substituídos. Resultado: **44 de 44 passos** nos três modos (desktop, movimento
+  reduzido e 390 px). O paciente sozinho vê a espera; o admin entra, a tela passa por `conectando` e
+  chega a `conectado`; o admin sai (`member_removed`) e a espera volta, com o contador zerado; com a
+  conexão forçada em `failed`, a espera também volta. Também medido: a dica com opacidade 0 aos 3 s e
+  1 depois dos 6 s, e imediata com movimento reduzido; orbe e ponto com `animation: none` com
+  movimento reduzido; com o bipe do microfone falso, de 128 a 135 alturas distintas de barra;
+  silenciado, uma só (`scaleY(0.25)`);
+- **controle:** com o microfone falso tocando um WAV de silêncio puro, **uma** altura em 3 s, a barra
+  parada;
+- `pnpm test`: **1881 casos em 78 arquivos** (eram 1861 em 77; +18 do guarda novo, +2 do
+  `a-chamada-de-atendimento-nao-grava-e-nao-vaza`, que deriva um caso por arquivo da chamada);
+  `pnpm build` com exit 0.
+
+⚠️ **O que NÃO foi provado local:** a tela com login do Clerk e o Pusher real (não há
+`CLERK_SECRET_KEY` local), e dois aparelhos. No Chromium de desktop com 390 px o botão "Mostrar minha
+tela" aparece, porque o navegador tem `getDisplayMedia`; num celular real, `podeCompartilharTela()`
+o esconde, como no quadro `-4`. As capturas ficaram fora do repositório, no scratchpad da sessão.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 
