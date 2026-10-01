@@ -8,7 +8,9 @@
 > 3. A **Fila de execução** no rodapé é a ordem oficial. Reordenar é decisão de quem manda.
 > 4. **A fila é atualizada no mesmo commit que conclui o item.**
 
-**Atualizado em 30/09/2026** (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`.
+**Atualizado em 01/10/2026** (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`.
+
+_Versão anterior: "Atualizado em 30/09/2026 (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`."_
 
 _Versão anterior deste cabeçalho: "Atualizado em 20/08/2026 (execução da Sprint 0). Branch atual: `feat/flow-representatives`."_
 
@@ -825,6 +827,38 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### ✅ Feito em 01/10/2026 (local, sem commit) — a espera da chamada (Item 76)
+
+- [x] **Item 76** — o palco da chamada de atendimento dizia _"{outro} está sem câmera"_ antes de o outro
+      lado entrar. Agora, antes de conectar, mostra a espera do canvas aprovado por Davi (`DO-86`), com
+      as barras do microfone medindo a voz de verdade e o contador contando. 01/10/2026, worktree da
+      branch `docs/fase-2-2-em-producao`. [ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      [04 — Item 76](04-LISTA-DE-AFAZERES.md). **Falta:** commit, PR e deploy, com ordem e nome.
+
+### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
+
+Os dois hooks se localizam pelo `git rev-parse` do diretório atual (`.claude/settings.json:9`, `:20`).
+Com o shell fora do repositório, os dois falham, e todo `Bash` e `Write` é recusado, até o `cd` de
+volta. Falha fechado, que é o lado seguro, mas trava a sessão. Diagnóstico em
+[04 — Item 77](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido**: hook é área protegida.
+
+### 🔴 Achado de 01/10/2026 — o levantamento dos consentimentos (Itens 67 a 73)
+
+Pedido por Davi: onde a plataforma pede aceite, de qual perfil, e o que cada um destrava. Resultado em
+[`levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf`](levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf):
+6 aceites ou autorizações gravados, 7 funcionalidades que dependem deles, 11 lugares nos três perfis.
+Sete achados, **lidos e não medidos**: o mais grave é que, em produção, o botão "Entrar na Consulta" do
+paciente espera um aceite que a tela não pede (Item 67). Os de perigo alto são o OAuth do Google Agenda
+sem sessão (Item 71) e a procuração cumprida sem DocuSign (Item 72). Diagnóstico em
+[04 — Itens 67 a 73](04-LISTA-DE-AFAZERES.md). **Catalogados, não corrigidos.**
+
+Do mesmo pedido saiu a versão **para o advogado**:
+[`levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf`](levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf),
+com o texto vigente de cada termo e as perguntas **J-01 a J-25**. Cada uma diz o que a TI constrói com
+a resposta, e as respostas voltam pelo Davi. O que depende só da TI ficou na
+[ADR-0030](adr/ADR-0030-o-que-depende-da-ti-no-levantamento-dos-consentimentos.md), como proposta, para depois (`DO-84`). Dois achados novos: "Excluir Minha Conta" promete apagar
+tudo e mantém (Item 74), e a Política não lista todos os destinatários (Item 75).
+
 ### ⚪ Achado de 30/09/2026 — apagar a autorização deixa o pedido e a chamada abertos (Item 65)
 
 Do PR #143: `apagarAutorizacaoAnvisaAdmin` não encerra o pedido de atendimento da autorização. A lista
@@ -1200,6 +1234,7 @@ Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada va
 | 16        | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                                                                                                                                                                                                            | —                                                                                              | ler a RDC 873/2024 primeiro · autorização                                      |
 | 17        | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                                                                                                                                                                                                         | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR |
 | ~~18~~ ✅ | **Item 56** — prioridade 1 definida por Davi em 29/09/2026: a ANVISA abre no "Faço eu mesmo", vídeo, pedido de atendimento assistido, a procuração ativada pelo admin, e a chamada com câmera, tela dos dois lados e print. **Tudo em produção** (PRs #141, #144 e #145, 30/09/2026); Davi: _"tudo funcionando corretamente"_ | [ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | o que ficou de fora está na ADR-0029 §5; a próxima demanda, Davi indica        |
+| 19 🟡     | **Item 76** — a espera da chamada (ADR-0029 D-28, `DO-86`, aprovada por Davi em 01/10/2026). **Feita e provada local**; falta commit, PR e deploy, que esperam ordem com nome                                                                                                                                                 | [§12.6](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | fora: a moldura do palco, os botões e o `<p>` justificado no celular (D-28)    |
 
 ### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
 

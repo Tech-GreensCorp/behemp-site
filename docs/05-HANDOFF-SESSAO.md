@@ -3,6 +3,25 @@
 > 🔴 **Leia antes de agir.** Se não ler, você refaz o que já foi feito, repete um erro que já
 > custou caro, ou reabre uma decisão que já foi tomada.
 
+> 🟡 **Acréscimo de 01/10/2026, sobre o estado de agora** (não é a reescrita da `/metodo-handoff`).
+> A demanda nova veio: a **espera da chamada de atendimento** (ADR-0029 §12.6, **D-28**, `DO-86`),
+> aprovada por **Davi**, a partir do canvas `docs/decisoes-visuais/teleconsulta-1..4.html`.
+>
+> - **Feita e provada local, SEM commit**, na worktree da `docs/fase-2-2-em-producao`. Arquivos:
+>   `lib/atendimento/espera.ts` (novo), `components/atendimento/EsperaDaChamada.tsx` (novo),
+>   `components/atendimento/ChamadaDeAtendimento.tsx` (+42 / −10), `app/globals.css` (+283, no fim),
+>   `__tests__/guardas/a-espera-da-chamada-diz-a-verdade.test.ts` (novo, 18 casos, 11 sabotagens).
+> - `pnpm test` com **1881 casos em 78 arquivos**; `pnpm build` com exit 0; Chromium com a tela real em duas abas,
+>   **44 de 44 passos** nos três modos. Portão de baseline: o Prettier acusa **+1**, que é a
+>   `.claude/rules/ponte-enderecamento-dos-prompts.md` (pessoal do Davi, não rastreada), não um arquivo desta entrega.
+> - ⚠️ A worktree já tinha, **antes** desta entrega, mudanças de outra sessão em `docs/00`, `02`, `03`, `04`,
+>   `adr/README.md`, a ADR-0030 e `docs/levantamentos/`. Esta entrega **acrescentou** nesses arquivos
+>   (DO-86, Itens 76 e 77, a linha da 0029 no índice, `decisoes-visuais` com 6 arquivos). **Não fazer `git add .`**:
+>   separar por arquivo e, nos compartilhados, por trecho.
+> - Commit, PR e deploy: **esperam ordem com nome** (Davi, Dryelle ou Gabriel).
+> - Novo achado: fora do repositório, os hooks travam a sessão (Item 77). **Nunca dê `cd` para o
+>   scratchpad**; use caminhos absolutos a partir da raiz.
+
 **Escrito em 30/09/2026, fim da tarde**, ao fim da sessão que entregou a **ADR-0029 inteira** (a
 aba ANVISA no "Faço eu mesmo", o pedido de atendimento assistido, a procuração ativada pelo admin e
 a chamada de atendimento com câmera, tela e print). Quem pediu e testou: **Davi**.
