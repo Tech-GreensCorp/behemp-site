@@ -6,6 +6,7 @@ import { getPusherClient } from '@/lib/integrations/pusher/client';
 import { buscarSalaPorRoomId, pacienteEntrarSala } from '../../../_actions/teleconsulta';
 import { buscarIceServers } from '@/lib/webrtc/ice-servers';
 import { Consentimento } from '@/components/teleconsulta/Consentimento';
+import { EsperaDaTeleconsulta } from '@/components/teleconsulta/EsperaDaTeleconsulta';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, AlertCircle, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -66,6 +67,8 @@ function TeleconsultaPacienteContent() {
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   
   const [micOn, setMicOn] = useState(true);
+  // A faixa do microfone em estado: a espera mede o nível dela, só neste aparelho (ADR-0029 D-30).
+  const [faixaDoMicrofone, setFaixaDoMicrofone] = useState<MediaStreamTrack | null>(null);
   const [camOn, setCamOn] = useState(true);
   const [cameraOk, setCameraOk] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -95,6 +98,7 @@ function TeleconsultaPacienteContent() {
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
       localStreamRef.current = stream;
+      setFaixaDoMicrofone(stream.getAudioTracks()[0] ?? null);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(console.warn);
@@ -104,6 +108,7 @@ function TeleconsultaPacienteContent() {
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         localStreamRef.current = audioStream;
+        setFaixaDoMicrofone(audioStream.getAudioTracks()[0] ?? null);
         setCameraOk(true);
         setCamOn(false);
       } catch {
@@ -405,12 +410,21 @@ function TeleconsultaPacienteContent() {
 
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4 z-[1]">
-            <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
-            <p className="text-slate-400 font-medium">Aguardando médico...</p>
+            {/* ADR-0029 D-30 (01/10/2026): a espera do atendimento, no escuro. Antes, um spinner
+                com "Aguardando médico...". */}
+            <EsperaDaTeleconsulta
+              quem="paciente"
+              fase="aguardando"
+              nomeDoOutro={sala?.medicoNome}
+              microfone={faixaDoMicrofone}
+              mudo={!micOn}
+            />
           </div>
         )}
         
-        <div className="absolute bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
+        {/* z-10: acima da espera (`z-[1]`). Sem ele a própria câmera ficava escondida até o médico
+            entrar — a mesma classe de defeito que o lado do médico teve em 10/09/2026. */}
+        <div className="absolute z-10 bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
           <video ref={setLocalVideoEl} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
           {!camOn && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-800">

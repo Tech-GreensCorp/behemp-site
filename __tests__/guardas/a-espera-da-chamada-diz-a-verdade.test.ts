@@ -14,6 +14,8 @@
  *   6. uma animação da espera ficar fora do bloco de `prefers-reduced-motion` (derivado do CSS);
  *   7. a dica deixar de esperar os 6 s decididos.
  *   8. conectado sem vídeo voltar ao bloco estático, em vez de "os dois, ligados" (D-29);
+ *  10. a teleconsulta (D-30) voltar ao spinner ou ao texto parado, perder o nome de quem se
+ *      espera, ganhar um segundo relógio, ou o indicador do microfone voltar ao canto da câmera;
  *   9. o palco voltar a ter a altura presa nos 16:9, cortando a orbe e pondo a dica por baixo do
  *      microfone numa janela estreita (medido por Davi em 01/10/2026, Firefox na metade da tela).
  *
@@ -184,6 +186,48 @@ describe('conectado sem vídeo e a janela estreita (D-29)', () => {
   it('o trilho encolhe, e os rostos não', () => {
     expect(ESPERA).toMatch(/espera-track mb-\[26px\] w-40 min-w-8 shrink/);
     expect(ESPERA).toMatch(/flex shrink-0 flex-col items-center gap-2\.5/);
+  });
+});
+
+describe('a teleconsulta usa a mesma espera, no escuro (D-30)', () => {
+  const HOST = ler('components/teleconsulta/GlobalTeleconsultaHost.tsx');
+  const PACIENTE = ler('app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx');
+  const TELE = ler('components/teleconsulta/EsperaDaTeleconsulta.tsx');
+
+  it('os dois lados usam a EsperaDaTeleconsulta, e o que havia antes saiu (código sem comentários)', () => {
+    expect(HOST).toMatch(/<EsperaDaTeleconsulta\s+quem="medico"/);
+    expect(PACIENTE).toMatch(/<EsperaDaTeleconsulta\s+quem="paciente"/);
+    expect(HOST).not.toMatch(/Aguardando paciente entrar na sala/);
+    expect(HOST).not.toMatch(/Conectando à sala\.\.\./);
+    expect(PACIENTE).not.toMatch(/Aguardando médico\.\.\./);
+    expect(PACIENTE).not.toMatch(/border-t-\[#EA5429\] animate-spin/);
+  });
+
+  it('o médico passa por "abrindo" enquanto a sala conecta', () => {
+    expect(HOST).toMatch(/fase=\{phase === "connecting" \? "abrindo" : "aguardando"\}/);
+  });
+
+  it('o texto diz o nome de quem se espera, vindo da própria sala', () => {
+    expect(HOST).toMatch(/nomeDoOutro=\{dadosPainel\?\.paciente\.nome\}/);
+    expect(PACIENTE).toMatch(/nomeDoOutro=\{sala\?\.medicoNome\}/);
+  });
+
+  it('é a MESMA espera: as peças vêm do atendimento, no tom escuro', () => {
+    expect(TELE).toMatch(/from '@\/components\/atendimento\/EsperaDaChamada'/);
+    expect(TELE).toMatch(/espera-palco-escuro/);
+    expect(TELE.match(/tom="escuro"/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it('um relógio só (o do cabeçalho), e o microfone no fluxo, longe da câmera', () => {
+    expect(TELE).not.toMatch(/TempoNaSala|Na sala há/);
+    expect(TELE).toMatch(/<IndicadorDoMicrofone[^>]*\bnoFluxo\b/);
+  });
+
+  it('as barras da teleconsulta medem a faixa real, e o silenciado é o botão da sala', () => {
+    expect(HOST).toMatch(/setFaixaDoMicrofone\(stream\.getAudioTracks\(\)\[0\] \?\? null\)/);
+    expect(PACIENTE).toMatch(/setFaixaDoMicrofone\(stream\.getAudioTracks\(\)\[0\] \?\? null\)/);
+    expect(HOST).toMatch(/mudo=\{!micOn\}/);
+    expect(PACIENTE).toMatch(/mudo=\{!micOn\}/);
   });
 });
 

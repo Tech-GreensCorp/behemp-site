@@ -5,7 +5,11 @@
 > imprimiu _"produção está servindo ESTE build, e a home responde 200"_; `[migrar] ✓ concluído`, sem
 > migration nova [medido]. Aprovada e mesclada por **Davi** (`DO-86`). Falta o teste com dois aparelhos.
 >
-> **Status da Fase 2.4 (§12.7, D-29):** 🟡 **implementada e provada local, sem commit** — 01/10/2026.
+> **Status da Fase 2.5 (§12.8, D-30):** 🟡 **implementada e provada local** — 01/10/2026. A espera na
+> teleconsulta (médico e paciente), e a câmera do paciente de volta por cima da espera.
+>
+> **Status da Fase 2.4 (§12.7, D-29):** ✅ **EM PRODUÇÃO** — 01/10/2026, PR #148, merge `39d1508`, deploy
+> `36894503274`; home 200 em todas as leituras. **Antes:** implementada e provada local, sem commit.
 > Conectado sem vídeo vira "os dois, ligados", e o palco deixa de quebrar em janela estreita.
 >
 > **Status anterior da Fase 2.3:** implementada e provada local, sem commit (01/10/2026, worktree).
@@ -1039,6 +1043,52 @@ os rostos não. Em 1280 px nada muda: a orbe fica no mesmo lugar medido na §12.
 
 ⚠️ O guarda lê a forma do palco (classes); quem prova o efeito é o harness por largura, que executa
 a tela no Chromium. Firefox e Safari não foram medidos.
+
+### 12.8 Fase 2.5: a mesma espera na teleconsulta (01/10/2026)
+
+Davi, depois de testar a Fase 2.4 em produção: _"vamos aplicar as mesmas telas de animações que
+montamos aqui na teleconsulta, só que personalizado o texto para médico paciente"_.
+
+**O que existe na teleconsulta, medido no código, e muda o desenho:** ela é escura e de tela cheia,
+com a câmera ligada desde a entrada; cada lado só sabe que o outro chegou quando o vídeo dele chega
+(`ontrack`); e não há aviso de câmera desligada. Por isso **não há "conectando" nem "os dois,
+ligados"** aqui: criá-los é mexer na sinalização da teleconsulta, que não foi pedido.
+
+**D-30. A teleconsulta usa a mesma espera, no escuro** (`DO-88`, escolhas de Davi entre opções):
+
+| decisão             | escolha                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | rejeitado                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| fundo               | as mesmas animações no escuro da sala (`espera-palco-escuro`, com as cores `slate` que a sala já usa)                                                                                                                                                                                                                                                                                                                                                                                                                              | o cartão creme no meio da tela escura |
+| textos              | paciente: _"Você já está na sala"_ / _"Assim que o(a) Dr(a). {nome} entrar, a consulta começa sozinha. Não precisa recarregar a página."_, dica _"Enquanto espera, confira se você está num lugar reservado e com a internet estável."_ (também no celular); médico: _"O paciente ainda não entrou"_ / _"A consulta começa sozinha quando {paciente} abrir a sala. Ele já foi avisado."_, dica _"Enquanto espera, você pode abrir o prontuário pelo botão Paciente, à esquerda."_; abrindo a sala: só a orbe e _"Abrindo a sala…"_ | —                                     |
+| relógio             | só o "AO VIVO" do cabeçalho                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | um segundo relógio no palco           |
+| arquivo do paciente | autorizado por Davi em `.claude/autorizacoes.txt`, só aquele arquivo                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —                                     |
+
+As peças vêm do atendimento (`OrbeDaEspera`, `Textos`, `Dica`, `IndicadorDoMicrofone`), com um `tom`
+claro ou escuro, como o `<Consentimento tom="escuro">` que a sala já usa. O indicador do microfone
+fica **no fluxo**, centrado: o canto é da própria câmera. As barras seguem a faixa real
+(`setFaixaDoMicrofone` onde o fluxo nasce), e o silenciado é o botão da própria sala.
+
+**Achado durante a D-30, e corrigido a pedido de Davi:** na tela do paciente, a **própria câmera**
+ficava por baixo da espera desde 13/08 (`8ee8e5c`): a espera tem `z-[1]` e a câmera não tinha
+z-index. Medido no Chromium: `elementFromPoint` no centro da câmera devolvia a espera. Davi:
+_"isso era um bug que eu já tinha resolvido, verifique novamente para consertá-lo"_. O que tinha
+sido resolvido em 10/09 era o lado do **médico**; nenhum commit tocou o do paciente. Agora a câmera
+tem `z-10`, e o guarda `a-sala-nao-esconde-os-proprios-controles` compara os dois z-index.
+⚠️ **E o mesmo guarda tinha um caso vazio:** exigia o texto "Aguardando paciente entrar na sala", que
+saiu da tela, e continuaria verde por um comentário que o cita. Retificado para exigir o componente.
+
+**Provas (01/10/2026, locais):**
+
+| prova                                                                                                                                               | resultado                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium com as DUAS telas reais (página do paciente e `GlobalTeleconsultaHost`), só as actions, o Pusher, o ICE e o `next/navigation` substituídos | **tudo OK** em desktop, movimento reduzido e 390 px: o spinner e os textos antigos saíram; o nome da médica e o do paciente aparecem; a dica aos 6 s (imediata com movimento reduzido); barras com som, paradas silenciado; os botões Paciente, Prontuário e Prescrição continuam por cima; o microfone não encosta na câmera; nenhum erro de página |
+| a câmera do paciente                                                                                                                                | antes: coberta pela espera; depois: `pipVisivelNoTopo: true`, z-index 10                                                                                                                                                                                                                                                                             |
+| atendimento, depois da reestruturação das peças                                                                                                     | duas abas **44/44**; larguras de 390 a 1280 px **tudo OK**                                                                                                                                                                                                                                                                                           |
+| guarda `a-espera-da-chamada-diz-a-verdade`                                                                                                          | **28 casos** (eram 22); 4 vermelhos contra a teleconsulta da `main`; **6 de 6 sabotagens**                                                                                                                                                                                                                                                           |
+| guarda `a-sala-nao-esconde-os-proprios-controles`                                                                                                   | **10 casos** (eram 8); vermelho antes do `z-10`; **3 de 3 sabotagens**                                                                                                                                                                                                                                                                               |
+| `pnpm test` · `pnpm build` · lint                                                                                                                   | **1893/1893** · exit 0 · os 5 achados de lint dos dois arquivos são os mesmos da `main`                                                                                                                                                                                                                                                              |
+
+⚠️ **Não provado local:** a sala real com Pusher, TURN e dois aparelhos.
 
 ## §8 — O que mudou durante o alinhamento (29/09/2026)
 

@@ -19,7 +19,35 @@
 
 ---
 
-## ✅ Item 78 — FEITO, 01/10/2026 (local, sem commit): conectado sem vídeo estático, e o palco quebrando em janela estreita
+## ✅ Item 80 — CORRIGIDO, 01/10/2026 (local): a câmera do paciente ficava por baixo da espera da teleconsulta
+
+**Status:** achado ao medir a D-30 no Chromium; corrigido a pedido de Davi (_"o funcionamento tem que ser
+normal"_). Em [ADR-0029 §12.8](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
+
+`app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx`: a espera (`absolute inset-0 … z-[1]`) cobria a
+câmera do paciente (`absolute bottom-6 right-6 …`, sem z-index), desde `8ee8e5c` (13/08/2026). Em
+produção, o paciente não via a própria câmera até o médico entrar. A correção de 10/09 foi só do lado do
+médico. **Agora:** `z-10` na câmera; guarda `a-sala-nao-esconde-os-proprios-controles` com o caso do
+paciente, vermelho antes, e 3 sabotagens. **Perigo medido:** uma classe numa div; nada mais na tela usa
+z-index entre 1 e 10.
+
+---
+
+## ✅ Item 79 — FEITO, 01/10/2026 (local): a espera da teleconsulta
+
+**Status:** pedido de Davi (`DO-88`), decisão em
+[ADR-0029 §12.8, D-30](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md).
+
+**Antes:** `components/teleconsulta/GlobalTeleconsultaHost.tsx` mostrava "Conectando à sala..." (ícone
+girando) e "Aguardando paciente entrar na sala..."; a página do paciente, um spinner com "Aguardando
+médico...". **Agora:** `components/teleconsulta/EsperaDaTeleconsulta.tsx`, com as peças da espera do
+atendimento no tom escuro. **O que ficou:** sem "conectando" e sem "os dois, ligados" na teleconsulta,
+porque ela não sabe quando o outro chegou nem quando a câmera dele desliga; criar isso é mexer na
+sinalização. A sala real (Pusher, TURN, dois aparelhos) só produção prova.
+
+---
+
+## ✅ Item 78 — EM PRODUÇÃO, 01/10/2026 (PR #148): conectado sem vídeo estático, e o palco quebrando em janela estreita
 
 **Status:** relatado por Davi com seis capturas de produção (Chrome e Firefox lado a lado).
 Corrigido e provado local; decisão em

@@ -6,7 +6,7 @@ import { getPusherClient } from "@/lib/integrations/pusher/client";
 import { encerrarTeleconsulta } from "@/app/(medico)/_actions/teleconsulta";
 import {
     Video, VideoOff, Mic, MicOff, PhoneOff,
-    Monitor, MonitorOff, RefreshCw, Brain, Minimize2,
+    Monitor, MonitorOff, Brain, Minimize2,
     FileText, User, Pill, VideoIcon
 } from "lucide-react";
 import { TeleconsultaPip } from '@/components/teleconsulta/TeleconsultaPip';
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useTeleconsulta } from "./TeleconsultaContext";
 import { buscarIceServers } from "@/lib/webrtc/ice-servers";
 import { Consentimento } from "@/components/teleconsulta/Consentimento";
+import { EsperaDaTeleconsulta } from "@/components/teleconsulta/EsperaDaTeleconsulta";
 
 const horaFmt = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -45,6 +46,8 @@ export function GlobalTeleconsultaHost() {
     const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
     const [micOn, setMicOn] = useState(true);
+    // A faixa do microfone em estado: a espera mede o nível dela, só neste aparelho (ADR-0029 D-30).
+    const [faixaDoMicrofone, setFaixaDoMicrofone] = useState<MediaStreamTrack | null>(null);
     const [camOn, setCamOn] = useState(true);
     const [screenSharing, setScreenSharing] = useState(false);
 
@@ -90,6 +93,7 @@ export function GlobalTeleconsultaHost() {
     // Callback estável: atribui stream ao <video> SEM disparar re-render desnecessário.
     const assignLocalStream = useCallback((stream: MediaStream) => {
         localStreamRef.current = stream;
+        setFaixaDoMicrofone(stream.getAudioTracks()[0] ?? null);
         if (localVideoRef.current && localVideoRef.current.srcObject !== stream) {
             localVideoRef.current.srcObject = stream;
             localVideoRef.current.play().catch(console.warn);
@@ -579,17 +583,17 @@ export function GlobalTeleconsultaHost() {
                                         Iniciar Teleconsulta
                                     </Button>
                                 </div>
-                            ) : phase === "connecting" ? (
-                                <div className="flex flex-col items-center gap-4 text-center">
-                                    <RefreshCw className="h-8 w-8 text-white/50 animate-spin" />
-                                    <p className="text-slate-400 text-sm">Conectando à sala...</p>
-                                </div>
                             ) : (
-                                <div className="flex flex-col items-center gap-4 text-center">
-                                    <VideoIcon className="h-10 w-10 text-slate-600" />
-                                    <p className="text-slate-400 text-sm">Aguardando paciente entrar na sala...</p>
-                                    <p className="text-slate-500 text-xs">O paciente foi notificado. Aguarde a conexão.</p>
-                                </div>
+                                /* ADR-0029 D-30 (01/10/2026): a espera do atendimento, no escuro.
+                                   Antes, "Conectando à sala..." com um ícone girando, e
+                                   "Aguardando paciente entrar na sala..." parado. */
+                                <EsperaDaTeleconsulta
+                                    quem="medico"
+                                    fase={phase === "connecting" ? "abrindo" : "aguardando"}
+                                    nomeDoOutro={dadosPainel?.paciente.nome}
+                                    microfone={faixaDoMicrofone}
+                                    mudo={!micOn}
+                                />
                             )}
                         </div>
                     )}

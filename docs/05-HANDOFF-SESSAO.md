@@ -28,6 +28,11 @@
 >   vídeo virou "os dois, ligados" no padrão da espera (`DO-87`), e o palco deixou de cortar a orbe em janela
 >   estreita (Chrome e Firefox lado a lado). Suíte 1885/1885, guarda 22 casos, harness OK de 390 a 1280 px.
 >   Esperando ordem para commit e deploy.
+> - **A D-29 subiu** (PR #148, `39d1508`, deploy `36894503274`, home 200 o tempo todo).
+> - **D-30 e Item 80 (local, branch `feat/teleconsulta-espera`):** a mesma espera na teleconsulta, no
+>   escuro, com textos de médico e paciente (`DO-88`); e a câmera do paciente, que ficava por baixo da
+>   espera desde 13/08, de volta por cima. O arquivo do paciente foi autorizado por Davi em
+>   `.claude/autorizacoes.txt`. Suíte 1893/1893; as duas telas reais rodaram no Chromium.
 > - Novo achado: fora do repositório, os hooks travam a sessão (Item 77). **Nunca dê `cd` para o
 >   scratchpad**; use caminhos absolutos a partir da raiz.
 

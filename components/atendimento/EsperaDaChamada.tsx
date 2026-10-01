@@ -11,6 +11,9 @@
  * As duas diferenças em relação ao canvas são as aprovadas: as barras do microfone seguem o nível
  * medido AQUI (um `AnalyserNode` local; nada sai do aparelho), paradas sem som ou silenciado; e o
  * contador conta. Ele começa do zero porque a tela monta este componente com `key={fase}`.
+ *
+ * As peças (orbe, textos, dica, indicador do microfone) são exportadas com `tom`: a teleconsulta
+ * as usa no fundo escuro dela (ADR-0029 D-30), no mesmo padrão do `<Consentimento tom="escuro">`.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Headphones, MessageCircle, MonitorUp, User } from 'lucide-react';
@@ -24,6 +27,9 @@ import {
   type FaseDeEspera,
 } from '@/lib/atendimento/espera';
 
+/** O fundo: o creme do atendimento, ou o escuro da teleconsulta (D-30). */
+export type Tom = 'claro' | 'escuro';
+
 interface Props {
   papel: PapelNaChamada | null;
   fase: FaseDeEspera;
@@ -33,7 +39,18 @@ interface Props {
 }
 
 /** "Você · microfone ligado": quatro barras, cada uma uma faixa da voz, medidas neste aparelho. */
-function IndicadorDoMicrofone({ microfone, mudo }: { microfone: MediaStreamTrack; mudo: boolean }) {
+export function IndicadorDoMicrofone({
+  microfone,
+  mudo,
+  tom = 'claro',
+  noFluxo = false,
+}: {
+  microfone: MediaStreamTrack;
+  mudo: boolean;
+  tom?: Tom;
+  /** No fluxo, centrado, em vez do canto: na teleconsulta o canto é da própria câmera. */
+  noFluxo?: boolean;
+}) {
   const barras = useRef<(HTMLElement | null)[]>([]);
 
   useEffect(() => {
@@ -83,8 +100,16 @@ function IndicadorDoMicrofone({ microfone, mudo }: { microfone: MediaStreamTrack
   }, [microfone, mudo]);
 
   return (
-    <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full border border-[#E7E1D8] bg-white/[0.82] py-1.5 pr-3 pl-2.5 text-xs text-[#3B342D] backdrop-blur-[8px]">
-      <span className="espera-eq" aria-hidden="true">
+    <div
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full border py-1.5 pr-3 pl-2.5 text-xs backdrop-blur-[8px]',
+        noFluxo ? 'espera-rise espera-d3' : 'absolute bottom-4 left-4',
+        tom === 'escuro'
+          ? 'border-slate-700 bg-slate-900/80 text-slate-200'
+          : 'border-[#E7E1D8] bg-white/[0.82] text-[#3B342D]',
+      )}
+    >
+      <span className={cn('espera-eq', tom === 'escuro' && 'espera-eq-escuro')} aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
           <i
             key={i}
@@ -119,6 +144,13 @@ const ICONE = 'size-[26px] md:size-[34px]';
 function Orbe({ papel }: { papel: PapelNaChamada | null }) {
   // Quem se espera: a equipe, para o paciente; o paciente, para a equipe.
   return (
+    <OrbeDaEspera icone={papel === 'paciente' ? Headphones : papel === 'admin' ? User : null} />
+  );
+}
+
+/** A orbe, com o ícone de quem se espera (ou nenhum, enquanto não se sabe). */
+export function OrbeDaEspera({ icone: Icone }: { icone: typeof User | null }) {
+  return (
     <div className="espera-orb size-[72px] md:size-24">
       <div className="espera-halo" />
       <div className="espera-ring" />
@@ -126,12 +158,7 @@ function Orbe({ papel }: { papel: PapelNaChamada | null }) {
       <div className="espera-ring espera-r3" />
       <div className="espera-arc" />
       <div className="espera-face">
-        {papel === 'paciente' && (
-          <Headphones className={ICONE} color="#EA5429" strokeWidth={1.6} aria-hidden="true" />
-        )}
-        {papel === 'admin' && (
-          <User className={ICONE} color="#EA5429" strokeWidth={1.6} aria-hidden="true" />
-        )}
+        {Icone && <Icone className={ICONE} color="#EA5429" strokeWidth={1.6} aria-hidden="true" />}
       </div>
     </div>
   );
@@ -200,19 +227,39 @@ function OsDois({ admin, ligados }: { admin: boolean; ligados: boolean }) {
 const PALCO =
   'espera-palco relative box-border flex min-h-[300px] flex-col items-center justify-center gap-[22px] overflow-clip px-5 py-[52px] md:aspect-video md:min-h-auto md:gap-[26px] md:px-6 md:py-[60px]';
 
-function Textos({ titulo, children }: { titulo: string; children: ReactNode }) {
+export function Textos({
+  titulo,
+  children,
+  tom = 'claro',
+}: {
+  titulo: string;
+  children?: ReactNode;
+  tom?: Tom;
+}) {
   return (
     <div
       role="status"
       aria-live="polite"
       className="flex flex-col items-center gap-1.5 text-center md:gap-2"
     >
-      <p className="espera-rise espera-d1 font-heading text-foreground m-0 text-center! text-lg font-semibold md:text-[21px] md:tracking-[-0.01em]">
+      <p
+        className={cn(
+          'espera-rise espera-d1 font-heading m-0 text-center! text-lg font-semibold md:text-[21px] md:tracking-[-0.01em]',
+          tom === 'escuro' ? 'text-white' : 'text-foreground',
+        )}
+      >
         {titulo}
       </p>
-      <p className="espera-rise espera-d2 m-0 text-center! text-[13px] leading-[1.45] text-[#6B6259] md:max-w-[420px] md:text-sm md:leading-normal">
-        {children}
-      </p>
+      {children && (
+        <p
+          className={cn(
+            'espera-rise espera-d2 m-0 text-center! text-[13px] leading-[1.45] md:max-w-[420px] md:text-sm md:leading-normal',
+            tom === 'escuro' ? 'text-slate-400' : 'text-[#6B6259]',
+          )}
+        >
+          {children}
+        </p>
+      )}
     </div>
   );
 }
@@ -238,11 +285,35 @@ export function ChamadaSemVideo({
   );
 }
 
-function Dica({ icone: Icone, children }: { icone: typeof User; children: string }) {
-  // No celular o chat fica ACIMA, e não "ao lado": o quadro do celular não tem dica.
+export function Dica({
+  icone: Icone,
+  children,
+  tom = 'claro',
+  tambemNoCelular = false,
+}: {
+  icone: typeof User;
+  children: string;
+  tom?: Tom;
+  /** No atendimento, não: no celular o chat fica ACIMA, e não "ao lado". */
+  tambemNoCelular?: boolean;
+}) {
   return (
-    <p className="espera-late m-0 hidden max-w-[440px] items-start gap-2 rounded-[12px] border border-[#E7E1D8] bg-white/70 px-3.5 py-2.5 text-left text-[12.5px] leading-[1.45] text-[#4A423A] md:inline-flex">
-      <Icone size={15} color="#8A7F73" strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
+    <p
+      className={cn(
+        'espera-late m-0 max-w-[440px] items-start gap-2 rounded-[12px] border px-3.5 py-2.5 text-left text-[12.5px] leading-[1.45]',
+        tambemNoCelular ? 'inline-flex' : 'hidden md:inline-flex',
+        tom === 'escuro'
+          ? 'border-slate-700 bg-slate-800/60 text-slate-300'
+          : 'border-[#E7E1D8] bg-white/70 text-[#4A423A]',
+      )}
+    >
+      <Icone
+        size={15}
+        color={tom === 'escuro' ? '#64748B' : '#8A7F73'}
+        strokeWidth={1.75}
+        className="shrink-0"
+        aria-hidden="true"
+      />
       <span>{children}</span>
     </p>
   );
