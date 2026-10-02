@@ -16,6 +16,7 @@ import { useUser } from '@clerk/nextjs';
 import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
 import { DialogoEditarUsuario } from './_components/dialogo-editar-usuario';
 import { DialogoExcluirUsuario } from './_components/dialogo-excluir-usuario';
+import { DialogoCriarAdmin } from './_components/dialogo-criar-admin';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
@@ -26,6 +27,7 @@ import {
   Pencil,
   Search,
   Shield,
+  ShieldPlus,
   Stethoscope,
   Trash2,
   User,
@@ -90,6 +92,7 @@ export default function UsuariosPage() {
   const [stats, setStats] = useState({ total: 0, admins: 0, medicos: 0, pacientes: 0 });
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [excluindo, setExcluindo] = useState<Usuario | null>(null);
+  const [criandoAdmin, setCriandoAdmin] = useState(false);
   const { user: euMesmo } = useUser();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,6 +147,12 @@ export default function UsuariosPage() {
         eyebrow="Controle"
         title="Usuários"
         description={`${stats.total} usuários registrados na plataforma`}
+        actions={
+          <Button onClick={() => setCriandoAdmin(true)}>
+            <ShieldPlus size={16} className="mr-1.5" />
+            Novo admin
+          </Button>
+        }
       />
 
       {/* KPIs */}
@@ -306,6 +315,9 @@ export default function UsuariosPage() {
           onFechar={() => setEditando(null)}
           onSalvo={carregar}
         />
+      )}
+      {criandoAdmin && (
+        <DialogoCriarAdmin onFechar={() => setCriandoAdmin(false)} onCriado={carregar} />
       )}
       {excluindo && (
         <DialogoExcluirUsuario

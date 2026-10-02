@@ -1005,3 +1005,22 @@ path:app/(admin)/admin/anvisa/atendimento/[pedidoId]/page.tsx
 #
 # Granularidade deliberada: o arquivo exato.
 path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
+
+# ── Autorizado por Dryelle em 02/10/2026 ────────────────────────────────────────
+# Pedido dela na tarefa "Implementar funcionalidade de criar usuário Admin" e confirmado no chat
+# ("autorizo, pode seguir com o plano"): em Controle > Usuários, um admin cria outro admin pela
+# interface, sem mexer na base. Hoje só dá para criar médico (`criarMedico`) ou PROMOVER quem já
+# existe (`alterarRoleUsuario`).
+#
+# O QUE MUDA: action nova `criarAdminUsuario` em usuarios.ts (Clerk + banco + auditoria), botão
+# "Novo admin" no cabeçalho da página e um diálogo novo. Nenhuma action existente muda de
+# comportamento; `auditarUsuario` só ganha criar no tipo da ação.
+#
+# PERIGO MEDIDO: médio-baixo. Quem cria admin cria acesso total — por isso a action é só do admin
+# (`verificarAdmin`), valida com Zod, NÃO pula a checagem de senha vazada do Clerk e audita
+# (e-mail mascarado). Não toca em migration, schema nem na rota de login.
+#
+# Granularidade deliberada: os três arquivos exatos.
+path:app/(admin)/_actions/usuarios.ts
+path:app/(admin)/admin/usuarios/page.tsx
+path:app/(admin)/admin/usuarios/_components/dialogo-criar-admin.tsx
