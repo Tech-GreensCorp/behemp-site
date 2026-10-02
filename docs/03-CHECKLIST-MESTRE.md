@@ -850,6 +850,15 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
       [04 — Item 79](04-LISTA-DE-AFAZERES.md).
 - [x] **Item 80** — a câmera do paciente ficava por baixo da espera da teleconsulta desde 13/08. Corrigida
       (`z-10`) a pedido de Davi, com guarda. [04 — Item 80](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 81** — criar usuário **Admin** pela interface (Controle > Usuários > "Novo admin"), pedido
+      de Dryelle em 02/10/2026. Antes só dava para criar médico ou promover quem já existia. A action
+      `criarAdminUsuario` é só do admin, fixa o papel no servidor, **não** pula a checagem de senha
+      vazada do Clerk, tolera a corrida com o webhook do Clerk, desfaz o login se o banco falhar e
+      audita com e-mail mascarado. Guarda `criar-admin-e-so-do-admin-e-nao-orfana` (17 casos, medido).
+      02/10/2026, local, branch `feat/admin-cria-admin`, sem commit. **Falta:** commit, PR e deploy,
+      com ordem e nome; prova com sessão de admin real (a instância local é de desenvolvimento).
+      **Fora, de propósito:** e-mail de convite (a senha temporária vai por outro canal) e
+      forçar a troca de senha no primeiro acesso (o Clerk não faz isso na criação).
 
 ### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
 

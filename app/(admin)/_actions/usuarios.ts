@@ -421,7 +421,145 @@ export async function resumirVinculosDoUsuario(
   }
 }
 
+/**
+ * Cria um usuário ADMIN do zero (Clerk + banco). Quem cria admin cria acesso total.
+ *
+ * Pedido de 02/10/2026: até aqui só dava para criar médico (`criarMedico`) ou PROMOVER quem já
+ * existia (`alterarRoleUsuario`); um admin novo exigia mexer na base.
+ *
+ *  - Só admin (`verificarAdmin`). O papel NÃO vem do cliente: é fixo em 'admin' aqui.
+ *  - E-mail que já tem usuário ativo é recusado, apontando para Editar > Papel (promoção).
+ *  - NÃO usa `skipPasswordChecks`: o Clerk recusa senha vazada (HIBP). O `criarMedico` pula essa
+ *    checagem; para acesso total, não.
+ *  - Ordem: Clerk primeiro; falha nele aborta sem tocar no banco. Se o banco falhar DEPOIS, o
+ *    login recém-criado é desfeito — senão sobraria um admin no Clerk sem registro aqui.
+ *  - O webhook `user.created` do Clerk pode gravar a linha antes deste insert (a corrida existe
+ *    também no cadastro de paciente): o conflito de e-mail é tolerado e quem chegou primeiro é
+ *    promovido a admin e religado ao `clerkId`.
+ *  - Auditoria com o e-mail MASCARADO; a senha não é gravada em lugar nenhum.
+ */
+export async function criarAdminUsuario(dados: {
+  nome: string;
+  email: string;
+  senha: string;
+}): Promise<ActionResult<{ id: string }>> {
+  try {
+    const auth = await verificarAdmin();
+    if (!auth.autorizado || !auth.clerkId) return { sucesso: false, erro: auth.erro };
+
+    const parsed = criarAdminSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+    const { nome, email, senha } = parsed.data;
+
+    // Já existe usuário ativo com este e-mail? Então é caso de promoção, não de criação.
+    const [existente] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.deletedAt)))
+      .limit(1);
+    if (existente) {
+      return {
+        sucesso: false,
+        erro: 'Já existe um usuário com este e-mail. Para torná-lo admin, use Editar > Papel.',
+      };
+    }
+
+    // 1. Login no Clerk, já com o papel no publicMetadata (é de lá que o papel EFETIVO é lido).
+    const client = await clerkClient();
+    let clerkId: string;
+    try {
+      const partes = nome.split(' ');
+      const clerkUser = await client.users.createUser({
+        emailAddress: [email],
+        firstName: partes[0],
+        lastName: partes.slice(1).join(' ') || '',
+        password: senha,
+        publicMetadata: { role: 'admin' },
+      });
+      clerkId = clerkUser.id;
+    } catch (clerkError) {
+      console.error('[Admin] Falha ao criar admin no Clerk:', clerkError);
+      return { sucesso: false, erro: mensagemDeErroDoClerk(clerkError) };
+    }
+
+    // 2. Linha em `users`. Se falhar, desfaz o login para não deixar admin órfão.
+    let userId: string;
+    try {
+      const [novo] = await db
+        .insert(users)
+        .values({ email, nome, clerkId, role: 'admin' })
+        .onConflictDoNothing({ target: users.email })
+        .returning({ id: users.id });
+
+      if (novo) {
+        userId = novo.id;
+      } else {
+        // O webhook do Clerk chegou primeiro: promove e religa a linha dele.
+        const [doWebhook] = await db
+          .update(users)
+          .set({ clerkId, nome, role: 'admin' })
+          .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.deletedAt)))
+          .returning({ id: users.id });
+        if (!doWebhook) throw new Error('Conflito de e-mail sem linha ativa correspondente');
+        userId = doWebhook.id;
+      }
+    } catch (dbError) {
+      console.error('[Admin] Falha ao gravar o novo admin no banco; desfazendo o login:', dbError);
+      try {
+        await client.users.deleteUser(clerkId);
+      } catch (desfazerError) {
+        console.error('[Admin] Não foi possível desfazer o login no Clerk:', clerkId, desfazerError);
+      }
+      return { sucesso: false, erro: 'Não foi possível concluir o cadastro. Nada foi criado.' };
+    }
+
+    await auditarUsuario(
+      auth.clerkId,
+      'criar',
+      userId,
+      {},
+      { role: 'admin', email: mascararEmail(email) },
+    );
+
+    return { sucesso: true, dados: { id: userId } };
+  } catch (error) {
+    console.error('[Admin] Erro ao criar admin:', error);
+    return { sucesso: false, erro: 'Erro ao criar admin' };
+  }
+}
+
 // ── Auxiliares (não exportados) ──────────────────────────────────
+
+const criarAdminSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome muito curto').max(100, 'Nome muito longo'),
+  email: z.string().trim().toLowerCase().email('E-mail inválido').max(254, 'E-mail muito longo'),
+  senha: z
+    .string()
+    .min(8, 'A senha deve ter pelo menos 8 caracteres')
+    .max(72, 'Senha muito longa')
+    .regex(/[A-Z]/, 'Deve conter ao menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Deve conter ao menos um número'),
+});
+
+/** Traduz o erro da Backend API do Clerk para algo que o admin entenda. Sem eco do que foi enviado. */
+function mensagemDeErroDoClerk(erro: unknown): string {
+  const codigo = (erro as { errors?: { code?: string }[] })?.errors?.[0]?.code;
+  switch (codigo) {
+    case 'form_identifier_exists':
+      return 'Este e-mail já tem login no Clerk mas não está no sistema. Peça à pessoa para entrar uma vez e depois use Editar > Papel.';
+    case 'form_password_pwned':
+      return 'Esta senha apareceu em vazamentos de dados. Escolha outra.';
+    case 'form_password_length_too_short':
+    case 'form_password_not_strong_enough':
+      return 'A senha é fraca demais. Use uma mais longa e variada.';
+    case 'form_param_format_invalid':
+      return 'E-mail inválido.';
+    default:
+      return 'Não foi possível criar o login. Tente novamente.';
+  }
+}
 
 const papelSchema = z.object({
   usuarioId: z.string().min(1).max(64),
@@ -474,7 +612,7 @@ function mascararEmail(email: string): string {
 /** Auditoria de administração de usuário. Falha de auditoria não derruba a operação. */
 async function auditarUsuario(
   adminClerkId: string | undefined,
-  acao: 'atualizar' | 'deletar',
+  acao: 'criar' | 'atualizar' | 'deletar',
   usuarioId: string,
   antes: Record<string, unknown>,
   depois: Record<string, unknown>,
