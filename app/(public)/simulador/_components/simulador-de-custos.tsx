@@ -54,7 +54,7 @@ export function SimuladorDeCustos() {
           </h1>
           <p className="text-muted-foreground mt-3">
             Planeje os custos estimados dos produtos prescritos, do frete e, se desejar, das
-            consultas sociais de acompanhamento.
+            consultas médicas de acompanhamento.
           </p>
         </header>
 
@@ -120,7 +120,7 @@ export function SimuladorDeCustos() {
 
         <div>
           <label htmlFor="consultas" className="mb-3 block font-semibold">
-            Consultas sociais opcionais por ano ({dinheiro(CONSULTA_SOCIAL_VALOR)} cada)
+            Consultas médicas opcionais por ano ({dinheiro(CONSULTA_SOCIAL_VALOR)} cada)
           </label>
           <select
             id="consultas"
