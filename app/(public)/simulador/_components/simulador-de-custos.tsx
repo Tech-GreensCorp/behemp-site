@@ -46,13 +46,13 @@ export function SimuladorDeCustos() {
     <Card className="mx-auto max-w-3xl">
       <CardContent className="space-y-8 p-6 sm:p-10">
         <header>
-          <p className="text-xs font-bold tracking-[0.2em] text-primary uppercase">
+          <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase">
             Programa Be4Hope · Acesso Social
           </p>
-          <h1 className="mt-3 font-heading text-3xl font-semibold sm:text-4xl">
+          <h1 className="font-heading mt-3 text-3xl font-semibold sm:text-4xl">
             Simule os custos do seu tratamento
           </h1>
-          <p className="mt-3 text-muted-foreground">
+          <p className="text-muted-foreground mt-3">
             Planeje os custos estimados dos produtos prescritos, do frete e, se desejar, das
             consultas sociais de acompanhamento.
           </p>
@@ -90,11 +90,11 @@ export function SimuladorDeCustos() {
               step={PRECO_PASSO}
               value={preco}
               onChange={(e) => setPreco(Number(e.target.value))}
-              className="flex-1 accent-primary"
+              className="accent-primary flex-1"
             />
             <output className="min-w-24 text-right font-semibold">{dinheiro(preco)}</output>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="text-muted-foreground mt-2 text-xs">
             Limite de {dinheiro(PRECO_MAX)} por frasco.
           </p>
         </div>
@@ -112,7 +112,7 @@ export function SimuladorDeCustos() {
               step={1}
               value={frascos}
               onChange={(e) => setFrascos(Number(e.target.value))}
-              className="flex-1 accent-primary"
+              className="accent-primary flex-1"
             />
             <output className="min-w-24 text-right font-semibold">{frascos}</output>
           </div>
@@ -135,17 +135,17 @@ export function SimuladorDeCustos() {
         </div>
 
         <section aria-live="polite" className="grid gap-3.5 sm:grid-cols-2">
-          <div className="rounded-xl bg-muted p-5">
-            <span className="text-sm text-muted-foreground">Custo total estimado no ano</span>
+          <div className="bg-muted rounded-xl p-5">
+            <span className="text-muted-foreground text-sm">Custo total estimado no ano</span>
             <strong className="mt-2 block text-2xl sm:text-3xl">{dinheiro(custos.total)}</strong>
           </div>
-          <div className="rounded-xl bg-muted p-5">
-            <span className="text-sm text-muted-foreground">Equivalente mensal estimado</span>
+          <div className="bg-muted rounded-xl p-5">
+            <span className="text-muted-foreground text-sm">Equivalente mensal estimado</span>
             <strong className="mt-2 block text-2xl sm:text-3xl">{dinheiro(custos.mensal)}</strong>
           </div>
         </section>
 
-        <dl className="space-y-1.5 border-t border-border pt-4 text-sm">
+        <dl className="border-border space-y-1.5 border-t pt-4 text-sm">
           <div className="flex justify-between gap-4">
             <dt>Produto</dt>
             <dd className="text-right font-semibold">{produto?.nome ?? '—'}</dd>
@@ -170,18 +170,17 @@ export function SimuladorDeCustos() {
           type="button"
           variant="outline"
           onClick={reiniciar}
-          className="btn-pill h-11 gap-2 border-primary/40 px-6 text-sm font-semibold text-primary hover:border-primary hover:bg-primary/5 hover:text-primary"
+          className="btn-pill border-primary/40 text-primary hover:border-primary hover:bg-primary/5 hover:text-primary h-11 gap-2 px-6 text-sm font-semibold"
         >
           <RotateCcw size={16} aria-hidden="true" />
           Reiniciar simulação
         </Button>
 
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-muted-foreground text-xs leading-relaxed">
           Simulação meramente informativa, sem compromisso de compra, assinatura, parcelamento ou
           garantia de fornecimento. Valores não incluem eventuais despesas adicionais, frete ou
-          taxas. Quantidades e importações dependem de prescrição, avaliação clínica,
-          documentação e exigências sanitárias aplicáveis. O paciente pode escolher livremente
-          seu médico.
+          taxas. Quantidades e importações dependem de prescrição, avaliação clínica, documentação e
+          exigências sanitárias aplicáveis. O paciente pode escolher livremente seu médico.
         </p>
       </CardContent>
     </Card>
