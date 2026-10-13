@@ -47,7 +47,7 @@ export function SimuladorDeCustos() {
       <CardContent className="space-y-8 p-6 sm:p-10">
         <header>
           <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase">
-            Programa Be4Hope · Acesso Social
+            Programa Be4Hope
           </p>
           <h1 className="font-heading mt-3 text-3xl font-semibold sm:text-4xl">
             Simule os custos do seu tratamento
