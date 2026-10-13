@@ -47,14 +47,14 @@ export function SimuladorDeCustos() {
       <CardContent className="space-y-8 p-6 sm:p-10">
         <header>
           <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase">
-            Programa Be4Hope · Acesso Social
+            Programa Be4Hope
           </p>
           <h1 className="font-heading mt-3 text-3xl font-semibold sm:text-4xl">
             Simule os custos do seu tratamento
           </h1>
           <p className="text-muted-foreground mt-3">
             Planeje os custos estimados dos produtos prescritos, do frete e, se desejar, das
-            consultas sociais de acompanhamento.
+            consultas médicas de acompanhamento.
           </p>
         </header>
 
@@ -120,7 +120,7 @@ export function SimuladorDeCustos() {
 
         <div>
           <label htmlFor="consultas" className="mb-3 block font-semibold">
-            Consultas sociais opcionais por ano ({dinheiro(CONSULTA_SOCIAL_VALOR)} cada)
+            Consultas médicas opcionais por ano ({dinheiro(CONSULTA_SOCIAL_VALOR)} cada)
           </label>
           <select
             id="consultas"
