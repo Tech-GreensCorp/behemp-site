@@ -23,6 +23,7 @@ const isPublicRoute = createRouteMatcher([
   '/programa-acesso-solidario',
   '/contato',
   '/triagem',
+  '/simulador',
   '/politica-de-privacidade',
   '/termos-de-uso',
   '/redirect',
