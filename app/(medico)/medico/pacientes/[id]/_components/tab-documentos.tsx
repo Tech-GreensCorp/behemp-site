@@ -21,6 +21,7 @@ import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-pa
 import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
 import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { CartaoComunicadoDoacao } from '@/components/admin/comunicados/CartaoComunicadoDoacao';
 import {
   Download,
   FileCheck,
@@ -143,6 +144,9 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
 
   return (
     <div className="space-y-6">
+      {/* Comunicado para assinatura (DocuSign) — a action só responde ao admin; para os demais o cartão some */}
+      <CartaoComunicadoDoacao pacienteId={pacienteId} />
+
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Documentos</h2>
         {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><Plus size={14} /> Enviar Documento</Button>}

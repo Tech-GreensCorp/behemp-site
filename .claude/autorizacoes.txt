@@ -1024,3 +1024,26 @@ path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
 path:app/(admin)/_actions/usuarios.ts
 path:app/(admin)/admin/usuarios/page.tsx
 path:app/(admin)/admin/usuarios/_components/dialogo-criar-admin.tsx
+
+# ── Autorizado por Dryelle em 15/10/2026 ────────────────────────────────────────
+# Pedido dela na tarefa "Implementar fluxo de envio e assinatura de documentos via DocuSign"
+# (comunicado "Atualização do Programa de Doação") e confirmado no chat ("Autorizo") depois de eu
+# listar os arquivos: o admin dispara o envio manual por paciente, o paciente assina pelo
+# DocuSign em /paciente/documentos e o status volta por webhook + consulta direta à API.
+#
+# O QUE MUDA:
+#   · lib/docusign/docusign-service.ts — só ACRESCENTA: exporta o token JWT que já existia e
+#     adiciona as funções do comunicado (criar envelope, link de assinatura, ler status, baixar
+#     PDF). `criarEnvelopeEmbedded` e `downloadPdfAssinado` da procuração NÃO mudam.
+#   · a tela do paciente ganha a seção do comunicado em /paciente/documentos.
+#   · a aba Documentos do detalhe do paciente (reaproveitada pelo admin) ganha o cartão do
+#     comunicado, com o botão de envio visível só para admin.
+#
+# PERIGO MEDIDO: médio-baixo. A procuração está em produção e usa o mesmo serviço, por isso a
+# mudança é aditiva e sem renomear nada existente. Migration nova (tabela nova, sem alterar as
+# existentes) gerada pelo drizzle-kit — nenhuma migration existente é editada.
+#
+# Granularidade deliberada: os três arquivos exatos.
+path:lib/docusign/docusign-service.ts
+path:app/(paciente)/paciente/documentos/page.tsx
+path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx

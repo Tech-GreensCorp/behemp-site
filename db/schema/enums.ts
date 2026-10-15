@@ -456,3 +456,20 @@ export const pedidoAtendimentoStatusEnum = pgEnum('pedido_atendimento_status', [
   'concluido',
   'rejeitado_anvisa',
 ]);
+
+/**
+ * Situação de um comunicado enviado ao paciente para assinatura eletrônica (DocuSign).
+ *
+ * pendente  — o envelope existe e o paciente ainda não assinou
+ * assinado  — o DocuSign confirmou a conclusão (nunca "o paciente voltou para a tela")
+ * recusado  — o paciente recusou ou o envelope foi anulado/expirou
+ * erro      — o envio não chegou a existir (falha do DocuSign): o paciente nunca vê esta linha
+ * cancelado — o admin desfez antes da assinatura (reservado; a linha nunca é apagada)
+ */
+export const comunicadoAssinaturaStatusEnum = pgEnum('comunicado_assinatura_status', [
+  'pendente',
+  'assinado',
+  'recusado',
+  'erro',
+  'cancelado',
+]);

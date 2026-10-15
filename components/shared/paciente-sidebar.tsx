@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Lock,
   FileText,
+  FolderOpen,
   CalendarDays,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -45,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Prescrições', href: '/paciente/prescricoes', icon: FileText },
       { label: 'Recompra', href: '/paciente/recompra', icon: ShoppingCart },
       { label: 'Autorização ANVISA', href: '/paciente/anvisa', icon: ShieldCheck },
+      { label: 'Documentos', href: '/paciente/documentos', icon: FolderOpen },
       { label: 'Calculadora', href: '/paciente/calculadora', icon: Calculator },
     ],
   },

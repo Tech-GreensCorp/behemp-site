@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
+import { ComunicadosParaAssinar } from '@/components/paciente/comunicados/ComunicadosParaAssinar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
 const TIPO_LABELS: Record<string, string> = {
@@ -148,6 +149,9 @@ export default function DocumentosPacientePage() {
           )
         }
       />
+
+      {/* Comunicados enviados pela equipe para assinatura (só aparece se houver) */}
+      <ComunicadosParaAssinar />
 
       {/* Formulário inline */}
       {mostrarForm && (
