@@ -19,6 +19,174 @@
 
 ---
 
+## ⚪ Item 87 — CATALOGADO, 15/10/2026: defeitos de tela do painel admin (não são segurança)
+
+**Status:** catalogado, **não corrigido**. Achados ao escrever o guia do Admin (`~/Documents/behemp-treinamento`),
+lendo o código e conferindo no sistema rodando **local**, com banco fictício.
+
+- `app/(admin)/admin/monitoramento-anvisa/page.tsx:183`: o nome do paciente linka `/admin/perfil/{pacienteId}`.
+  A pasta `app/(admin)/admin/perfil/` só tem `page.tsx`, então o clique dá 404.
+- `components/admin/invoices/invoice-form.tsx`: quando salvar falha, o formulário não mostra nada (só navega
+  em sucesso). `deletarInvoice` existe (`app/(admin)/_actions/invoices.ts:425`) e nenhuma tela a chama.
+  `FieldRow` é declarado **dentro** do componente (`:184`); em React isso recria os inputs a cada render e pode tirar
+  o foco a cada tecla. **Não medido** (precisa digitar na tela).
+- `app/(admin)/admin/auditoria/page.tsx:80`: os botões rápidos filtram por `paciente`, `documento`, `evolucao` e
+  `dosagem` (singular), e a coluna grava `pacientes`, `documentos`, `evolucoes`, `dosagens` (plural), com filtro por
+  igualdade. Os botões tendem a voltar vazios. A tela também não mostra `dadosAntes`/`dadosDepois` nem nomes, só 8
+  caracteres do id. Fora do menu (item comentado em `admin-sidebar.tsx`).
+- `app/(admin)/admin/configuracoes/page.tsx:36` e `:81`: tela estática, sem leitura do sistema. Mostra
+  "Ambiente: Desenvolvimento" (fixo, também em produção) e "Resend (E-mail)" como "Pendente" — o e-mail é Brevo.
+  Fora do menu.
+- A aba **Prescrições** da ficha do paciente, aberta por um **admin**, manda para `/entrar`. **Medido em
+  15/10/2026** no navegador local: `listarPrescricoesPaciente` usa `verificarMedico()` e faz `redirect`
+  (`app/(medico)/_actions/prescricoes.ts:159-160`). A tela é a mesma do médico (`export { default }` em
+  `app/(admin)/admin/pacientes/[id]/page.tsx`).
+- O contador do menu "Atribuir Médico" (`contarPacientesSemMedico`, `app/_actions/admin-atribuicao.ts:305`)
+  conta também paciente arquivado, e a lista da tela não.
+
+**Perigo de mexer:** baixo, cada um é local a uma tela, sem teste que prove antes e depois. Não é urgente;
+o guia do Admin já descreve cada comportamento.
+
+---
+
+## 🔴 Item 86 — CATALOGADO, 15/10/2026: `seed-test-pagamentos.mjs`, na raiz, lê o `.env` e apaga e insere no banco de produção
+
+**Status:** catalogado, **não corrigido**, **o arquivo não foi executado**. Está **sem rastreio** no git
+(`?? seed-test-pagamentos.mjs`), então não passa por revisão nem por guarda.
+
+`seed-test-pagamentos.mjs:8-12` lê `DATABASE_URL` de `.env` por caminho absoluto e abre `neon(url)`. O `.env`
+aponta para o Neon de produção (medido em 15/10/2026, sem imprimir a URL). O script ignora o `.env.local`, que é
+onde o desenvolvimento local aponta para um Postgres próprio. `:15-19` faz `DELETE FROM pagamentos` e `DELETE FROM consultas` das linhas com observação
+`[TESTE ADMIN]`, e o resto do arquivo **insere** em `consultas` e `pagamentos` com paciente e médico reais
+(`SELECT … LIMIT 1`). Quem rodar sem ler cria pagamento e consulta de teste na agenda de um médico real.
+Segue o mesmo padrão do Item 17 (abaixo):
+seed sem trava. `db/seed-produtos.ts` usa o driver `neon-http` e **não** roda contra Postgres local.
+**Perigo de mexer:** baixo (um arquivo, ninguém o chama; está fora do `package.json`). **Caminho:** adicionar a
+mesma trava dos seeds de perfil (recusa URL de Neon e `NODE_ENV=production`) ou apagar o arquivo, com decisão de
+quem o criou. **Hoje:** não rodar.
+
+---
+
+## 🟠 Item 85 — CATALOGADO, 15/10/2026: as migrations não cobrem o schema, e o journal tem datas fora de ordem
+
+**Status:** catalogado, **não corrigido**. **Não verificado em produção** (sem acesso ao banco de lá nesta
+sessão). Descoberto ao criar um Postgres novo, só com as migrations, para os prints do guia.
+
+1. **`db/migrations/meta/_journal.json`: 36, 37 e 38 têm `when` anterior ao da 35.** `0035` = `1789134788403`
+   (11/09 13:53 UTC); `0036` = `1789066049422` e `0037` = `1789066049423` (10/09 18:47); `0038` = `1789134004694`
+   (11/09 13:40). O migrator do Drizzle só roda as entradas com `when` maior que o da última aplicada. Num
+   banco que já tem a `0035`, a `0036`, a `0037` e a `0038` são **puladas sem erro**. Num banco novo, rodar tudo
+   numa transação única **falha** na `0037` (`ALTER TYPE … ADD VALUE` e uso do valor na mesma transação:
+   `ALTER TABLE "consultas" ALTER COLUMN "status" SET DEFAULT 'reservada'`) e, depois, a `0040` falha com
+   `table "pagamentos_config" does not exist`. **A produção tem as três?** Conferir
+   `SELECT id, created_at FROM drizzle.__drizzle_migrations ORDER BY id` (a tabela do Drizzle fica no schema
+   `drizzle`) contra o journal. Relacionado ao Item 32
+   e ao Item 1.
+2. **Tabelas sem migration nenhuma.** `grep` em `db/migrations/*.sql` não acha `emails_notificacao`
+   (`db/schema/emails-notificacao.ts`) nem as 8 tabelas `invoice_*` (`db/schema/invoices.ts`). Aparecem só nos snapshots.
+3. **`recompras` tem 9 colunas a mais que a migration.** `0000_old_rictor.sql:138-146` cria 7 colunas, com
+   `dosagem_id NOT NULL` e `status DEFAULT 'agendada'`. `db/schema/recompras.ts` tem também `solicitante_id`,
+   `paciente_id`, `medicamento_nome`, `ml_frasco`, `gotas_por_dia`, `contato_telefone`, `contato_email`,
+   `observacoes`, com `dosagem_id` nulável e default `'pedida'`. Nenhuma migration posterior toca a tabela.
+
+**Leitura mais provável (inferência):** a produção recebeu essas tabelas e colunas por `drizzle-kit push`, fora do
+journal. Se for isso, um banco novo (staging, recuperação de desastre, ambiente de teste) **não nasce igual à
+produção**, e `/admin/invoices`, `/admin/recompras` e `/medico/recompra` quebram nele.
+**Perigo de mexer:** **alto**. Migration é irreversível em produção (`scripts/migrar.mjs`), e corrigir o journal
+muda o que o migrator considera aplicado. **Caminho:** primeiro medir a produção (SELECT acima e `\d recompras`);
+depois uma migration **aditiva e idempotente** (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`) para o
+que falta, e a correção dos `when` só com a medição na mão. Exige autorização em `.claude/autorizacoes.txt`
+(o hook bloqueia `db/migrations/`). Um guarda que derive "toda tabela do schema tem `CREATE TABLE` nas
+migrations" nasce vermelho hoje, então só entra **depois** da correção.
+
+---
+
+## 🟠 Item 84 — CATALOGADO, 15/10/2026: ações de admin sem auditoria, ou auditadas sem dizer quem
+
+**Status:** catalogado, **não corrigido**. Complementa o Item 59.
+
+- `app/api/anvisa/atualizar-status/route.ts:131-138`: grava `ATUALIZAR_STATUS` em `logs_auditoria` com `entidade` e
+  `entidadeId`, **sem `userId`**. Quem mudou o status do processo da ANVISA não fica registrado. Idem
+  `iniciarRenovacao` (`app/_actions/anvisa-renovacao.ts`, `CRIAR_RENOVACAO`).
+- `reatribuirTodosPacientes` (`app/_actions/admin-atribuicao.ts:330`): move **todos** os pacientes, inclusive os
+  arquivados (sem `deletedAt IS NULL`), para um médico, **sem auditoria** nem aviso ao médico de origem. O diálogo
+  mostra a contagem só dos não arquivados. A atribuição simples (`:212`) também não é auditada.
+- `excluirTriagem` (`app/(public)/_actions/triagem.ts:317-329`) e `excluirTriagensEmLote` (`:357`): `DELETE`
+  físico, sem auditoria. A lote não tem tela.
+- `importarPacientesCSV` e `exportarPacientesCSV` (`app/_actions/pacientes.ts:811`, `:998`): sem auditoria. O
+  export leva CPF, RG, histórico médico e patologia de todos os pacientes não arquivados (37 colunas).
+- `obterPaciente` (`app/_actions/pacientes.ts:545`): ler a ficha completa não é auditado (o "Ver" do documento é).
+- Sem auditoria também: `criarMedico` e `atualizarConfigAgenda` (`app/_actions/admin-medicos.ts`), invoices,
+  recompras (status e e-mails), responder contato, leads. A configuração de pagamento do médico **é** auditada,
+  mas guarda PIX e dados bancários **em claro** em `dadosAntes`/`dadosDepois` (`app/(admin)/_actions/pagamentos-medicos.ts`).
+
+**Perigo de mexer:** baixo a médio. `registrarAuditoria` já existe (`lib/utils/audit.ts`) e falha sem derrubar a
+ação. O cuidado é **o que entra no log**: audit de export não deve carregar a lista, e a de pagamento deve
+mascarar PIX e banco. Cada um é um commit próprio. Pendente de decisão do dono: **o que a LGPD exige registrar** em
+exportação e em leitura de ficha por admin.
+
+---
+
+## 🔴 Item 83 — CATALOGADO, 15/10/2026: leituras e escritas de paciente e usuário sem escopo de vínculo, para qualquer médico, admin ou, no chat e na recompra, qualquer logado
+
+**Status:** catalogado, **não corrigido**. Medido **só por leitura de código**; nenhuma foi executada com um
+segundo médico. Estende o Item 13,
+que cobre a cadeia de dosagem, com as que ele não nomeia.
+
+- `obterPaciente` (`app/_actions/pacientes.ts:545`): `verificarMedicoOuAdmin()` e `SELECT` por `p.id`, **sem
+  `p.medico_id`**. Devolve CPF, RG, endereço, histórico médico, patologia e dados do responsável. A rota
+  `/medico/pacientes/{id}` abre qualquer ficha não apagada. O mesmo vale para `atualizarPaciente` (`:186`),
+  `arquivarPaciente` (`:273`) e `atualizarJornadaFase` (`:685`).
+- Só checam o papel, sem vínculo: `app/_actions/anamneses.ts`, `evolucoes.ts`, `exames.ts`,
+  `documentos-paciente.ts`, `relatorios.ts`, `ajustes-dosagem.ts` e o rastreio de frasco.
+- `listarPacientesParaRecompra` (`app/_actions/recompras.ts:402-420`): `obterUsuarioAtual()` só autentica, e o
+  `.where` é um no-op; devolve **todos** os pacientes (nome e e-mail) a qualquer logado.
+- `listarTodasRecompras` (`app/_actions/recompras.ts:330-374`): só autentica, e devolve `contato_telefone` e
+  `contato_email` de **todos** os pedidos, com o nome do paciente. Está no Item 82.
+- `buscarUsuariosChat` (`app/_actions/chat.ts:372-`): `verificarUsuarioAutenticado()` e `SELECT` de `users` sem
+  filtro de papel nem de vínculo. **Qualquer logado, inclusive paciente, lista 20 usuários por vez** (nome, e-mail
+  e papel), com busca por trecho.
+
+É OWASP API1 (BOLA) e A01. O que existe de certo e funciona é `garantirMedicoDoPaciente`
+(`lib/auth/escopo-paciente.ts`), usado em conduta, anamnese-baseline, revisão IA e prescrição.
+**Perigo de mexer:** **médio a alto**. Cada action tem 1 a 3 arquivos chamadores (medido com `grep`), mas elas
+sustentam a ficha do médico em produção e **o admin precisa continuar passando** (regra de negócio em aberto:
+`lib/auth/escopo-paciente.ts` marca "Item 13.5" para o dono). A guarda `autorizacao-tem-escopo-de-objeto` cobre
+só a teleconsulta. **Caminho:** uma action por commit, `garantirMedicoDoPaciente` no começo, teste de dois
+médicos; guarda derivada do disco só **depois** da correção (guarda que acusa dezenas no primeiro dia é
+desligado). **Decisão do dono antes:** o admin enxerga a ficha clínica? E o médico pode abrir o paciente de outro?
+
+---
+
+## 🔴 Item 82 — CATALOGADO, 15/10/2026: quatro grupos de Server Actions do painel admin não exigem admin
+
+**Status:** catalogado, **não corrigido**. Achado ao levantar as telas do admin para o guia. **Só por leitura de
+código**: não foi invocada nenhuma action como paciente. Server Action é um endpoint `POST`: o que decide se
+alguém sem papel de admin consegue chamá-la é a checagem **dentro** da action, não a tela. **A doc do Next sobre o
+alcance disso não foi lida nesta sessão**: confirmar antes de afirmar até onde chega.
+
+| Action | Evidência | O que falta |
+|---|---|---|
+| `listarLogs` | `app/(admin)/_actions/auditoria.ts:57-98`; `:66` é `// TODO: verificarAdmin() quando Clerk estiver configurado` | **Nenhuma checagem**, nem de login. `select()` da tabela inteira (`dadosAntes`, `dadosDepois`, IP, `userId`), até `limite` linhas. |
+| `buscarResumoAlertas`, `listarAlertas`, `buscarConfigAlertas`, `salvarConfigAlertas`, `dispararVerificacaoManual`, `enviarEmailTeste` | `app/(admin)/_actions/alertas.ts:15`, `:55`, `:90`, `:104`, `:120`, `:135` | `await verificarAdmin();` **sem usar o retorno**. `verificarAdmin` (`lib/auth/permissions.ts:97-123`) **devolve** `{ autorizado: false }`, não lança. A linha não bloqueia nada. |
+| `listarTodasRecompras`, `atualizarStatusRecompra`, `listarPacientesParaRecompra` | `app/_actions/recompras.ts:345`, `:384`, `:408` | `obterUsuarioAtual()` só prova que há sessão, e o papel padrão é `paciente` (`permissions.ts:43`). Qualquer logado lê telefone e e-mail de todos os pedidos e muda status. |
+| `listarEmailsNotificacao`, `criarEmailNotificacao`, `toggleEmailNotificacao`, `excluirEmailNotificacao` | `app/_actions/emails-notificacao.ts:42`, `:70`, `:97`, `:125` | Idem. Quem cria um e-mail ali passa a **receber os avisos de novos pedidos de recompra**. |
+
+**Efeitos pelo código:** quem estiver logado, com qualquer papel, pode (a) ler o log de auditoria inteiro, e
+`listarLogs` nem exige login; (b) disparar `dispararVerificacaoManual`, que envia o digest **real** (e-mail e
+notificação a pacientes); (c) listar telefone e e-mail de pacientes que pediram recompra; (d) cadastrar um endereço
+que recebe notificação de recompra. Os layouts `(admin)` bloqueiam quem não é admin **na tela**, mas não na action.
+**Perigo de mexer:** **baixo**. A correção é `const auth = await verificarAdmin(); if (!auth.autorizado) return
+{ sucesso: false, erro: auth.erro }` no começo de cada uma (padrão já usado em `app/(admin)/_actions/usuarios.ts`).
+1 a 2 arquivos chamam cada action, todos da tela admin. **Sem teste** hoje prova isso; a guarda
+`autorizacao-tem-escopo-de-objeto` só olha teleconsulta. **Caminho:** um commit só para estas 14 actions, e uma
+guarda **derivada do disco** ("toda action exportada de `app/(admin)/_actions` chama `verificarAdmin` **e usa o
+retorno**") — o `await verificarAdmin();` solto é o padrão a acusar, e deve entrar com **sabotagem**. A guarda
+só entra **depois** da correção. **Autorização do dono** antes de mexer. Família: OWASP API5:2023 (função sem
+checagem de nível) e A01:2021.
+
+---
+
 ## ✅ Item 80 — CORRIGIDO, 01/10/2026 (local): a câmera do paciente ficava por baixo da espera da teleconsulta
 
 **Status:** achado ao medir a D-30 no Chromium; corrigido a pedido de Davi (_"o funcionamento tem que ser

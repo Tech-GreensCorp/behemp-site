@@ -8,7 +8,9 @@
 > 3. A **Fila de execução** no rodapé é a ordem oficial. Reordenar é decisão de quem manda.
 > 4. **A fila é atualizada no mesmo commit que conclui o item.**
 
-**Atualizado em 01/10/2026** (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`.
+**Atualizado em 15/10/2026** (achados do guia do Admin e do Médico catalogados: Itens 82 a 87, **não corrigidos**; a fila não mudou). Produção: `main` `6065964` (valor da atualização anterior, **não reconferido** nesta data).
+
+_Versão anterior: "Atualizado em 01/10/2026 (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`."_
 
 _Versão anterior: "Atualizado em 30/09/2026 (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`."_
 
@@ -859,6 +861,35 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
       com ordem e nome; prova com sessão de admin real (a instância local é de desenvolvimento).
       **Fora, de propósito:** e-mail de convite (a senha temporária vai por outro canal) e
       forçar a troca de senha no primeiro acesso (o Clerk não faz isso na criação).
+
+### 🔴 Achados de 15/10/2026 — o levantamento para o guia do Admin e do Médico (Itens 82 a 87)
+
+Ao ler o código e conferir as telas **no ambiente local** (Postgres de teste, dados fictícios) para escrever os
+dois guias de treinamento, apareceram seis achados. **Catalogados, nenhum corrigido; nenhum entra na fila sem
+ordem de quem manda.** A numeração pula o 81 de propósito: ele é o "Novo admin" (linha acima), que só tem entrada
+aqui. Diagnóstico, `caminho:linha` e o perigo de mexer de cada um em [04 — Itens 82 a 87](04-LISTA-DE-AFAZERES.md).
+
+- [ ] 🔴 **Item 82 — quatro grupos de Server Actions do admin não exigem admin.** `listarLogs` (auditoria) não
+      checa nem login (`app/(admin)/_actions/auditoria.ts:66`, TODO); as 6 de alertas chamam `verificarAdmin()`
+      **sem usar o retorno** (`alertas.ts:15`…`:135`), e a `dispararVerificacaoManual` envia o digest real; as de
+      recompras e as de e-mails de notificação só exigem sessão (`recompras.ts:345`, `emails-notificacao.ts:42`).
+      Lido, **não executado como paciente**. Perigo de mexer: baixo.
+- [ ] 🔴 **Item 83 — leituras e escritas de paciente e usuário sem escopo de vínculo.** `obterPaciente`
+      (`app/_actions/pacientes.ts:545`) e as actions legadas de anamnese, evolução, exames e documentos checam só o
+      papel; `buscarUsuariosChat` e `listarPacientesParaRecompra` entregam usuários e pacientes a qualquer logado.
+      Estende o Item 13. Perigo de mexer: médio a alto; **depende de decisão do dono** (o admin vê a ficha?).
+- [ ] 🟠 **Item 84 — ações de admin sem auditoria, ou auditadas sem dizer quem.** Status da ANVISA grava
+      `ATUALIZAR_STATUS` sem `userId` (`app/api/anvisa/atualizar-status/route.ts:131`); "Reatribuir todos" move até
+      arquivados sem log; excluir triagem é físico; importar e exportar CSV (com CPF e histórico) não são auditados.
+- [ ] 🟠 **Item 85 — as migrations não cobrem o schema.** O `_journal.json` tem as entradas 36, 37 e 38 com data
+      anterior à da 35, e o migrator do Drizzle as pula; `emails_notificacao` e as 8 `invoice_*` não têm migration;
+      `recompras` tem 9 colunas a mais que a `0000`. **Não verificado em produção**: medir antes
+      (`drizzle.__drizzle_migrations`). Perigo de mexer: **alto**, exige autorização e migration aditiva.
+- [ ] 🔴 **Item 86 — `seed-test-pagamentos.mjs`, na raiz e sem rastreio, lê o `.env` e apaga e insere no banco de
+      produção.** Não foi executado. **Não rodar.** Perigo de mexer: baixo (apagar ou travar o arquivo).
+- [ ] ⚪ **Item 87 — defeitos de tela do admin, não de segurança:** link do Monitoramento ANVISA para rota que não
+      existe, Invoices que falha sem mensagem e sem exclusão, botões da Auditoria que voltam vazios, tela de
+      Configurações estática, aba Prescrições que manda o admin para o login (**medido**).
 
 ### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
 
