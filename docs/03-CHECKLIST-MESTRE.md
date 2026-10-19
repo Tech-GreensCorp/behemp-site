@@ -834,6 +834,47 @@ temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com convers
 
 ---
 
+### ✅ Feito em 15/10/2026 (local, sem commit) — comunicado "Atualização do Programa de Doação" por DocuSign
+
+Pedido da Dryelle: o admin dispara, **um paciente por vez**, o comunicado da carta
+`CARTA-PACIENTES-DOACAO.docx`; o paciente assina em `/paciente/documentos` pelo DocuSign; o
+admin acompanha na aba Documentos do paciente.
+
+- **Tabela nova** `comunicados_assinatura` (migration `0051`, aditiva): uma linha por **envio**, nada se
+  apaga. O índice único parcial `comunicados_assinatura_ativo_unq` faz o **banco** recusar um segundo
+  envio enquanto houver um `pendente` ou `assinado` — o clique duplo não cria dois envelopes.
+- **Reaproveita** a integração DocuSign da procuração (mesmo JWT, mesma conta): `lib/docusign/docusign-service.ts`
+  só **ganhou** funções (`obterAccessToken` passou a ser exportada; nada existente mudou).
+- 🔴 **Quem diz que assinou é o DocuSign.** O retorno do paciente à tela e o corpo do webhook são
+  **gatilhos**: `sincronizarComunicado` consulta a API com as nossas credenciais e só ela muda o status.
+  Um webhook forjado ou `?event=signing_complete` digitado não assinam nada (provado no teste de integração).
+- **Idempotência:** cada passo pós-assinatura (PDF no store privado, e-mail ao paciente, e-mail a
+  `docs@`) reivindica a sua trava com `UPDATE … WHERE marcador IS NULL RETURNING`; falha devolve a trava
+  e o webhook responde 500 para o DocuSign reentregar.
+- **Código:** `lib/comunicados/` (catálogo, PDF, núcleo, funções puras), `lib/email/comunicados.ts`,
+  `app/_actions/comunicados.ts`, `app/api/comunicados/[id]/{arquivo,retorno}`, ramo novo no
+  `app/api/webhooks/docusign/route.ts`, `components/admin/comunicados/`, `components/paciente/comunicados/`,
+  item **Documentos** na `paciente-sidebar`.
+- **Testes:** guarda `o-comunicado-assina-so-pelo-docusign` (28) e integração contra Postgres real
+  `o-comunicado-so-assina-quem-o-docusign-confirma` (22), ambos **provados vermelhos por sabotagem**.
+  ⚠️ As fronteiras de rede (API do DocuSign, Brevo, store privado) são **duplos** nesses testes.
+- ⚠️ **O que NÃO foi provado:** envio real pelo DocuSign, e-mail real pelo Brevo e a tela com sessão
+  (não há credencial DocuSign, `CLERK_SECRET_KEY` nem `BLOB_TOKEN_PRIVADO` locais; o Brevo bloqueia o IP
+  da máquina de desenvolvimento).
+- **Pendências de configuração para produção:** (1) `docs@be4hope.org` autenticado como remetente no Brevo;
+  (2) credenciais `DOCUSIGN_*` **de produção** e `DOCUSIGN_BASE_URL`/`DOCUSIGN_OAUTH_BASE_URL` de produção
+  (os padrões do código são o sandbox); (3) `BLOB_TOKEN_PRIVADO` no processo; (4) consentimento JWT do
+  aplicativo na conta DocuSign. O webhook é registrado **por envelope** (`eventNotification`) — não exige
+  Connect configurado na conta.
+- **Não feito, de propósito:** validação HMAC do webhook (a `DOCUSIGN_HMAC_KEY` não existe e entrar no
+  `deploy.yml` é decisão própria); como o status é lido da API, o HMAC é defesa em profundidade, não
+  controle de integridade. O texto da carta tem uma inconsistência **de conteúdo**: o exemplo diz
+  "paciente que toma 6 frascos por semestre" e calcula 12 frascos + 2 fretes — ficou como no `.docx`.
+- ⚠️ **Achado de ambiente:** nesta máquina o `python` não existe, então o hook `escopo-autorizado.py`
+  **não executa** (os 18 casos de `hooks-de-escopo` falham por isso) — a autorização por escrito foi
+  registrada em `.claude/autorizacoes.txt` mesmo assim. E 58 casos falham **também no `main` limpo**
+  (CRLF do checkout no Windows), com o conjunto idêntico antes e depois desta mudança.
+
 ### ✅ Feito em 01/10/2026 (local, sem commit) — a espera da chamada (Item 76)
 
 - [x] **Item 76** — o palco da chamada de atendimento dizia _"{outro} está sem câmera"_ antes de o outro

@@ -15,6 +15,31 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    /**
+     * Comunicados enviados pelo admin (Atualização do Programa de Doação).
+     *
+     * O corpo do webhook aqui é só um GATILHO — traz o envelopeId, e o status é perguntado à API
+     * do DocuSign com as nossas credenciais (`sincronizarComunicado`). Um webhook forjado não
+     * consegue marcar nada como assinado. O formato do payload varia conforme a configuração do
+     * Connect, por isso o envelopeId é procurado nos lugares onde o DocuSign o põe.
+     *
+     * Responde 500 quando o DocuSign não respondeu ou a finalização (PDF/e-mails) ficou pela
+     * metade: é o que faz o DocuSign reentregar, e cada passo é idempotente.
+     */
+    const envelopeIdDoPayload: unknown =
+      body?.data?.envelopeId ?? body?.envelopeId ?? body?.envelopeSummary?.envelopeId;
+    if (typeof envelopeIdDoPayload === 'string' && envelopeIdDoPayload) {
+      const { processarWebhookDoComunicado } = await import('@/lib/comunicados/assinatura');
+      const comunicado = await processarWebhookDoComunicado(envelopeIdDoPayload);
+      if (comunicado) {
+        if (!comunicado.consultou || comunicado.finalizacaoPendente) {
+          return NextResponse.json({ erro: 'Processamento incompleto' }, { status: 500 });
+        }
+        return NextResponse.json({ recebido: true });
+      }
+      // Não é comunicado: segue para a procuração, como sempre foi.
+    }
+
     // TODO produção: validar assinatura HMAC do DocuSign
     // const hmacKey = env.DOCUSIGN_HMAC_KEY;
     // const signature = request.headers.get('x-docusign-signature-1');

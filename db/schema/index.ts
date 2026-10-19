@@ -60,3 +60,6 @@ export * from './consentimentos';
 // ── Pedido de atendimento assistido da ANVISA — ADR-0029 ──
 export * from './pedidos-atendimento-assistido';
 export * from './chamadas-de-atendimento';
+
+// ── Comunicados para assinatura via DocuSign (Atualização do Programa de Doação) ──
+export * from './comunicados-assinatura';
