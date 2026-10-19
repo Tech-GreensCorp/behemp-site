@@ -174,7 +174,8 @@ export async function listarDocumentosPaciente() {
       SELECT
         d.id,
         d.tipo,
-        d.url_blob         AS "urlBlob",
+        d.tipo_personalizado AS "tipoPersonalizado",
+        d.url_blob        AS "urlBlob",
         d.nome_arquivo     AS "nomeArquivo",
         d.data_emissao     AS "dataEmissao",
         d.data_validade    AS "dataValidade",
