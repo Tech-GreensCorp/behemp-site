@@ -23,7 +23,7 @@ import {
   ehViolacaoDeUnico,
   situacaoPeloStatusDoDocusign,
 } from '@/lib/comunicados/puro';
-import { ANCORA_ASSINATURA, ANCORA_DATA, REMETENTE_DOCUMENTOS } from '@/lib/comunicados/catalogo';
+import { REMETENTE_DOCUMENTOS } from '@/lib/comunicados/catalogo';
 import {
   montarEmailConfirmacaoPaciente,
   montarEmailDeEnvio,
@@ -153,50 +153,6 @@ describe('e-mails do fluxo', () => {
   });
 });
 
-describe('o PDF do comunicado', () => {
-  it('não carrega campo em branco da carta e traz o contato informado', () => {
-    const src = ler('lib/comunicados/carta-doacao-pdf.tsx') + ler('lib/comunicados/catalogo.ts');
-    for (const ph of [
-      '[DATA]',
-      '[NOME',
-      '[TELEFONE]',
-      '[E-MAIL]',
-      '[HORÁRIO',
-      '[NOME DO RESPONSÁVEL]',
-    ]) {
-      expect(src).not.toContain(ph);
-    }
-    expect(src).not.toMatch(/GovBr/i);
-    for (const c of [
-      'Associação Behemp | Be4Hope',
-      'docs@be4hope.org',
-      '(11) 93204-7360',
-      '09h00 às 18h00',
-    ]) {
-      expect(src).toContain(c);
-    }
-  });
-
-  it('imprime as âncoras onde o DocuSign procura a assinatura e a data', () => {
-    const src = ler('lib/comunicados/carta-doacao-pdf.tsx');
-    expect(src).toContain('{ANCORA_ASSINATURA}');
-    expect(src).toContain('{ANCORA_DATA}');
-    const svc = ler('lib/docusign/docusign-service.ts');
-    expect(svc).toContain('anchorString: dados.ancoraAssinatura');
-    expect(ANCORA_ASSINATURA).not.toBe(ANCORA_DATA);
-  });
-
-  it('é gerado de verdade, com o nome do paciente', async () => {
-    const { gerarPdfCartaDoacao } = await import('@/lib/comunicados/carta-doacao-pdf');
-    const pdf = await gerarPdfCartaDoacao({
-      nomePaciente: 'Maria da Silva',
-      dataPorExtenso: '15 de outubro de 2026',
-    });
-    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(pdf.length).toBeGreaterThan(10_000);
-  });
-});
-
 describe('escopo e vazamento', () => {
   const src = semComentarios(ler('app/_actions/comunicados.ts'));
   const acoes = [...src.matchAll(/export async function (\w+)\(/g)].map((m) => m[1]);
@@ -245,6 +201,46 @@ describe('escopo e vazamento', () => {
       'components/admin/comunicados/CartaoComunicadoDoacao.tsx',
     ]) {
       expect(semComentarios(ler(tela))).not.toContain('urlPdfAssinado');
+    }
+  });
+
+  it('reiniciar o fluxo NÃO apaga: a função só atualiza a linha e preserva o PDF assinado', () => {
+    const lib = semComentarios(ler('lib/comunicados/assinatura.ts'));
+    const i = lib.indexOf('export async function reiniciarComunicado');
+    const corpo = lib.slice(i, lib.indexOf('// ── Leituras', i));
+    expect(corpo).toContain("status: 'cancelado'");
+    expect(corpo).toContain("eq(comunicadosAssinatura.status, 'assinado')"); // só sai de assinado
+    expect(corpo).toContain('motivoCancelamento');
+    expect(corpo).toContain('canceladoPorUserId');
+    expect(corpo).toContain('registrarAuditoria(');
+    expect(corpo).not.toMatch(/\.delete\(|apagarDocumentoPrivado|urlPdfAssinado:\s*null/);
+  });
+
+  it('só o admin reinicia, e o motivo é obrigatório', () => {
+    const acoesSrc = semComentarios(ler('app/_actions/comunicados.ts'));
+    const i = acoesSrc.indexOf('export async function reiniciarFluxoDoComunicado');
+    const corpo = acoesSrc.slice(i, i + 900);
+    expect(corpo).toContain('adminAtual()');
+    expect(corpo).toContain('motivoSchema');
+    expect(acoesSrc).toMatch(/motivoSchema[\s\S]*?\.min\(5/);
+  });
+
+  it('o PDF de um fluxo reiniciado só abre para o admin (o paciente recebe 404)', () => {
+    const rota = semComentarios(ler('app/api/comunicados/[id]/arquivo/route.ts'));
+    expect(rota).toMatch(/status === 'cancelado' && user\.role === 'admin'/);
+  });
+
+  it('o paciente não vê comunicado reiniciado (a lista só traz pendente, assinado e recusado)', () => {
+    const lib = semComentarios(ler('lib/comunicados/assinatura.ts'));
+    const i = lib.indexOf('export async function listarParaPaciente');
+    expect(lib.slice(i, i + 900)).not.toContain("'cancelado'");
+  });
+
+  it('a migration do reinício só ACRESCENTA colunas', () => {
+    const sql = ler('db/migrations/0052_reinicio_do_comunicado.sql');
+    expect(sql).not.toMatch(/DROP |DELETE FROM|UPDATE "|ALTER COLUMN|TRUNCATE/i);
+    for (const col of ['cancelado_em', 'cancelado_por_user_id', 'motivo_cancelamento']) {
+      expect(sql).toContain(col);
     }
   });
 

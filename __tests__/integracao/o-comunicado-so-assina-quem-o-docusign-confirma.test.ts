@@ -202,6 +202,8 @@ describe('o admin envia o comunicado', () => {
     expect(dadosDoEnvelope.pdfBuffer.subarray(0, 4).toString()).toBe('%PDF');
     expect(dadosDoEnvelope.clientUserId).toBe(`comunicado-${c.id}`);
     expect(dadosDoEnvelope.pacienteEmail).toBe('a@teste.invalid');
+    // o PDF foi gerado de verdade (o conteúdo da carta é provado no guarda a-carta-do-docusign-e-a-carta-aprovada)
+    expect(dadosDoEnvelope.pdfBuffer.length).toBeGreaterThan(10_000);
 
     const auditoria = await db.select().from(schema.logsAuditoria);
     expect(
@@ -273,6 +275,17 @@ describe('o admin envia o comunicado', () => {
     const de = await acoes.enviarComunicadoAtualizacaoDoacao(pa);
     expect(de.sucesso).toBe(true);
     expect(await linhas()).toHaveLength(2); // o histórico do erro fica
+  });
+
+  it('paciente sem CPF não recebe: a carta o exibe, e nada é gravado nem enviado', async () => {
+    await db.update(schema.pacientes).set({ cpf: null }).where(eq(schema.pacientes.id, pb));
+    como('ck_adm', 'admin');
+    const r = await acoes.enviarComunicadoAtualizacaoDoacao(pb);
+    expect(r).toMatchObject({ sucesso: false });
+    expect(!r.sucesso && r.erro).toContain('CPF');
+    expect(await linhas()).toHaveLength(0);
+    expect(docusign.criar).not.toHaveBeenCalled();
+    expect(emails.envio).not.toHaveBeenCalled();
   });
 
   it('sem DocuSign configurado nada é gravado', async () => {
@@ -584,5 +597,193 @@ describe('o PDF assinado só abre para o dono e para o admin', () => {
     expect((await abrir(pendente.id)).status).toBe(404);
     sessao.clerkId = null;
     expect((await abrir(pendente.id)).status).toBe(401);
+  });
+});
+
+describe('o admin reinicia o fluxo depois da assinatura', () => {
+  async function assinado() {
+    como('ck_adm', 'admin');
+    await acoes.enviarComunicadoAtualizacaoDoacao(pa);
+    const [c] = await linhas();
+    docusign.statusDoEnvelope = 'completed';
+    await nucleo.sincronizarComunicado(c.id);
+    return c.id;
+  }
+  const abrir = (id: string) =>
+    rotaArquivo.GET(GET(`http://localhost/api/comunicados/${id}/arquivo`), {
+      params: Promise.resolve({ id }),
+    } as never);
+  const MOTIVO = 'carta atualizada, precisa ser assinada de novo';
+
+  it('nada é apagado: a linha vira cancelada com quem, quando e por quê, e o PDF assinado fica', async () => {
+    const id = await assinado();
+    const antes = (await linhas())[0];
+    expect(antes.urlPdfAssinado).not.toBeNull();
+
+    como('ck_adm', 'admin');
+    const r = await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+    expect(r).toEqual({ sucesso: true, dados: { reiniciado: true } });
+
+    const todas = await linhas();
+    expect(todas).toHaveLength(1);
+    const c = todas[0];
+    expect(c.status).toBe('cancelado');
+    expect(c.motivoCancelamento).toBe(MOTIVO);
+    expect(c.canceladoEm).not.toBeNull();
+    expect(c.canceladoPorUserId).toBeTruthy();
+    // o arquivo, o envelope e o vínculo com o paciente seguem na linha
+    expect(c.urlPdfAssinado).toBe(antes.urlPdfAssinado);
+    expect(c.docusignEnvelopeId).toBe(antes.docusignEnvelopeId);
+    expect(c.pacienteId).toBe(pa);
+    expect(c.assinadoEm).not.toBeNull();
+
+    const aud = (await db.select().from(schema.logsAuditoria)).filter(
+      (l) => l.entidadeId === id && l.acao === 'atualizar' && l.dadosDepois,
+    );
+    const reinicio = aud.find((l) => (l.dadosDepois as { status?: string }).status === 'cancelado');
+    expect(reinicio).toBeTruthy();
+    expect(reinicio?.dadosAntes).toMatchObject({
+      status: 'assinado',
+      arquivoAssinadoGuardado: true,
+    });
+    expect(reinicio?.dadosDepois).toMatchObject({
+      motivo: MOTIVO,
+      arquivoAssinadoPreservado: true,
+    });
+  });
+
+  it('o paciente deixa de ver o comunicado e o admin vê o estado inicial mais o histórico', async () => {
+    const id = await assinado();
+    como('ck_adm', 'admin');
+    await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+
+    como('ck_a', 'paciente');
+    expect(await acoes.listarMeusComunicados()).toMatchObject({ sucesso: true, dados: [] });
+    // e não consegue mais abrir o fluxo antigo por link
+    expect((await acoes.iniciarAssinaturaDoComunicado(id)).sucesso).toBe(false);
+
+    como('ck_adm', 'admin');
+    const h = await acoes.listarComunicadosDoPaciente(pa);
+    expect(h.sucesso && h.dados).toHaveLength(1);
+    expect(h.sucesso && h.dados[0]).toMatchObject({
+      status: 'cancelado',
+      reiniciadoPorNome: 'Admin Teste',
+      motivoDoReinicio: MOTIVO,
+      temArquivoAssinado: true,
+    });
+  });
+
+  it('depois de reiniciar o admin envia de novo, e o histórico mantém as duas linhas', async () => {
+    const id = await assinado();
+    como('ck_adm', 'admin');
+    await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+    docusign.statusDoEnvelope = 'sent';
+    const novo = await acoes.enviarComunicadoAtualizacaoDoacao(pa);
+    expect(novo.sucesso).toBe(true);
+    expect(docusign.criar).toHaveBeenCalledTimes(2);
+
+    const todas = await linhas();
+    expect(todas.map((c) => c.status).sort()).toEqual(['cancelado', 'pendente']);
+
+    como('ck_a', 'paciente');
+    const minha = await acoes.listarMeusComunicados();
+    expect(minha.sucesso && minha.dados.map((x) => x.status)).toEqual(['pendente']);
+  });
+
+  it('só o admin reinicia, e com motivo', async () => {
+    const id = await assinado();
+    como('ck_a', 'paciente');
+    expect((await acoes.reiniciarFluxoDoComunicado(id, MOTIVO)).sucesso).toBe(false);
+    como('ck_med', 'medico');
+    expect((await acoes.reiniciarFluxoDoComunicado(id, MOTIVO)).sucesso).toBe(false);
+    como('ck_adm', 'admin');
+    expect((await acoes.reiniciarFluxoDoComunicado(id, '')).sucesso).toBe(false);
+    expect((await acoes.reiniciarFluxoDoComunicado(id, 'abc')).sucesso).toBe(false);
+    expect((await linhas())[0].status).toBe('assinado');
+  });
+
+  it('só reinicia o que está assinado: pendente e já reiniciado são recusados', async () => {
+    como('ck_adm', 'admin');
+    await acoes.enviarComunicadoAtualizacaoDoacao(pa);
+    const [pendente] = await linhas();
+    expect((await acoes.reiniciarFluxoDoComunicado(pendente.id, MOTIVO)).sucesso).toBe(false);
+    expect((await linhas())[0].status).toBe('pendente');
+
+    docusign.statusDoEnvelope = 'completed';
+    await nucleo.sincronizarComunicado(pendente.id);
+    expect((await acoes.reiniciarFluxoDoComunicado(pendente.id, MOTIVO)).sucesso).toBe(true);
+    expect((await acoes.reiniciarFluxoDoComunicado(pendente.id, MOTIVO)).sucesso).toBe(false);
+  });
+
+  it('dois reinícios ao mesmo tempo resultam em UM', async () => {
+    const id = await assinado();
+    como('ck_adm', 'admin');
+    const [r1, r2] = await Promise.all([
+      acoes.reiniciarFluxoDoComunicado(id, MOTIVO),
+      acoes.reiniciarFluxoDoComunicado(id, MOTIVO),
+    ]);
+    expect([r1.sucesso, r2.sucesso].filter(Boolean)).toHaveLength(1);
+    const reinicios = (await db.select().from(schema.logsAuditoria)).filter(
+      (l) =>
+        l.entidadeId === id &&
+        (l.dadosDepois as { status?: string } | null)?.status === 'cancelado',
+    );
+    expect(reinicios).toHaveLength(1);
+  });
+
+  it('o webhook do envelope antigo, que chega depois do reinício, não muda nada nem manda e-mail', async () => {
+    const id = await assinado();
+    const antes = {
+      conf: emails.confirmacao.mock.calls.length,
+      docs: emails.docs.mock.calls.length,
+    };
+    como('ck_adm', 'admin');
+    await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+    const [c] = await linhas();
+    const resp = await webhook.POST(
+      new Request('http://localhost/api/webhooks/docusign', {
+        method: 'POST',
+        body: JSON.stringify({
+          event: 'envelope-completed',
+          data: { envelopeId: c.docusignEnvelopeId },
+        }),
+      }) as never,
+    );
+    expect(resp.status).toBe(200); // não pede reentrega
+    expect((await linhas())[0].status).toBe('cancelado');
+    expect(emails.confirmacao.mock.calls.length).toBe(antes.conf);
+    expect(emails.docs.mock.calls.length).toBe(antes.docs);
+  });
+
+  it('o PDF do fluxo reiniciado só abre para o admin: o paciente dono e os outros recebem 404', async () => {
+    const id = await assinado();
+    como('ck_a', 'paciente');
+    expect((await abrir(id)).status).toBe(200); // antes de reiniciar, o dono abre
+    como('ck_adm', 'admin');
+    await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+
+    expect((await abrir(id)).status).toBe(200); // o admin consulta o arquivo
+    como('ck_a', 'paciente');
+    expect((await abrir(id)).status).toBe(404);
+    como('ck_b', 'paciente');
+    expect((await abrir(id)).status).toBe(404);
+    como('ck_med', 'medico');
+    expect((await abrir(id)).status).toBe(404);
+  });
+
+  it('o segundo ciclo assina e finaliza normalmente, com os seus próprios e-mails', async () => {
+    const id = await assinado();
+    como('ck_adm', 'admin');
+    await acoes.reiniciarFluxoDoComunicado(id, MOTIVO);
+    docusign.statusDoEnvelope = 'sent';
+    await acoes.enviarComunicadoAtualizacaoDoacao(pa);
+    const novo = (await linhas()).find((c) => c.status === 'pendente')!;
+    expect(novo.docusignEnvelopeId).toBe('env-2');
+
+    docusign.statusDoEnvelope = 'completed';
+    await nucleo.sincronizarComunicado(novo.id);
+    expect(emails.confirmacao).toHaveBeenCalledTimes(2); // um por assinatura
+    expect(emails.docs).toHaveBeenCalledTimes(2);
+    expect((await linhas()).map((c) => c.status).sort()).toEqual(['assinado', 'cancelado']);
   });
 });

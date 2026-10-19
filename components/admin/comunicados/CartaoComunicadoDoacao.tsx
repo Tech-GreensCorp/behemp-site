@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { FileSignature, Loader2, RefreshCw, Mail, ExternalLink, Send } from 'lucide-react';
+import {
+  FileSignature,
+  Loader2,
+  RefreshCw,
+  Mail,
+  ExternalLink,
+  Send,
+  RotateCcw,
+} from 'lucide-react';
 
 import {
   AlertDialog,
@@ -17,10 +25,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   atualizarStatusDoComunicado,
   enviarComunicadoAtualizacaoDoacao,
   listarComunicadosDoPaciente,
+  reiniciarFluxoDoComunicado,
   reenviarEmailDoComunicado,
 } from '@/app/_actions/comunicados';
 import { TITULO_ATUALIZACAO_PROGRAMA_DOACAO } from '@/lib/comunicados/catalogo';
@@ -57,7 +68,8 @@ function rotuloDe(c: ComunicadoParaAdmin | undefined): Rotulo {
     case 'recusado':
       return { texto: 'Erro na assinatura (recusado ou anulado)', classe: '', destrutivo: true };
     default:
-      return { texto: 'Cancelado', classe: 'text-muted-foreground' };
+      // `cancelado` = fluxo reiniciado pelo admin; o registro fica como histórico
+      return { texto: 'Reiniciado', classe: 'text-muted-foreground' };
   }
 }
 
@@ -66,6 +78,8 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
   const [permitido, setPermitido] = useState(true);
   const [confirmando, setConfirmando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [reiniciando, setReiniciando] = useState(false);
+  const [motivo, setMotivo] = useState('');
 
   const carregar = useCallback(async () => {
     const res = await listarComunicadosDoPaciente(pacienteId);
@@ -85,7 +99,9 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
   if (!permitido || historico === null) return null;
 
   const ativo = historico.find((c) => c.status === 'pendente' || c.status === 'assinado');
-  const atual = ativo ?? historico[0];
+  // Um fluxo reiniciado volta ao estado inicial ("Não enviado"); o registro dele fica só no histórico.
+  const ultimo = historico[0];
+  const atual = ativo ?? (ultimo && ultimo.status !== 'cancelado' ? ultimo : undefined);
   const rotulo = rotuloDe(atual);
 
   async function enviar() {
@@ -105,6 +121,20 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
     setOcupado(null);
     if (!res.sucesso) toast.error(res.erro);
     else toast.success('Status atualizado.');
+    await carregar();
+  }
+
+  async function reiniciar(id: string) {
+    setOcupado(`reiniciar-${id}`);
+    const res = await reiniciarFluxoDoComunicado(id, motivo);
+    setOcupado(null);
+    if (!res.sucesso) {
+      toast.error(res.erro);
+      return;
+    }
+    toast.success('Fluxo reiniciado. Agora é possível enviar o comunicado de novo.');
+    setReiniciando(false);
+    setMotivo('');
     await carregar();
   }
 
@@ -229,9 +259,29 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
               Ver documento assinado
             </Button>
           )}
+          {atual?.status === 'assinado' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive gap-2 rounded-xl"
+              onClick={() => setReiniciando(true)}
+              disabled={ocupado !== null}
+            >
+              <RotateCcw size={14} />
+              Reiniciar fluxo
+            </Button>
+          )}
         </div>
 
-        {historico.length > 1 && (
+        {ultimo?.status === 'cancelado' && !ativo && (
+          <p className="text-muted-foreground rounded-xl border border-dashed p-3 text-sm">
+            O fluxo foi reiniciado
+            {ultimo.reiniciadoEm ? ` em ${quando(ultimo.reiniciadoEm)}` : ''}. O documento assinado
+            anterior continua guardado no histórico, só para o admin.
+          </p>
+        )}
+
+        {historico.length > 0 && (historico.length > 1 || historico[0].status === 'cancelado') && (
           <div className="border-border/30 space-y-1.5 border-t pt-4">
             <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
               Histórico de envios
@@ -242,7 +292,26 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                   <span className="text-muted-foreground">
                     {quando(c.enviadoEm)} · {c.enviadoPorNome ?? '—'}
                   </span>
-                  <span>{rotuloDe(c).texto}</span>
+                  <span className="text-right">
+                    {rotuloDe(c).texto}
+                    {c.status === 'cancelado' && (
+                      <span className="text-muted-foreground block text-xs">
+                        por {c.reiniciadoPorNome ?? '—'}
+                        {c.reiniciadoEm ? ` em ${quando(c.reiniciadoEm)}` : ''}
+                        {c.motivoDoReinicio ? ` — ${c.motivoDoReinicio}` : ''}
+                      </span>
+                    )}
+                    {c.status === 'cancelado' && c.temArquivoAssinado && (
+                      <a
+                        href={`/api/comunicados/${c.id}/arquivo`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary block text-xs underline"
+                      >
+                        Ver documento assinado (arquivado)
+                      </a>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -271,6 +340,57 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                 <Send size={14} />
               )}
               {ocupado === 'enviar' ? 'Enviando...' : 'Sim, enviar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={reiniciando}
+        onOpenChange={(aberto) => {
+          if (!aberto && ocupado === null) {
+            setReiniciando(false);
+            setMotivo('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar o fluxo deste comunicado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O comunicado volta ao estado &quot;Não enviado&quot; e o paciente deixa de vê-lo em
+              Documentos, para você poder enviar de novo. <strong>Nada é apagado:</strong> o
+              documento assinado e o registro ficam guardados no histórico para auditoria, com o seu
+              nome, a data e o motivo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="motivo-reinicio">Motivo (obrigatório)</Label>
+            <Textarea
+              id="motivo-reinicio"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              maxLength={500}
+              placeholder="Ex.: carta atualizada, precisa ser assinada de novo"
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ocupado !== null}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (atual) void reiniciar(atual.id);
+              }}
+              disabled={ocupado !== null || motivo.trim().length < 5}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+            >
+              {ocupado?.startsWith('reiniciar-') ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RotateCcw size={14} />
+              )}
+              Sim, reiniciar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

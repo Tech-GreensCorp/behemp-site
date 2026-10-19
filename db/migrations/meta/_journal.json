@@ -365,6 +365,13 @@
       "when": 1792094449634,
       "tag": "0051_comunicados_assinatura",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792418292033,
+      "tag": "0052_reinicio_do_comunicado",
+      "breakpoints": true
     }
   ]
 }

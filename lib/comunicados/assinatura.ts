@@ -16,6 +16,7 @@
  * trava. Se o envio falha, a trava é devolvida e o próximo gatilho tenta de novo.
  */
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { comunicadosAssinatura, pacientes, users } from '@/db/schema';
 import type { ComunicadoAssinatura } from '@/db/schema';
@@ -98,7 +99,7 @@ export async function enviarComunicado(params: {
   }
 
   const [alvo] = await db
-    .select({ pacienteId: pacientes.id, nome: users.nome, email: users.email })
+    .select({ pacienteId: pacientes.id, nome: users.nome, email: users.email, cpf: pacientes.cpf })
     .from(pacientes)
     .innerJoin(users, eq(pacientes.userId, users.id))
     .where(
@@ -112,6 +113,14 @@ export async function enviarComunicado(params: {
   if (!alvo) return { sucesso: false, erro: 'Paciente não encontrado.' };
   if (!alvo.email?.trim()) {
     return { sucesso: false, erro: 'O paciente não tem e-mail cadastrado.' };
+  }
+  // A carta mostra o CPF logo abaixo do nome: sem ele, sairia com a linha em branco. Falha ANTES
+  // de reservar a vaga e de criar o envelope, para não deixar rastro de um envio que não existiu.
+  if (!alvo.cpf?.trim()) {
+    return {
+      sucesso: false,
+      erro: 'O paciente não tem CPF cadastrado, e a carta o exibe. Complete o cadastro e envie de novo.',
+    };
   }
 
   // 1) Reserva a vaga. Se já há um pendente ou assinado, o banco recusa.
@@ -160,6 +169,8 @@ export async function enviarComunicado(params: {
   try {
     pdf = await gerarPdfCartaDoacao({
       nomePaciente: alvo.nome,
+      emailPaciente: alvo.email.trim(),
+      cpfPaciente: alvo.cpf.trim(),
       dataPorExtenso: dataPorExtenso(new Date()),
     });
   } catch (erro) {
@@ -547,6 +558,79 @@ export async function processarWebhookDoComunicado(
   return sincronizarComunicado(c.id);
 }
 
+// ── Reiniciar o fluxo (admin) ─────────────────────────────────
+
+export type ResultadoDoReinicio = { sucesso: true } | { sucesso: false; erro: string };
+
+/**
+ * Volta o comunicado ao estado inicial, para o admin poder enviá-lo de novo ao paciente.
+ *
+ * 🔴 NADA É APAGADO. A linha passa a `cancelado` com quem, quando e por quê; o PDF assinado
+ * continua no store privado e o vínculo com o paciente e o envelope do DocuSign continuam na
+ * linha — é o que sustenta a auditoria e a prova de que o paciente assinou aquela versão. O que
+ * muda é só o que o índice único parcial enxerga: `cancelado` não é `pendente` nem `assinado`, e
+ * por isso um novo envio deixa de ser recusado.
+ *
+ * Só sai de `assinado`, e com UPDATE condicional: dois admins clicando juntos, ou o webhook
+ * chegando no meio, resultam em UMA transição. Quem perde a corrida recebe erro e não duplica nada.
+ * Depois do reinício, o paciente deixa de ver o comunicado em Documentos e o envelope antigo
+ * (já concluído no DocuSign) não gera mais e-mail: `finalizarAssinatura` só age sobre `assinado`.
+ */
+export async function reiniciarComunicado(params: {
+  comunicadoId: string;
+  adminUserId: string;
+  motivo: string;
+}): Promise<ResultadoDoReinicio> {
+  const [c] = await db
+    .select()
+    .from(comunicadosAssinatura)
+    .where(eq(comunicadosAssinatura.id, params.comunicadoId))
+    .limit(1);
+  if (!c) return { sucesso: false, erro: 'Comunicado não encontrado.' };
+  if (c.status !== 'assinado') {
+    return {
+      sucesso: false,
+      erro:
+        c.status === 'pendente'
+          ? 'Este comunicado ainda está pendente de assinatura. O reinício vale só para comunicado já assinado.'
+          : 'Este comunicado não está assinado; não há o que reiniciar.',
+    };
+  }
+
+  const [virou] = await db
+    .update(comunicadosAssinatura)
+    .set({
+      status: 'cancelado',
+      canceladoEm: new Date(),
+      canceladoPorUserId: params.adminUserId,
+      motivoCancelamento: params.motivo,
+    })
+    .where(and(eq(comunicadosAssinatura.id, c.id), eq(comunicadosAssinatura.status, 'assinado')))
+    .returning({ id: comunicadosAssinatura.id });
+  if (!virou) {
+    return { sucesso: false, erro: 'O comunicado mudou de situação. Atualize a tela e confira.' };
+  }
+
+  await registrarAuditoria({
+    userId: params.adminUserId,
+    acao: 'atualizar',
+    entidade: ENTIDADE,
+    entidadeId: c.id,
+    dadosAntes: {
+      status: 'assinado',
+      assinadoEm: c.assinadoEm?.toISOString() ?? null,
+      docusignEnvelopeId: c.docusignEnvelopeId,
+      arquivoAssinadoGuardado: !!c.urlPdfAssinado,
+    },
+    dadosDepois: {
+      status: 'cancelado',
+      motivo: params.motivo,
+      arquivoAssinadoPreservado: !!c.urlPdfAssinado,
+    },
+  });
+  return { sucesso: true };
+}
+
 // ── Leituras ──────────────────────────────────────────────────
 
 /** Campos que o admin vê. Sem URL de arquivo: o acesso passa pela rota autenticada. */
@@ -562,13 +646,24 @@ export interface ComunicadoParaAdmin {
   erro: string | null;
   emailEnvioErro: string | null;
   emailEnviado: boolean;
+  /** Preenchidos quando o admin reiniciou o fluxo (status cancelado). */
+  reiniciadoEm: Date | null;
+  reiniciadoPorNome: string | null;
+  motivoDoReinicio: string | null;
 }
+
+const quemReiniciou = alias(users, 'quem_reiniciou');
 
 export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoParaAdmin[]> {
   const linhas = await db
-    .select({ c: comunicadosAssinatura, enviadoPorNome: users.nome })
+    .select({
+      c: comunicadosAssinatura,
+      enviadoPorNome: users.nome,
+      reiniciadoPorNome: quemReiniciou.nome,
+    })
     .from(comunicadosAssinatura)
     .leftJoin(users, eq(comunicadosAssinatura.enviadoPorUserId, users.id))
+    .leftJoin(quemReiniciou, eq(comunicadosAssinatura.canceladoPorUserId, quemReiniciou.id))
     .where(
       and(
         eq(comunicadosAssinatura.pacienteId, pacienteId),
@@ -576,7 +671,7 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
       ),
     )
     .orderBy(desc(comunicadosAssinatura.enviadoEm));
-  return linhas.map(({ c, enviadoPorNome }) => ({
+  return linhas.map(({ c, enviadoPorNome, reiniciadoPorNome }) => ({
     id: c.id,
     titulo: c.titulo,
     status: c.status,
@@ -588,6 +683,9 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
     erro: c.erro,
     emailEnvioErro: c.emailEnvioErro,
     emailEnviado: !!c.emailEnvioEnviadoEm,
+    reiniciadoEm: c.canceladoEm,
+    reiniciadoPorNome,
+    motivoDoReinicio: c.motivoCancelamento,
   }));
 }
 

@@ -873,6 +873,47 @@ admin acompanha na aba Documentos do paciente.
   registrada em `.claude/autorizacoes.txt` mesmo assim. E 58 casos falham **também no `main` limpo**
   (CRLF do checkout no Windows), com o conjunto idêntico antes e depois desta mudança.
 
+### ✅ Feito em 19/10/2026 (local, sem commit) — carta atualizada ("VF atualizada teste")
+
+A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo a parágrafo (o resto é igual):
+
+- **Texto novo:** "E as consultas de acompanhamento **para quem aderir ao Collab anual** continuam gratuitas…".
+- **Dois campos novos no quadro do cabeçalho, abaixo do nome:** `e-mail:` e `cpf:`. O PDF passa a mostrar o
+  e-mail e o **CPF do paciente**. Sem CPF cadastrado o envio é **recusado antes de criar o envelope**
+  (a carta sairia com a linha em branco). O CPF é dado pessoal que segue para o DocuSign e para o PDF
+  anexado a `docs@`, como já ocorre na procuração.
+- ⚠️ **O arquivo veio preenchido com dados de teste** (data "15/10/2026", nome "André Laragnoit Fernande",
+  "Querido(a) [" sem o fim do campo, `e-mail:` e `cpf:` vazios). O .docx guardado é exatamente o recebido;
+  `CAMPOS_DA_CARTA_DE_TESTE` (`lib/comunicados/docx-para-modelo.ts`) devolve cada trecho ao campo que ele
+  ocupava. Quando chegar uma carta com os campos em branco, **remover essa tabela** — o guarda avisa.
+- Quadro do cabeçalho com a 2ª coluna mais larga (o e-mail não quebra no meio).
+
+### ✅ Feito em 19/10/2026 (local, sem commit) — a carta vem do .docx e o admin reinicia o fluxo
+
+Dois ajustes pedidos pela Dryelle no comunicado acima (branch `feat/comunicado-assinatura-docusign`).
+
+- **A carta enviada ao DocuSign é a do `CARTA PACIENTES DOACAO _VF.docx`, sem alterar texto.** O PDF não
+  tem mais o texto digitado em TSX: `lib/comunicados/docx-para-modelo.ts` extrai o .docx para
+  `modelo/carta-doacao.json` (`scripts/gerar-modelo-da-carta.ts`) e `carta-doacao-pdf.tsx` só desenha.
+  Só mudam os campos que o autor marcou em amarelo (data, nome, bloco de atendimento). Logo e
+  "Associação Behemp | Be4Hope" no topo de **todas** as páginas, como no .docx.
+  Guarda `a-carta-do-docusign-e-a-carta-aprovada` (13): texto do PDF = texto do .docx, parágrafo a
+  parágrafo, por leitura independente; modelo/logo atualizados; campo vazio ou sobrando **lança**.
+  ⚠️ O texto aprovado tem coisas que parecem erro e **foram mantidas**: "Vice Presidnete",
+  "(assinar pelo GovBr)" (a assinatura é pelo DocuSign) e o exemplo "6 frascos por semestre" com
+  12 frascos e 2 fretes. Corrigir é decisão de quem aprova a carta; trocar o .docx e rodar o script basta.
+- **Reiniciar o fluxo (só admin, só comunicado `assinado`, com motivo).** A linha passa a `cancelado`
+  com `cancelado_em`, `cancelado_por_user_id` e `motivo_cancelamento` (migration `0052`, aditiva);
+  **nada é apagado**: o PDF assinado, o envelope e o vínculo com o paciente ficam. O índice único
+  parcial deixa de enxergar a linha, e o admin pode enviar de novo. O paciente deixa de ver o
+  comunicado; só o admin abre o PDF arquivado. UPDATE condicional: dois reinícios simultâneos
+  resultam em um. Webhook tardio do envelope antigo não muda nada nem manda e-mail.
+- **Ficou de fora:** reiniciar comunicado **pendente** (exigiria anular o envelope no DocuSign);
+  o paciente não é avisado do reinício.
+- **Testes:** integração contra Postgres real agora com 31 casos, 9 deles do reinício (provados vermelhos
+  por sabotagem). `next build` passou na segunda tentativa: a primeira falhou ao buscar a fonte Sora no
+  Google Fonts (transitório). Full suite: as mesmas 58 falhas do `main` limpo, nenhuma nova.
+
 ### ✅ Feito em 01/10/2026 (local, sem commit) — a espera da chamada (Item 76)
 
 - [x] **Item 76** — o palco da chamada de atendimento dizia _"{outro} está sem câmera"_ antes de o outro

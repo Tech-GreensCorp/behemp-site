@@ -46,6 +46,13 @@ export const comunicadosAssinatura = pgTable(
     /** PDF assinado, em store PRIVADO. Entregue só por `/api/comunicados/[id]/arquivo`. */
     urlPdfAssinado: text('url_pdf_assinado'),
 
+    // ── Reinício do fluxo pelo admin (status 'cancelado') ──
+    // A linha e o PDF assinado NUNCA são apagados: ficam como histórico de auditoria, só que
+    // fora dos dois estados "ativos" — o que libera um novo envio ao paciente.
+    canceladoEm: timestamp('cancelado_em', { withTimezone: true }),
+    canceladoPorUserId: text('cancelado_por_user_id').references(() => users.id),
+    motivoCancelamento: text('motivo_cancelamento'),
+
     // ── Falhas (texto seguro, sem dado pessoal) ──
     erro: text('erro'),
     erroEm: timestamp('erro_em', { withTimezone: true }),

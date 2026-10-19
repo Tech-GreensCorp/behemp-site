@@ -68,7 +68,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .from(comunicadosAssinatura)
     .where(eq(comunicadosAssinatura.id, id))
     .limit(1);
-  if (!c || c.status !== 'assinado' || !c.urlPdfAssinado) return NAO_ENCONTRADO();
+  if (!c || !c.urlPdfAssinado) return NAO_ENCONTRADO();
+  // `cancelado` é o comunicado REINICIADO pelo admin: o PDF assinado fica guardado para auditoria,
+  // e só o admin o abre. O paciente só abre o que está `assinado`.
+  if (c.status !== 'assinado' && !(c.status === 'cancelado' && user.role === 'admin')) {
+    return NAO_ENCONTRADO();
+  }
 
   // Escopo de objeto: admin, ou o paciente dono do comunicado. Mais ninguém.
   if (user.role !== 'admin') {

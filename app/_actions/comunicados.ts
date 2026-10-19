@@ -11,6 +11,7 @@ import {
   gerarLinkDeAssinatura,
   listarParaAdmin,
   listarParaPaciente,
+  reiniciarComunicado,
   sincronizarComunicado,
   type ComunicadoParaAdmin,
   type ComunicadoParaPaciente,
@@ -119,6 +120,38 @@ export async function atualizarStatusDoComunicado(
     return { sucesso: false, erro: 'Não foi possível consultar o DocuSign agora.' };
   }
   return { sucesso: true, dados: { status: r.status } };
+}
+
+const motivoSchema = z
+  .string()
+  .trim()
+  .min(5, 'Informe o motivo (mínimo de 5 caracteres).')
+  .max(500, 'O motivo pode ter no máximo 500 caracteres.');
+
+/**
+ * Reinicia o fluxo de um comunicado JÁ ASSINADO, para permitir um novo envio ao paciente.
+ *
+ * Nada é apagado: a linha e o PDF assinado ficam como histórico de auditoria, com quem reiniciou,
+ * quando e o motivo. Só admin.
+ */
+export async function reiniciarFluxoDoComunicado(
+  comunicadoId: string,
+  motivo: string,
+): Promise<Resposta<{ reiniciado: true }>> {
+  const admin = await adminAtual();
+  if (!admin) return { sucesso: false, erro: 'Apenas administradores podem reiniciar o fluxo.' };
+  const id = idSchema.safeParse(comunicadoId);
+  if (!id.success) return { sucesso: false, erro: 'Comunicado inválido.' };
+  const m = motivoSchema.safeParse(motivo);
+  if (!m.success) return { sucesso: false, erro: m.error.issues[0]?.message ?? 'Motivo inválido.' };
+
+  const r = await reiniciarComunicado({
+    comunicadoId: id.data,
+    adminUserId: admin.userId,
+    motivo: m.data,
+  });
+  if (!r.sucesso) return { sucesso: false, erro: r.erro };
+  return { sucesso: true, dados: { reiniciado: true } };
 }
 
 // ── Paciente ──────────────────────────────────────────────────
