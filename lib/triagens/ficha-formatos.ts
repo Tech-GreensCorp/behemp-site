@@ -30,7 +30,10 @@ export function formatarDataHora(valor: Date | string | null | undefined): strin
 }
 
 /** Idade a partir de `DD/MM/YYYY` (formulário novo) ou ISO (importação legada). */
-export function calcularIdade(nascimento: string | null | undefined, hoje = new Date()): number | null {
+export function calcularIdade(
+  nascimento: string | null | undefined,
+  hoje = new Date(),
+): number | null {
   if (!nascimento) return null;
   const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(nascimento);
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(nascimento);
@@ -63,7 +66,9 @@ export function limparTexto(valor: unknown): string {
     .replace(/\u2026/g, '...')
     .replace(/\u2022/g, '·')
     .replace(/[^\n\t\u0020-\u007E\u00A0-\u00FF\u2013\u2014\u20AC]/g, '');
-  return semGlifoAusente.replace(/\S{40,}/g, (palavra) => palavra.replace(/(.{40})/g, '$1 ').trim());
+  return semGlifoAusente.replace(/\S{40,}/g, (palavra) =>
+    palavra.replace(/(.{40})/g, '$1 ').trim(),
+  );
 }
 
 /**

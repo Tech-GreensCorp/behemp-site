@@ -18,7 +18,15 @@
  * indivisível, e o título de seção nunca fica sozinho no pé da página (`minPresenceAhead`).
  */
 import React from 'react';
-import { Document, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
+import {
+  Document,
+  Image as ImagemPdf,
+  Page,
+  StyleSheet,
+  Text,
+  View,
+  pdf,
+} from '@react-pdf/renderer';
 
 import type { triagens } from '@/db/schema';
 import { calcularIdade, formatarDataHora, limparTexto } from '@/lib/triagens/ficha-formatos';
@@ -145,13 +153,24 @@ const s = StyleSheet.create({
     marginBottom: 8,
     marginTop: 14,
   },
-  secaoMarca: { width: 8, height: 8, borderRadius: 2, backgroundColor: COR.primaria, marginRight: 8 },
+  secaoMarca: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: COR.primaria,
+    marginRight: 8,
+  },
   secaoNome: { fontFamily: 'Helvetica-Bold', fontSize: 13, color: COR.verde },
 
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
   campo: { width: '50%', paddingRight: 10, paddingBottom: 8 },
   campoLargo: { width: '100%', paddingRight: 0 },
-  campoCaixa: { backgroundColor: COR.creme, borderRadius: 6, paddingVertical: 7, paddingHorizontal: 10 },
+  campoCaixa: {
+    backgroundColor: COR.creme,
+    borderRadius: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
   campoRotulo: {
     fontFamily: 'Helvetica-Bold',
     fontSize: 7,
@@ -225,7 +244,17 @@ function Campos({ itens }: { itens: Par[] }) {
   );
 }
 
-function Capa({ t, logo, geradaPor, geradaEm }: { t: TriagemParaPdf; logo: Buffer | null; geradaPor: string; geradaEm: Date }) {
+function Capa({
+  t,
+  logo,
+  geradaPor,
+  geradaEm,
+}: {
+  t: TriagemParaPdf;
+  logo: Buffer | null;
+  geradaPor: string;
+  geradaEm: Date;
+}) {
   const dados = dadosDe(t);
   const importada = Boolean(valorLegivelDaTriagem(dados._formulario));
   const idade = calcularIdade(primeiro(dados, ['data_nascimento', 'Data de nascimento:']));
@@ -246,7 +275,7 @@ function Capa({ t, logo, geradaPor, geradaEm }: { t: TriagemParaPdf; logo: Buffe
   return (
     <View style={s.capa}>
       <View style={s.capaTopo}>
-        {logo ? <Image src={{ data: logo, format: 'png' }} style={s.capaLogo} /> : <Text />}
+        {logo ? <ImagemPdf src={{ data: logo, format: 'png' }} style={s.capaLogo} /> : <Text />}
         <View>
           <Text style={s.capaTipo}>FICHA DE TRIAGEM</Text>
           <Text style={s.capaTipoSub}>Be4Hope · BeHemp</Text>
@@ -292,7 +321,12 @@ function TriagemDocument({
   const destaques = [
     {
       rotulo: 'Diagnóstico',
-      valor: primeiro(dados, ['diagnostico_principal', 'Diagnóstico principal: ', 'Patologia do paciente', 'Patologia']),
+      valor: primeiro(dados, [
+        'diagnostico_principal',
+        'Diagnóstico principal: ',
+        'Patologia do paciente',
+        'Patologia',
+      ]),
     },
     { rotulo: 'Urgência', valor: primeiro(dados, ['nivel_tratamento', 'Tratamento:']) },
     { rotulo: 'Estado', valor: primeiro(dados, ['estado', 'Estado:', 'Estado']) },
@@ -301,7 +335,8 @@ function TriagemDocument({
 
   const mapeados = new Set(SECOES_DA_TRIAGEM.flatMap((x) => x.campos));
   const extras = Object.keys(dados).filter(
-    (k) => !mapeados.has(k) && !CAMPOS_INTERNOS_DA_TRIAGEM.has(k) && valorLegivelDaTriagem(dados[k]),
+    (k) =>
+      !mapeados.has(k) && !CAMPOS_INTERNOS_DA_TRIAGEM.has(k) && valorLegivelDaTriagem(dados[k]),
   );
 
   const secoes = SECOES_DA_TRIAGEM.map((sec) => ({
@@ -318,7 +353,11 @@ function TriagemDocument({
   }
 
   return (
-    <Document title={`Triagem — ${limparTexto(nome)}`} author="Be4Hope · BeHemp" subject="Ficha de triagem">
+    <Document
+      title={`Triagem — ${limparTexto(nome)}`}
+      author="Be4Hope · BeHemp"
+      subject="Ficha de triagem"
+    >
       <Page size="A4" style={s.page} wrap>
         {/* Cabeçalho corrente: some na primeira página, que tem a capa. */}
         <View
@@ -329,7 +368,11 @@ function TriagemDocument({
               <View />
             ) : (
               <View style={s.cabecalhoMiolo}>
-                {logo ? <Image src={{ data: logo, format: 'png' }} style={s.cabecalhoLogo} /> : <Text />}
+                {logo ? (
+                  <ImagemPdf src={{ data: logo, format: 'png' }} style={s.cabecalhoLogo} />
+                ) : (
+                  <Text />
+                )}
                 <Text style={s.cabecalhoTexto}>
                   Triagem · <Text style={s.cabecalhoNome}>{limparTexto(nome)}</Text>
                 </Text>
@@ -343,7 +386,10 @@ function TriagemDocument({
         {destaques.length > 0 ? (
           <View style={s.destaques} wrap={false}>
             {destaques.map((d, i) => (
-              <View key={d.rotulo} style={i === destaques.length - 1 ? [s.destaque, s.destaqueUltimo] : s.destaque}>
+              <View
+                key={d.rotulo}
+                style={i === destaques.length - 1 ? [s.destaque, s.destaqueUltimo] : s.destaque}
+              >
                 <Text style={s.destaqueRotulo}>{d.rotulo}</Text>
                 <Text style={s.destaqueValor}>{limparTexto(d.valor)}</Text>
               </View>
@@ -377,6 +423,8 @@ export async function gerarPdfDaTriagem(
   geradaPor: string,
   logo: Buffer | null,
 ): Promise<Buffer> {
-  const blob = await pdf(<TriagemDocument t={t} logo={logo} geradaPor={geradaPor} geradaEm={new Date()} />).toBlob();
+  const blob = await pdf(
+    <TriagemDocument t={t} logo={logo} geradaPor={geradaPor} geradaEm={new Date()} />,
+  ).toBlob();
   return Buffer.from(await blob.arrayBuffer());
 }
