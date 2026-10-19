@@ -35,7 +35,21 @@ const TIPO_LABELS: Record<string, string> = {
   oficio_anvisa: 'Ofício da ANVISA',
   documento_pessoal: 'Documento Pessoal',
   procuracao_especifica: 'Procuração Específica',
+  contrato_termos: 'Contrato e termos',
+  laudo_relatorio: 'Laudo / relatório',
+  orcamento: 'Orçamento',
+  outro: 'Outro',
 };
+
+/** Documento do tipo "outro" agrupa pelo nome que o admin deu; os demais, pelo tipo. */
+function chaveDoTipo(d: { tipo?: string; tipoPersonalizado?: string | null }): string {
+  if (d.tipo === 'outro' && d.tipoPersonalizado) return `outro:${d.tipoPersonalizado}`;
+  return d.tipo || 'outro';
+}
+
+function rotuloDaChave(chave: string): string {
+  return chave.startsWith('outro:') ? chave.slice('outro:'.length) : (TIPO_LABELS[chave] ?? chave);
+}
 
 export default function DocumentosPacientePage() {
   const [docs, setDocs] = useState<any[]>([]);
@@ -105,7 +119,7 @@ export default function DocumentosPacientePage() {
   }
 
   const agrupados = docs.reduce((acc: Record<string, any[]>, d) => {
-    const key = d.tipo || 'outro';
+    const key = chaveDoTipo(d);
     if (!acc[key]) acc[key] = [];
     acc[key].push(d);
     return acc;
@@ -245,7 +259,7 @@ export default function DocumentosPacientePage() {
           {Object.entries(agrupados).map(([tipoKey, items]) => (
             <div key={tipoKey} className="space-y-3">
               <h3 className="font-heading text-xs font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
-                {TIPO_LABELS[tipoKey] ?? tipoKey}
+                {rotuloDaChave(tipoKey)}
               </h3>
               <DataList>
                 {items.map((doc: any) => {
@@ -273,7 +287,7 @@ export default function DocumentosPacientePage() {
                           {/* Ver abre o documento num modal — 14/09/2026. Mesma rota de antes. */}
                           <VisualizadorDeDocumento
                             documentoId={doc.id}
-                            rotulo={TIPO_LABELS[tipoKey] ?? tipoKey}
+                            rotulo={rotuloDaChave(tipoKey)}
                             nomeArquivo={doc.nomeArquivo}
                             className="h-8 rounded-full text-xs"
                           />

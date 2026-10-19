@@ -372,6 +372,13 @@
       "when": 1792418292033,
       "tag": "0052_reinicio_do_comunicado",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792438199585,
+      "tag": "0053_tipos_de_documento_manual",
+      "breakpoints": true
     }
   ]
 }

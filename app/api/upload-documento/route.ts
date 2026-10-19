@@ -21,13 +21,26 @@ const TIPOS_VALIDOS = [
   'autorizacao_anvisa',
   'documento_pessoal',
   'oficio_anvisa',
+  'contrato_termos',
+  'laudo_relatorio',
+  'orcamento',
+  'outro',
 ] as const;
+
+/** Nome livre do tipo "outro": texto curto, sem caractere de controle. */
+const tipoPersonalizadoSchema = z
+  .string()
+  .trim()
+  .min(2, 'Informe o nome do tipo de documento (mín. 2 caracteres)')
+  .max(60, 'O nome do tipo de documento aceita até 60 caracteres')
+  .refine((v) => !/\p{Cc}/u.test(v), 'Nome do tipo contém caracteres inválidos');
 
 const uploadSchema = z.object({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
   tipo: z.enum(TIPOS_VALIDOS),
   dataEmissao: z.string().min(1, 'Data de emissão é obrigatória'),
   observacoes: z.string().optional(),
+  tipoPersonalizado: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -71,6 +84,7 @@ export async function POST(request: Request) {
       tipo: formData.get('tipo') ?? '',
       dataEmissao: formData.get('dataEmissao') ?? '',
       observacoes: formData.get('observacoes') ?? undefined,
+      tipoPersonalizado: formData.get('tipoPersonalizado') ?? undefined,
     };
 
     const parsed = uploadSchema.safeParse(dados);
@@ -79,6 +93,26 @@ export async function POST(request: Request) {
         { sucesso: false, erro: parsed.error.errors[0].message },
         { status: 400 },
       );
+    }
+
+    // "Outro" com nome livre é cadastro de tipo novo: só o admin. A UI esconde o campo, mas é
+    // aqui que se decide — o cliente nunca é confiável.
+    let tipoPersonalizado: string | null = null;
+    if (parsed.data.tipo === 'outro') {
+      if (auth.role !== 'admin') {
+        return NextResponse.json(
+          { sucesso: false, erro: 'Apenas administradores podem cadastrar um novo tipo de documento' },
+          { status: 403 },
+        );
+      }
+      const nome = tipoPersonalizadoSchema.safeParse(parsed.data.tipoPersonalizado ?? '');
+      if (!nome.success) {
+        return NextResponse.json(
+          { sucesso: false, erro: nome.error.errors[0].message },
+          { status: 400 },
+        );
+      }
+      tipoPersonalizado = nome.data;
     }
 
     // Upload para Vercel Blob Storage
@@ -110,6 +144,7 @@ export async function POST(request: Request) {
         pacienteId: parsed.data.pacienteId,
         tipo: parsed.data.tipo as typeof documentos.$inferInsert.tipo,
         urlBlob: blob.url,
+        tipoPersonalizado,
         nomeArquivo: file.name,
         dataEmissao: parsed.data.dataEmissao,
         dataValidade: validade.toISOString().split('T')[0],

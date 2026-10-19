@@ -34,6 +34,11 @@ const PRAZOS_VALIDADE: Record<TipoDocumento, number | null> = {
   procuracao_especifica: null,
   /** Laudo não vence — e `TIPOS_RENOVAVEIS` do cron também não o inclui. */
   laudo_medico: null,
+  /** Tipos do envio manual (contrato, laudo/relatório, orçamento, outro): sem prazo de validade. */
+  contrato_termos: null,
+  laudo_relatorio: null,
+  orcamento: null,
+  outro: null,
   /**
    * ⚠️ DIVERGÊNCIA MEDIDA, NÃO RESOLVIDA AQUI. `app/api/cron/verificar-validade-documentos`
    * trata `oficio_anvisa` como **renovável** (`TIPOS_RENOVAVEIS`), e `lib/documentos/validade.ts`

@@ -18,6 +18,8 @@ export const documentos = pgTable(
       .references(() => pacientes.id),
     tipo: documentoTipoEnum('tipo').notNull(),
     urlBlob: text('url_blob').notNull(),
+    /** Nome do tipo quando `tipo = 'outro'`. Só o admin o informa; nulo nos demais tipos. */
+    tipoPersonalizado: text('tipo_personalizado'),
     nomeArquivo: text('nome_arquivo'),
     dataEmissao: date('data_emissao').notNull(),
     dataValidade: date('data_validade').notNull(),

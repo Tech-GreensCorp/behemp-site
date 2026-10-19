@@ -40,6 +40,15 @@ export const documentoTipoEnum = pgEnum('documento_tipo', [
    * `AFTER` acrescenta ao final, e é a forma que não reordena o enum existente.
    */
   'laudo_medico',
+  /**
+   * Tipos de envio manual pela aba Documentos (admin/médico). Entram no FIM da lista, pelo
+   * mesmo motivo do `laudo_medico`. `outro` é o tipo "livre": o nome que o admin digita fica em
+   * `documentos.tipo_personalizado`; o enum não cresce a cada nome novo.
+   */
+  'contrato_termos',
+  'laudo_relatorio',
+  'orcamento',
+  'outro',
 ]);
 
 /**
