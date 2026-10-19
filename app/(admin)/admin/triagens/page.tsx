@@ -24,6 +24,7 @@ import {
   Download,
   Eye,
   FileCheck,
+  FileDown,
   FileSpreadsheet,
   Filter,
   HeartCrack,
@@ -376,6 +377,7 @@ export default function TriagensAdminPage() {
   const [triagemSelecionada, setTriagemSelecionada] = useState<Triagem | null>(null);
   const [triagemParaExcluir, setTriagemParaExcluir] = useState<Triagem | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   // Filtros
   const [busca, setBusca] = useState('');
@@ -511,6 +513,43 @@ export default function TriagensAdminPage() {
     link.href = base64;
     link.download = nomeArquivo;
     link.click();
+  }
+
+  /** Baixa a triagem em PDF — gerada no servidor, só para admin (`/api/triagens/[id]/ficha-pdf`). */
+  async function handleBaixarFichaPdf(triagem: Triagem) {
+    setGerandoPdf(true);
+    try {
+      const resposta = await fetch(`/api/triagens/${encodeURIComponent(triagem.id)}/ficha-pdf`);
+      if (!resposta.ok) {
+        toast.error(
+          resposta.status === 429
+            ? 'Muitas tentativas. Aguarde um instante e tente de novo.'
+            : 'Não foi possível gerar o PDF da ficha.',
+        );
+        return;
+      }
+      // O nome do arquivo vem do servidor (nome do paciente, com acento em `filename*`).
+      const cabecalho = resposta.headers.get('content-disposition') ?? '';
+      const codificado = /filename\*=UTF-8''([^;]+)/i.exec(cabecalho)?.[1];
+      let nomeArquivo = `${triagem.nomeContato || 'Paciente'}.pdf`;
+      if (codificado) {
+        try {
+          nomeArquivo = decodeURIComponent(codificado);
+        } catch {
+          // Mantém o nome de reserva.
+        }
+      }
+      const url = URL.createObjectURL(await resposta.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Não foi possível gerar o PDF da ficha.');
+    } finally {
+      setGerandoPdf(false);
+    }
   }
 
   // ── Contadores ───────────────────────────────────────────────
@@ -1085,6 +1124,20 @@ export default function TriagensAdminPage() {
                       Baixar relatório médico
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={gerandoPdf}
+                    onClick={() => handleBaixarFichaPdf(triagemSelecionada)}
+                  >
+                    {gerandoPdf ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <FileDown size={15} />
+                    )}
+                    {gerandoPdf ? 'Gerando PDF…' : 'Baixar ficha completa em PDF'}
+                  </Button>
                   <a href={SHEETS_URL} target="_blank" rel="noopener noreferrer">
                     <Button
                       variant="outline"
