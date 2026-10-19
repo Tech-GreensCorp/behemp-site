@@ -101,9 +101,27 @@ const TEXTO_LONGO =
 beforeAll(async () => {
   await limpar();
   await db.insert(schema.users).values([
-    { id: 'triag_pdf_adm', clerkId: 'triag_pdf_ck_adm', email: 'triag_pdf_adm@teste.invalid', nome: 'Admin do PDF', role: 'admin' },
-    { id: 'triag_pdf_med', clerkId: 'triag_pdf_ck_med', email: 'triag_pdf_med@teste.invalid', nome: 'Médico', role: 'medico' },
-    { id: 'triag_pdf_pac', clerkId: 'triag_pdf_ck_pac', email: 'triag_pdf_pac@teste.invalid', nome: 'Paciente', role: 'paciente' },
+    {
+      id: 'triag_pdf_adm',
+      clerkId: 'triag_pdf_ck_adm',
+      email: 'triag_pdf_adm@teste.invalid',
+      nome: 'Admin do PDF',
+      role: 'admin',
+    },
+    {
+      id: 'triag_pdf_med',
+      clerkId: 'triag_pdf_ck_med',
+      email: 'triag_pdf_med@teste.invalid',
+      nome: 'Médico',
+      role: 'medico',
+    },
+    {
+      id: 'triag_pdf_pac',
+      clerkId: 'triag_pdf_ck_pac',
+      email: 'triag_pdf_pac@teste.invalid',
+      nome: 'Paciente',
+      role: 'paciente',
+    },
   ]);
 
   await db.insert(schema.triagens).values([
@@ -255,7 +273,11 @@ describe('a triagem enviada pelo formulário', () => {
       .from(schema.logsAuditoria)
       .where(eq(schema.logsAuditoria.entidadeId, 'triag_pdf_nova'));
     expect(registros).toHaveLength(1);
-    expect(registros[0]).toMatchObject({ acao: 'visualizar', entidade: 'triagens', userId: 'triag_pdf_adm' });
+    expect(registros[0]).toMatchObject({
+      acao: 'visualizar',
+      entidade: 'triagens',
+      userId: 'triag_pdf_adm',
+    });
     expect(registros[0].dadosDepois).toEqual({ exportacao: 'triagem_pdf' });
     expect(JSON.stringify(registros[0])).not.toContain('529.982.247-25');
     expect(JSON.stringify(registros[0])).not.toContain('maria@teste.invalid');
@@ -270,8 +292,17 @@ describe('a triagem importada (chaves legadas)', () => {
     const pdf = Buffer.from(await r.arrayBuffer());
     gravar('triagem-importada.pdf', pdf);
     const texto = textoDoPdf(pdf);
-    expect(r.headers.get('content-disposition')).toContain(`${encodeURIComponent('José da Silva')}.pdf`);
-    for (const esperado of ['Jos', 'Parkinson', 'Moderado', 'Importado', 'Alugada', 'RENDA FAMILIAR']) {
+    expect(r.headers.get('content-disposition')).toContain(
+      `${encodeURIComponent('José da Silva')}.pdf`,
+    );
+    for (const esperado of [
+      'Jos',
+      'Parkinson',
+      'Moderado',
+      'Importado',
+      'Alugada',
+      'RENDA FAMILIAR',
+    ]) {
       expect(texto, `faltou "${esperado}"`).toContain(esperado);
     }
     expect(texto).not.toContain('elementor-2023'); // _formulario é interno: só vira o selo
