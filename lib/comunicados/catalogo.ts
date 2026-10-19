@@ -21,12 +21,15 @@ export const REMETENTE_DOCUMENTOS = {
   email: 'docs@be4hope.org',
 } as const;
 
-/** Rodapé de atendimento da carta (informado pela Dryelle em 15/10/2026). */
+/**
+ * Dados do bloco "Fale com a gente" da carta, que no .docx são campos a preencher.
+ * Informados pela Dryelle em 15/10/2026 — o horário é a frase dela, sem reescrever.
+ */
 export const CONTATO_DA_CARTA = {
   atendimento: 'Associação Behemp | Be4Hope',
   whatsapp: '(11) 93204-7360',
   email: 'docs@be4hope.org',
-  horario: '09h00 às 18h00, de segunda a sexta',
+  horario: '09h00 às 18h00 seg à sex',
 } as const;
 
 /** Âncoras de texto que o DocuSign procura no PDF para posicionar a assinatura e a data. */
