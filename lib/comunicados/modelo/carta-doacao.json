@@ -674,7 +674,7 @@
       "k": "p",
       "runs": [
         {
-          "t": "E as consultas de acompanhamento para quem aderir ao Collab anual ",
+          "t": "E as consultas de acompanhamento para quem aderir ao plano anual ",
           "sz": 22
         },
         {
@@ -1323,18 +1323,6 @@
                 "runs": [
                   {
                     "t": "Ciente dos novos termos para fornecimento do medicamento.",
-                    "sz": 22
-                  }
-                ],
-                "jc": "center"
-              },
-              {
-                "k": "p",
-                "runs": [
-                  {
-                    "t": "(assinar pelo GovBr)",
-                    "b": true,
-                    "c": "EE0000",
                     "sz": 22
                   }
                 ],

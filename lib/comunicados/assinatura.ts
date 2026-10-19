@@ -244,7 +244,15 @@ export async function enviarAvisoPorEmail(comunicadoId: string): Promise<boolean
     console.error('[comunicados] e-mail de envio:', erro instanceof Error ? erro.message : 'erro');
     await db
       .update(comunicadosAssinatura)
-      .set({ emailEnvioErro: 'O e-mail de aviso não foi enviado (falha no serviço de e-mail).' })
+      // O motivo real (HTTP, código e mensagem do Brevo, sem dado pessoal) vai para o cartão do admin:
+      // sem ele, "falhou" não diz se é remetente, chave ou rede.
+      .set({
+        emailEnvioErro:
+          `O e-mail de aviso não foi enviado. ${erro instanceof Error ? erro.message : 'Falha no serviço de e-mail.'}`.slice(
+            0,
+            400,
+          ),
+      })
       .where(eq(comunicadosAssinatura.id, c.id));
     return false;
   }

@@ -69,17 +69,17 @@ export function aplicarDados(modelo: Modelo, dados: DadosDaCarta): Bloco[] {
   };
 
   const preencherCelula = (c: Celula): Celula => {
-    let depoisDoGovBr = false;
+    let depoisDoCiente = false;
     const paragrafos: ParagrafoPreenchido[] = c.paragrafos.map((p) => {
       const { runs, assinatura } = trocar(p.runs);
       const novo: ParagrafoPreenchido = { ...p, runs };
       if (assinatura) novo.ancoraAssinatura = true;
-      // a data da assinatura vai no parágrafo vazio logo abaixo de "(assinar pelo GovBr)"
-      if (depoisDoGovBr && runs.length === 0) {
+      // a data da assinatura vai no parágrafo vazio logo abaixo de "Ciente dos novos termos…"
+      if (depoisDoCiente && runs.length === 0) {
         novo.ancoraData = true;
-        depoisDoGovBr = false;
+        depoisDoCiente = false;
       }
-      if (/assinar pelo/i.test(runs.map((r) => r.t).join(''))) depoisDoGovBr = true;
+      if (/^Ciente dos novos termos/.test(runs.map((r) => r.t).join(''))) depoisDoCiente = true;
       return novo;
     });
     return { ...c, paragrafos };

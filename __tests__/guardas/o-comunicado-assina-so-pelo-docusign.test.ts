@@ -94,7 +94,13 @@ describe('e-mails do fluxo', () => {
     const src = ler('lib/email/comunicados.ts');
     expect(src).toContain('REMETENTE_DOCUMENTOS');
     expect(src).not.toContain('tech@be4hope.org');
-    expect(src).not.toMatch(/BREVO_FROM_EMAIL/);
+    // BREVO_FROM_EMAIL só existe como REMETENTE ALTERNATIVO, quando o Brevo recusa o docs@ (ver o guarda do e-mail)
+    const semComentariosSrc = semComentarios(src);
+    expect(semComentariosSrc.match(/BREVO_FROM_EMAIL/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    expect(semComentariosSrc.indexOf('BREVO_FROM_EMAIL')).toBeGreaterThan(
+      semComentariosSrc.indexOf('const remetenteAlternativo'),
+    );
+    expect(semComentariosSrc).toMatch(/sender: sender\(\)/);
   });
 
   it('só a notificação a docs@ leva anexo — e o paciente recebe link, não arquivo', () => {

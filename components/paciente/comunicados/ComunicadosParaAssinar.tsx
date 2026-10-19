@@ -65,7 +65,11 @@ export function ComunicadosParaAssinar() {
   if (!itens || itens.length === 0) return null;
 
   return (
-    <section className="animate-fade-up space-y-3" aria-label="Comunicados para assinatura">
+    <section
+      id="comunicados"
+      className="animate-fade-up scroll-mt-24 space-y-3"
+      aria-label="Comunicados para assinatura"
+    >
       <h2 className="font-heading text-muted-foreground text-sm font-semibold tracking-wide uppercase">
         Comunicados
       </h2>
