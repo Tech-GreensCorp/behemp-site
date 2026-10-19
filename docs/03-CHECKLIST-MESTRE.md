@@ -875,6 +875,23 @@ admin acompanha na aba Documentos do paciente.
   registrada em `.claude/autorizacoes.txt` mesmo assim. E 58 casos falham **também no `main` limpo**
   (CRLF do checkout no Windows), com o conjunto idêntico antes e depois desta mudança.
 
+### 🔴 Feito em 19/10/2026 (local, sem commit) — ajustes urgentes: texto da carta, GovBr e e-mail de aviso
+
+- **Texto:** "para quem aderir ao Collab anual" → "para quem aderir ao **plano anual**", a pedido da Dryelle (que
+  mandou o texto correto). **Alterado no próprio `.docx`** de `lib/comunicados/modelo/`, não no código;
+  o modelo foi regenerado e o guarda `a-carta-do-docusign-e-a-carta-aprovada` confere a frase.
+- **GovBr:** o parágrafo "(assinar pelo GovBr)" foi **removido do `.docx`** (última página). A âncora da data da
+  assinatura passou a ficar no parágrafo vazio logo abaixo de "Ciente dos novos termos…".
+- **E-mail de aviso que não chegou ao paciente em produção:** a causa NÃO foi confirmada (sem acesso ao Brevo
+  nem ao log da VPS). O DNS de `be4hope.org` tem o DKIM do Brevo, e a hipótese mais provável é o endereço
+  `docs@be4hope.org` **não estar cadastrado como remetente** no Brevo (erro "valid sender email required").
+  Mudanças: (1) o Brevo recusando o remetente, há **uma nova tentativa** pelo remetente que o produto já usa
+  (`BREVO_FROM_EMAIL`), com `docs@` em `replyTo`; (2) o motivo real da recusa (HTTP, código e mensagem do
+  Brevo, sem dado pessoal) vai ao log e ao cartão do admin, em vez de "falha no serviço de e-mail";
+  (3) o aviso ganhou botão para a seção Comunicados do site, passo a passo de onde achar e assinar,
+  endereço por extenso e versão em texto. Guarda `o-email-do-comunicado-chega-ou-diz-por-que` (23).
+  **Pendência no Brevo:** cadastrar `docs@be4hope.org` como remetente; enquanto isso, o aviso sai por `tech@`.
+
 ### ✅ Feito em 19/10/2026 (local, sem commit) — carta atualizada ("VF atualizada teste")
 
 A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo a parágrafo (o resto é igual):

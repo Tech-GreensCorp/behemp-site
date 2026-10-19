@@ -151,7 +151,7 @@ describe('o texto do PDF é o do .docx aprovado', () => {
   it('a mudança de conteúdo da versão atualizada está na carta', () => {
     const t = textosPreenchidos(aplicarDados(modelo, DADOS));
     expect(t).toContain(
-      'E as consultas de acompanhamento para quem aderir ao Collab anual continuam gratuitas, exatamente como sempre foram. O paciente segue tendo direito a 2 consultas por ano — uma a cada 6 meses — sem nenhum custo, para garantir que o tratamento continue sendo acompanhado de perto. Existindo a necessidade de consultas extras, o valor será de R$ 90,00 pagos diretamente aos médicos parceiros e escolhidos por vocês. ',
+      'E as consultas de acompanhamento para quem aderir ao plano anual continuam gratuitas, exatamente como sempre foram. O paciente segue tendo direito a 2 consultas por ano — uma a cada 6 meses — sem nenhum custo, para garantir que o tratamento continue sendo acompanhado de perto. Existindo a necessidade de consultas extras, o valor será de R$ 90,00 pagos diretamente aos médicos parceiros e escolhidos por vocês. ',
     );
     expect(t).toContain(`e-mail: ${DADOS.emailPaciente}`);
     expect(t).toContain(`cpf: ${DADOS.cpfPaciente}`);
@@ -160,7 +160,9 @@ describe('o texto do PDF é o do .docx aprovado', () => {
   it('o texto aprovado segue como está, inclusive o que parece erro (não é nosso corrigir)', () => {
     const t = textosPreenchidos(aplicarDados(modelo, DADOS));
     expect(t).toContain('Vice Presidnete');
-    expect(t).toContain('(assinar pelo GovBr)');
+    // 19/10/2026: a Dryelle mandou remover a linha do GovBr da última página, e trocar "Collab anual" por "plano anual"
+    expect(t.join(' ')).not.toMatch(/GovBr/i);
+    expect(t.join(' ')).not.toMatch(/Collab/);
     expect(t).toContain('12 frascos × R$ 210,00');
   });
 });

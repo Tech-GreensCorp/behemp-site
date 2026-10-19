@@ -86,11 +86,22 @@ const par = (t: string) =>
 
 // ── 1. Envio: aviso ao paciente ───────────────────────────────
 
+/** Onde o comunicado aparece no site: a página Documentos, na seção Comunicados. */
+export const LINK_DOS_COMUNICADOS = () => `${APP_URL()}/paciente/documentos#comunicados`;
+
 export function montarEmailDeEnvio(dados: { nome: string; titulo: string }): {
   assunto: string;
   html: string;
+  texto: string;
 } {
-  const link = `${APP_URL()}/paciente/documentos`;
+  const link = LINK_DOS_COMUNICADOS();
+  const passos = [
+    'Clique no botão <strong>Ler e assinar o comunicado</strong> e entre na sua conta Be4Hope (com o e-mail e a senha que você usa no site).',
+    'No <strong>menu lateral esquerdo</strong>, clique em <strong>Documentos</strong>. No celular, toque no ícone de menu (≡) no topo da tela para abrir o menu.',
+    `Na página Documentos, procure o cartão <strong>${esc(dados.titulo)}</strong>, com a etiqueta <em>Pendente de assinatura</em>.`,
+    'Clique em <strong>Abrir e assinar</strong>, leia o documento e siga as instruções da tela de assinatura eletrônica (DocuSign) até confirmar.',
+    'Pronto: você recebe um e-mail confirmando a assinatura, e o documento assinado fica guardado na página Documentos.',
+  ];
   const html = moldura({
     titulo: dados.titulo,
     emoji: '💌',
@@ -100,21 +111,38 @@ export function montarEmailDeEnvio(dados: { nome: string; titulo: string }): {
     corpo: [
       h1('Você recebeu um comunicado importante'),
       par(
-        `Olá, <strong style="color:${CORES.texto};">${esc(dados.nome)}</strong>! A equipe Be4Hope preparou o comunicado <strong style="color:${CORES.texto};">${esc(dados.titulo)}</strong> especialmente para você.`,
+        `Olá, <strong style="color:${CORES.texto};">${esc(dados.nome)}</strong>! A equipe Be4Hope enviou para você o comunicado <strong style="color:${CORES.texto};">${esc(dados.titulo)}</strong>. Ele traz informações importantes sobre o seu tratamento e precisa da sua <strong>ciência e assinatura eletrônica</strong>.`,
       ),
-      par(
-        'Para ler e assinar eletronicamente, é preciso acessá-lo pelo nosso sistema. É rápido e seguro:',
-      ),
-      `<ol style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.8;color:${CORES.texto2};">
-        <li>Clique no botão abaixo e entre na sua conta Be4Hope.</li>
-        <li>Na página <strong>Documentos</strong>, abra o comunicado e leia com calma.</li>
-        <li>Clique em <strong>Abrir e assinar</strong> e siga as instruções na tela.</li>
-      </ol>`,
-      botao(link, 'Acessar meus documentos'),
-      `<p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:${CORES.muted};text-align:center;">Este e-mail não traz o documento anexado: a leitura e a assinatura acontecem dentro do sistema, para que fiquem registradas. Dúvidas? Responda a este e-mail ou fale com a gente pelo WhatsApp (11) 93204-7360, de segunda a sexta, das 9h às 18h.</p>`,
+      botao(link, 'Ler e assinar o comunicado'),
+      `<p style="margin:26px 0 8px;font-size:13px;font-weight:700;color:${CORES.texto};">Como encontrar e assinar, passo a passo</p>
+      <ol style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.75;color:${CORES.texto2};">${passos.map((p) => `<li style="margin-bottom:6px;">${p}</li>`).join('')}</ol>`,
+      `<p style="margin:0 0 14px;font-size:12px;line-height:1.6;color:${CORES.muted};">Se o botão não abrir, copie e cole este endereço no navegador:<br><a href="${esc(link)}" style="color:${CORES.primary};word-break:break-all;">${esc(link)}</a></p>`,
+      `<p style="margin:0;font-size:12px;line-height:1.6;color:${CORES.muted};">O documento não vai anexado a este e-mail: a leitura e a assinatura acontecem dentro do sistema, para que fiquem registradas. Dúvidas ou dificuldade para encontrar? Responda este e-mail ou fale com a gente pelo WhatsApp (11) 93204-7360, de segunda a sexta, das 9h às 18h.</p>`,
     ].join(''),
   });
-  return { assunto: `Be4Hope — Você recebeu um comunicado para assinar: ${dados.titulo}`, html };
+  const texto = [
+    `Olá, ${dados.nome}!`,
+    '',
+    `A equipe Be4Hope enviou para você o comunicado "${dados.titulo}". Ele traz informações importantes sobre o seu tratamento e precisa da sua ciência e assinatura eletrônica.`,
+    '',
+    `Acesse: ${link}`,
+    '',
+    'Como encontrar e assinar:',
+    '1. Abra o link acima e entre na sua conta Be4Hope.',
+    '2. No menu lateral esquerdo, clique em "Documentos" (no celular, toque no ícone de menu no topo da tela).',
+    `3. Procure o cartão "${dados.titulo}", com a etiqueta "Pendente de assinatura".`,
+    '4. Clique em "Abrir e assinar", leia o documento e siga as instruções da tela até confirmar.',
+    '5. Você recebe um e-mail de confirmação, e o documento assinado fica guardado em Documentos.',
+    '',
+    'Dúvidas? Responda este e-mail ou chame no WhatsApp (11) 93204-7360, de segunda a sexta, das 9h às 18h.',
+    '',
+    'Be4Hope',
+  ].join('\n');
+  return {
+    assunto: `Be4Hope — Você recebeu um comunicado para assinar: ${dados.titulo}`,
+    html,
+    texto,
+  };
 }
 
 // ── 2. Conclusão: confirmação ao paciente ─────────────────────
@@ -124,7 +152,7 @@ export function montarEmailConfirmacaoPaciente(dados: {
   titulo: string;
   assinadoEmTexto: string;
 }): { assunto: string; html: string } {
-  const link = `${APP_URL()}/paciente/documentos`;
+  const link = LINK_DOS_COMUNICADOS();
   const html = moldura({
     titulo: 'Assinatura confirmada',
     emoji: '✅',
@@ -192,15 +220,88 @@ function cliente() {
 
 const sender = () => ({ name: REMETENTE_DOCUMENTOS.name, email: REMETENTE_DOCUMENTOS.email });
 
+/**
+ * O remetente que o resto do produto já usa em produção (`BREVO_FROM_EMAIL`), ou `null` se for o
+ * próprio docs@. Só entra quando o Brevo recusa o docs@.
+ */
+const remetenteAlternativo = () => {
+  const email = process.env.BREVO_FROM_EMAIL?.trim();
+  if (!email || email.toLowerCase() === REMETENTE_DOCUMENTOS.email) return null;
+  return { name: process.env.BREVO_FROM_NAME?.trim() || 'Be4Hope', email };
+};
+
+/**
+ * Diz, em uma linha e SEM dado pessoal, por que o Brevo recusou — é o que o admin lê no cartão e o
+ * que fica no log. O corpo de erro do Brevo traz `code` e `message` da API (ex.: "valid sender
+ * email required"), nunca o destinatário.
+ */
+export function descreverErroDoBrevo(erro: unknown): string {
+  const e = erro as {
+    statusCode?: number;
+    body?: { code?: string; message?: string };
+    message?: string;
+  } | null;
+  const partes: string[] = [];
+  if (e?.statusCode) partes.push(`HTTP ${e.statusCode}`);
+  if (e?.body?.code) partes.push(String(e.body.code));
+  const msg = e?.body?.message ?? e?.message;
+  if (msg) partes.push(String(msg));
+  return (partes.join(' · ') || 'erro desconhecido').slice(0, 200);
+}
+
+type CorpoDoEmail = Omit<
+  Parameters<ReturnType<typeof cliente>['transactionalEmails']['sendTransacEmail']>[0],
+  'sender'
+>;
+
+/**
+ * Envia por docs@be4hope.org; se o Brevo recusar (o motivo mais provável é o endereço ainda não
+ * estar cadastrado como remetente), tenta UMA vez pelo remetente que o produto já usa, com docs@
+ * em `replyTo` — a resposta do paciente continua indo para docs@. LANÇA com o motivo das duas
+ * recusas se nenhuma passar.
+ */
+async function enviar(corpo: CorpoDoEmail): Promise<void> {
+  const brevo = cliente();
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({ ...corpo, sender: sender() });
+    return;
+  } catch (primeiro) {
+    const motivo1 = descreverErroDoBrevo(primeiro);
+    const alt = remetenteAlternativo();
+    console.error(
+      `[comunicados] Brevo recusou o remetente ${REMETENTE_DOCUMENTOS.email}: ${motivo1}`,
+    );
+    if (!alt)
+      throw new Error(`Brevo recusou o envio por ${REMETENTE_DOCUMENTOS.email} (${motivo1})`);
+    try {
+      await brevo.transactionalEmails.sendTransacEmail({
+        ...corpo,
+        sender: alt,
+        replyTo: sender(),
+      });
+      console.warn(
+        `[comunicados] e-mail enviado pelo remetente alternativo ${alt.email}. Cadastre ${REMETENTE_DOCUMENTOS.email} como remetente no Brevo.`,
+      );
+    } catch (segundo) {
+      throw new Error(
+        `Brevo recusou o envio. Por ${REMETENTE_DOCUMENTOS.email}: ${motivo1}. Por ${alt.email}: ${descreverErroDoBrevo(segundo)}`,
+      );
+    }
+  }
+}
+
 export async function enviarEmailDeEnvio(dados: {
   para: { email: string; nome: string };
   titulo: string;
 }): Promise<void> {
-  const { assunto, html } = montarEmailDeEnvio({ nome: dados.para.nome, titulo: dados.titulo });
-  await cliente().transactionalEmails.sendTransacEmail({
+  const { assunto, html, texto } = montarEmailDeEnvio({
+    nome: dados.para.nome,
+    titulo: dados.titulo,
+  });
+  await enviar({
     subject: assunto,
     htmlContent: html,
-    sender: sender(),
+    textContent: texto,
     replyTo: sender(),
     to: [{ email: dados.para.email, name: dados.para.nome }],
   });
@@ -216,10 +317,9 @@ export async function enviarEmailConfirmacaoPaciente(dados: {
     titulo: dados.titulo,
     assinadoEmTexto: dados.assinadoEmTexto,
   });
-  await cliente().transactionalEmails.sendTransacEmail({
+  await enviar({
     subject: assunto,
     htmlContent: html,
-    sender: sender(),
     replyTo: sender(),
     to: [{ email: dados.para.email, name: dados.para.nome }],
   });
@@ -236,10 +336,9 @@ export async function enviarEmailNotificacaoDocs(dados: {
   nomeDoAnexo: string;
 }): Promise<void> {
   const { assunto, html } = montarEmailNotificacaoDocs(dados);
-  await cliente().transactionalEmails.sendTransacEmail({
+  await enviar({
     subject: assunto,
     htmlContent: html,
-    sender: sender(),
     to: [{ email: REMETENTE_DOCUMENTOS.email, name: REMETENTE_DOCUMENTOS.name }],
     attachment: [{ name: dados.nomeDoAnexo, content: dados.pdfAssinado.toString('base64') }],
   });
