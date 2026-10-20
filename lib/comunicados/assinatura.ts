@@ -649,6 +649,7 @@ export interface ComunicadoParaAdmin {
   enviadoEm: Date;
   enviadoPorNome: string | null;
   assinadoEm: Date | null;
+  nomeDestino: string;
   emailDestino: string;
   temArquivoAssinado: boolean;
   erro: string | null;
@@ -686,6 +687,7 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
     enviadoEm: c.enviadoEm,
     enviadoPorNome,
     assinadoEm: c.assinadoEm,
+    nomeDestino: c.nomeDestino,
     emailDestino: c.emailDestino,
     temArquivoAssinado: !!c.urlPdfAssinado,
     erro: c.erro,

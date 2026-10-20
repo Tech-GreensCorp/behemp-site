@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  Download,
+  Eye,
+  FileCheck,
   FileSignature,
+  FileText,
   Loader2,
   RefreshCw,
   Mail,
@@ -186,6 +190,116 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
           </dl>
         )}
 
+        {atual && (
+          <div className="rounded-2xl border border-border/40 bg-stone-50/60 dark:bg-stone-900/30 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Documento anexado para assinatura
+              </span>
+              <Badge variant="outline" className="border-[#C08E3A]/40 text-[#C08E3A] text-xs">
+                PDF preenchido
+              </Badge>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/40 bg-background p-3 shadow-xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#C08E3A]/10 text-[#C08E3A]">
+                  <FileText size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-heading text-sm font-semibold text-foreground truncate">
+                    {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} — {atual.nomeDestino || 'Paciente'}.pdf
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Carta preenchida com os dados do paciente para assinatura no DocuSign
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 rounded-xl text-xs"
+                  render={
+                    <a
+                      href={`/api/comunicados/${atual.id}/documento`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  }
+                >
+                  <Eye size={13} />
+                  Visualizar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 rounded-xl text-xs bg-[#C08E3A]/10 hover:bg-[#C08E3A]/20 text-[#A87928] dark:text-[#E0B25E] border-[#C08E3A]/30"
+                  render={
+                    <a
+                      href={`/api/comunicados/${atual.id}/documento?download=1`}
+                      download={`Atualizacao-Programa-Doacao-${atual.nomeDestino || 'paciente'}.pdf`}
+                    />
+                  }
+                >
+                  <Download size={13} />
+                  Baixar documento
+                </Button>
+              </div>
+            </div>
+
+            {atual.status === 'assinado' && atual.temArquivoAssinado && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <FileCheck size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-heading text-sm font-semibold text-foreground truncate">
+                      {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} — Assinado.pdf
+                    </p>
+                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                      Documento com assinatura eletrônica confirmada pelo DocuSign
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 rounded-xl text-xs border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    render={
+                      <a
+                        href={`/api/comunicados/${atual.id}/arquivo`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    }
+                  >
+                    <Eye size={13} />
+                    Visualizar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 rounded-xl text-xs bg-emerald-600 text-white hover:bg-emerald-700 border-0"
+                    render={
+                      <a
+                        href={`/api/comunicados/${atual.id}/arquivo?download=1`}
+                        download
+                      />
+                    }
+                  >
+                    <Download size={13} />
+                    Baixar assinado
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {atual?.erro && (
           <p className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border p-3 text-sm">
             {atual.erro}
@@ -207,6 +321,22 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             >
               <Send size={14} />
               {historico.length > 0 ? 'Enviar novamente' : 'Enviar comunicado'}
+            </Button>
+          )}
+          {atual && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 rounded-xl"
+              render={
+                <a
+                  href={`/api/comunicados/${atual.id}/documento?download=1`}
+                  download={`Atualizacao-Programa-Doacao-${atual.nomeDestino || 'paciente'}.pdf`}
+                />
+              }
+            >
+              <Download size={14} />
+              Baixar documento
             </Button>
           )}
           {atual?.status === 'pendente' && (
@@ -294,6 +424,13 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                   </span>
                   <span className="text-right">
                     {rotuloDe(c).texto}
+                    <a
+                      href={`/api/comunicados/${c.id}/documento?download=1`}
+                      download={`Atualizacao-Programa-Doacao-${c.nomeDestino || 'paciente'}.pdf`}
+                      className="text-primary block text-xs underline"
+                    >
+                      Baixar documento enviado
+                    </a>
                     {c.status === 'cancelado' && (
                       <span className="text-muted-foreground block text-xs">
                         por {c.reiniciadoPorNome ?? '—'}

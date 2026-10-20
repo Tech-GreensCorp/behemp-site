@@ -31,7 +31,7 @@ import {
 } from '@/lib/email/comunicados';
 
 const RAIZ = join(__dirname, '..', '..');
-const ler = (rel: string) => readFileSync(join(RAIZ, rel), 'utf8');
+const ler = (rel: string) => readFileSync(join(RAIZ, rel), 'utf8').replace(/\r\n/g, '\n');
 
 /** Tira comentários, para a asserção olhar o código e não a explicação do código. */
 const semComentarios = (s: string) =>
