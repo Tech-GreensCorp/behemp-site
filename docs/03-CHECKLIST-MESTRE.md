@@ -915,6 +915,27 @@ A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo 
   ocupava. Quando chegar uma carta com os campos em branco, **remover essa tabela** — o guarda avisa.
 - Quadro do cabeçalho com a 2ª coluna mais larga (o e-mail não quebra no meio).
 
+### ✅ Feito em 20/10/2026 — admin não conseguia cadastrar paciente (era campo em branco, não o papel)
+
+Relatado pela Dryelle: "o admin não consegue cadastrar, o médico consegue; e o paciente novo não vai para o começo
+da lista".
+
+- **Medido, não suposto:** reproduzido contra Postgres real com **os dois papéis** — os dois falham igual. A
+  tela exige só nome e e-mail; todo campo em branco vai como `''`, e `criarPaciente` o gravava cru.
+  `dataNascimento: ''` e `dataAssociacao: ''` em coluna `date` dão `invalid input syntax for type date: ""`, e a tela
+  mostrava só "Erro ao criar paciente". Quem preenchia as duas datas conseguia (admin **e** médico); quem as deixava
+  em branco, não. **Não há diferença de permissão:** a action usa `verificarMedicoOuAdmin`.
+- **A lista:** a do admin já ordena por `createdAt` decrescente e não filtra por médico. O paciente "não ia para o
+  começo" porque **não era criado**. Com a criação funcionando, o último cadastrado aparece primeiro (provado).
+- **A única diferença real entre os papéis:** o paciente do **médico** nasce com `medicoId`; o do **admin** nasce
+  **sem médico** e cai na fila "Atribuir Médico" (comportamento já documentado em `admin/pacientes/novo/page.tsx`).
+- **Correção:** `semCamposVazios` (`lib/pacientes/edicao.ts`) tira o `''` antes do `INSERT`; a coluna fica NULL. Mesmo
+  princípio da edição (acima). 🔴 Se o admin ainda falhar depois do deploy, o texto do aviso na tela diz qual é o outro
+  motivo — esta correção cobre só o campo em branco.
+- **Testes:** integração `o-cadastro-de-paciente-aceita-campo-vazio` (**7**, Postgres real, vermelha antes) e 2 casos
+  novos no guarda `a-edicao-do-paciente-aceita-campo-vazio` (agora **9**); 4 sabotagens vermelhas.
+- **Não verificado:** o clique na tela (depende do login no Clerk).
+
 ### ✅ Feito em 20/10/2026 — editar paciente antigo (sem dado nenhum) não salvava
 
 Relatado pela Dryelle com print: na tela do paciente (`/admin/pacientes/[id]`), num cadastro antigo vazio,
