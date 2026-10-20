@@ -23,6 +23,13 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DialogoEnvioEmLote,
+  montarLinhasDoLote,
+  type LinhaDoLote,
+} from '@/components/admin/comunicados/DialogoEnvioEmLote';
+import { LIMITE_DO_LOTE } from '@/lib/comunicados/lote';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +44,7 @@ import {
   Archive,
   ChevronRight,
   Download,
+  FileSignature,
   Loader2,
   Search,
   Stethoscope,
@@ -92,6 +100,12 @@ export default function AdminPacientesPage() {
   const [paraArquivar, setParaArquivar] = useState<PacienteDoAdmin | null>(null);
   const [motivoArquivo, setMotivoArquivo] = useState('');
   const [arquivando, setArquivando] = useState(false);
+
+  // Seleção para o envio em lote do comunicado: id → nome, e vale entre páginas e filtros.
+  const [selecionados, setSelecionados] = useState<Record<string, string>>({});
+  const [linhasDoLote, setLinhasDoLote] = useState<LinhaDoLote[] | null>(null);
+  const [preparandoLote, setPreparandoLote] = useState(false);
+  const qtdSelecionados = Object.keys(selecionados).length;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,6 +178,45 @@ export default function AdminPacientesPage() {
       cancelado = true;
     };
   }, [chave, buscaDebounced, filtroStatus, filtroTratamento, filtroJornada, pagina, porPagina]);
+
+  // ── Envio em lote do comunicado ───────────────────────────────
+  function alternarSelecao(paciente: PacienteDoAdmin, marcado: boolean) {
+    const novo = { ...selecionados };
+    if (!marcado) {
+      delete novo[paciente.id];
+    } else if (qtdSelecionados >= LIMITE_DO_LOTE) {
+      toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pacientes por vez.`);
+      return;
+    } else {
+      novo[paciente.id] = paciente.nome;
+    }
+    setSelecionados(novo);
+  }
+
+  function selecionarPagina() {
+    const novo = { ...selecionados };
+    for (const p of pacientes) {
+      if (Object.keys(novo).length >= LIMITE_DO_LOTE) {
+        toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pacientes por vez.`);
+        break;
+      }
+      novo[p.id] = p.nome;
+    }
+    setSelecionados(novo);
+  }
+
+  async function prepararLote() {
+    setPreparandoLote(true);
+    const res = await montarLinhasDoLote(
+      Object.entries(selecionados).map(([id, nome]) => ({ chave: id, nome, pacienteId: id })),
+    );
+    setPreparandoLote(false);
+    if (!res.sucesso) {
+      toast.error(res.erro);
+      return;
+    }
+    setLinhasDoLote(res.linhas);
+  }
 
   // ── Importar CSV / XLSX ───────────────────────────────────────
   async function handleImportar(e: React.ChangeEvent<HTMLInputElement>) {
@@ -444,6 +497,48 @@ export default function AdminPacientesPage() {
         />
       ) : (
         <DataList>
+          <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+            <span className="text-muted-foreground">
+              {qtdSelecionados > 0
+                ? `${qtdSelecionados} selecionado${qtdSelecionados !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
+                : 'Marque pacientes para enviar o comunicado da carta de doação em lote'}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-lg text-xs"
+                onClick={selecionarPagina}
+              >
+                Selecionar esta página
+              </Button>
+              {qtdSelecionados > 0 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 rounded-lg text-xs"
+                    onClick={() => setSelecionados({})}
+                  >
+                    Limpar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1.5 rounded-lg text-xs"
+                    onClick={prepararLote}
+                    disabled={preparandoLote}
+                  >
+                    {preparandoLote ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <FileSignature size={13} />
+                    )}
+                    Enviar carta de doação ({qtdSelecionados})
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
           {pacientes.map((paciente) => {
             const statusConfig =
               STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
@@ -452,6 +547,24 @@ export default function AdminPacientesPage() {
               <DataRow
                 key={paciente.id}
                 href={`/admin/pacientes/${paciente.id}`}
+                leading={
+                  <span
+                    className="-m-2 p-2"
+                    onClick={(e) => {
+                      // A linha inteira é um link: marcar a caixa não pode navegar. O estado é
+                      // controlado por aqui; a caixa só mostra.
+                      e.preventDefault();
+                      e.stopPropagation();
+                      alternarSelecao(paciente, !(paciente.id in selecionados));
+                    }}
+                  >
+                    <Checkbox
+                      checked={paciente.id in selecionados}
+                      className="pointer-events-none"
+                      aria-label={`Selecionar ${paciente.nome} para o envio em lote`}
+                    />
+                  </span>
+                }
                 icon={
                   <span className="font-heading text-secondary text-sm font-semibold">
                     {paciente.nome.charAt(0).toUpperCase()}
@@ -565,6 +678,16 @@ export default function AdminPacientesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {linhasDoLote && (
+        <DialogoEnvioEmLote
+          linhasIniciais={linhasDoLote}
+          onFechar={(limpar) => {
+            setLinhasDoLote(null);
+            if (limpar) setSelecionados({});
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DialogoEnvioEmLote,
+  montarLinhasDoLote,
+  type LinhaDoLote,
+} from '@/components/admin/comunicados/DialogoEnvioEmLote';
+import { resolverPacientesDasTriagens } from '@/app/_actions/comunicados';
+import { LIMITE_DO_LOTE } from '@/lib/comunicados/lote';
 import {
   AlertTriangle,
   Calendar,
@@ -26,9 +34,11 @@ import {
   FileCheck,
   FileDown,
   FileSpreadsheet,
+  FileSignature,
   Filter,
   HeartCrack,
   Home,
+  Loader2,
   Mail,
   Phone,
   Search,
@@ -379,6 +389,12 @@ export default function TriagensAdminPage() {
   const [excluindo, setExcluindo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
 
+  // Seleção para o envio em lote do comunicado: id da triagem → nome. Vale entre páginas.
+  const [selecionadas, setSelecionadas] = useState<Record<string, string>>({});
+  const [linhasDoLote, setLinhasDoLote] = useState<LinhaDoLote[] | null>(null);
+  const [preparandoLote, setPreparandoLote] = useState(false);
+  const qtdSelecionadas = Object.keys(selecionadas).length;
+
   // Filtros
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
@@ -458,6 +474,57 @@ export default function TriagensAdminPage() {
     const inicio = (paginaSegura - 1) * ITENS_POR_PAGINA;
     return triagensFiltradas.slice(inicio, inicio + ITENS_POR_PAGINA);
   }, [triagensFiltradas, paginaSegura]);
+
+  // ── Envio em lote do comunicado ──────────────────────────────
+
+  function alternarSelecao(triagem: Triagem, marcado: boolean) {
+    const novo = { ...selecionadas };
+    if (!marcado) {
+      delete novo[triagem.id];
+    } else if (qtdSelecionadas >= LIMITE_DO_LOTE) {
+      toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
+      return;
+    } else {
+      novo[triagem.id] = triagem.nomeContato || triagem.emailContato || 'Sem nome';
+    }
+    setSelecionadas(novo);
+  }
+
+  function selecionarPagina() {
+    const novo = { ...selecionadas };
+    for (const t of triagensPagina) {
+      if (Object.keys(novo).length >= LIMITE_DO_LOTE) {
+        toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
+        break;
+      }
+      novo[t.id] = t.nomeContato || t.emailContato || 'Sem nome';
+    }
+    setSelecionadas(novo);
+  }
+
+  async function prepararLote() {
+    setPreparandoLote(true);
+    // Triagem não tem FK para paciente: o servidor casa pelo e-mail com a ficha ativa.
+    const resolvidas = await resolverPacientesDasTriagens(Object.keys(selecionadas));
+    if (!resolvidas.sucesso) {
+      setPreparandoLote(false);
+      toast.error(resolvidas.erro);
+      return;
+    }
+    const res = await montarLinhasDoLote(
+      resolvidas.dados.map((r) => ({
+        chave: r.triagemId,
+        nome: selecionadas[r.triagemId] ?? 'Sem nome',
+        pacienteId: r.pacienteId,
+      })),
+    );
+    setPreparandoLote(false);
+    if (!res.sucesso) {
+      toast.error(res.erro);
+      return;
+    }
+    setLinhasDoLote(res.linhas);
+  }
 
   // ── Ações ────────────────────────────────────────────────────
 
@@ -707,6 +774,48 @@ export default function TriagensAdminPage() {
       ) : (
         <>
           <DataList>
+            <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+              <span className="text-muted-foreground">
+                {qtdSelecionadas > 0
+                  ? `${qtdSelecionadas} selecionada${qtdSelecionadas !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
+                  : 'Marque pessoas para enviar o comunicado da carta de doação em lote'}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-lg text-xs"
+                  onClick={selecionarPagina}
+                >
+                  Selecionar esta página
+                </Button>
+                {qtdSelecionadas > 0 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-lg text-xs"
+                      onClick={() => setSelecionadas({})}
+                    >
+                      Limpar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1.5 rounded-lg text-xs"
+                      onClick={prepararLote}
+                      disabled={preparandoLote}
+                    >
+                      {preparandoLote ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <FileSignature size={13} />
+                      )}
+                      Enviar carta de doação ({qtdSelecionadas})
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
             {triagensPagina.map((triagem) => {
               const config = STATUS_CONFIG[triagem.statusVisualizacao] || STATUS_CONFIG.pendente;
               const formulario =
@@ -718,6 +827,13 @@ export default function TriagensAdminPage() {
                     'group',
                     triagem.statusVisualizacao === 'pendente' && 'bg-primary-soft/30',
                   )}
+                  leading={
+                    <Checkbox
+                      checked={triagem.id in selecionadas}
+                      onCheckedChange={(marcado) => alternarSelecao(triagem, marcado === true)}
+                      aria-label={`Selecionar ${triagem.nomeContato || 'triagem'} para o envio em lote`}
+                    />
+                  }
                   icon={
                     <div
                       className="flex h-full w-full cursor-pointer items-center justify-center"
@@ -1191,6 +1307,16 @@ export default function TriagensAdminPage() {
           onConfirmar={handleConfirmarExclusao}
           onCancelar={() => setTriagemParaExcluir(null)}
           carregando={excluindo}
+        />
+      )}
+
+      {linhasDoLote && (
+        <DialogoEnvioEmLote
+          linhasIniciais={linhasDoLote}
+          onFechar={(limpar) => {
+            setLinhasDoLote(null);
+            if (limpar) setSelecionadas({});
+          }}
         />
       )}
     </div>

@@ -23,6 +23,8 @@ export function DataList({ children, className }: DataListProps) {
 }
 
 interface DataRowProps {
+  /** Controle antes do avatar — ex: checkbox de seleção. Em linha-link, quem passa evita a navegação. */
+  leading?: ReactNode;
   /** Avatar/ícone à esquerda — geralmente um círculo com iniciais ou ícone de status. */
   icon?: ReactNode;
   title: ReactNode;
@@ -37,6 +39,7 @@ interface DataRowProps {
 }
 
 export function DataRow({
+  leading,
   icon,
   title,
   subtitle,
@@ -48,6 +51,7 @@ export function DataRow({
 }: DataRowProps) {
   const content = (
     <>
+      {leading}
       {icon && (
         <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
           {icon}

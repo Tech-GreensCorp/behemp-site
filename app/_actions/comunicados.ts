@@ -1,9 +1,9 @@
 'use server';
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { comunicadosAssinatura, pacientes, users } from '@/db/schema';
+import { comunicadosAssinatura, pacientes, triagens, users } from '@/db/schema';
 import { verificarAdmin, obterUsuarioAtual } from '@/lib/auth';
 import {
   enviarAvisoPorEmail,
@@ -16,7 +16,15 @@ import {
   type ComunicadoParaAdmin,
   type ComunicadoParaPaciente,
 } from '@/lib/comunicados/assinatura';
+import { TIPO_ATUALIZACAO_PROGRAMA_DOACAO } from '@/lib/comunicados/catalogo';
+import {
+  LIMITE_DO_LOTE,
+  situacaoNoLote,
+  type AlvoDaPrevia,
+  type TriagemResolvida,
+} from '@/lib/comunicados/lote';
 import { db } from '@/lib/db';
+import { normalizarEmail } from '@/lib/triagens/e-paciente';
 import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
@@ -71,7 +79,7 @@ export async function listarComunicadosDoPaciente(
   return { sucesso: true, dados: await listarParaAdmin(id.data) };
 }
 
-/** Disparo manual e individual: um clique, um paciente. */
+/** Disparo manual de UM paciente. O lote (telas Pacientes e Triagens) chama esta mesma action, um por vez. */
 export async function enviarComunicadoAtualizacaoDoacao(
   pacienteId: string,
 ): Promise<Resposta<{ comunicadoId: string; emailEnviado: boolean }>> {
@@ -83,6 +91,113 @@ export async function enviarComunicadoAtualizacaoDoacao(
   const r = await enviarComunicado({ pacienteId: id.data, adminUserId: admin.userId });
   if (!r.sucesso) return { sucesso: false, erro: r.erro };
   return { sucesso: true, dados: { comunicadoId: r.comunicadoId, emailEnviado: r.emailEnviado } };
+}
+
+const idsDoLoteSchema = z.array(idSchema).min(1).max(LIMITE_DO_LOTE);
+
+/**
+ * Pré-checagem do lote: diz, para cada paciente, se o envio vai acontecer ou por que não. Só LÊ —
+ * nada é enviado aqui. O envio de cada um é feito depois, um a um, por
+ * `enviarComunicadoAtualizacaoDoacao`, que repete estas mesmas conferências no servidor.
+ */
+export async function previaDoLoteDeComunicados(
+  pacienteIds: string[],
+): Promise<Resposta<AlvoDaPrevia[]>> {
+  const admin = await adminAtual();
+  if (!admin) return { sucesso: false, erro: 'Apenas administradores podem enviar comunicados.' };
+  const ids = idsDoLoteSchema.safeParse(pacienteIds);
+  if (!ids.success) {
+    return { sucesso: false, erro: `Selecione de 1 a ${LIMITE_DO_LOTE} pacientes por envio.` };
+  }
+  const unicos = [...new Set(ids.data)];
+
+  const fichas = await db
+    .select({ id: pacientes.id, nome: users.nome, email: users.email, cpf: pacientes.cpf })
+    .from(pacientes)
+    .innerJoin(users, eq(pacientes.userId, users.id))
+    .where(
+      and(inArray(pacientes.id, unicos), isNull(pacientes.deletedAt), isNull(users.deletedAt)),
+    );
+  const ativos = await db
+    .select({ pacienteId: comunicadosAssinatura.pacienteId })
+    .from(comunicadosAssinatura)
+    .where(
+      and(
+        inArray(comunicadosAssinatura.pacienteId, unicos),
+        eq(comunicadosAssinatura.tipo, TIPO_ATUALIZACAO_PROGRAMA_DOACAO),
+        inArray(comunicadosAssinatura.status, ['pendente', 'assinado']),
+      ),
+    );
+  const comEnvioAtivo = new Set(ativos.map((a) => a.pacienteId));
+  const porId = new Map(fichas.map((f) => [f.id, f]));
+
+  return {
+    sucesso: true,
+    dados: unicos.map((pacienteId) => {
+      const f = porId.get(pacienteId);
+      return {
+        pacienteId,
+        nome: f?.nome ?? null,
+        situacao: situacaoNoLote({
+          existe: !!f,
+          email: f?.email ?? null,
+          cpf: f?.cpf ?? null,
+          temEnvioAtivo: comEnvioAtivo.has(pacienteId),
+        }),
+      };
+    }),
+  };
+}
+
+/**
+ * Triagem não tem FK para paciente: o único elo é o e-mail (mesma regra de
+ * `lib/triagens/e-paciente.ts` — ficha ATIVA, ignorando caixa e espaços). Devolve, para cada
+ * triagem escolhida, a ficha a que ela corresponde ou `null` quando não há cadastro.
+ */
+export async function resolverPacientesDasTriagens(
+  triagemIds: string[],
+): Promise<Resposta<TriagemResolvida[]>> {
+  const admin = await adminAtual();
+  if (!admin) return { sucesso: false, erro: 'Apenas administradores podem enviar comunicados.' };
+  const ids = idsDoLoteSchema.safeParse(triagemIds);
+  if (!ids.success) {
+    return { sucesso: false, erro: `Selecione de 1 a ${LIMITE_DO_LOTE} triagens por envio.` };
+  }
+
+  const linhas = await db
+    .select({ id: triagens.id, emailContato: triagens.emailContato })
+    .from(triagens)
+    .where(inArray(triagens.id, ids.data));
+  const emailDe = new Map(linhas.map((t) => [t.id, normalizarEmail(t.emailContato)]));
+  const emails = [...new Set([...emailDe.values()].filter((e): e is string => e !== null))];
+
+  const pacientePorEmail = new Map<string, string>();
+  if (emails.length > 0) {
+    const fichas = await db
+      .select({ pacienteId: pacientes.id, email: sql<string>`lower(trim(${users.email}))` })
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(
+        and(
+          isNull(pacientes.deletedAt),
+          isNull(users.deletedAt),
+          sql`lower(trim(${users.email})) IN (${sql.join(
+            emails.map((e) => sql`${e}`),
+            sql`, `,
+          )})`,
+        ),
+      );
+    for (const f of fichas)
+      if (!pacientePorEmail.has(f.email)) pacientePorEmail.set(f.email, f.pacienteId);
+  }
+
+  return {
+    sucesso: true,
+    dados: ids.data.map((triagemId) => {
+      const email = emailDe.get(triagemId) ?? null;
+      return { triagemId, pacienteId: email ? (pacientePorEmail.get(email) ?? null) : null };
+    }),
+  };
 }
 
 /** Reenvia só o e-mail de aviso (o envelope não muda). */

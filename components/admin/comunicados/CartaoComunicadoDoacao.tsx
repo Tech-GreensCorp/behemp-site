@@ -171,7 +171,8 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             {TITULO_ATUALIZACAO_PROGRAMA_DOACAO}
           </CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            Envio manual e individual, com assinatura eletrônica pelo DocuSign.
+            Envio manual, com assinatura eletrônica pelo DocuSign. Para vários pacientes de uma vez,
+            use a seleção nas telas Pacientes e Triagens.
           </p>
         </div>
         <Badge variant={rotulo.destrutivo ? 'destructive' : 'outline'} className={rotulo.classe}>
