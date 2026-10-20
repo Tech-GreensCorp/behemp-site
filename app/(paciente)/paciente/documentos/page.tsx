@@ -215,7 +215,7 @@ export default function DocumentosPacientePage() {
 
             {/* Arquivo */}
             <div className="space-y-1.5">
-              <Label htmlFor="doc-file" className="text-xs text-muted-foreground font-semibold">Arquivo (máx. 100MB) — PDF, JPG, PNG <span className="text-destructive">*</span></Label>
+              <Label htmlFor="doc-file" className="text-xs text-muted-foreground font-semibold">Arquivo (máx. 200MB) — PDF, JPG, PNG <span className="text-destructive">*</span></Label>
               <Input id="doc-file" ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="rounded-xl border-border/40 file:rounded-lg file:border-border/40" />
             </div>
 

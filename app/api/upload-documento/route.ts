@@ -64,9 +64,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (file.size > 100 * 1024 * 1024) {
+    if (file.size > 200 * 1024 * 1024) {
       return NextResponse.json(
-        { sucesso: false, erro: 'Arquivo excede 100MB' },
+        { sucesso: false, erro: 'Arquivo excede 200MB' },
         { status: 400 },
       );
     }

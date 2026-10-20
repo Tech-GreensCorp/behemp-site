@@ -224,7 +224,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
               <div><Label>Data do Documento *</Label><Input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)} /></div>
             </div>
             <div>
-              <Label>Arquivo (máx. 100MB) — PDF, JPG, PNG</Label>
+              <Label>Arquivo (máx. 200MB) — PDF, JPG, PNG</Label>
               <Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" />
             </div>
             <div className="flex justify-end gap-3 pt-2">

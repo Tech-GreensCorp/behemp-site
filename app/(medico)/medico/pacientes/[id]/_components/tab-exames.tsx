@@ -63,7 +63,18 @@ export function TabExames({ pacienteId }: TabExamesProps) {
       fd.append('dataExame', dataExame);
       fd.append('observacoes', observacoes);
       const file = fileRef.current?.files?.[0];
-      if (file) fd.append('arquivo', file);
+      if (file) {
+        const limiteMb = 200;
+        if (file.size > limiteMb * 1024 * 1024) {
+          const tamanhoMb = (file.size / (1024 * 1024)).toFixed(1).replace('.', ',');
+          toast.error(
+            `O arquivo "${file.name}" tem ${tamanhoMb} MB e o limite é ${limiteMb} MB. Comprima o PDF ou reduza a resolução da imagem e tente novamente.`,
+            { duration: 10000 },
+          );
+          return;
+        }
+        fd.append('arquivo', file);
+      }
 
       const response = await fetch('/api/upload-exame', {
         method: 'POST',
@@ -142,7 +153,7 @@ export function TabExames({ pacienteId }: TabExamesProps) {
               <div><Label>Data do Exame *</Label><Input type="date" value={dataExame} onChange={e => setDataExame(e.target.value)} /></div>
             </div>
             <div><Label>Observações</Label><Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} rows={2} /></div>
-            <div><Label>Arquivo do Exame (máx. 100MB) — PDF, JPG, PNG</Label><Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" /></div>
+            <div><Label>Arquivo do Exame (máx. 200MB) — PDF, JPG, PNG</Label><Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" /></div>
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
               <Button onClick={handleSalvar} disabled={salvando || !nomeExame || !dataExame} className="gap-2 rounded-xl">

@@ -55,8 +55,11 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: '100mb',
+      bodySizeLimit: '200mb',
     },
+    // O proxy/middleware (Clerk) bufferiza o corpo da requisição e, por padrão, corta em 10MB:
+    // `formData()` falha e a rota de upload responde 500. Alinhado ao limite de 200MB dos uploads.
+    proxyClientMaxBodySize: '200mb',
   },
 
   typescript: {
