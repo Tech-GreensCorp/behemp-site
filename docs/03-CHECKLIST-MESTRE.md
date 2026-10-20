@@ -915,6 +915,38 @@ A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo 
   ocupava. Quando chegar uma carta com os campos em branco, **remover essa tabela** — o guarda avisa.
 - Quadro do cabeçalho com a 2ª coluna mais larga (o e-mail não quebra no meio).
 
+### ✅ Feito em 20/10/2026 (local, sem commit) — envio em lote do comunicado, nas telas de Pacientes e Triagens
+
+Pedido da Dryelle. 🔴 **Muda a regra do pedido original ("um paciente por vez", acima)** — confirmado por
+ela em 20/10/2026: o lote é permitido; o envio individual no cartão continua.
+
+- **Decisões dela:** (1) lote permitido; (2) **25 pacientes por disparo** (`LIMITE_DO_LOTE`, só em
+  `lib/comunicados/lote.ts`, e conferido **também no servidor**); (3) na triagem, quem não tem cadastro de
+  paciente é **listado e ignorado** ("Sem cadastro de paciente"). Triagem não tem FK para paciente: o elo é o
+  e-mail (`lib/triagens/e-paciente.ts`), casado no servidor por `resolverPacientesDasTriagens`.
+- **Desenho (opção B de três):** o **navegador** envia um paciente por vez pela action **individual**
+  (`enviarComunicadoAtualizacaoDoacao`), com pré-checagem, barra de progresso e resultado por linha. Rejeitadas:
+  (A) uma action em laço — a request longa estoura o timeout do proxy e perde o lote ao fechar; (C) fila no
+  servidor — tabela, migration e cron de 5 min do GitHub, desproporcional para lotes de 25. O lote **não é
+  caminho novo de envio**: mesma autorização, mesma trava de duplicidade no banco, mesma auditoria por envelope.
+  Cada envio é um envelope no DocuSign (limite de 3.000 chamadas/hora e 500 por 30 s, segundo o blog do
+  DocuSign; duas fontes de terceiros dizem 1.000/h, não confirmado) — por isso é sequencial.
+- **Código:** `lib/comunicados/lote.ts` (regra pura), `app/_actions/comunicados.ts` (+`previaDoLoteDeComunicados`,
+  +`resolverPacientesDasTriagens`, só leitura, só admin), `components/admin/comunicados/DialogoEnvioEmLote.tsx`,
+  seleção nas duas telas, e `DataRow` ganhou o slot opcional `leading`.
+- **Testes:** guarda `o-lote-do-comunicado-passa-pelo-envio-individual` (**16**, provados por 10 sabotagens —
+  uma sobreviveu e achou um defeito do guarda: `toContain('<DialogoEnvioEmLote')` casava `<DialogoEnvioEmLoteX`);
+  integração `o-lote-do-comunicado-so-envia-a-quem-pode` (**10**, Postgres real, 3 sabotagens de SQL — uma
+  sobreviveu porque a ficha de teste já tinha e-mail normalizado). `tsc` 0 erros; lint sem piora.
+- **Ficou de fora:** sem registro de auditoria **do lote** como evento (cada envelope audita o seu, com quem e
+  quando); sem "enviar a todos os filtrados" (de propósito, pelo teto); a tela **não foi vista rodando**
+  (depende de login no Clerk, sem chave local).
+- 🔴 **Achados catalogados, não corrigidos:** (a) a integração `o-comunicado-so-assina-quem-o-docusign-confirma`
+  tem **2 casos vermelhos desde o PR #164**: a rota `arquivo` passou a ler `request.nextUrl` e o teste a chama
+  com `Request` simples (vira 502). Não afeta produção. (b) o mock dessa integração não tinha
+  `LINK_DOS_COMUNICADOS` (regressão do botão "Copiar link"); corrigido junto. A integração **não roda no
+  portão de CI** — por isso (a) passou despercebido.
+
 ### ✅ Feito em 19/10/2026 (local, sem commit) — a carta vem do .docx e o admin reinicia o fluxo
 
 Dois ajustes pedidos pela Dryelle no comunicado acima (branch `feat/comunicado-assinatura-docusign`).
