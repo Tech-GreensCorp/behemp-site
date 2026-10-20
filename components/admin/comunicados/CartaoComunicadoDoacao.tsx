@@ -191,23 +191,23 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
         )}
 
         {atual && (
-          <div className="rounded-2xl border border-border/40 bg-stone-50/60 dark:bg-stone-900/30 p-3.5 space-y-2.5">
+          <div className="border-border/40 space-y-2.5 rounded-2xl border bg-stone-50/60 p-3.5 dark:bg-stone-900/30">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+              <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                 Documento anexado para assinatura
               </span>
-              <Badge variant="outline" className="border-[#C08E3A]/40 text-[#C08E3A] text-xs">
+              <Badge variant="outline" className="border-[#C08E3A]/40 text-xs text-[#C08E3A]">
                 PDF preenchido
               </Badge>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/40 bg-background p-3 shadow-xs">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="border-border/40 bg-background flex flex-col justify-between gap-3 rounded-xl border p-3 shadow-xs sm:flex-row sm:items-center">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#C08E3A]/10 text-[#C08E3A]">
                   <FileText size={20} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-heading text-sm font-semibold text-foreground truncate">
+                  <p className="font-heading text-foreground truncate text-sm font-semibold">
                     {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} — {atual.nomeDestino || 'Paciente'}.pdf
                   </p>
                   <p className="text-muted-foreground text-xs">
@@ -216,7 +216,7 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -235,7 +235,7 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 rounded-xl text-xs bg-[#C08E3A]/10 hover:bg-[#C08E3A]/20 text-[#A87928] dark:text-[#E0B25E] border-[#C08E3A]/30"
+                  className="gap-1.5 rounded-xl border-[#C08E3A]/30 bg-[#C08E3A]/10 text-xs text-[#A87928] hover:bg-[#C08E3A]/20 dark:text-[#E0B25E]"
                   render={
                     <a
                       href={`/api/comunicados/${atual.id}/documento?download=1`}
@@ -250,13 +250,13 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             </div>
 
             {atual.status === 'assinado' && atual.temArquivoAssinado && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="flex flex-col justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-3 sm:flex-row sm:items-center dark:bg-emerald-950/20">
+                <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                     <FileCheck size={20} />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-heading text-sm font-semibold text-foreground truncate">
+                    <p className="font-heading text-foreground truncate text-sm font-semibold">
                       {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} — Assinado.pdf
                     </p>
                     <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
@@ -264,11 +264,11 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 rounded-xl text-xs border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    className="gap-1.5 rounded-xl border-emerald-500/30 text-xs text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
                     render={
                       <a
                         href={`/api/comunicados/${atual.id}/arquivo`}
@@ -283,13 +283,8 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 rounded-xl text-xs bg-emerald-600 text-white hover:bg-emerald-700 border-0"
-                    render={
-                      <a
-                        href={`/api/comunicados/${atual.id}/arquivo?download=1`}
-                        download
-                      />
-                    }
+                    className="gap-1.5 rounded-xl border-0 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+                    render={<a href={`/api/comunicados/${atual.id}/arquivo?download=1`} download />}
                   >
                     <Download size={13} />
                     Baixar assinado
