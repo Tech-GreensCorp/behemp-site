@@ -7,8 +7,9 @@
  * chave ou a rede.
  *
  * O que este guarda impede de voltar:
- *   · o Brevo recusar o remetente docs@ e o paciente ficar sem e-mail — há UMA nova tentativa pelo
- *     remetente que o produto já usa, com docs@ em `replyTo`
+ *   · o fluxo enviar por `docs@be4hope.org` como REMETENTE — o remetente é o padrão do produto
+ *     (`BREVO_FROM_EMAIL`), o mesmo que já entrega os outros e-mails; `docs@` só recebe as respostas
+ *     e a notificação de conclusão
  *   · a falha ser engolida sem o motivo (HTTP, código e mensagem do Brevo) — ele vai ao log e ao
  *     cartão do admin, sem dado pessoal
  *   · o aviso sair sem o botão para o site, sem o caminho "menu Documentos → Abrir e assinar",
@@ -46,6 +47,7 @@ import {
   descreverErroDoBrevo,
   enviarEmailConfirmacaoPaciente,
   enviarEmailDeEnvio,
+  enviarEmailNotificacaoDocs,
   montarEmailDeEnvio,
 } from '@/lib/email/comunicados';
 
@@ -68,57 +70,71 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
-describe('o envio chega ao paciente mesmo se o Brevo recusar o docs@', () => {
-  it('caminho feliz: sai por docs@be4hope.org, para o paciente, com docs@ no replyTo', async () => {
+describe('o remetente é o PADRÃO do produto, o que já entrega em produção', () => {
+  it('sai pelo BREVO_FROM_EMAIL, nunca por docs@, com docs@ só como destino das respostas', async () => {
     await enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO });
     expect(brevo.chamadas).toHaveLength(1);
-    expect(brevo.chamadas[0].sender.email).toBe('docs@be4hope.org');
-    expect(brevo.chamadas[0].to).toEqual([{ email: PACIENTE.email, name: PACIENTE.nome }]);
+    expect(brevo.chamadas[0].sender).toEqual({ email: 'tech@be4hope.org', name: 'Be4Hope' });
     expect(brevo.chamadas[0].replyTo?.email).toBe('docs@be4hope.org');
+    expect(brevo.chamadas[0].to).toEqual([{ email: PACIENTE.email, name: PACIENTE.nome }]);
   });
 
-  it('o Brevo recusa o remetente docs@: tenta de novo pelo remetente do produto e o e-mail CHEGA', async () => {
+  it('sem variáveis de ambiente usa o mesmo padrão de lib/email/brevo.ts (tech@be4hope.org)', async () => {
+    delete process.env.BREVO_FROM_EMAIL;
+    delete process.env.BREVO_FROM_NAME;
+    await enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO });
+    expect(brevo.chamadas[0].sender).toEqual({ email: 'tech@be4hope.org', name: 'Be4Hope' });
+  });
+
+  it('o remetente configurado em produção vale, e é o MESMO das outras mensagens do fluxo', async () => {
+    process.env.BREVO_FROM_EMAIL = 'contato@be4hope.org';
+    process.env.BREVO_FROM_NAME = 'Be4Hope Teste';
+    await enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO });
+    await enviarEmailConfirmacaoPaciente({
+      para: PACIENTE,
+      titulo: TITULO,
+      assinadoEmTexto: '19 de outubro de 2026',
+    });
+    for (const c of brevo.chamadas) {
+      expect(c.sender).toEqual({ email: 'contato@be4hope.org', name: 'Be4Hope Teste' });
+    }
+  });
+
+  it('a notificação de conclusão chega a docs@ (destinatário), enviada pelo remetente padrão', async () => {
+    await enviarEmailNotificacaoDocs({
+      pacienteNome: 'Maria',
+      pacienteEmail: PACIENTE.email,
+      pacienteId: 'p1',
+      titulo: TITULO,
+      assinadoEmTexto: '19 de outubro de 2026',
+      envelopeId: 'env-1',
+      pdfAssinado: Buffer.from('%PDF'),
+      nomeDoAnexo: 'x.pdf',
+    });
+    expect(brevo.chamadas[0].to[0].email).toBe('docs@be4hope.org');
+    expect(brevo.chamadas[0].sender.email).toBe('tech@be4hope.org');
+  });
+
+  it('o código não usa docs@ como remetente em lugar nenhum', () => {
+    const src = readFileSync(join(RAIZ, 'lib/email/comunicados.ts'), 'utf8');
+    const semComentarios = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // sender: sempre a função sender(), que lê o ambiente; nunca o REMETENTE_DOCUMENTOS
+    expect(semComentarios).not.toMatch(/sender:\s*\{?\s*(name|email)?[^}]*REMETENTE_DOCUMENTOS/);
+    expect(semComentarios).toMatch(/const sender = \(\) => \(\{[\s\S]*?BREVO_FROM_EMAIL/);
+    expect(semComentarios).toMatch(/sender: sender\(\)/);
+  });
+
+  it('o Brevo recusa: LANÇA dizendo o motivo, sem o e-mail do paciente, e sem repetir o envio', async () => {
     brevo.falhasAntesDeFuncionar = 1;
-    brevo.erro = ERRO_DO_REMETENTE;
-    await expect(enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO })).resolves.toBeUndefined();
-    expect(brevo.chamadas).toHaveLength(2);
-    expect(brevo.chamadas[1].sender.email).toBe('tech@be4hope.org');
-    expect(brevo.chamadas[1].replyTo?.email).toBe('docs@be4hope.org'); // a resposta continua indo para docs@
-    expect(brevo.chamadas[1].to[0].email).toBe(PACIENTE.email);
-  });
-
-  it('as duas tentativas recusadas: LANÇA dizendo o motivo de cada uma, sem o e-mail do paciente', async () => {
-    brevo.falhasAntesDeFuncionar = 2;
     brevo.erro = ERRO_DO_REMETENTE;
     const erro = await enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO }).catch(
       (e: Error) => e,
     );
     expect(erro).toBeInstanceOf(Error);
     const msg = (erro as Error).message;
-    expect(msg).toContain('docs@be4hope.org');
-    expect(msg).toContain('tech@be4hope.org');
     expect(msg).toContain('HTTP 400');
     expect(msg).toContain('valid sender email required');
     expect(msg).not.toContain(PACIENTE.email);
-    expect(brevo.chamadas).toHaveLength(2); // uma nova tentativa, não um laço
-  });
-
-  it('sem remetente alternativo configurado, falha de uma vez com o motivo', async () => {
-    delete process.env.BREVO_FROM_EMAIL;
-    brevo.falhasAntesDeFuncionar = 1;
-    brevo.erro = ERRO_DO_REMETENTE;
-    const erro = await enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO }).catch(
-      (e: Error) => e,
-    );
-    expect((erro as Error).message).toContain('valid sender email required');
-    expect(brevo.chamadas).toHaveLength(1);
-  });
-
-  it('se o alternativo for o próprio docs@, não repete a mesma tentativa', async () => {
-    process.env.BREVO_FROM_EMAIL = 'docs@be4hope.org';
-    brevo.falhasAntesDeFuncionar = 1;
-    brevo.erro = ERRO_DO_REMETENTE;
-    await expect(enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO })).rejects.toThrow();
     expect(brevo.chamadas).toHaveLength(1);
   });
 
@@ -127,17 +143,6 @@ describe('o envio chega ao paciente mesmo se o Brevo recusar o docs@', () => {
     await expect(enviarEmailDeEnvio({ para: PACIENTE, titulo: TITULO })).rejects.toThrow(
       /BREVO_API_KEY/,
     );
-  });
-
-  it('a confirmação ao paciente tem o mesmo caminho alternativo', async () => {
-    brevo.falhasAntesDeFuncionar = 1;
-    brevo.erro = ERRO_DO_REMETENTE;
-    await enviarEmailConfirmacaoPaciente({
-      para: PACIENTE,
-      titulo: TITULO,
-      assinadoEmTexto: '19 de outubro de 2026',
-    });
-    expect(brevo.chamadas).toHaveLength(2);
   });
 });
 
