@@ -130,14 +130,12 @@ beforeEach(async () => {
     .values({ clerkId: 'ck_adm', email: 'adm@teste.invalid', nome: 'Admin Teste', role: 'admin' })
     .returning({ id: schema.users.id });
   adminId = adm.id;
-  await db
-    .insert(schema.users)
-    .values({
-      clerkId: 'ck_med',
-      email: 'med@teste.invalid',
-      nome: 'Médico Teste',
-      role: 'medico',
-    });
+  await db.insert(schema.users).values({
+    clerkId: 'ck_med',
+    email: 'med@teste.invalid',
+    nome: 'Médico Teste',
+    role: 'medico',
+  });
   como('ck_adm', 'admin');
   docusign.envelopeSeq = 0;
   docusign.criar.mockReset().mockImplementation(async () => ({

@@ -931,8 +931,7 @@ ela em 20/10/2026: o lote é permitido; o envio individual no cartão continua.
   caminho novo de envio**: mesma autorização, mesma trava de duplicidade no banco, mesma auditoria por envelope.
   Cada envio é um envelope no DocuSign (limite de 3.000 chamadas/hora e 500 por 30 s, segundo o blog do
   DocuSign; duas fontes de terceiros dizem 1.000/h, não confirmado) — por isso é sequencial.
-- **Código:** `lib/comunicados/lote.ts` (regra pura), `app/_actions/comunicados.ts` (+`previaDoLoteDeComunicados`,
-  +`resolverPacientesDasTriagens`, só leitura, só admin), `components/admin/comunicados/DialogoEnvioEmLote.tsx`,
+- **Código:** `lib/comunicados/lote.ts` (regra pura), `app/_actions/comunicados.ts` (+`previaDoLoteDeComunicados`, +`resolverPacientesDasTriagens`, só leitura, só admin), `components/admin/comunicados/DialogoEnvioEmLote.tsx`,
   seleção nas duas telas, e `DataRow` ganhou o slot opcional `leading`.
 - **Testes:** guarda `o-lote-do-comunicado-passa-pelo-envio-individual` (**16**, provados por 10 sabotagens —
   uma sobreviveu e achou um defeito do guarda: `toContain('<DialogoEnvioEmLote')` casava `<DialogoEnvioEmLoteX`);
