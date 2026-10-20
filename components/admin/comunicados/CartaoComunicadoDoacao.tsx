@@ -326,9 +326,9 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
               Enviar &quot;{TITULO_ATUALIZACAO_PROGRAMA_DOACAO}&quot;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              O paciente receberá um e-mail de docs@be4hope.org e o comunicado passará a aparecer em
-              Documentos, pendente de assinatura. O envio é individual e fica registrado com o seu
-              nome.
+              O paciente receberá um e-mail de aviso no endereço cadastrado e o comunicado passará a
+              aparecer em Documentos, pendente de assinatura. O envio é individual e fica registrado
+              com o seu nome.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -892,6 +892,14 @@ admin acompanha na aba Documentos do paciente.
   endereço por extenso e versão em texto. Guarda `o-email-do-comunicado-chega-ou-diz-por-que` (23).
   **Pendência no Brevo:** cadastrar `docs@be4hope.org` como remetente; enquanto isso, o aviso sai por `tech@`.
 
+- 🔴 **Retificação (mesmo dia): o remetente voltou a ser o PADRÃO do produto.** A nova tentativa por remetente
+  alternativo não bastou — o aviso seguiu sem chegar em produção (e o Brevo pode aceitar a chamada e bloquear
+  o envio depois, caso em que nenhuma tentativa "falha"). Agora **todas as mensagens do fluxo saem por
+  `BREVO_FROM_EMAIL`/`BREVO_FROM_NAME`**, o mesmo remetente de `lib/email/brevo.ts`, que já entrega. `docs@be4hope.org`
+  ficou só como `replyTo` (para onde o paciente responde) e como destinatário da notificação de conclusão. O
+  fallback foi removido; a mensagem de erro do Brevo no cartão do admin foi mantida. Para `docs@` voltar a ser
+  remetente: cadastrá-lo antes em Senders, Domains & Dedicated IPs do Brevo.
+
 ### ✅ Feito em 19/10/2026 (local, sem commit) — carta atualizada ("VF atualizada teste")
 
 A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo a parágrafo (o resto é igual):

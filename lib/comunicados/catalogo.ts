@@ -12,9 +12,10 @@ export const TITULO_ATUALIZACAO_PROGRAMA_DOACAO = 'Atualização do Programa de 
 export const NUMERO_DO_COMUNICADO = '001/2026';
 
 /**
- * Remetente das mensagens deste fluxo. É uma constante e não variável de ambiente de propósito:
- * o endereço faz parte do contrato do fluxo (o admin recebe a notificação NELE) e o remetente
- * precisa estar autenticado no Brevo — ver o relatório de entrega.
+ * Caixa de documentos da Behemp: para onde o paciente RESPONDE (`replyTo`) e onde chega a
+ * notificação de assinatura concluída. NÃO é o remetente — o remetente é o padrão do produto
+ * (`BREVO_FROM_EMAIL`), porque `docs@` não estava cadastrado como remetente no Brevo e o aviso
+ * não chegou ao paciente (19/10/2026). O nome do export foi mantido para não quebrar quem o importa.
  */
 export const REMETENTE_DOCUMENTOS = {
   name: 'Be4Hope Documentos',

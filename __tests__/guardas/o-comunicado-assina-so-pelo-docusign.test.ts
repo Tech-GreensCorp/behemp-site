@@ -89,18 +89,12 @@ describe('o status vem do DocuSign, nunca do cliente', () => {
 describe('e-mails do fluxo', () => {
   const html = (s: { html: string }) => s.html;
 
-  it('o remetente é docs@be4hope.org', () => {
+  it('docs@be4hope.org é a caixa de respostas e o destino da notificação, não o remetente', () => {
     expect(REMETENTE_DOCUMENTOS.email).toBe('docs@be4hope.org');
     const src = ler('lib/email/comunicados.ts');
     expect(src).toContain('REMETENTE_DOCUMENTOS');
-    expect(src).not.toContain('tech@be4hope.org');
-    // BREVO_FROM_EMAIL só existe como REMETENTE ALTERNATIVO, quando o Brevo recusa o docs@ (ver o guarda do e-mail)
-    const semComentariosSrc = semComentarios(src);
-    expect(semComentariosSrc.match(/BREVO_FROM_EMAIL/g)?.length ?? 0).toBeLessThanOrEqual(1);
-    expect(semComentariosSrc.indexOf('BREVO_FROM_EMAIL')).toBeGreaterThan(
-      semComentariosSrc.indexOf('const remetenteAlternativo'),
-    );
-    expect(semComentariosSrc).toMatch(/sender: sender\(\)/);
+    expect(semComentarios(src)).toMatch(/sender: sender\(\)/);
+    expect(semComentarios(src)).toMatch(/BREVO_FROM_EMAIL/);
   });
 
   it('só a notificação a docs@ leva anexo — e o paciente recebe link, não arquivo', () => {

@@ -1,8 +1,9 @@
 /**
  * E-mails do fluxo "comunicado para assinatura" (Atualização do Programa de Doação).
  *
- * Mesmo serviço (Brevo) e mesma identidade visual dos outros e-mails do produto; o remetente é
- * `docs@be4hope.org` (`REMETENTE_DOCUMENTOS`). Três mensagens:
+ * Mesmo serviço (Brevo), mesmo remetente e mesma identidade visual dos outros e-mails do produto
+ * (`BREVO_FROM_EMAIL`); `docs@be4hope.org` é o lugar onde o paciente responde e onde chega a
+ * notificação de conclusão. Três mensagens:
  *   1. ao paciente, quando o admin envia — só o aviso e o link para o sistema;
  *   2. ao paciente, quando o DocuSign confirma a assinatura — link seguro, sem anexo;
  *   3. a docs@, quando o paciente conclui — com o PDF assinado em anexo.
@@ -218,22 +219,30 @@ function cliente() {
   return new BrevoClient({ apiKey });
 }
 
-const sender = () => ({ name: REMETENTE_DOCUMENTOS.name, email: REMETENTE_DOCUMENTOS.email });
-
 /**
- * O remetente que o resto do produto já usa em produção (`BREVO_FROM_EMAIL`), ou `null` se for o
- * próprio docs@. Só entra quando o Brevo recusa o docs@.
+ * 🔴 O REMETENTE É O PADRÃO DO PRODUTO, o mesmo de `lib/email/brevo.ts`, `notificacoes.ts` e dos
+ * alertas: `BREVO_FROM_EMAIL` / `BREVO_FROM_NAME`. Esses e-mails já chegam em produção.
+ *
+ * A primeira versão deste fluxo enviava por `docs@be4hope.org`, endereço que o Brevo não
+ * reconhecia como remetente — e o aviso ao paciente não chegou (19/10/2026). `docs@` continua
+ * existindo, mas só como o lugar para onde o paciente RESPONDE (`replyTo`) e onde chega a
+ * notificação de assinatura concluída (destinatário). Virar remetente de novo exige antes
+ * cadastrá-lo como remetente no Brevo.
  */
-const remetenteAlternativo = () => {
-  const email = process.env.BREVO_FROM_EMAIL?.trim();
-  if (!email || email.toLowerCase() === REMETENTE_DOCUMENTOS.email) return null;
-  return { name: process.env.BREVO_FROM_NAME?.trim() || 'Be4Hope', email };
-};
+const sender = () => ({
+  name: process.env.BREVO_FROM_NAME?.trim() || 'Be4Hope',
+  email: process.env.BREVO_FROM_EMAIL?.trim() || 'tech@be4hope.org',
+});
+
+/** Para onde o paciente responde. */
+const respostasPara = () => ({
+  name: REMETENTE_DOCUMENTOS.name,
+  email: REMETENTE_DOCUMENTOS.email,
+});
 
 /**
  * Diz, em uma linha e SEM dado pessoal, por que o Brevo recusou — é o que o admin lê no cartão e o
- * que fica no log. O corpo de erro do Brevo traz `code` e `message` da API (ex.: "valid sender
- * email required"), nunca o destinatário.
+ * que fica no log. O corpo de erro do Brevo traz `code` e `message` da API, nunca o destinatário.
  */
 export function descreverErroDoBrevo(erro: unknown): string {
   const e = erro as {
@@ -254,39 +263,14 @@ type CorpoDoEmail = Omit<
   'sender'
 >;
 
-/**
- * Envia por docs@be4hope.org; se o Brevo recusar (o motivo mais provável é o endereço ainda não
- * estar cadastrado como remetente), tenta UMA vez pelo remetente que o produto já usa, com docs@
- * em `replyTo` — a resposta do paciente continua indo para docs@. LANÇA com o motivo das duas
- * recusas se nenhuma passar.
- */
+/** Envia pelo remetente padrão. LANÇA com o motivo da recusa (sem dado pessoal) se o Brevo recusar. */
 async function enviar(corpo: CorpoDoEmail): Promise<void> {
-  const brevo = cliente();
   try {
-    await brevo.transactionalEmails.sendTransacEmail({ ...corpo, sender: sender() });
-    return;
-  } catch (primeiro) {
-    const motivo1 = descreverErroDoBrevo(primeiro);
-    const alt = remetenteAlternativo();
-    console.error(
-      `[comunicados] Brevo recusou o remetente ${REMETENTE_DOCUMENTOS.email}: ${motivo1}`,
-    );
-    if (!alt)
-      throw new Error(`Brevo recusou o envio por ${REMETENTE_DOCUMENTOS.email} (${motivo1})`);
-    try {
-      await brevo.transactionalEmails.sendTransacEmail({
-        ...corpo,
-        sender: alt,
-        replyTo: sender(),
-      });
-      console.warn(
-        `[comunicados] e-mail enviado pelo remetente alternativo ${alt.email}. Cadastre ${REMETENTE_DOCUMENTOS.email} como remetente no Brevo.`,
-      );
-    } catch (segundo) {
-      throw new Error(
-        `Brevo recusou o envio. Por ${REMETENTE_DOCUMENTOS.email}: ${motivo1}. Por ${alt.email}: ${descreverErroDoBrevo(segundo)}`,
-      );
-    }
+    await cliente().transactionalEmails.sendTransacEmail({ ...corpo, sender: sender() });
+  } catch (erro) {
+    const motivo = descreverErroDoBrevo(erro);
+    console.error(`[comunicados] Brevo recusou o envio: ${motivo}`);
+    throw new Error(`Brevo recusou o envio (${motivo})`);
   }
 }
 
@@ -302,7 +286,7 @@ export async function enviarEmailDeEnvio(dados: {
     subject: assunto,
     htmlContent: html,
     textContent: texto,
-    replyTo: sender(),
+    replyTo: respostasPara(),
     to: [{ email: dados.para.email, name: dados.para.nome }],
   });
 }
@@ -320,7 +304,7 @@ export async function enviarEmailConfirmacaoPaciente(dados: {
   await enviar({
     subject: assunto,
     htmlContent: html,
-    replyTo: sender(),
+    replyTo: respostasPara(),
     to: [{ email: dados.para.email, name: dados.para.nome }],
   });
 }
