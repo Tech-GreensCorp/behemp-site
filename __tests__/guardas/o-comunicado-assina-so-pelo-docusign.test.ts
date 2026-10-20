@@ -187,6 +187,23 @@ describe('escopo e vazamento', () => {
     }
   });
 
+  it('o admin copia o MESMO link do e-mail (o do site) e nunca gera link do DocuSign para o paciente', () => {
+    const lib = semComentarios(ler('lib/comunicados/assinatura.ts'));
+    const i = lib.indexOf('export async function listarParaAdmin');
+    expect(lib.slice(i)).toContain('linkDeAssinatura: LINK_DOS_COMUNICADOS()');
+
+    // O link direto do DocuSign é de uso único e assina em nome do paciente: só o PRÓPRIO paciente,
+    // logado, o pede (`iniciarAssinaturaDoComunicado`). Nem a lista do admin nem o cartão o geram.
+    const acoes = semComentarios(ler('app/_actions/comunicados.ts'));
+    const j = acoes.indexOf('export async function listarComunicadosDoPaciente');
+    const k = acoes.indexOf('export async function enviarComunicadoAtualizacaoDoacao');
+    expect(acoes.slice(j, k)).not.toContain('gerarLinkDeAssinatura');
+    const cartao = semComentarios(ler('components/admin/comunicados/CartaoComunicadoDoacao.tsx'));
+    expect(cartao).toContain('linkDeAssinatura');
+    expect(cartao).not.toContain('iniciarAssinaturaDoComunicado');
+    expect(cartao).not.toContain('gerarLinkDeAssinatura');
+  });
+
   it('o PDF assinado é entregue pela rota autenticada, em store privado, e nunca por URL crua', () => {
     const rota = semComentarios(ler('app/api/comunicados/[id]/arquivo/route.ts'));
     expect(rota).toContain('lerDocumentoPrivado(');

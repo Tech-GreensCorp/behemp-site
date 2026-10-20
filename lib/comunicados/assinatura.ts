@@ -38,6 +38,7 @@ import {
   enviarEmailConfirmacaoPaciente,
   enviarEmailDeEnvio,
   enviarEmailNotificacaoDocs,
+  LINK_DOS_COMUNICADOS,
 } from '@/lib/email/comunicados';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { gerarPdfCartaDoacao } from '@/lib/comunicados/carta-doacao-pdf';
@@ -655,6 +656,12 @@ export interface ComunicadoParaAdmin {
   erro: string | null;
   emailEnvioErro: string | null;
   emailEnviado: boolean;
+  /**
+   * O MESMO link do e-mail de aviso (página Documentos do site, onde o paciente logado abre o
+   * DocuSign). Fixo e sem credencial: quem o abre ainda precisa entrar na própria conta. NUNCA o
+   * link direto do DocuSign — esse é de uso único, vale minutos e assina em nome do paciente.
+   */
+  linkDeAssinatura: string;
   /** Preenchidos quando o admin reiniciou o fluxo (status cancelado). */
   reiniciadoEm: Date | null;
   reiniciadoPorNome: string | null;
@@ -693,6 +700,7 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
     erro: c.erro,
     emailEnvioErro: c.emailEnvioErro,
     emailEnviado: !!c.emailEnvioEnviadoEm,
+    linkDeAssinatura: LINK_DOS_COMUNICADOS(),
     reiniciadoEm: c.canceladoEm,
     reiniciadoPorNome,
     motivoDoReinicio: c.motivoCancelamento,
