@@ -87,6 +87,8 @@ vi.mock('@/lib/email/comunicados', () => ({
     (emails.confirmacao as (...x: unknown[]) => unknown)(...a),
   enviarEmailNotificacaoDocs: (...a: unknown[]) =>
     (emails.docs as (...x: unknown[]) => unknown)(...a),
+  // `listarParaAdmin` o importa para o link que o admin copia no cartão.
+  LINK_DOS_COMUNICADOS: () => 'https://exemplo.invalid/paciente/documentos#comunicados',
 }));
 
 const loja = { guardados: [] as string[], put: vi.fn() };
