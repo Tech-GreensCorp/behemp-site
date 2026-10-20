@@ -56,9 +56,12 @@ export async function POST(request: Request) {
 
     const file = formData.get('arquivo') as File | null;
     if (file && file.size > 0) {
-      if (file.size > 100 * 1024 * 1024) {
+      if (file.size > 200 * 1024 * 1024) {
         return NextResponse.json(
-          { sucesso: false, erro: 'Arquivo excede 100MB' },
+          {
+            sucesso: false,
+            erro: `O arquivo tem ${(file.size / (1024 * 1024)).toFixed(1)} MB e o limite é 200 MB. Comprima o PDF ou reduza a imagem e tente novamente.`,
+          },
           { status: 400 },
         );
       }

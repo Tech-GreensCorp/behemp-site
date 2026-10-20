@@ -102,8 +102,8 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     if (!file || file.size === 0) {
       return { sucesso: false, erro: 'Selecione um arquivo.' };
     }
-    if (file.size > 100 * 1024 * 1024) {
-      return { sucesso: false, erro: 'Arquivo excede 100MB.' };
+    if (file.size > 200 * 1024 * 1024) {
+      return { sucesso: false, erro: 'Arquivo excede 200MB.' };
     }
     const tiposPermitidos = ['image/jpeg', 'image/png', 'application/pdf'];
     if (!tiposPermitidos.includes(file.type)) {
