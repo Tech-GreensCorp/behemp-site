@@ -8,6 +8,7 @@ import {
   FileCheck,
   FileSignature,
   FileText,
+  Link2,
   Loader2,
   RefreshCw,
   Mail,
@@ -142,6 +143,16 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
     await carregar();
   }
 
+  /** Copia o mesmo link do e-mail de aviso, para o admin mandar ao paciente por outro canal. */
+  async function copiarLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Link de assinatura copiado.');
+    } catch {
+      toast.error('Não foi possível copiar. Selecione e copie o endereço manualmente.');
+    }
+  }
+
   async function reenviarEmail(id: string) {
     setOcupado(`email-${id}`);
     const res = await reenviarEmailDoComunicado(id);
@@ -246,6 +257,17 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                   <Download size={13} />
                   Baixar documento
                 </Button>
+                {atual.status === 'pendente' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 rounded-xl text-xs"
+                    onClick={() => copiarLink(atual.linkDeAssinatura)}
+                  >
+                    <Link2 size={13} />
+                    Copiar link de assinatura
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -332,6 +354,17 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             >
               <Download size={14} />
               Baixar documento
+            </Button>
+          )}
+          {atual?.status === 'pendente' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 rounded-xl"
+              onClick={() => copiarLink(atual.linkDeAssinatura)}
+            >
+              <Link2 size={14} />
+              Copiar link de assinatura
             </Button>
           )}
           {atual?.status === 'pendente' && (
