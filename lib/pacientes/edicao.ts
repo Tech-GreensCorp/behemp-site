@@ -34,6 +34,15 @@ export const statusDaEdicaoSchema = z.enum(STATUS_DO_PACIENTE).or(z.literal(''))
 const vazio = (v: unknown): v is string => typeof v === 'string' && v.trim() === '';
 
 /**
+ * Na CRIAÇÃO o formulário também manda `''` para campo sem valor (`dataNascimento`, `dataAssociacao`, …).
+ * Coluna `date` recusa `''`; coluna de texto ficaria com `''` em vez de NULL. Tira do objeto todo campo
+ * vazio: no `INSERT`, campo ausente vira o padrão da coluna (NULL).
+ */
+export function semCamposVazios<T extends Record<string, unknown>>(dados: T): T {
+  return Object.fromEntries(Object.entries(dados).filter(([, v]) => !vazio(v))) as T;
+}
+
+/**
  * O que vai no `UPDATE`. Campo ausente (`undefined`) não é tocado; `''` vira NULL; o resto passa
  * como veio. `status` vazio nunca entra.
  */

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  semCamposVazios,
   statusDaEdicaoSchema,
   tratamentoDaEdicaoSchema,
   valoresParaGravar,
@@ -91,5 +92,31 @@ describe('a action não grava o formulário cru', () => {
     // o `status` da edição não pode voltar ao enum puro
     const schema = codigo.slice(codigo.indexOf('const atualizarPacienteSchema'));
     expect(schema.slice(0, schema.indexOf('});'))).not.toContain("z.enum(['aguardando_consulta'");
+  });
+});
+
+describe('o CADASTRO de paciente também recebe "" nos campos em branco', () => {
+  it('semCamposVazios tira "" e só espaços, e mantém o resto (inclusive 0 e false)', () => {
+    expect(
+      semCamposVazios({
+        nome: 'A',
+        dataNascimento: '',
+        rg: '   ',
+        cidade: 'Recife',
+        n: 0,
+        b: false,
+      }),
+    ).toEqual({ nome: 'A', cidade: 'Recife', n: 0, b: false });
+  });
+
+  const codigo = semComentarios(ler('app/_actions/pacientes.ts'));
+  const i = codigo.indexOf('export async function criarPaciente(');
+  const corpo = codigo.slice(i, codigo.indexOf('\nexport async function ', i + 1));
+
+  it('criarPaciente grava o resultado de semCamposVazios, nunca o formulário cru', () => {
+    expect(corpo).toContain('semCamposVazios(parsed.data)');
+    // depois da limpeza, nada lê parsed.data: ele traz o "" de dataNascimento/dataAssociacao
+    const depois = corpo.slice(corpo.indexOf('semCamposVazios(parsed.data)') + 30);
+    expect(depois).not.toContain('parsed.data');
   });
 });
