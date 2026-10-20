@@ -103,10 +103,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!ehDoStorePrivado(c.urlPdfAssinado)) return NAO_ENCONTRADO();
     const privado = await lerDocumentoPrivado(c.urlPdfAssinado);
     if (!privado) return NextResponse.json({ erro: 'Documento indisponível' }, { status: 502 });
+    const download = request.nextUrl.searchParams.get('download') === '1';
     return new NextResponse(privado.stream, {
       headers: {
         'content-type': 'application/pdf',
-        'content-disposition': `inline; filename="${c.id}-assinado.pdf"`,
+        'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${c.id}-assinado.pdf"`,
         'cache-control': 'private, no-store',
       },
     });
