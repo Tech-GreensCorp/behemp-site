@@ -915,6 +915,26 @@ A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo 
   ocupava. Quando chegar uma carta com os campos em branco, **remover essa tabela** — o guarda avisa.
 - Quadro do cabeçalho com a 2ª coluna mais larga (o e-mail não quebra no meio).
 
+### ✅ Feito em 20/10/2026 — editar paciente antigo (sem dado nenhum) não salvava
+
+Relatado pela Dryelle com print: na tela do paciente (`/admin/pacientes/[id]`), num cadastro antigo vazio,
+"Editar" → preencher qualquer campo → salvar dava _"Invalid enum value. Expected 'cbd' | 'thc' | 'cbd_thc', received ''"_.
+
+- **Causa:** `syncForm` (`app/(medico)/medico/pacientes/[id]/page.tsx`, a mesma tela serve admin e médico) converte
+  `null` em `''` e a tela manda o formulário **inteiro**. `atualizarPaciente` validava `tratamentoTipo` com enum
+  puro. E havia mais dois defeitos atrás do primeiro: `dataNascimento: ''` e `dataAssociacao: ''` vão a colunas
+  `date` (o Postgres recusa), e os campos de texto gravariam `''` em vez de NULL.
+- **Correção na action** (vale para admin e médico): `lib/pacientes/edicao.ts` — `''`/só espaços **esvazia o
+  campo (NULL)**; `status` vazio é **ignorado** (coluna obrigatória); valor preenchido continua validado como
+  antes. ⚠️ Mudança de comportamento: apagar um campo no formulário agora grava NULL, não `''`.
+- **Testes:** integração `a-edicao-do-paciente-aceita-campo-vazio` (**5**, Postgres real, **vermelha antes** com a
+  mensagem exata do print) e guarda `a-edicao-do-paciente-aceita-campo-vazio` (**7**, 5 sabotagens vermelhas).
+  A sabotagem que afrouxa o enum para `z.string()` só o guarda pega; na integração o Postgres ainda recusa o
+  valor inválido, só que com erro genérico.
+- 🔴 **Achado catalogado, não corrigido:** `app/(medico)/_actions/pacientes.ts` tem **outra cópia** de
+  `atualizarPaciente`/`criarPacienteSchema` que **nenhum arquivo importa** (código morto). Tem o mesmo enum puro;
+  se alguém a religar, o erro volta. Remover é decisão de quem manda.
+
 ### ✅ Feito em 20/10/2026 (local, sem commit) — envio em lote do comunicado, nas telas de Pacientes e Triagens
 
 Pedido da Dryelle. 🔴 **Muda a regra do pedido original ("um paciente por vez", acima)** — confirmado por

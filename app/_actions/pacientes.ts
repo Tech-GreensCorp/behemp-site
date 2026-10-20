@@ -6,6 +6,11 @@ import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  statusDaEdicaoSchema,
+  tratamentoDaEdicaoSchema,
+  valoresParaGravar,
+} from '@/lib/pacientes/edicao';
 
 /**
  * Server Actions de pacientes.
@@ -60,7 +65,9 @@ const criarPacienteSchema = z.object({
 
 const atualizarPacienteSchema = criarPacienteSchema.partial().extend({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
-  status: z.enum(['aguardando_consulta', 'em_tratamento', 'concluido', 'arquivado']).optional(),
+  // Na edição o formulário manda `''` para campo sem valor: ver lib/pacientes/edicao.ts.
+  tratamentoTipo: tratamentoDaEdicaoSchema.optional(),
+  status: statusDaEdicaoSchema.optional(),
 });
 
 // ── Types ─────────────────────────────────────────────────────
@@ -214,11 +221,8 @@ export async function atualizarPaciente(
       'tratamentoTipo', 'status',
     ] as const;
 
-    const updatePaciente: Record<string, unknown> = {};
-    for (const campo of CAMPOS_PACIENTE) {
-      const valor = (dadosPaciente as Record<string, unknown>)[campo];
-      if (valor !== undefined) updatePaciente[campo] = valor;
-    }
+    // `''` esvazia o campo (NULL); `status` vazio é ignorado. Ver lib/pacientes/edicao.ts.
+    const updatePaciente = valoresParaGravar(dadosPaciente as Record<string, unknown>, CAMPOS_PACIENTE);
 
     if (Object.keys(updatePaciente).length > 0) {
       await db
