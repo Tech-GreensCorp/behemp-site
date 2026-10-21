@@ -3,6 +3,8 @@
 import { db } from '@/lib/db';
 import { teleconsultas, pacientes, users, medicos, logsAuditoria } from '@/db/schema';
 import { verificarPaciente } from '@/lib/auth/permissions';
+import { garantirDonoDaSala } from '@/lib/auth/escopo-sala';
+import { registrarAuditoria } from '@/lib/utils/audit';
 import { redirect } from 'next/navigation';
 import { eq, and, isNull } from 'drizzle-orm';
 
@@ -83,24 +85,33 @@ export async function buscarSalaPorRoomId(roomId: string) {
  * Registra entrada do paciente na sala.
  * Atualiza status para 'em_andamento' se estava 'aguardando'.
  */
+// 🔴 CORRIGIDO EM 20/08/2026 — Item 11 de docs/04-LISTA-DE-AFAZERES.md. `verificarPaciente`
+// autoriza o PAPEL; o `where` aceitava qualquer `salaId`, então um paciente mudava para
+// `em_andamento` a sala de outro paciente. Note o contraste com `buscarSalaPorRoomId` acima,
+// que sempre conferiu `pacienteId` — o mesmo arquivo acertava na leitura e errava na escrita.
 export async function pacienteEntrarSala(salaId: string) {
-  const perm = await verificarPaciente();
-  if (!perm.autorizado) redirect('/entrar');
+  const escopo = await garantirDonoDaSala({ salaId });
+  if (!escopo.ok) return { sucesso: false, erro: escopo.erro };
+  if (escopo.sala.papel !== 'paciente') {
+    return { sucesso: false, erro: 'Apenas o paciente da consulta entra por aqui' };
+  }
 
   await db.update(teleconsultas)
     .set({ status: 'em_andamento' })
     .where(
       and(
-        eq(teleconsultas.id, salaId),
+        eq(teleconsultas.id, escopo.sala.salaId),
         eq(teleconsultas.status, 'aguardando'),
       ),
     );
 
-  await db.insert(logsAuditoria).values({
-    acao: 'PACIENTE_ENTROU',
+  await registrarAuditoria({
+    userId: escopo.sala.userId,
+    acao: 'atualizar',
     entidade: 'teleconsultas',
-    entidadeId: salaId,
-  }).catch(() => {});
+    entidadeId: escopo.sala.salaId,
+    dadosDepois: { status: 'em_andamento', por: 'paciente' },
+  });
 
   return { sucesso: true };
 }

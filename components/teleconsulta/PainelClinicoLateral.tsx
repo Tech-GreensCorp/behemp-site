@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle, Activity } from 'lucide-react';
+import { Brain, X, User, FileText, Pill, Calendar, Phone, Stethoscope, AlertTriangle, Activity } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/app/(medico)/_actions/teleconsulta-painel';
+import { AnaliseAssistida } from '@/components/ia-clinica/AnaliseAssistida';
 import { renovarUltimaPrescricao, type DadosFormRenovar } from '@/app/(medico)/_actions/prescricao-inline';
 import { PrescricaoInlineWizard } from './PrescricaoInlineWizard';
 import { ProntuarioVivo } from './ProntuarioVivo';
@@ -18,13 +19,13 @@ import { toast } from 'sonner';
 interface PainelClinicoLateralProps {
   dados: DadosPainelTeleconsulta;
   salaId: string;
-  abaInicial: 'paciente' | 'prontuario' | 'prescricao';
+  abaInicial: 'paciente' | 'prontuario' | 'prescricao' | 'ia';
   visivel: boolean;
   onFechar: () => void;
 }
 
 export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, visivel, onFechar }: PainelClinicoLateralProps) {
-  const [aba, setAba] = useState<'paciente' | 'prontuario' | 'prescricao'>(abaInicial);
+  const [aba, setAba] = useState<'paciente' | 'prontuario' | 'prescricao' | 'ia'>(abaInicial);
   const [dadosLocais, setDadosLocais] = useState(initialDados);
 
   // Estados do Wizard e Timeline
@@ -163,6 +164,7 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                     {aba === 'paciente' && <><User className="h-4 w-4 text-primary" /> Dados do Paciente</>}
                     {aba === 'prontuario' && <><FileText className="h-4 w-4 text-primary" /> Prontuário</>}
                     {aba === 'prescricao' && <><Pill className="h-4 w-4 text-primary" /> Prescrições</>}
+                    {aba === 'ia' && <><Brain className="h-4 w-4 text-primary" /> IA Clínica</>}
                   </div>
                   <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                     <X className="h-4 w-4" />
@@ -175,6 +177,9 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                 { id: 'paciente', label: 'Paciente', icon: User },
                 { id: 'prontuario', label: 'Prontuário', icon: FileText },
                 { id: 'prescricao', label: 'Prescrição', icon: Pill },
+                // `DO-49` + `DO-50`: rótulo "IA Clínica", e entra por ÚLTIMO — nenhuma aba
+                // existente muda de posição. O design do sidebar é do chefe (`DO-39`).
+                { id: 'ia', label: 'IA Clínica', icon: Brain },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -493,6 +498,30 @@ export function PainelClinicoLateral({ dados: initialDados, salaId, abaInicial, 
                     </p>
                   </div>
                 </div>
+              )}
+
+              {/* ── ABA IA CLÍNICA (`DO-39`, `DO-49`, `DO-50` · ADR-0010) ──────────
+                  "ele é mais uma aba no sidebar da teleconsulta, não vamos fugir desse design
+                   que meu chefe fez, isso se torna uma nova aba em etapas dentro dessa mesma aba"
+
+                  As ETAPAS ficam dentro desta aba: `AnaliseAssistida` já traz hipóteses,
+                  evidência, opções de medicamento e o passo de decisão humana, em sequência.
+
+                  🔴 `denso` é obrigatório aqui — o sidebar é estreito. O que `denso` muda:
+                  cartões nascem fechados, tipografia cai um passo, botão de revisar fica só com
+                  ícone. O que ele NÃO muda é o conteúdo: nenhuma contradição, ressalva ou rótulo
+                  de origem desaparece para caber.
+
+                  ⚠️ `grafo={null}` hoje, e isso é honesto: o motor de IA é a Metade 2
+                  (`DO-06`). `AnaliseAssistida` mostra o estado vazio explicando o que virá —
+                  sem botão inerte, que é o que faria a tela prometer o que não entrega. */}
+              {aba === 'ia' && (
+                <AnaliseAssistida
+                  pacienteId={paciente.id}
+                  teleconsultaId={salaId}
+                  grafo={null}
+                  denso
+                />
               )}
             </div>
               </>

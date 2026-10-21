@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,16 @@ import {
 } from '@/app/(public)/_actions/triagem';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DialogoEnvioEmLote,
+  montarLinhasDoLote,
+  type LinhaDoLote,
+} from '@/components/admin/comunicados/DialogoEnvioEmLote';
+import { resolverPacientesDasTriagens } from '@/app/_actions/comunicados';
+import { LIMITE_DO_LOTE } from '@/lib/comunicados/lote';
 import {
   AlertTriangle,
   Calendar,
@@ -23,10 +32,13 @@ import {
   Download,
   Eye,
   FileCheck,
+  FileDown,
   FileSpreadsheet,
+  FileSignature,
   Filter,
   HeartCrack,
   Home,
+  Loader2,
   Mail,
   Phone,
   Search,
@@ -75,6 +87,8 @@ interface Triagem {
   statusVisualizacao: string;
   medicoClerkId: string | null;
   createdAt: Date;
+  /** Calculado no servidor: e-mail bate com paciente de ficha ativa. */
+  ehPaciente: boolean;
 }
 
 // ── LABEL MAP ──────────────────────────────────────────────────────────────
@@ -267,6 +281,21 @@ const CAMPOS_INTERNOS = new Set([
 
 // ── Sub-componentes ────────────────────────────────────────────────────────
 
+/** Idade a partir de `DD/MM/YYYY` (formulário novo) ou string ISO (importação legada). */
+function calcularIdadeDaTriagem(dataNascimento: string | undefined): number | null {
+  if (!dataNascimento) return null;
+  const brMatch = dataNascimento.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const nascimento = brMatch
+    ? new Date(Number(brMatch[3]), Number(brMatch[2]) - 1, Number(brMatch[1]))
+    : new Date(dataNascimento);
+  if (isNaN(nascimento.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const m = hoje.getMonth() - nascimento.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
+  return idade >= 0 && idade < 130 ? idade : null;
+}
+
 function CampoDetalhe({ label, valor }: { label: string; valor: string }) {
   if (!valor || valor === 'undefined' || valor === 'on') return null;
   const isLongo = valor.length > 80;
@@ -358,6 +387,13 @@ export default function TriagensAdminPage() {
   const [triagemSelecionada, setTriagemSelecionada] = useState<Triagem | null>(null);
   const [triagemParaExcluir, setTriagemParaExcluir] = useState<Triagem | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  // Seleção para o envio em lote do comunicado: id da triagem → nome. Vale entre páginas.
+  const [selecionadas, setSelecionadas] = useState<Record<string, string>>({});
+  const [linhasDoLote, setLinhasDoLote] = useState<LinhaDoLote[] | null>(null);
+  const [preparandoLote, setPreparandoLote] = useState(false);
+  const qtdSelecionadas = Object.keys(selecionadas).length;
 
   // Filtros
   const [busca, setBusca] = useState('');
@@ -375,6 +411,18 @@ export default function TriagensAdminPage() {
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca, filtroStatus, filtroOrigem]);
+
+  // Trava o scroll da página por trás enquanto um modal está aberto — sem isto, o
+  // backdrop fixed tem overflow próprio mas o body por trás também rola, e dá pra
+  // ver a lista se movendo por baixo do modal.
+  useEffect(() => {
+    if (!triagemSelecionada && !triagemParaExcluir) return;
+    const overflowOriginal = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = overflowOriginal;
+    };
+  }, [triagemSelecionada, triagemParaExcluir]);
 
   async function carregarTriagens() {
     setCarregando(true);
@@ -426,6 +474,57 @@ export default function TriagensAdminPage() {
     const inicio = (paginaSegura - 1) * ITENS_POR_PAGINA;
     return triagensFiltradas.slice(inicio, inicio + ITENS_POR_PAGINA);
   }, [triagensFiltradas, paginaSegura]);
+
+  // ── Envio em lote do comunicado ──────────────────────────────
+
+  function alternarSelecao(triagem: Triagem, marcado: boolean) {
+    const novo = { ...selecionadas };
+    if (!marcado) {
+      delete novo[triagem.id];
+    } else if (qtdSelecionadas >= LIMITE_DO_LOTE) {
+      toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
+      return;
+    } else {
+      novo[triagem.id] = triagem.nomeContato || triagem.emailContato || 'Sem nome';
+    }
+    setSelecionadas(novo);
+  }
+
+  function selecionarPagina() {
+    const novo = { ...selecionadas };
+    for (const t of triagensPagina) {
+      if (Object.keys(novo).length >= LIMITE_DO_LOTE) {
+        toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
+        break;
+      }
+      novo[t.id] = t.nomeContato || t.emailContato || 'Sem nome';
+    }
+    setSelecionadas(novo);
+  }
+
+  async function prepararLote() {
+    setPreparandoLote(true);
+    // Triagem não tem FK para paciente: o servidor casa pelo e-mail com a ficha ativa.
+    const resolvidas = await resolverPacientesDasTriagens(Object.keys(selecionadas));
+    if (!resolvidas.sucesso) {
+      setPreparandoLote(false);
+      toast.error(resolvidas.erro);
+      return;
+    }
+    const res = await montarLinhasDoLote(
+      resolvidas.dados.map((r) => ({
+        chave: r.triagemId,
+        nome: selecionadas[r.triagemId] ?? 'Sem nome',
+        pacienteId: r.pacienteId,
+      })),
+    );
+    setPreparandoLote(false);
+    if (!res.sucesso) {
+      toast.error(res.erro);
+      return;
+    }
+    setLinhasDoLote(res.linhas);
+  }
 
   // ── Ações ────────────────────────────────────────────────────
 
@@ -483,6 +582,43 @@ export default function TriagensAdminPage() {
     link.click();
   }
 
+  /** Baixa a triagem em PDF — gerada no servidor, só para admin (`/api/triagens/[id]/ficha-pdf`). */
+  async function handleBaixarFichaPdf(triagem: Triagem) {
+    setGerandoPdf(true);
+    try {
+      const resposta = await fetch(`/api/triagens/${encodeURIComponent(triagem.id)}/ficha-pdf`);
+      if (!resposta.ok) {
+        toast.error(
+          resposta.status === 429
+            ? 'Muitas tentativas. Aguarde um instante e tente de novo.'
+            : 'Não foi possível gerar o PDF da ficha.',
+        );
+        return;
+      }
+      // O nome do arquivo vem do servidor (nome do paciente, com acento em `filename*`).
+      const cabecalho = resposta.headers.get('content-disposition') ?? '';
+      const codificado = /filename\*=UTF-8''([^;]+)/i.exec(cabecalho)?.[1];
+      let nomeArquivo = `${triagem.nomeContato || 'Paciente'}.pdf`;
+      if (codificado) {
+        try {
+          nomeArquivo = decodeURIComponent(codificado);
+        } catch {
+          // Mantém o nome de reserva.
+        }
+      }
+      const url = URL.createObjectURL(await resposta.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Não foi possível gerar o PDF da ficha.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   // ── Contadores ───────────────────────────────────────────────
 
   const pendentes = todasTriagens.filter((t) => t.statusVisualizacao === 'pendente').length;
@@ -501,19 +637,21 @@ export default function TriagensAdminPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Triagens</h1>
-        <p className="text-sm text-muted-foreground">
-          {todasTriagens.length} triagem{todasTriagens.length !== 1 ? 'ns' : ''} recebida
-          {todasTriagens.length !== 1 ? 's' : ''}
-          {pendentes > 0 && (
-            <span className="ml-1 font-semibold text-amber-600">
-              · {pendentes} pendente{pendentes > 1 ? 's' : ''}
-            </span>
-          )}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Controle"
+        title="Triagens"
+        description={
+          <>
+            {todasTriagens.length} triagem{todasTriagens.length !== 1 ? 'ns' : ''} recebida
+            {todasTriagens.length !== 1 ? 's' : ''}
+            {pendentes > 0 && (
+              <span className="ml-1 font-semibold text-amber-600">
+                · {pendentes} pendente{pendentes > 1 ? 's' : ''}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {/* ── Barra de filtros ────────────────────────────────── */}
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center">
@@ -609,20 +747,19 @@ export default function TriagensAdminPage() {
 
       {/* ── Lista ────────────────────────────────────────────── */}
       {triagensFiltradas.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <FileCheck size={48} className="mb-4 text-muted-foreground/30" />
-            <p className="text-lg font-medium">Nenhuma triagem encontrada</p>
-            <p className="text-sm text-muted-foreground">
-              {busca || filtroStatus !== 'todos'
-                ? 'Tente ajustar os filtros de busca.'
-                : 'Quando alguém preencher o formulário de triagem, os dados aparecerão aqui.'}
-            </p>
-            {(busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
+        <DataEmpty
+          icon={<FileCheck size={24} />}
+          title="Nenhuma triagem encontrada"
+          description={
+            busca || filtroStatus !== 'todos'
+              ? 'Tente ajustar os filtros de busca.'
+              : 'Quando alguém preencher o formulário de triagem, os dados aparecerão aqui.'
+          }
+          actions={
+            (busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4"
                 onClick={() => {
                   setBusca('');
                   setFiltroStatus('todos');
@@ -631,46 +768,99 @@ export default function TriagensAdminPage() {
               >
                 Limpar filtros
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        />
       ) : (
         <>
-          <div className="space-y-2">
+          <DataList>
+            <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+              <span className="text-muted-foreground">
+                {qtdSelecionadas > 0
+                  ? `${qtdSelecionadas} selecionada${qtdSelecionadas !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
+                  : 'Marque pessoas para enviar o comunicado da carta de doação em lote'}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-lg text-xs"
+                  onClick={selecionarPagina}
+                >
+                  Selecionar esta página
+                </Button>
+                {qtdSelecionadas > 0 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-lg text-xs"
+                      onClick={() => setSelecionadas({})}
+                    >
+                      Limpar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1.5 rounded-lg text-xs"
+                      onClick={prepararLote}
+                      disabled={preparandoLote}
+                    >
+                      {preparandoLote ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <FileSignature size={13} />
+                      )}
+                      Enviar carta de doação ({qtdSelecionadas})
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
             {triagensPagina.map((triagem) => {
               const config = STATUS_CONFIG[triagem.statusVisualizacao] || STATUS_CONFIG.pendente;
               const formulario =
                 (triagem.dados as Record<string, string>)['_formulario'] ?? '';
               return (
-                <Card
+                <DataRow
                   key={triagem.id}
                   className={cn(
-                    'group border-0 shadow-sm transition-all hover:shadow-md',
-                    triagem.statusVisualizacao === 'pendente' && 'ring-1 ring-primary/20',
+                    'group',
+                    triagem.statusVisualizacao === 'pendente' && 'bg-primary-soft/30',
                   )}
-                >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    {/* Ícone */}
+                  leading={
+                    <Checkbox
+                      checked={triagem.id in selecionadas}
+                      onCheckedChange={(marcado) => alternarSelecao(triagem, marcado === true)}
+                      aria-label={`Selecionar ${triagem.nomeContato || 'triagem'} para o envio em lote`}
+                    />
+                  }
+                  icon={
                     <div
-                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary/10"
+                      className="flex h-full w-full cursor-pointer items-center justify-center"
                       onClick={() => handleVisualizarTriagem(triagem)}
                     >
                       <FileCheck size={20} className="text-primary" />
                     </div>
-
-                    {/* Info principal */}
-                    <div
-                      className="min-w-0 flex-1 cursor-pointer"
-                      onClick={() => handleVisualizarTriagem(triagem)}
-                    >
-                      <p className="font-medium">{triagem.nomeContato || 'Sem nome'}</p>
-                      <p className="truncate text-sm text-muted-foreground">
+                  }
+                  title={
+                    <div className="cursor-pointer" onClick={() => handleVisualizarTriagem(triagem)}>
+                      <div className="truncate text-sm font-medium">{triagem.nomeContato || 'Sem nome'}</div>
+                      <div className="truncate text-xs text-muted-foreground">
                         {triagem.emailContato || triagem.telefoneContato || 'Sem contato'}
-                      </p>
+                      </div>
                     </div>
-
-                    {/* Meta */}
-                    <div className="hidden items-center gap-3 sm:flex">
+                  }
+                  meta={
+                    <div className="flex items-center gap-3">
+                      {triagem.ehPaciente ? (
+                        <Badge className="border-0 bg-emerald-500/10 text-[11px] font-medium text-emerald-700">
+                          Paciente
+                        </Badge>
+                      ) : (
+                        <Badge className="border-0 bg-muted text-[11px] font-medium text-muted-foreground">
+                          Não paciente
+                        </Badge>
+                      )}
                       {formulario && (
                         <Badge className="border-0 bg-violet-500/10 text-[11px] font-medium text-violet-600">
                           Elementor
@@ -682,16 +872,12 @@ export default function TriagensAdminPage() {
                           Via médico
                         </Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(triagem.createdAt).toLocaleDateString('pt-BR')}
-                      </span>
-                      <Badge className={cn('border-0 font-medium', config.cor)}>
-                        {config.label}
-                      </Badge>
+                      <span>{new Date(triagem.createdAt).toLocaleDateString('pt-BR')}</span>
+                      <Badge className={cn('border-0 font-medium', config.cor)}>{config.label}</Badge>
                     </div>
-
-                    {/* Ações */}
-                    <div className="flex items-center gap-1">
+                  }
+                  trailing={
+                    <>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -704,20 +890,17 @@ export default function TriagensAdminPage() {
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTriagemParaExcluir(triagem);
-                        }}
+                        onClick={() => setTriagemParaExcluir(triagem)}
                         title="Excluir triagem"
                       >
                         <Trash2 size={16} />
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </>
+                  }
+                />
               );
             })}
-          </div>
+          </DataList>
 
           {/* ── Paginação ─────────────────────────────────── */}
           {totalPaginas > 1 && (
@@ -808,41 +991,32 @@ export default function TriagensAdminPage() {
       {/* ══════════════════════════════════════════════════════════ */}
       {triagemSelecionada && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pb-8 pt-8 backdrop-blur-sm sm:items-center sm:pt-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 pb-8 pt-8 backdrop-blur-sm sm:items-center sm:pt-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setTriagemSelecionada(null);
           }}
         >
           <div className="relative w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="overflow-hidden rounded-xl bg-card shadow-2xl">
-              {/* ── Hero Header ─────────────────────────── */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-6 pt-6 pb-4 text-white sm:px-8">
-                <div
-                  className="absolute inset-0 opacity-[0.06]"
-                  style={{
-                    backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-                    backgroundSize: '24px 24px',
-                  }}
-                />
-                <div className="relative flex items-start justify-between">
+              {/* ── Header ──────────────────────────────── */}
+              <div className="relative border-b px-6 pt-6 pb-4 sm:px-8">
+                <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <Badge
                         className={cn(
                           'border-0 px-2.5 py-0.5 text-[11px] font-semibold',
-                          triagemSelecionada.statusVisualizacao === 'pendente' &&
-                            'bg-amber-400/20 text-amber-100',
-                          triagemSelecionada.statusVisualizacao === 'visualizada' &&
-                            'bg-white/20 text-white',
-                          triagemSelecionada.statusVisualizacao === 'respondida' &&
-                            'bg-emerald-400/20 text-emerald-100',
+                          (
+                            STATUS_CONFIG[triagemSelecionada.statusVisualizacao] ||
+                            STATUS_CONFIG.pendente
+                          ).cor,
                         )}
                       >
                         {STATUS_CONFIG[triagemSelecionada.statusVisualizacao]?.label ||
                           'Pendente'}
                       </Badge>
                       {(triagemSelecionada.dados as Record<string, string>)['_formulario'] && (
-                        <Badge className="border-0 bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">
+                        <Badge className="border-0 bg-violet-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-violet-600">
                           Importado · Elementor
                         </Badge>
                       )}
@@ -852,35 +1026,74 @@ export default function TriagensAdminPage() {
                       {triagemSelecionada.nomeContato || 'Paciente sem nome'}
                     </h2>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
-                      {triagemSelecionada.emailContato && (
-                        <span className="flex items-center gap-1.5">
-                          <Mail size={14} />
-                          {triagemSelecionada.emailContato}
-                        </span>
-                      )}
-                      {triagemSelecionada.telefoneContato && (
-                        <span className="flex items-center gap-1.5">
-                          <Phone size={14} />
-                          {triagemSelecionada.telefoneContato}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1.5">
-                        <Calendar size={14} />
-                        {new Date(triagemSelecionada.createdAt).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
+                    {(() => {
+                      const dados = triagemSelecionada.dados as Record<string, string>;
+                      const idade = calcularIdadeDaTriagem(
+                        dados.data_nascimento || dados['Data de nascimento:'],
+                      );
+                      const patologia =
+                        dados.diagnostico_principal ||
+                        dados['Diagnóstico principal: '] ||
+                        dados['Patologia do paciente'] ||
+                        dados['Patologia'] ||
+                        '';
+                      return (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                          {triagemSelecionada.emailContato && (
+                            <a
+                              href={`mailto:${triagemSelecionada.emailContato}`}
+                              className="flex items-center gap-1.5 transition-colors hover:text-primary"
+                              title="Enviar e-mail"
+                            >
+                              <Mail size={14} />
+                              {triagemSelecionada.emailContato}
+                            </a>
+                          )}
+                          {triagemSelecionada.telefoneContato && (
+                            <a
+                              href={`https://wa.me/55${triagemSelecionada.telefoneContato.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 transition-colors hover:text-primary"
+                              title="Falar no WhatsApp"
+                            >
+                              <Phone size={14} />
+                              {triagemSelecionada.telefoneContato}
+                            </a>
+                          )}
+                          {idade !== null && (
+                            <span className="flex items-center gap-1.5">
+                              <User size={14} />
+                              {idade} anos
+                            </span>
+                          )}
+                          {patologia && (
+                            <span
+                              className="flex min-w-0 max-w-[220px] items-center gap-1.5 sm:max-w-[320px]"
+                              title={patologia}
+                            >
+                              <Stethoscope size={14} className="shrink-0" />
+                              <span className="truncate">{patologia}</span>
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={14} />
+                            {new Date(triagemSelecionada.createdAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <button
                     onClick={() => setTriagemSelecionada(null)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <X size={18} />
                   </button>
@@ -910,14 +1123,13 @@ export default function TriagensAdminPage() {
                   return (
                     <div className="relative mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {stats.map((stat) => (
-                        <div
-                          key={stat.label}
-                          className="rounded-lg bg-white/10 px-3 py-2.5 backdrop-blur-sm"
-                        >
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60">
+                        <div key={stat.label} className="rounded-lg bg-muted/40 px-3 py-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70">
                             {stat.label}
                           </p>
-                          <p className="mt-0.5 text-sm font-semibold text-white">{stat.valor}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-foreground">
+                            {stat.valor}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -1028,6 +1240,20 @@ export default function TriagensAdminPage() {
                       Baixar relatório médico
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={gerandoPdf}
+                    onClick={() => handleBaixarFichaPdf(triagemSelecionada)}
+                  >
+                    {gerandoPdf ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <FileDown size={15} />
+                    )}
+                    {gerandoPdf ? 'Gerando PDF…' : 'Baixar ficha completa em PDF'}
+                  </Button>
                   <a href={SHEETS_URL} target="_blank" rel="noopener noreferrer">
                     <Button
                       variant="outline"
@@ -1081,6 +1307,16 @@ export default function TriagensAdminPage() {
           onConfirmar={handleConfirmarExclusao}
           onCancelar={() => setTriagemParaExcluir(null)}
           carregando={excluindo}
+        />
+      )}
+
+      {linhasDoLote && (
+        <DialogoEnvioEmLote
+          linhasIniciais={linhasDoLote}
+          onFechar={(limpar) => {
+            setLinhasDoLote(null);
+            if (limpar) setSelecionadas({});
+          }}
         />
       )}
     </div>

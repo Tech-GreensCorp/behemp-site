@@ -1,0 +1,1 @@
+ALTER TABLE "consultas" ADD COLUMN "remarcada_pelo_paciente_em" timestamp with time zone;

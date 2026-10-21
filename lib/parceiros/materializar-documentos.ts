@@ -1,0 +1,150 @@
+/**
+ * OS ARQUIVOS DO PARCEIRO VIRAM DOCUMENTOS DO PACIENTE, NO MOMENTO EM QUE A FICHA NASCE.
+ *
+ * O handoff baixa e re-hospeda os arquivos assim que o cadastro chega — a URL do parceiro é
+ * assinada e de vida curta, e o paciente tem 7 dias para abrir o link. Mas `documentos` exige
+ * `pacienteId`, e o paciente só existe quando ele conclui o cadastro. Então o arquivo espera
+ * guardado na solicitação, e é aqui que ele encontra o dono.
+ *
+ * 🔴 O QUE ISSO RESOLVE, em uma frase: o paciente que já subiu RG e comprovante no formulário
+ * da Greens não é obrigado a subir tudo de novo aqui para fazer a procuração da ANVISA. A tela
+ * da ANVISA lê a tabela `documentos` — a partir do momento em que a linha existe, ela aparece.
+ *
+ * ⚠️ NUNCA LANÇA — e o motivo mudou em 13/09/2026.
+
+ * Até aqui o comentário dizia _"documento é conveniência; o cadastro é o que importa"_. **O dono
+ * derrubou essa premissa**, com um argumento que os dados confirmam:
+ *
+ *   _"o envio do documento é tão necessário quanto a criação da conta. O paciente passa por 2
+ *   formulários e 1 se torna à toa e o outro mentiroso, já que os dados nunca chegam. Para que
+ *   serve então esse fluxo todo que estamos criando?"_
+ *
+ * 🔴 Ele está certo, e medido: dos 67 itens de documento recebidos da Greens, **zero** tinham
+ * arquivo. O paciente anexa lá, e a nossa tela pede de novo aqui — chegando a afirmar _"o que já
+ * recebemos"_ sobre uma palavra, não um arquivo.
+ *
+ * **O que continua valendo:** não lançar. Derrubar o cadastro porque um arquivo não copiou
+ * deixaria o paciente sem conta E sem documento, que é pior que sem documento.
+ *
+ * 🔴 **O que MUDA:** a falha deixa de ser aceitável e passa a ser um FATO A COBRAR. Ela precisa
+ * ter motivo legível, ficar visível ao paciente (S8.4) e ser cobrável da origem. Engolir em
+ * silêncio é o que fez 67 documentos sumirem sem ninguém notar por semanas.
+ *
+ * Se a inserção falhar,
+ * o paciente segue com a pendência e envia manualmente, como sempre pôde.
+ */
+
+import { db } from '@/lib/db';
+import { motivoLegivel } from '@/lib/erros/motivo-legivel';
+import { documentos } from '@/db/schema';
+import { calcularValidade } from '@/lib/documentos/validade';
+
+import { type DocumentoDoFluxo } from './documentos';
+
+interface ArquivoGuardado {
+  tipo: string;
+  urlBlob: string;
+  nomeArquivo: string | null;
+  dataEmissao: string | null;
+}
+
+function ehArquivo(item: unknown): item is ArquivoGuardado {
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    'urlBlob' in item &&
+    typeof (item as ArquivoGuardado).urlBlob === 'string' &&
+    'tipo' in item
+  );
+}
+
+const HOJE = () => new Date().toISOString().split('T')[0];
+
+/**
+ * 🔴 OS DOIS LADOS CHAMAM AS MESMAS COISAS POR NOMES DIFERENTES.
+ *
+ * O fluxo do parceiro (`DOCUMENTOS_DO_FLUXO`) nomeia os cinco documentos do encaminhamento.
+ * A tabela `documentos` deste projeto tem outro vocabulário, mais antigo e mais granular:
+ * `rg`, `rg_responsavel`, `documento_pessoal`, `oficio_anvisa`, `procuracao_especifica`.
+ *
+ * Quatro nomes coincidem. Um precisa de tradução:
+ *
+ *   receita_medica         → receita_medica          (igual)
+ *   comprovante_residencia → comprovante_residencia  (igual)
+ *   autorizacao_anvisa     → autorizacao_anvisa      (igual)
+ *   laudo_medico           → laudo_medico            (igual, desde 23/09/2026)
+ *   documento_identidade   → rg                      (traduzido)
+ *
+ * 🔴 `laudo_medico` ENTROU EM 23/09/2026 — ADR-0026, migration 0049.
+ *
+ * Até aqui ele não tinha para onde ir: o enum `documento_tipo` não tinha o valor, e este
+ * bloco registrava a ausência como decisão (_"forçá-lo em `documento_pessoal` classificaria
+ * um documento clínico como pessoal"_ — o que continua verdadeiro, e é o rejeitado da ADR).
+ *
+ * ⚠️ O efeito do que havia antes, medido em produção em 23/09/2026: **3 laudos baixados e
+ * guardados no nosso blob, 0 linhas em `documentos`.** O descarte acontecia DEPOIS do
+ * download — `materializarArquivos` roda no handoff —, então existia documento clínico
+ * guardado que nenhuma linha apontava.
+ */
+const TRADUCAO: Partial<Record<DocumentoDoFluxo, string>> = {
+  receita_medica: 'receita_medica',
+  comprovante_residencia: 'comprovante_residencia',
+  autorizacao_anvisa: 'autorizacao_anvisa',
+  documento_identidade: 'rg',
+  laudo_medico: 'laudo_medico',
+};
+
+export async function materializarDocumentosDoParceiro(params: {
+  pacienteId: string;
+  documentosDoParceiro: unknown;
+  protocolo: string;
+}): Promise<{ inseridos: number }> {
+  try {
+    const lista = Array.isArray(params.documentosDoParceiro) ? params.documentosDoParceiro : [];
+    const arquivos = lista.filter(ehArquivo);
+    if (arquivos.length === 0) return { inseridos: 0 };
+
+    const linhas = arquivos
+      .filter((a) => !!TRADUCAO[a.tipo as DocumentoDoFluxo])
+      .map((a) => {
+        /**
+         * 🔴 A DATA NÃO SE INVENTA.
+         *
+         * `dataEmissao` e `dataValidade` são `notNull`. Quando o parceiro informa a emissão,
+         * é ela que vale. Quando não informa — e não informar é normal, nem todo sistema
+         * guarda essa data —, gravamos a data em que o documento CHEGOU e dizemos isso na
+         * observação. Registrar o que se sabe é diferente de fingir o que não se sabe.
+         *
+         * A validade sai de `calcularValidade`, a mesma regra que o upload manual usa:
+         * ANVISA 24 meses, receita 6, o resto sem validade prática. Uma segunda regra aqui
+         * seria uma segunda verdade sobre o mesmo documento.
+         */
+        const informou = !!a.dataEmissao;
+        const dataEmissao = a.dataEmissao ?? HOJE();
+        const tipoAqui = TRADUCAO[a.tipo as DocumentoDoFluxo]!;
+        return {
+          pacienteId: params.pacienteId,
+          tipo: tipoAqui as 'receita_medica',
+          urlBlob: a.urlBlob,
+          nomeArquivo: a.nomeArquivo,
+          dataEmissao,
+          dataValidade: calcularValidade(tipoAqui, dataEmissao),
+          observacoes: informou
+            ? `Recebido do parceiro · protocolo ${params.protocolo}`
+            : `Recebido do parceiro · protocolo ${params.protocolo} · data de emissão não informada pelo parceiro; a data acima é a do recebimento`,
+        };
+      });
+
+    if (linhas.length === 0) return { inseridos: 0 };
+
+    await db.insert(documentos).values(linhas);
+    return { inseridos: linhas.length };
+  } catch (erro) {
+    console.error(
+      '[parceiros] falha ao materializar documentos:',
+      // `erro.name` é sempre 'Error' — foi o que escondeu a falha do blob por 4 dias.
+      motivoLegivel(erro),
+    );
+    return { inseridos: 0 };
+  }
+}

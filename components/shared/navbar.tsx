@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { label: 'Quem somos', href: '/#quem-somos' },
   { label: 'Triagem', href: '/triagem' },
+  { label: 'Simulador', href: '/simulador' },
   { label: 'Histórias', href: '/historias' },
   { label: 'Ebooks', href: '/ebooks' },
   { label: 'Programas de Acesso', href: '/programa-acesso-solidario' },
@@ -119,7 +120,7 @@ export function Navbar() {
       <nav className="mx-auto flex h-24 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
         {/* Left container: Logo & Nav links closer together */}
-        <div className="flex items-center gap-12">
+        <div className="flex items-center gap-4 xl:gap-12">
           {/* ── Logo ── */}
           <Link
             href="/"
@@ -159,7 +160,7 @@ export function Navbar() {
                   href={item.href}
                   onClick={handleAnchorClick}
                   className={cn(
-                    'relative px-3.5 py-2 text-sm font-medium transition-colors duration-200',
+                    'relative px-2.5 py-2 text-sm font-medium transition-colors duration-200 xl:px-3.5',
                     isActive(item.href)
                       ? 'text-primary'
                       : 'text-stone-600 hover:text-foreground',
@@ -168,7 +169,7 @@ export function Navbar() {
                   {item.label}
                   {/* Sublinhado ativo */}
                   {isActive(item.href) && (
-                    <span className="absolute bottom-1 left-3.5 right-3.5 h-px rounded-full bg-primary" />
+                    <span className="absolute bottom-1 left-2.5 right-2.5 h-px xl:left-3.5 xl:right-3.5 rounded-full bg-primary" />
                   )}
                 </Link>
               );

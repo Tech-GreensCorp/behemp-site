@@ -22,6 +22,20 @@ export const medicamentos = pgTable('medicamentos', {
   cbgMgPorGota: numeric('cbg_mg_por_gota', { precision: 6, scale: 3 }).default('0'),
   thcvMgPorGota: numeric('thcv_mg_por_gota', { precision: 6, scale: 3 }).default('0'),
   tipoEspectro: tipoEspectroEnum('tipo_espectro'),
+  /**
+   * Teor de THC do produto, em PERCENTUAL, conforme a Autorização Sanitária da ANVISA
+   * (`CAN-03`). É o que decide o tipo de receituário pelo `CAN-04`: <= 0,2% Receita de
+   * Controle Especial; > 0,2% Notificação de Receita "A".
+   *
+   * 🔴 NULLABLE DE PROPÓSITO, e fica vazio (`DO-46`): levantar os teores do catálogo é
+   * trabalho do chefe, fora da Sprint 5. Nulo significa "não sabemos" — e a tela DIZ que
+   * não sabe, em vez de assumir a faixa mais confortável.
+   *
+   * 🛑 NÃO derivar de `thcMgPorGota`: chega-se a mg/ml, mas o percentual depende de a base
+   * ser m/m ou m/v e, na primeira, da densidade — que este schema não tem. Ver ADR-0012 D-02
+   * e o rejeitado R-04.
+   */
+  teorThcPercentual: numeric('teor_thc_percentual', { precision: 6, scale: 3 }),
   nanotecnologia: boolean('nanotecnologia').default(false),
   preco: numeric('preco', { precision: 10, scale: 2 }),
   ativo: boolean('ativo').default(true),

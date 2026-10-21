@@ -1,0 +1,1970 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LGPD para o Jurídico</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Epilogue:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: #f5f2ed;
+        --foreground: #1a1612;
+        --card: #ffffff;
+        --primary: #ea5429;
+        --primary-suave: #fbe3da;
+        --secondary: #2d4f3c;
+        --secondary-suave: #dfe8e2;
+        --muted: #ede8e1;
+        --accent: #e8e2da;
+        --border: #ddd8d1;
+        --destructive: #dc2626;
+        --destructive-suave: #fbe1e1;
+        --suave: #5c544b;
+      }
+      @page {
+        size: A4;
+        margin: 15mm 14mm 17mm;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          9.7pt/1.52 'Epilogue',
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 182mm;
+        margin: 0 auto;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: 'Outfit', system-ui, sans-serif;
+        line-height: 1.15;
+      }
+      h1 {
+        font-size: 25pt;
+        font-weight: 700;
+        margin: 0 0 6pt;
+        letter-spacing: -0.015em;
+      }
+      h2 {
+        font-size: 15pt;
+        font-weight: 600;
+        margin: 18pt 0 6pt;
+        padding-top: 7pt;
+        border-top: 2px solid var(--primary);
+        break-after: avoid;
+      }
+      h2 .num {
+        color: var(--primary);
+        margin-right: 4pt;
+      }
+      h3 {
+        font-size: 11pt;
+        font-weight: 600;
+        margin: 12pt 0 4pt;
+        color: var(--secondary);
+        break-after: avoid;
+      }
+      p {
+        margin: 0 0 6pt;
+      }
+      b {
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 4pt 0 10pt;
+        font-size: 8.6pt;
+        background: var(--card);
+        border: 1px solid var(--border);
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 4pt 6pt;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        background: var(--accent);
+      }
+      tr {
+        break-inside: avoid;
+      }
+      ul,
+      ol {
+        margin: 0 0 7pt;
+        padding-left: 14pt;
+      }
+      li {
+        margin-bottom: 2pt;
+      }
+      .capa {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 14pt;
+        align-items: start;
+        border-left: 5px solid var(--primary);
+        padding: 4pt 0 4pt 13pt;
+        margin-bottom: 12pt;
+      }
+      .capa img {
+        width: 26mm;
+        height: auto;
+      }
+      .sobretitulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--primary);
+        margin-bottom: 3pt;
+      }
+      .sub {
+        color: var(--suave);
+        font-size: 10.5pt;
+        max-width: 140mm;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5pt;
+        margin-top: 9pt;
+      }
+      .tag {
+        font-family: 'Outfit', sans-serif;
+        font-size: 7.8pt;
+        background: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1pt 8pt;
+        white-space: nowrap;
+      }
+      .tag.status {
+        background: var(--secondary);
+        color: #fff;
+        border-color: var(--secondary);
+      }
+      .caixa {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 8px;
+        padding: 8pt 10pt;
+        margin: 6pt 0 10pt;
+        break-inside: avoid;
+      }
+      .caixa.alerta {
+        border-left: 4px solid var(--destructive);
+      }
+      .caixa.verde {
+        border-left: 4px solid var(--secondary);
+      }
+      .caixa.laranja {
+        border-left: 4px solid var(--primary);
+      }
+      .rotulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.4pt;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--suave);
+        margin-bottom: 3pt;
+      }
+      .selo {
+        display: inline-block;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 7.6pt;
+        border-radius: 4px;
+        padding: 0.5pt 5pt;
+        white-space: nowrap;
+      }
+      .selo.ok {
+        background: var(--secondary-suave);
+        color: var(--secondary);
+      }
+      .selo.off {
+        background: var(--muted);
+        color: var(--suave);
+      }
+      .selo.ruim {
+        background: var(--destructive-suave);
+        color: var(--destructive);
+      }
+      .selo.atencao {
+        background: var(--primary-suave);
+        color: #b8401c;
+      }
+
+      /* o termo, como o paciente lê */
+      .termo {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: 4px solid var(--secondary);
+        border-radius: 8px;
+        padding: 9pt 12pt 8pt;
+        margin: 6pt 0 8pt;
+      }
+      .termo .cab {
+        display: flex;
+        justify-content: space-between;
+        gap: 10pt;
+        align-items: baseline;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4pt;
+        margin-bottom: 6pt;
+        break-after: avoid;
+      }
+      .termo .cab b {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11pt;
+      }
+      .termo .cab span {
+        font-size: 7.8pt;
+        color: var(--suave);
+        white-space: nowrap;
+      }
+      .termo ol,
+      .termo ul {
+        padding-left: 15pt;
+      }
+      .termo li {
+        margin-bottom: 3pt;
+      }
+      .termo .tela {
+        font-size: 8.4pt;
+        background: var(--muted);
+        border-radius: 5px;
+        padding: 4pt 7pt;
+        margin: 5pt 0;
+      }
+      .termo .tela b {
+        font-family: 'Outfit', sans-serif;
+      }
+      .termo .caixinha::before {
+        content: '☐ ';
+        font-family: 'Outfit', sans-serif;
+      }
+      .termo .botao {
+        display: inline-block;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 8.2pt;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 5px;
+        padding: 1pt 8pt;
+      }
+      .ficha-tecnica {
+        display: grid;
+        grid-template-columns: 34mm 1fr;
+        gap: 2pt 8pt;
+        font-size: 8.6pt;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6pt 10pt;
+        margin: 0 0 12pt;
+        break-inside: avoid;
+      }
+      .ficha-tecnica dt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        color: var(--suave);
+      }
+      .ficha-tecnica dd {
+        margin: 0;
+      }
+
+      /* a pergunta ao advogado */
+      .q {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--primary);
+        border-radius: 8px;
+        padding: 7pt 10pt 6pt;
+        margin: 6pt 0 8pt;
+        break-inside: avoid;
+      }
+      .q.urgente {
+        border-left-color: var(--destructive);
+      }
+      .q-cab {
+        display: flex;
+        gap: 8pt;
+        align-items: baseline;
+        margin-bottom: 4pt;
+      }
+      .q-id {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 10pt;
+        color: var(--primary);
+        white-space: nowrap;
+      }
+      .q.urgente .q-id {
+        color: var(--destructive);
+      }
+      .q-titulo {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 10pt;
+      }
+      .q dl {
+        display: grid;
+        grid-template-columns: 31mm 1fr;
+        gap: 3pt 8pt;
+        margin: 0;
+        font-size: 8.8pt;
+      }
+      .q dt {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        color: var(--suave);
+      }
+      .q dt.pergunta {
+        color: var(--foreground);
+      }
+      .q dd {
+        margin: 0;
+      }
+      .q dd.pergunta {
+        font-weight: 500;
+      }
+      .q dt.exemplo {
+        color: #b8401c;
+      }
+      .q dd.exemplo {
+        background: var(--muted);
+        border-radius: 4px;
+        padding: 2pt 6pt;
+      }
+      .q dt.ti {
+        color: var(--secondary);
+      }
+      .bloco-tema {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 9pt;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--secondary);
+        margin: 12pt 0 2pt;
+        break-after: avoid;
+      }
+      .quebra {
+        break-before: page;
+      }
+      footer {
+        margin-top: 16pt;
+        padding-top: 6pt;
+        border-top: 1px solid var(--border);
+        color: var(--suave);
+        font-size: 7.8pt;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- ═══════════════════════════ CAPA ═══════════════════════════ -->
+      <div class="capa">
+        <div>
+          <div class="sobretitulo">Para o Jurídico · LGPD e CFM</div>
+          <h1>Consentimentos e proteção de dados na plataforma Be4Hope</h1>
+          <div class="sub">
+            O texto atual de cada termo, do jeito que o paciente o lê; o que a plataforma registra;
+            e as perguntas que só o Jurídico responde, cada uma com o que a equipe técnica fará a
+            partir da resposta.
+          </div>
+          <div class="meta">
+            <span class="tag status">PARA REVISÃO JURÍDICA</span>
+            <span class="tag">01/10/2026</span>
+            <span class="tag">plataforma como está em produção</span
+            ><span class="tag">25 perguntas · J-01 a J-25</span>
+          </div>
+        </div>
+        <img
+          src="data:image/png;base64,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"
+          alt="be.4hope"
+        />
+      </div>
+
+      <div class="caixa verde">
+        <div class="rotulo">Uma apresentação</div>
+        <p>
+          Este documento foi preparado pela equipe técnica para reunir, num só lugar, tudo o que a
+          plataforma Be4Hope faz hoje com consentimentos e dados pessoais, escrito sem jargão de
+          programação. Não pressupõe conhecimento técnico: quando um termo for inevitável, ele está
+          explicado no glossário da página seguinte.
+        </p>
+        <p style="margin: 0">
+          Procuramos ser francos, inclusive sobre o que ainda não está bom. Onde não sabemos algo,
+          dizemos que não sabemos. O objetivo é que a revisão jurídica parta da realidade do
+          sistema, e que cada decisão sua possa virar mudança concreta.
+        </p>
+      </div>
+
+      <div class="caixa laranja">
+        <div class="rotulo">Como usar este documento</div>
+        <ol style="margin-bottom: 0">
+          <li>
+            A <b>seção 2</b> traz o <b>texto vigente</b> de cada termo, transcrito da plataforma,
+            sem edição. Onde há negrito, ele também aparece para o paciente.
+          </li>
+          <li>
+            A <b>seção 4</b> traz as <b>perguntas</b>, numeradas de <b>J-01 a J-25</b>. Cada uma diz
+            como está hoje, o que precisamos saber e <b>o que faremos com a sua resposta</b>. Basta
+            responder citando o número.
+          </li>
+          <li>
+            As respostas voltam pelo <b>Davi</b>, que faz a ponte com a equipe técnica. Nada do que
+            depende de decisão jurídica será mudado antes da resposta.
+          </li>
+        </ol>
+      </div>
+
+      <div class="caixa alerta">
+        <div class="rotulo">O que tem pressa</div>
+        <p>
+          Os dois termos da <b>teleconsulta</b> (consulta por vídeo e resumo automático) são
+          <b>rascunhos de 20/08/2026</b> que aguardam esta revisão. Enquanto não forem aprovados, a
+          plataforma <b>não os coleta em produção</b>, de propósito: colher aceite sobre texto não
+          revisado produziria um registro sem valor.
+        </p>
+        <p style="margin: 0">
+          A consequência: o resumo automático fica desligado, e a consulta segue sem ele. Mas a
+          autorização da <b>consulta por vídeo</b> é exigida antes da entrada (CFM 2.314/2022, Art.
+          15). Pela leitura do sistema, sem ela o paciente fica
+          <b>sem como entrar na consulta por vídeo</b>. A equipe técnica está confirmando isso em
+          produção. As perguntas <b>J-01 a J-04</b> destravam esse ponto.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════ 0 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">0.</span>A plataforma em um minuto</h2>
+      <p>
+        A Be4Hope é uma plataforma de acompanhamento de pacientes em tratamento com produtos à base
+        de cannabis. Quatro participantes aparecem neste documento:
+      </p>
+      <table>
+        <tr>
+          <th style="width: 22%">quem</th>
+          <th>o que faz na plataforma</th>
+        </tr>
+        <tr>
+          <td><b>Paciente</b></td>
+          <td>
+            cria a conta, envia documentos, faz a consulta por vídeo, recebe a receita e acompanha o
+            pedido de autorização na ANVISA.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Médico</b></td>
+          <td>atende por vídeo, registra a consulta no prontuário e emite a receita.</td>
+        </tr>
+        <tr>
+          <td><b>Equipe administrativa</b></td>
+          <td>
+            organiza os cadastros, atende o paciente que pede ajuda e protocola o pedido na ANVISA
+            quando o paciente dá procuração.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Greens Corp</b></td>
+          <td>
+            empresa parceira, de outra razão social, que encaminha pacientes à Be4Hope e é avisada
+            quando a receita é emitida e quando a ANVISA aprova, para seguir com o pedido do
+            produto.
+          </td>
+        </tr>
+      </table>
+      <p>
+        <b>O caminho mais comum do paciente:</b> ele chega pela Greens ou pelo WhatsApp e recebe um
+        link de cadastro → preenche os dados e, na última etapa, escolhe o que autoriza compartilhar
+        (§2.3) → faz a consulta por vídeo, que pede a autorização da §2.1 → recebe a receita → pede
+        a autorização da ANVISA sozinho, com o passo a passo, ou com a procuração da §2.4. Quem
+        chega direto pelo site cria a conta pela página de cadastro (§2.5).
+      </p>
+
+      <h3>Glossário</h3>
+      <table>
+        <tr>
+          <th style="width: 24%">termo</th>
+          <th>o que quer dizer neste documento</th>
+        </tr>
+        <tr>
+          <td><b>Consentimento</b> e <b>autorização</b></td>
+          <td>
+            usamos os dois como as telas usam. Tecnicamente, chamamos de consentimento a
+            manifestação do paciente sobre o uso dos seus dados, e de autorização o "sim" a um ato
+            (a consulta por vídeo, a procuração). A qualificação jurídica de cada um é sua.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Versão do texto</b></td>
+          <td>
+            um código que muda sempre que a redação muda. É o que permite provar a qual texto a
+            pessoa disse sim, mesmo depois de o texto ter sido alterado.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Registro de auditoria</b></td>
+          <td>um histórico interno, que não se edita, de quem fez o quê e quando no sistema.</td>
+        </tr>
+        <tr>
+          <td><b>Rascunho, não colhido</b></td>
+          <td>
+            texto escrito pela equipe técnica, que aguarda a sua revisão. Enquanto for rascunho, a
+            plataforma no ar não o mostra para aceite.
+          </td>
+        </tr>
+        <tr>
+          <td><b>"No ar" / em produção</b></td>
+          <td>
+            a plataforma que os pacientes usam de verdade, em oposição aos ambientes de teste.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Link temporário</b></td>
+          <td>endereço de um arquivo que deixa de funcionar depois de um prazo (aqui, 1 hora).</td>
+        </tr>
+        <tr>
+          <td><b>Armazenamento privado</b></td>
+          <td>
+            onde o arquivo só abre para quem entrou na plataforma e tem permissão para vê-lo. O
+            oposto é o armazenamento em que basta ter o endereço do arquivo.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Fornecedores citados</b></td>
+          <td>
+            <b>Clerk</b>: login e senhas · <b>Neon</b>: banco de dados · <b>Brevo</b>: envio de
+            e-mail · <b>Pusher</b>: mensagens em tempo real · <b>ChatPro</b>: o atendimento
+            automático no WhatsApp · <b>DocuSign</b>: assinatura eletrônica · <b>AWS</b>: o servidor
+            onde a plataforma roda · <b>Vercel</b>: o armazenamento de arquivos ·<b
+              >Google Speech-to-Text e Gemini</b
+            >: transcrição e resumo por inteligência artificial · <b>Google Sheets</b>: planilha ·
+            <b>Inngest</b>: agendamento de tarefas, como lembretes.
+          </td>
+        </tr>
+      </table>
+
+      <!-- ═══════════════════════════ 1 ═══════════════════════════ -->
+      <h2><span class="num">1.</span>Visão geral</h2>
+      <p>
+        A plataforma pede <b>quatro manifestações formais</b> do paciente: três consentimentos e uma
+        procuração. Além delas, há o aceite dos Termos de Uso e da Política de Privacidade no
+        cadastro, e avisos sem aceite em algumas telas.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 22%">termo</th>
+          <th style="width: 14%">quem manifesta</th>
+          <th style="width: 20%">quando aparece</th>
+          <th>o que depende dele</th>
+          <th style="width: 15%">situação</th>
+        </tr>
+        <tr>
+          <td><b>Autorização para consulta por telemedicina</b><br />§2.1</td>
+          <td>paciente</td>
+          <td>antes de entrar na consulta por vídeo</td>
+          <td>a consulta por vídeo. A recusa não nega atendimento: indica o caminho presencial</td>
+          <td><span class="selo ruim">rascunho, não colhido</span></td>
+        </tr>
+        <tr>
+          <td><b>Autorização para o resumo automático da consulta</b><br />§2.2</td>
+          <td>paciente <b>e</b> médico</td>
+          <td>antes de entrar na consulta</td>
+          <td>gravar o áudio, transcrever e gerar o resumo clínico. É opcional</td>
+          <td><span class="selo ruim">rascunho, não colhido</span></td>
+        </tr>
+        <tr>
+          <td><b>Compartilhamento entre Be4Hope e Greens Corp</b><br />§2.3</td>
+          <td>paciente</td>
+          <td>no cadastro; revisável no menu Privacidade e na tela da ANVISA</td>
+          <td>
+            o envio do cadastro e de documentos à Greens, e os avisos de receita emitida e de ANVISA
+            aprovada
+          </td>
+          <td><span class="selo ok">em uso · versão de 10/09/2026</span></td>
+        </tr>
+        <tr>
+          <td><b>Procuração específica ANVISA</b><br />§2.4</td>
+          <td>paciente (ou representante legal)</td>
+          <td>quando o paciente pede que a Be4Hope faça o processo, e a equipe libera</td>
+          <td>a Be4Hope solicitar a autorização da ANVISA em nome do paciente</td>
+          <td><span class="selo ok">em uso</span></td>
+        </tr>
+        <tr>
+          <td><b>Termos de Uso e Política de Privacidade</b><br />§2.5 e §2.6</td>
+          <td>quem cria conta</td>
+          <td>na criação de conta pelo site</td>
+          <td>a criação da conta, pelo formulário</td>
+          <td><span class="selo atencao">aceite não registrado</span></td>
+        </tr>
+      </table>
+
+      <div class="caixa verde">
+        <div class="rotulo">O que a plataforma já faz a favor do titular</div>
+        <ul style="margin: 0">
+          <li>
+            Os consentimentos são <b>separados por finalidade</b>: aceitar uma não aceita as outras.
+          </li>
+          <li>
+            As caixas nascem <b>desmarcadas</b>, e nenhum consentimento sobre dados é condição para
+            criar a conta (o aceite dos Termos de Uso é, ver §2.5).
+          </li>
+          <li>Cada tela diz, <b>antes</b> da escolha, o que acontece se a pessoa recusar.</li>
+          <li>
+            Fica registrado <b>quem</b> aceitou, <b>quando</b> e <b>qual versão</b> do texto. No
+            compartilhamento com a Greens, o <b>texto exato</b> lido também fica guardado.
+          </li>
+          <li>
+            Retirar não apaga o registro anterior: marca a data da retirada. E,
+            <b>antes de cada envio</b>
+            à Greens, o sistema confere de novo se a autorização ainda vale.
+          </li>
+          <li>
+            Antes de o texto da consulta ir ao serviço de inteligência artificial, o sistema
+            <b>tenta remover CPF, RG, telefone e e-mail</b>. Reconhece um CPF escrito em números,
+            mas não um telefone sem parênteses, um RG sem pontos ou um número dito por extenso
+            (J-04). O áudio não é guardado.
+          </li>
+          <li>
+            A maior parte dos acessos a dado clínico sensível fica em <b>registro de auditoria</b>,
+            com quem acessou e quando.
+          </li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════ 2 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">2.</span>Os textos vigentes, na íntegra</h2>
+      <p>
+        Transcritos da plataforma em 01/10/2026. Os nomes da empresa, as datas e a versão são os que
+        aparecem hoje. Entre colchetes, o que o sistema preenche com os dados do paciente.
+      </p>
+
+      <h3>2.1 Autorização para consulta por telemedicina</h3>
+      <div class="termo">
+        <div class="cab">
+          <b>Autorização para consulta por telemedicina</b>
+          <span>versão rascunho-teleconsulta-2026-08-20</span>
+        </div>
+        <p>
+          Sem esta autorização não é possível realizar a consulta <b>por vídeo</b>. Você continua
+          com direito a atendimento presencial — a telemedicina complementa, não substitui.
+        </p>
+        <ul>
+          <li>
+            Autorizo que esta consulta médica seja realizada <b>a distância</b>, por vídeo e áudio,
+            com o médico identificado nesta tela.
+          </li>
+          <li>
+            Autorizo a
+            <b>transmissão da minha imagem, da minha voz e dos meus dados de saúde</b> entre mim e o
+            médico durante a consulta.
+          </li>
+          <li>
+            Estou ciente de que minhas informações de saúde podem ser
+            <b>compartilhadas com a equipe envolvida no meu cuidado</b> e com os serviços de
+            tecnologia necessários para a chamada acontecer.
+          </li>
+          <li>
+            Estou ciente de que a consulta e esta autorização ficam
+            <b>registradas no meu prontuário</b>.
+          </li>
+          <li>
+            Estou ciente de que o médico pode <b>indicar atendimento presencial</b> a qualquer
+            momento, se entender necessário.
+          </li>
+          <li>
+            Sei que posso <b>retirar esta autorização</b> quando quiser, e que tenho direito a
+            <b
+              >confirmar o tratamento, acessar, corrigir, pedir a portabilidade e pedir a
+              eliminação</b
+            >
+            dos meus dados, além de <b>saber com quem eles foram compartilhados</b> (LGPD, art. 18).
+          </li>
+        </ul>
+        <div class="tela">
+          <b>Se você não autorizar:</b> Você pode recusar. A recusa não impede seu atendimento: ela
+          apenas impede que ele aconteça por vídeo, e a equipe orienta o caminho presencial.
+        </div>
+        <p class="caixinha" style="margin: 4pt 0">
+          Li e autorizo a realização desta consulta por telemedicina.
+        </p>
+        <p style="margin: 0">
+          <span class="botao">Autorizar e entrar na consulta</span>
+          &nbsp;<span style="font-size: 8pt; color: var(--suave)"
+            >Fundamento: CFM 2.314/2022, Art. 15</span
+          >
+        </p>
+      </div>
+      <dl class="ficha-tecnica">
+        <dt>Também escrito</dt>
+        <dd>
+          <i
+            >"Em situação de emergência médica, o atendimento acontece sem esta autorização prévia —
+            e isso fica registrado no prontuário."</i
+          >
+          Esta frase existe no sistema, mas <b>não aparece na tela</b> (J-05).
+        </dd>
+        <dt>O que se registra</dt>
+        <dd>
+          quem autorizou, data e hora, e a versão do texto, no registro da consulta, com registro de
+          auditoria. A ligação com o prontuário eletrônico completo
+          <b>ainda não foi feita</b> (J-06).
+        </dd>
+        <dt>Como retirar</dt>
+        <dd><b>Não há meio na plataforma</b>, apesar de o texto prometer (J-11).</dd>
+        <dt>Exceção</dt>
+        <dd>
+          emergência médica declarada pelo médico, com motivo registrado. Existe no sistema, sem
+          botão para o médico usar (J-05).
+        </dd>
+      </dl>
+
+      <h3>2.2 Autorização para o resumo automático da consulta</h3>
+      <div class="termo">
+        <div class="cab">
+          <b>Autorização para o resumo automático da consulta</b>
+          <span>versão rascunho-ia-2026-08-20</span>
+        </div>
+        <p>
+          Esta autorização é <b>opcional</b>. Sem ela, sua consulta acontece normalmente — apenas
+          sem o resumo automático, e o médico registra as anotações à mão.
+        </p>
+        <ul>
+          <li>
+            A finalidade é <b>uma só</b>: transformar o que foi falado na consulta em um resumo
+            clínico escrito, para o seu médico registrar no prontuário com menos digitação.
+          </li>
+          <li>
+            O áudio é processado <b>ao vivo</b> e <b>não é gravado nem armazenado</b> — depois de
+            convertido em texto, é descartado.
+          </li>
+          <li>
+            Para isso, <b>dois serviços de tecnologia</b> recebem parte do conteúdo: o
+            <b>Google Speech-to-Text</b> recebe o áudio para transcrever, e o <b>Gemini</b>, também
+            do Google, recebe o texto para organizá-lo em resumo clínico. Os dois têm servidores
+            fora do Brasil.
+          </li>
+          <li>
+            Antes de enviar o texto ao serviço que organiza o resumo, o sistema
+            <b>remove automaticamente CPF, RG, telefone e e-mail</b> que apareçam na fala. ⚠️
+            <b>O áudio vai ao serviço de transcrição sem essa remoção</b> — não é possível apagar
+            dados de dentro de um áudio.
+          </li>
+          <li>
+            O resumo fica no seu prontuário, sob responsabilidade do médico e da clínica.
+            <b>Somente você e sua equipe de cuidado</b> têm acesso.
+          </li>
+          <li>
+            O resumo é guardado junto do seu prontuário. O prazo de guarda segue as regras de
+            prontuário médico.
+          </li>
+          <li>
+            Posso <b>retirar esta autorização</b> quando quiser, e tenho direito a
+            <b
+              >confirmar o tratamento, acessar, corrigir, pedir a portabilidade, pedir a
+              eliminação</b
+            >
+            e <b>saber com quem meus dados foram compartilhados</b> (LGPD, art. 18).
+          </li>
+        </ul>
+        <div class="tela">
+          <b>Se você não autorizar:</b> A consulta acontece normalmente. Sem esta autorização, não
+          haverá resumo automático — seu médico registra as anotações à mão, como sempre.
+        </div>
+        <p class="caixinha" style="margin: 4pt 0">
+          Li e autorizo o processamento do áudio para gerar o resumo clínico.
+        </p>
+        <p style="margin: 0">
+          <span class="botao">Autorizar o resumo automático</span>
+          &nbsp;<span style="font-size: 8pt; color: var(--suave)"
+            >Fundamento: LGPD, art. 11, I</span
+          >
+        </p>
+      </div>
+      <dl class="ficha-tecnica">
+        <dt>Quem manifesta</dt>
+        <dd>
+          o paciente <b>e</b> o médico, cada um na sua tela. Sem os dois, não há resumo. Cada lado
+          vê se o outro já autorizou.
+        </dd>
+        <dt>O que se registra</dt>
+        <dd>as duas autorizações (quem e quando), a versão do texto e a retirada, se houver.</dd>
+        <dt>Como retirar</dt>
+        <dd>
+          o sistema sabe registrar a retirada, mas <b>não há botão</b> para o paciente (J-11).
+        </dd>
+        <dt>Pendências do próprio texto</dt>
+        <dd>
+          o sistema ainda marca como não preenchidos: razão social, CNPJ e contato do encarregado
+          (J-01, J-02) e o prazo de guarda da transcrição (J-14).
+        </dd>
+      </dl>
+
+      <h3>2.3 Compartilhamento entre Be4Hope e Greens Corp</h3>
+      <div class="termo">
+        <div class="cab">
+          <b>O que você autoriza</b>
+          <span>Versão do termo: 2026-09-10.v1 · idioma: português</span>
+        </div>
+        <p>
+          Marque o que você autoriza. Você pode mudar de ideia depois, a qualquer momento, no seu
+          painel — e nada aqui é obrigatório para criar a sua conta.
+        </p>
+        <p style="font-style: italic; border-left: 2px solid var(--border); padding-left: 8pt">
+          Autorizo o compartilhamento dos meus dados e documentos pessoais e de saúde com a Be4Hope,
+          organização parceira da Greens Corp, para duas finalidades: (1) a avaliação médica por
+          profissional da Be4Hope, quando eu precisar de receita; e (2) o apoio na obtenção da
+          autorização da Anvisa. Autorizo também que a Be4Hope informe à Greens Corp os documentos
+          que emitir para mim, para que o meu pedido possa seguir.
+        </p>
+        <p class="caixinha" style="margin: 3pt 0 0">
+          <b>Avaliação médica por um profissional da Be4Hope</b>
+        </p>
+        <p style="margin: 0 0 4pt 12pt; font-size: 8.6pt; color: var(--suave)">
+          Sem isto não conseguimos agendar a sua consulta.
+        </p>
+        <p class="caixinha" style="margin: 3pt 0 0"><b>Apoio na autorização da Anvisa</b></p>
+        <p style="margin: 0 0 4pt 12pt; font-size: 8.6pt; color: var(--suave)">
+          Você continua podendo pedir a autorização por conta própria.
+        </p>
+        <p class="caixinha" style="margin: 3pt 0 0">
+          <b>Informar à Greens Corp os documentos emitidos para você</b>
+        </p>
+        <p style="margin: 0 0 0 12pt; font-size: 8.6pt; color: var(--suave)">
+          O seu pedido na Greens não avança sozinho: você levaria os documentos.
+        </p>
+      </div>
+      <dl class="ficha-tecnica">
+        <dt>Onde aparece</dt>
+        <dd>
+          <b>(1)</b> na última etapa do cadastro, chamada "Autorização", para todo paciente que
+          chega por link (vindo da Greens, do WhatsApp ou enviado pela equipe); <b>(2)</b> no menu
+          <b>Configurações › Privacidade</b>, para rever e retirar; <b>(3)</b> na tela da ANVISA,
+          para quem veio da Greens ou do WhatsApp e ainda não autorizou o retorno à Greens ou o
+          apoio na ANVISA, com o texto:
+          <i
+            >"Falta a sua autorização para compartilhar com a Greens. Seu cadastro está completo e
+            isso não trava nada — mas sem esta autorização não podemos devolver a sua receita nem o
+            resultado da ANVISA para lá."</i
+          >
+          e os botões <b>Autorizar</b> e <b>Agora não</b>.
+        </dd>
+        <dt>Tela Privacidade</dt>
+        <dd>
+          <i
+            >"Aqui fica o que você autorizou. Pode mudar quando quiser — vale a partir do momento em
+            que você salva."</i
+          >
+          e, ao pé:
+          <i
+            >"Desmarcar vale daqui para a frente. O que já foi enviado antes continua com quem
+            recebeu — se você quiser que apaguem de lá, fale com a gente e nós encaminhamos o
+            pedido."</i
+          >
+        </dd>
+        <dt>O que se registra</dt>
+        <dd>
+          uma linha por finalidade aceita, com a versão, o idioma, o <b>texto exato</b> lido, a data
+          e a tela em que foi dado. Retirar marca a data, sem apagar. A Greens recebe esse registro
+          (versão, finalidades, texto, data e idioma) junto com o cadastro, quando ele é enviado.
+        </dd>
+        <dt>O que sai para a Greens</dt>
+        <dd>
+          com a terceira finalidade aceita: o cadastro e os documentos do paciente,
+          <b>inclusive o laudo médico</b>, por link temporário de 1 hora; e os avisos de "receita
+          emitida" e "ANVISA aprovada", que levam só o protocolo, o tipo do aviso e a data. O envio
+          do cadastro depende também de uma chave que a equipe técnica liga no servidor; o estado
+          atual dessa chave está sendo confirmado.
+        </dd>
+        <dt>Atenção</dt>
+        <dd>
+          das três finalidades, <b>só a terceira tem efeito</b> no sistema. A primeira diz que sem
+          ela "não conseguimos agendar a sua consulta", e o agendamento
+          <b>não depende dela</b> (J-07).
+        </dd>
+      </dl>
+
+      <h3 class="quebra">2.4 Procuração específica ANVISA</h3>
+      <div class="termo">
+        <div class="cab">
+          <b>PROCURAÇÃO</b>
+          <span>gerada em PDF e assinada eletronicamente (DocuSign)</span>
+        </div>
+        <p style="text-align: center; font-size: 8.6pt; margin-top: -2pt">
+          (Autorização para solicitação de uso de produtos à base de canabidiol via GOV.BR/ANVISA)
+        </p>
+        <p>
+          <b>OUTORGANTE</b><br />[nome completo], [nacionalidade], [estado civil], [profissão], RG
+          nº [rg], CPF nº [cpf], e-mail [e-mail], telefone [telefone], residente à [endereço
+          completo], CEP [cep].
+        </p>
+        <p>
+          <b>OUTORGADO</b><br />ASSOCIAÇÃO BEHEMP DE DESENVOLVIMENTO, PESQUISA E FOMENTO EM CANNABIS
+          NO BRASIL – ABH, CNPJ nº 07.578.940/0001-01, com sede na R. Gomes de Carvalho, 1629 – Vila
+          Olímpia – São Paulo/SP, e-mail contato@be4hope.org, doravante denominada ASSOCIAÇÃO.
+        </p>
+        <p>
+          <b>OBJETO</b><br />A presente procuração tem por objeto outorgar poderes específicos à
+          ASSOCIAÇÃO para emitir/solicitar a autorização da ANVISA para uso de produtos à base de
+          canabidiol por meio do acesso GOV.BR do Outorgante (ou, se menor, do Representante Legal),
+          exclusivamente para fins de tratamento de saúde, nos termos da regulamentação sanitária
+          aplicável.
+        </p>
+        <p><b>PODERES ESPECÍFICOS</b></p>
+        <ol>
+          <li>
+            Acessar e operar a conta GOV.BR do Outorgante, exclusivamente para solicitar, emitir,
+            renovar e acompanhar autorização sanitária perante a ANVISA para produtos à base de
+            canabidiol;
+          </li>
+          <li>
+            Preencher, anexar e protocolar formulários, requerimentos, receitas e demais documentos
+            necessários à solicitação/renovação da autorização, inclusive assinar eletronicamente
+            quando cabível;
+          </li>
+          <li>
+            Acompanhar o processo administrativo, receber comunicações e intimações, prestar
+            esclarecimentos e corrigir/complementar informações;
+          </li>
+          <li>
+            Obter cópias e certidões relacionadas ao processo e compartilhar documentos com
+            profissionais de saúde vinculados ao tratamento, observada a confidencialidade.
+          </li>
+        </ol>
+        <p>
+          Limitação: Os poderes ora concedidos restringem-se ao objetivo descrito neste instrumento,
+          vedado qualquer uso para finalidades diversas.
+        </p>
+        <p>
+          <b>PROTEÇÃO DE DADOS</b><br />O Outorgante autoriza o tratamento dos dados pessoais e
+          documentos estritamente necessários ao trâmite do pedido junto à ANVISA e ao GOV.BR, nos
+          termos da legislação aplicável, exclusivamente para a finalidade desta procuração.
+        </p>
+        <p>
+          <b>VALIDADE</b><br />Esta procuração é válida por 24 (vinte e quatro) meses contados da
+          data de assinatura, expirando automaticamente ao término desse prazo. Poderá ser revogada
+          a qualquer tempo, mediante comunicação por escrito à ASSOCIAÇÃO.
+        </p>
+        <p style="margin: 0">
+          [cidade]/[UF], [dia] de [mês] de [ano].<br />ASSINATURA DO OUTORGANTE (ou do REPRESENTANTE
+          LEGAL, se menor): Nome: [nome] · CPF: [cpf]
+        </p>
+        <p style="margin: 6pt 0 0; font-size: 8pt; color: var(--suave)">
+          Rodapé: Associação Behemp de Desenvolvimento Pesquisa e Fomento em Cannabis no Brasil · R.
+          Gomes de Carvalho, 1629, Vila Olímpia - São Paulo · www.be4hope.org - contato@be4hope.org
+        </p>
+      </div>
+      <dl class="ficha-tecnica">
+        <dt>Como chega ao paciente</dt>
+        <dd>
+          o paciente pede "Atendimento com suporte"; a equipe administrativa <b>libera</b> a opção
+          "Be4Hope faz por mim"; só então o paciente gera e assina a procuração, dentro da própria
+          plataforma.
+        </dd>
+        <dt>Assinatura</dt>
+        <dd>
+          eletrônica, pelo DocuSign, embutida na plataforma. O DocuSign
+          <b>não faz verificação própria de identidade</b>: confia no login que a pessoa já fez na
+          plataforma (J-24).
+        </dd>
+        <dt>O que se registra</dt>
+        <dd>
+          quem pediu, quem liberou e quando, a situação da assinatura e o PDF assinado, guardado
+          como documento do paciente com validade de 2 anos.
+        </dd>
+        <dt>Como revogar</dt>
+        <dd>
+          só "por comunicação por escrito", como diz o texto. Não há meio na plataforma (J-11).
+        </dd>
+      </dl>
+
+      <h3>2.5 Aceite no cadastro pelo site</h3>
+      <div class="termo">
+        <div class="cab">
+          <b>Criar conta</b>
+          <span>página /registrar-se</span>
+        </div>
+        <p class="caixinha" style="margin: 0">
+          Li e concordo com a <b>Política de Privacidade</b> e os <b>Termos de Uso</b>.
+        </p>
+      </div>
+      <dl class="ficha-tecnica">
+        <dt>Obrigatório?</dt>
+        <dd>
+          sim, pelo formulário: sem marcar, a tela diz
+          <i>"Você precisa aceitar a Política de Privacidade para criar sua conta."</i>
+        </dd>
+        <dt>O que se registra</dt>
+        <dd>
+          <b>nada.</b> Não fica guardado quem marcou, quando, nem qual versão dos documentos estava
+          em vigor (J-09).
+        </dd>
+        <dt>Pelo Google</dt>
+        <dd>
+          o botão <b>"Cadastrar com Google"</b>, na mesma tela, cria a conta
+          <b>sem passar pela caixa</b>
+          (J-09).
+        </dd>
+        <dt>No cadastro por link</dt>
+        <dd>quem chega pela Greens ou pelo WhatsApp não vê esta caixa; vê o termo da §2.3.</dd>
+      </dl>
+
+      <h3>2.6 Trechos dos Termos de Uso e da Política de Privacidade</h3>
+      <p>
+        Os dois documentos completos estão no site, em <b>/termos-de-uso</b> e
+        <b>/politica-de-privacidade</b>. A Política informa
+        <b>"Última atualização: 11 de maio de 2026"</b>; os Termos não informam data nem versão.
+        Abaixo, só os trechos que tocam consentimento e LGPD.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 22%">documento e assunto</th>
+          <th>texto vigente</th>
+        </tr>
+        <tr>
+          <td><b>Termos</b> · aceitação</td>
+          <td>
+            <i
+              >"Ao acessar e utilizar a plataforma Be4Hope — incluindo o site institucional, o
+              sistema de triagem, a área restrita de pacientes e médicos ou qualquer outro serviço
+              disponibilizado — você declara ter lido, compreendido e concordado com estes Termos de
+              Uso. Caso não concorde com qualquer disposição destes Termos, você deve interromper
+              imediatamente o uso da plataforma."</i
+            >
+          </td>
+        </tr>
+        <tr>
+          <td><b>Termos</b> · Política</td>
+          <td>
+            <i
+              >"Ao aceitar estes Termos, você também concorda com a nossa Política de Privacidade,
+              que faz parte integrante deste documento."</i
+            >
+          </td>
+        </tr>
+        <tr>
+          <td><b>Termos</b> · alterações</td>
+          <td>
+            <i
+              >"Sempre que houver alterações materiais, notificaremos os usuários ativos por e-mail
+              e atualizaremos a data de última revisão no topo desta página. O uso continuado da
+              plataforma após a publicação das alterações constitui aceitação automática dos novos
+              Termos."</i
+            >
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · base legal</td>
+          <td>
+            <i
+              >Consentimento (Art. 7º, I): quando você preenche formulários e aceita nossos termos ·
+              Tutela da saúde (Art. 7º, VIII): para tratamentos e prontuários clínicos · Proteção da
+              vida (Art. 7º, VII): quando os dados são necessários para proteger a vida ou
+              incolumidade física · Obrigação legal (Art. 7º, II): para cumprimento de
+              regulamentações da Anvisa · Interesse legítimo (Art. 7º, IX): para melhorias
+              operacionais e comunicações administrativas. "Para dados sensíveis de saúde,
+              utilizamos a base legal de tutela da saúde, conforme Art. 11, II, 'f' da LGPD, em
+              procedimentos realizados por profissionais de saúde."</i
+            >
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · compartilhamento</td>
+          <td>
+            <i
+              >"Seus dados pessoais nunca são vendidos a terceiros. O compartilhamento ocorre apenas
+              nas seguintes situações:"</i
+            >
+            médicos credenciados; Neon (banco de dados); Clerk (login); Brevo (e-mail); Pusher
+            (chat); Anvisa, quando exigido.
+            <i
+              >"Todos os terceiros mencionados possuem contratos de proteção de dados e seguem
+              padrões de segurança compatíveis com a LGPD e regulamentações internacionais
+              (GDPR)."</i
+            >
+            <br /><b>Não constam da lista:</b> a Greens Corp, o Google (transcrição e Gemini), o
+            DocuSign, o Mercado Pago, o WhatsApp e o provedor de servidores (J-15).
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · direitos</td>
+          <td>
+            confirmar o tratamento; acessar; corrigir; anonimizar, bloquear ou eliminar;
+            portabilidade; revogar o consentimento; saber com quem foram compartilhados; reclamar à
+            ANPD.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · cookies</td>
+          <td>
+            <i>"Não utilizamos cookies de marketing, rastreamento ou publicidade."</i> Há cookies de
+            sessão do Clerk, para manter o login. No levantamento técnico, não encontramos
+            ferramenta de rastreamento no site.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · menores</td>
+          <td>
+            <i
+              >"Quando o paciente for menor de 18 anos, o tratamento de dados será realizado
+              mediante consentimento expresso do responsável legal, conforme Art. 14 da LGPD. Os
+              dados do responsável (nome, CPF) são coletados na triagem para esse fim, garantindo a
+              legalidade do processo."</i
+            >
+          </td>
+        </tr>
+        <tr>
+          <td><b>Política</b> · encarregado</td>
+          <td>
+            <i>"entre em contato com nosso encarregado de proteção de dados (DPO)."</i>
+            privacidade@be4hope.org, com telefone.
+          </td>
+        </tr>
+      </table>
+
+      <h3 class="quebra">2.7 Avisos que aparecem sem pedir aceite</h3>
+      <table>
+        <tr>
+          <th style="width: 24%">onde</th>
+          <th>texto vigente</th>
+          <th style="width: 22%">o que se registra</th>
+        </tr>
+        <tr>
+          <td>
+            <b>Chamada de atendimento</b>, antes de o paciente mostrar a própria tela à equipe
+          </td>
+          <td>
+            <i
+              >"Antes de mostrar a sua tela. A equipe vai ver o que aparece na sua tela enquanto
+              você compartilhar. (…) Não mostre senhas. Nada é gravado: nem a voz, nem a tela."</i
+            >
+            Botões <b>Entendi, mostrar a tela</b> e <b>Cancelar</b>.
+          </td>
+          <td>
+            nada sobre o aviso. Mas as <b>mensagens escritas</b> e as <b>imagens de tela</b> que a
+            pessoa envia no chat da chamada <b>ficam guardadas</b>, sem prazo definido (J-23)
+          </td>
+        </tr>
+        <tr>
+          <td><b>Triagem pública</b> do site, que recolhe dado de saúde antes de qualquer conta</td>
+          <td><i>"🔒 Suas informações são confidenciais e protegidas pela LGPD."</i></td>
+          <td>
+            as respostas da triagem, na plataforma <b>e numa planilha Google</b>; nenhum aceite
+            (J-18)
+          </td>
+        </tr>
+        <tr>
+          <td><b>E-books gratuitos</b>, em troca de nome, e-mail e telefone</td>
+          <td><i>"🔒 Seus dados estão seguros e protegidos de acordo com a LGPD."</i></td>
+          <td>nome, e-mail e telefone; nenhum aceite (J-19)</td>
+        </tr>
+        <tr>
+          <td><b>Programa de Acesso Solidário</b></td>
+          <td>lista como requisito <i>"concordar com o regulamento"</i></td>
+          <td>nada. Não encontramos regulamento publicado na plataforma (J-22)</td>
+        </tr>
+        <tr>
+          <td><b>Excluir Minha Conta</b>, no perfil do paciente</td>
+          <td>
+            <i
+              >"Você realmente deseja excluir permanentemente sua conta e todos os dados associados
+              a ela?"</i
+            >
+          </td>
+          <td>o login é apagado; os dados <b>são mantidos</b>, marcados como excluídos (J-12)</td>
+        </tr>
+      </table>
+
+      <!-- ═══════════════════════════ 3 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">3.</span>Quem recebe dados do paciente</h2>
+      <p>
+        Lista do que o sistema envia hoje, para conferir contra a Política (J-15), os contratos
+        (J-17) e a transferência internacional (J-16).
+        <b>A localização dos servidores de cada fornecedor não foi verificada</b>, exceto onde o
+        próprio termo a declara.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 22%">quem</th>
+          <th>o que recebe, e para quê</th>
+          <th style="width: 15%">na Política?</th>
+        </tr>
+        <tr>
+          <td><b>Greens Corp</b></td>
+          <td>
+            cadastro, documentos e avisos de receita e de ANVISA, com a autorização da §2.3. A
+            Greens também <b>envia</b> à Be4Hope os dados do paciente que chega de lá
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Google</b> (Speech-to-Text e Gemini)</td>
+          <td>
+            áudio e texto da consulta, para o resumo. O termo diz "servidores fora do Brasil"; o
+            sistema usa o endereço global do Google, que não garante processamento no Brasil (J-16).
+            <b>Hoje desligado</b>: nada vai ao Google por esse caminho
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>DocuSign</b></td>
+          <td>a procuração com os dados do outorgante, para a assinatura</td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Mercado Pago</b></td>
+          <td>dados do pagamento da consulta</td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>WhatsApp</b> (pelo ChatPro)</td>
+          <td>
+            o atendimento automático do WhatsApp envia à plataforma nome, telefone e e-mail de quem
+            pede cadastro, e recebe dela o link. A plataforma não envia avisos por WhatsApp
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Google Agenda</b> do médico</td>
+          <td>
+            o evento da consulta, com o nome e o e-mail do paciente no convite, e o link do Google
+            Meet
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Servidor e armazenamento de arquivos</b></td>
+          <td>
+            a plataforma roda em servidor da AWS; documentos e imagens ficam no armazenamento da
+            Vercel. A Política cita só a Neon
+          </td>
+          <td><span class="selo atencao">parcial</span></td>
+        </tr>
+        <tr>
+          <td><b>Google Sheets</b> (planilha)</td>
+          <td>
+            as respostas da triagem pública: nome, CPF, nascimento, contato, endereço,
+            <b>diagnóstico, tratamentos, medicamentos</b>, composição familiar e renda. Só se a
+            integração estiver configurada no servidor (não verificado)
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Inngest</b> (agendamento de tarefas)</td>
+          <td>
+            nome, e-mail e <b>nome do medicamento</b> do paciente, para os lembretes de recompra. Só
+            se a integração estiver configurada no servidor (não verificado)
+          </td>
+          <td><span class="selo ruim">não</span></td>
+        </tr>
+        <tr>
+          <td><b>Neon, Clerk, Brevo, Pusher</b></td>
+          <td>banco de dados, login, e-mail e mensagens em tempo real</td>
+          <td><span class="selo ok">sim</span></td>
+        </tr>
+        <tr>
+          <td><b>ANVISA</b></td>
+          <td>
+            o pedido de autorização, protocolado pela equipe em nome do paciente, com a procuração
+          </td>
+          <td><span class="selo ok">sim</span></td>
+        </tr>
+      </table>
+
+      <!-- ═══════════════════════════ 4 ═══════════════════════════ -->
+      <h2 class="quebra"><span class="num">4.</span>As perguntas para o Jurídico</h2>
+      <p>
+        Cada pergunta tem três partes: <b>como está hoje</b> (o que a plataforma faz, descrito por
+        nós), <b>o que precisamos saber</b> (a decisão que é sua) e
+        <b>o que faremos depois</b> (como a sua resposta vira mudança no sistema). As de borda
+        vermelha têm pressa. Não esperamos respostas longas: um "sim", um "não" ou uma redação
+        sugerida, com o número da pergunta, já nos permite trabalhar. E onde a pergunta estiver mal
+        formulada, diga: preferimos corrigir a pergunta a construir em cima dela.
+      </p>
+
+      <div class="bloco-tema">A · Quem responde pelos dados</div>
+      <div class="q urgente">
+        <div class="q-cab">
+          <span class="q-id">J-01</span
+          ><span class="q-titulo">Quem é o controlador, e qual o papel da Greens</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            os termos da teleconsulta deixam razão social e CNPJ <b>em branco</b>. A procuração
+            nomeia a
+            <b
+              >Associação Behemp de Desenvolvimento, Pesquisa e Fomento em Cannabis no Brasil – ABH,
+              CNPJ 07.578.940/0001-01</b
+            >. A Política e as telas falam em <b>"Be4Hope"</b>. A Greens recebe e envia dados de
+            pacientes.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            um paciente escreve ao encarregado perguntando quem guarda os seus dados. O termo da
+            consulta não diz; a procuração diz "Associação Behemp"; a Política diz "Be4Hope". São
+            três respostas diferentes para a mesma pergunta.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Qual entidade é a controladora, com que nome e CNPJ deve aparecer nos termos? A Greens é
+            controladora conjunta, operadora ou terceira? É preciso contrato entre as duas sobre os
+            dados?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            preenchemos os dados do controlador nos termos (um dos requisitos para liberar a coleta)
+            e, se o papel da Greens mudar, ajustamos o texto da §2.3 com versão nova.
+          </dd>
+        </dl>
+      </div>
+      <div class="q urgente">
+        <div class="q-cab">
+          <span class="q-id">J-02</span
+          ><span class="q-titulo">O encarregado e o canal de contato</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a Política indica <b>privacidade@be4hope.org</b> como canal do encarregado. Os termos da
+            teleconsulta deixam o contato em branco.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Quem é o encarregado, e esse é o canal que deve aparecer em todos os termos?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>preenchemos o contato nos termos. É o segundo requisito para liberar a coleta.</dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">B · Textos que aguardam aprovação</div>
+      <div class="q urgente">
+        <div class="q-cab">
+          <span class="q-id">J-03</span
+          ><span class="q-titulo">Aprovar a autorização para consulta por telemedicina (§2.1)</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            rascunho de 20/08/2026, escrito a partir da CFM 2.314/2022 e da LGPD. Não é colhido.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">O texto está adequado? O que muda?</dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            aplicamos o texto aprovado com versão nova e, com J-01, J-02 e J-14, ligamos a coleta. A
+            consulta por vídeo volta a abrir com a autorização.
+          </dd>
+        </dl>
+      </div>
+      <div class="q urgente">
+        <div class="q-cab">
+          <span class="q-id">J-04</span
+          ><span class="q-titulo">Aprovar a autorização para o resumo automático (§2.2)</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            rascunho de 20/08/2026. Nomeia o Google e diz que os servidores ficam fora do Brasil.
+            Promete remover CPF, RG, telefone e e-mail do texto, e a remoção não reconhece todos os
+            formatos em que esses dados aparecem. Não é colhido; o resumo está desligado.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            na consulta, o paciente diz "meu telefone é 11 9 1234 5678" ou "meu CPF é um, dois,
+            três…". O transcritor escreve isso sem parênteses, ou por extenso, e a remoção não
+            reconhece: o número segue no texto enviado ao Gemini. E o áudio, em qualquer caso, vai
+            inteiro ao Google.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O texto está adequado, inclusive sobre o envio ao exterior (J-16), o áudio sem remoção
+            de dados e o alcance real da remoção no texto?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>aplicamos o texto com versão nova e ligamos o resumo para quem autorizar.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-05</span><span class="q-titulo">A exceção de emergência médica</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a frase sobre emergência existe no sistema, mas não aparece na tela. O sistema sabe
+            registrar a emergência declarada pelo médico, com motivo, mas não há botão para ele.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            A frase deve aparecer no termo? Quem pode declarar a emergência, e o que precisa ficar
+            registrado?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            exibimos (ou retiramos) a frase e criamos o botão do médico, com o registro definido.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-06</span
+          ><span class="q-titulo">"Fica registrada no meu prontuário"</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            o termo de telemedicina afirma que a autorização fica no prontuário. Ela fica no
+            registro da consulta e no registro de auditoria; ainda não aparece no prontuário do
+            paciente.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O registro atual atende à exigência da CFM (Art. 15, registro no prontuário), ou precisa
+            constar do prontuário em si?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>levamos a autorização ao prontuário, ou ajustamos o texto ao que existe.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-07</span
+          ><span class="q-titulo">A finalidade "avaliação médica" diz o que o sistema não faz</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a caixa diz <i>"Sem isto não conseguimos agendar a sua consulta"</i>, e o agendamento
+            não depende dela. A finalidade "apoio na ANVISA" também não muda nada no sistema. A
+            própria plataforma trata a avaliação médica como tutela da saúde (art. 11, II, "f"). A
+            LGPD considera nulo o consentimento obtido com informação enganosa (art. 9º, §1º).
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            Maria desmarca "Avaliação médica", porque leu que sem isso não agendam, e quer só o
+            apoio na ANVISA. Ela agenda a consulta normalmente. O que a tela disse a ela não
+            aconteceu, e ela decidiu com base nessa informação.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            A avaliação médica e o apoio na ANVISA devem continuar como finalidades de
+            consentimento? Se sim, o texto deve mudar, ou o sistema deve passar a respeitar a
+            recusa? E os aceites já dados nesta versão continuam válidos?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            ou fazemos o sistema respeitar a recusa, ou reescrevemos o texto com versão nova. Versão
+            nova muda o que a Greens recebe, e por isso é combinada com ela.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">C · A prova do aceite</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-08</span
+          ><span class="q-titulo">Um texto só para três finalidades</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            o termo da §2.3 tem um parágrafo único que descreve as três finalidades, e três caixas
+            separadas. Quem marca só uma leu o parágrafo que fala das três.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Essa forma atende ao consentimento específico e destacado para dado de saúde (art. 11,
+            I), ou cada finalidade precisa de texto próprio?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>mantemos, ou separamos o texto por caixa, com versão nova.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-09</span
+          ><span class="q-titulo">O aceite dos Termos de Uso e da Política não é registrado</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a caixa "Li e concordo" do cadastro é obrigatória, mas nada é guardado. Quem cria conta
+            pelo Google não passa por ela. Quem chega por link não a vê. Os Termos dizem que o
+            simples acesso, e o uso continuado depois de mudanças, valem como aceite.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            João clica em "Cadastrar com Google". A conta é criada sem que ele veja a caixa "Li e
+            concordo". Se um dia houver disputa, não há registro de que ele aceitou os Termos, nem
+            de qual versão estava no ar naquele dia.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Precisamos registrar quem aceitou, quando e qual versão? O aceite vale para quem entrou
+            pelo Google ou por link? A cláusula de aceite por uso é suficiente?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            passamos a gravar o aceite com a versão, colhemos o aceite também de quem entra pelo
+            Google e pelo link, e pedimos aceite novo quando a versão mudar, se for o caso.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-10</span
+          ><span class="q-titulo">Versão dos Termos e da Política</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>a Política tem só a data (11/05/2026); os Termos não têm data nem versão.</dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Os documentos devem ter versão numerada e histórico das versões anteriores disponível?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>numeramos as versões e guardamos as anteriores, ligando cada aceite à sua versão.</dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">D · Retirar o consentimento e os direitos do titular</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-11</span><span class="q-titulo">Os meios de retirar</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            o compartilhamento com a Greens se retira na tela Privacidade. A autorização da
+            telemedicina
+            <b>não tem como ser retirada</b>; a do resumo automático tem registro, mas não tem
+            botão. A procuração, "por comunicação por escrito". A LGPD pede procedimento gratuito e
+            facilitado (art. 8º, §5º).
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            um paciente autorizou a consulta por vídeo e depois mudou de ideia. O termo diz que ele
+            pode retirar quando quiser, mas não há botão: ele teria de pedir à equipe, e o sistema
+            não tem onde registrar a retirada.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Cada termo precisa de um meio de retirada na própria plataforma? A revogação da
+            procuração por escrito é adequada, e por qual canal?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            criamos os botões de retirada que faltarem, com registro, e o canal para a procuração.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-12</span
+          ><span class="q-titulo">"Excluir Minha Conta" promete apagar tudo</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a tela pergunta se a pessoa deseja
+            <i>"excluir permanentemente sua conta e todos os dados associados a ela"</i>. O sistema
+            apaga o login e <b>mantém</b> os dados, marcados como excluídos. Documentos e o que foi
+            enviado à Greens permanecem. Prontuário tem prazo mínimo de guarda por norma do CFM.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            Ana clica em "Excluir Minha Conta" e confirma a frase "excluir permanentemente… todos os
+            dados". Ela não consegue mais entrar, mas o cadastro, os documentos e o que foi para a
+            Greens continuam guardados, só marcados como excluídos. Se ela pedir a confirmação de
+            que tudo foi apagado, a resposta honesta é que não foi.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O que pode e o que não pode ser apagado a pedido do paciente? Como o texto da tela deve
+            informar isso? A Greens deve ser avisada do pedido?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            ajustamos o texto e o que a exclusão faz: apagar o que pode, anonimizar ou manter o que
+            a norma exige, e avisar a Greens se for o caso.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-13</span
+          ><span class="q-titulo">Acesso, portabilidade e informação sobre compartilhamento</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            os termos e a Política prometem os direitos do art. 18. A plataforma mostra ao paciente
+            os próprios documentos e consentimentos, mas <b>não exporta</b> os dados nem lista com
+            quem foram compartilhados. Os pedidos dependeriam de atendimento pelo encarregado.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Atendimento manual pelo encarregado basta, ou a plataforma deve oferecer o autosserviço?
+            Em que prazo e em que formato?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            construímos a exportação e o histórico de compartilhamento, ou apenas a ferramenta
+            interna que ajuda o encarregado a responder.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">E · Prazos de guarda</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-14</span
+          ><span class="q-titulo">Por quanto tempo guardar cada coisa</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            nenhum prazo foi definido. Para alguns, o sistema já tem o campo, vazio de propósito à
+            espera do Jurídico; para outros, nem o campo existe. A lista: a transcrição e o resumo
+            da consulta; as mensagens e imagens da chamada de atendimento; os registros de
+            consentimento depois de retirados; os documentos e a procuração (marcada hoje com
+            validade de 2 anos); os contatos do e-book; as respostas da triagem de quem não virou
+            paciente.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Qual o prazo de cada um, e o que acontece ao fim: apagar ou anonimizar?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            gravamos os prazos, mostramos o da transcrição no termo (requisito para liberar a
+            coleta) e criamos a rotina que apaga ou anonimiza no vencimento.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">F · Terceiros e envio ao exterior</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-15</span
+          ><span class="q-titulo">A Política não lista todos que recebem dados</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a lista da Política omite a Greens, o Google (resumo por IA, agenda e planilha da
+            triagem), o DocuSign, o Mercado Pago, o WhatsApp, o Inngest e o servidor da AWS (quadro
+            da seção 3).
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            A Política deve ser atualizada? A mudança obriga a avisar quem já aceitou (art. 8º, §6º
+            e art. 9º, §2º)?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            publicamos a Política revisada com versão nova e, se preciso, avisamos e colhemos
+            aceite.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-16</span
+          ><span class="q-titulo">Dados de saúde enviados para fora do Brasil</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            o rascunho da §2.2 afirma que o Google processa áudio e texto da consulta fora do
+            Brasil. O sistema usa o endereço global do Google, que não garante processamento no
+            Brasil. Como o resumo está desligado, <b>hoje nada vai ao Google por esse caminho</b>. A
+            localização dos demais fornecedores, inclusive a planilha da triagem, não foi
+            verificada.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            o Google tem centros de processamento em vários países, inclusive no Brasil (São Paulo).
+            Em parte dos seus serviços, quem contrata pode escolher a região; a plataforma hoje
+            chama o <b>endereço geral</b> do serviço, sem escolher região. É como despachar uma
+            encomenda pela central dos Correios sem indicar a agência: ela chega ao destino, mas não
+            se controla por onde passa. Por isso não dá para afirmar nem que o dado sai do Brasil,
+            nem que fica. A frase "servidores fora do Brasil", no rascunho, foi escrita para não
+            prometer menos do que pode acontecer. A mesma dúvida vale para a planilha da triagem e a
+            agenda, que também são do Google. <b>Importante:</b> como o resumo por IA está
+            desligado, nenhum áudio ou texto de consulta foi enviado ao Google por esse caminho.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O que a LGPD exige para essa transferência internacional (capítulo V), e o consentimento
+            da §2.2 é a base adequada?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            levantamos a região de cada fornecedor; conforme a exigência, trocamos a região, o
+            fornecedor ou ajustamos o termo.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-17</span><span class="q-titulo">Contratos com os operadores</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a Política afirma que
+            <i>"todos os terceiros mencionados possuem contratos de proteção de dados"</i>. A equipe
+            técnica não tem como confirmar.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Existem esses contratos (ou os termos de uso dos fornecedores bastam)? Algum fornecedor
+            exige contrato antes de continuar recebendo dados?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>desligamos ou trocamos o fornecedor que não puder ficar.</dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">G · Coletas que hoje não pedem consentimento</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-18</span
+          ><span class="q-titulo">A triagem pública recolhe dado de saúde</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            antes de qualquer conta, a triagem do site pergunta sobre saúde, renda e família, e
+            mostra só a frase "protegidas pela LGPD". As respostas ficam na plataforma e também são
+            copiadas para uma planilha Google.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            uma mãe preenche a triagem para o filho, com diagnóstico, medicamentos e a renda da
+            família, antes de ter conta. Esses dados vão para o banco da plataforma e para uma linha
+            de planilha. Quem tiver acesso à planilha vê tudo isso, e hoje não sabemos quem tem.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Qual a base legal? É preciso consentimento antes da triagem, e com que texto?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            incluímos o aviso ou o consentimento na triagem, com registro, e revemos a cópia para a
+            planilha.
+          </dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-19</span
+          ><span class="q-titulo">E-books e comunicações por e-mail</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            o e-book grava nome, e-mail e telefone sem aceite. A plataforma envia e-mails (por
+            exemplo, lembretes de recompra) sem preferência de comunicação nem opção de descadastro
+            registrada.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Para que esses contatos podem ser usados? É preciso consentimento para comunicações que
+            não sejam do tratamento, e opção de descadastro?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>criamos o aceite no e-book, as preferências de comunicação e o descadastro.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-20</span><span class="q-titulo">Pacientes menores de idade</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a Política promete consentimento expresso do responsável (art. 14). A triagem recolhe
+            nome e CPF do responsável, e a procuração prevê a assinatura dele. Nenhum termo é
+            colhido do responsável na plataforma.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O que precisa ser colhido do responsável, em que momento, e como comprovar a
+            representação?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>criamos o fluxo do responsável: identificação, termo próprio e registro.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab"><span class="q-id">J-21</span><span class="q-titulo">Cookies</span></div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>pelo que encontramos, só cookies de sessão do login. Não há aviso de cookies.</dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">É necessário aviso ou consentimento para os cookies de sessão?</dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>incluímos o aviso, se for exigido.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-22</span
+          ><span class="q-titulo">Regulamento do Programa de Acesso Solidário</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a página exige "concordar com o regulamento" e "comprovar renda", mas não há regulamento
+            publicado nem aceite.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Qual o regulamento, e como colher a concordância e tratar o comprovante de renda?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>publicamos o regulamento e criamos o aceite com registro.</dd>
+        </dl>
+      </div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-23</span
+          ><span class="q-titulo">A chamada de atendimento diz "nada é gravado"</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            é verdade para a voz, a câmera e a tela compartilhada. Mas as mensagens escritas e as
+            imagens de tela que a pessoa envia no chat da chamada ficam guardadas, sem prazo, e o
+            aviso não diz isso. Não há termo para a chamada.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            durante a chamada, o paciente manda no chat um print da tela do gov.br, com o CPF dele.
+            A chamada termina, mas a imagem continua guardada, sem prazo, embora o aviso diga "nada
+            é gravado".
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            O aviso basta, ou precisa de ajuste ou de aceite? Qual o prazo de guarda das mensagens e
+            imagens?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>ajustamos o aviso e aplicamos o prazo (J-14).</dd>
+        </dl>
+      </div>
+
+      <div class="bloco-tema">H · Procuração</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-24</span
+          ><span class="q-titulo">Os poderes e a forma de assinatura da procuração</span>
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            a procuração dá poderes para <b>"acessar e operar a conta GOV.BR do Outorgante"</b>. É
+            assinada eletronicamente pelo DocuSign, sem verificação de identidade própria do
+            DocuSign, dentro da conta do paciente. Vale 24 meses.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            para a Be4Hope "acessar e operar a conta GOV.BR", alguém da equipe precisa entrar no
+            gov.br como se fosse o paciente. A procuração não diz como esse acesso é dado, e a
+            plataforma não registra como isso acontece na prática. A equipe saberá dizer como é
+            feito hoje.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            A forma de assinatura é suficiente para este instrumento? O poder de operar a conta
+            gov.br é adequado, e como o paciente deve fornecer esse acesso? A cláusula de proteção
+            de dados basta?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>
+            ajustamos o texto e, se preciso, exigimos verificação de identidade na assinatura.
+          </dd>
+        </dl>
+      </div>
+      <div class="bloco-tema">I · Cópias de segurança</div>
+      <div class="q">
+        <div class="q-cab">
+          <span class="q-id">J-25</span
+          ><span class="q-titulo"
+            >Cópias de segurança: as regras para uma funcionalidade futura</span
+          >
+        </div>
+        <dl>
+          <dt>Como está hoje</dt>
+          <dd>
+            <b>Esta pergunta é sobre algo que ainda vamos construir</b>: a rotina de cópias de
+            segurança da plataforma. Ela não existe ainda, e a pergunta serve para que já nasça com
+            as regras certas. Para referência, hoje há uma única cópia completa, feita manualmente
+            no servidor em 30/09/2026, com dados de todos os pacientes e sem prazo para ser apagada.
+          </dd>
+          <dt class="exemplo">Exemplo</dt>
+          <dd class="exemplo">
+            a rotina copiaria o banco inteiro, por exemplo toda noite. Cada cópia teria os dados de
+            todos os pacientes, inclusive os de quem pediu para excluir a conta. Sem regra, essas
+            cópias se acumulam e ninguém sabe quando devem ser apagadas.
+          </dd>
+          <dt class="pergunta">O que precisamos saber</dt>
+          <dd class="pergunta">
+            Quando a rotina existir: por quanto tempo cada cópia pode ficar, onde, com que proteção
+            e quem pode acessá-la? Os dados de quem pediu exclusão precisam sair também das cópias?
+            E a cópia manual de 30/09 deve seguir a mesma regra?
+          </dd>
+          <dt class="ti">O que faremos depois</dt>
+          <dd>construímos a rotina já com essas regras e aplicamos à cópia que existe.</dd>
+        </dl>
+      </div>
+
+      <div class="caixa verde" style="margin-top: 14pt">
+        <div class="rotulo">Para conversar</div>
+        <p style="margin: 0">
+          Se preferir tratar alguma pergunta numa conversa em vez de por escrito, o Davi organiza.
+          Podemos também mostrar qualquer uma destas telas funcionando, para ver exatamente o que o
+          paciente vê. E se algo aqui não estiver claro, a falha é nossa: pergunte, que
+          reescrevemos.
+        </p>
+      </div>
+
+      <footer>
+        Preparado pela equipe técnica da Be4Hope (Claude Code Be4Hope), a pedido do Davi, em
+        01/10/2026. Os textos foram transcritos da plataforma como ela está em produção. Este
+        documento descreve fatos do sistema e formula perguntas; não é parecer jurídico. A versão
+        técnica deste levantamento, para a equipe de TI, é o
+        <b>Levantamento dos consentimentos</b> da mesma data.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { listarContatos, atualizarStatusContato, responderContato } from '@/app/(public)/_actions/contato';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   Calendar,
   CheckCircle2,
@@ -148,65 +149,42 @@ export default function MensagensAdminPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mensagens</h1>
-          <p className="text-sm text-muted-foreground">
-            {contatos.length} mensagem{contatos.length !== 1 ? 'ns' : ''} recebida{contatos.length !== 1 ? 's' : ''}
-            {naoLidas > 0 && ` · ${naoLidas} não lida${naoLidas > 1 ? 's' : ''}`}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Mensagens"
+        title="Mensagens"
+        description={`${contatos.length} mensagem${contatos.length !== 1 ? 'ns' : ''} recebida${contatos.length !== 1 ? 's' : ''}${naoLidas > 0 ? ` · ${naoLidas} não lida${naoLidas > 1 ? 's' : ''}` : ''}`}
+      />
 
       {/* Lista vazia */}
       {contatos.length === 0 ? (
-        <Card className="border-0 shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Mail size={48} className="mb-4 text-muted-foreground/30" />
-            <p className="text-lg font-medium">Nenhuma mensagem recebida</p>
-            <p className="text-sm text-muted-foreground">
-              Quando alguém preencher o formulário de contato, as mensagens aparecerão aqui.
-            </p>
-          </CardContent>
-        </Card>
+        <DataEmpty
+          icon={<Mail size={24} />}
+          title="Nenhuma mensagem recebida"
+          description="Quando alguém preencher o formulário de contato, as mensagens aparecerão aqui."
+        />
       ) : (
-        <div className="space-y-3">
+        <DataList>
           {contatos.map((contato) => {
             const config = STATUS_CONFIG[contato.statusLeitura] || STATUS_CONFIG.nao_lida;
             return (
-              <Card
+              <DataRow
                 key={contato.id}
-                className={cn(
-                  'cursor-pointer border-0 shadow-sm transition-all hover:shadow-md',
-                  contato.statusLeitura === 'nao_lida' && 'ring-1 ring-primary/20',
-                )}
                 onClick={() => handleVisualizarContato(contato)}
-              >
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                    <MessageSquare size={20} className="text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{contato.nome}</p>
-                    <p className="truncate text-sm text-muted-foreground">{contato.assunto}</p>
-                  </div>
-                  <div className="hidden items-center gap-3 sm:flex">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(contato.createdAt).toLocaleDateString('pt-BR')}
-                    </span>
-                    <Badge className={cn('border-0 font-medium', config.cor)}>
-                      {config.label}
-                    </Badge>
-                  </div>
-                  <Button variant="ghost" size="icon">
-                    <Eye size={18} />
-                  </Button>
-                </CardContent>
-              </Card>
+                className={contato.statusLeitura === 'nao_lida' ? 'bg-primary-soft/30' : undefined}
+                icon={<MessageSquare size={20} className="text-primary" />}
+                title={contato.nome}
+                subtitle={contato.assunto}
+                meta={new Date(contato.createdAt).toLocaleDateString('pt-BR')}
+                trailing={
+                  <>
+                    <Badge className={cn('border-0 font-medium', config.cor)}>{config.label}</Badge>
+                    <Eye size={18} className="text-muted-foreground" />
+                  </>
+                }
+              />
             );
           })}
-        </div>
+        </DataList>
       )}
 
       {/* ═══════════════════════════════════════════════ */}

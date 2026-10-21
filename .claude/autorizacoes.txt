@@ -1,0 +1,1049 @@
+# Autorizações explícitas de escopo — behemp-site
+#
+# Este arquivo é a única forma de liberar o que os hooks de .claude/hooks/ bloqueiam.
+# Autorização é POR ESCRITO e aparece no diff — foi decidido assim de propósito.
+#
+# Formato:
+#   path:<prefixo ou trecho do caminho>    libera ESCRITA naquele caminho
+#   git:<trecho exato do comando>          libera aquele comando destrutivo
+#
+# Regra: cada linha nasce com um comentário acima dizendo QUEM autorizou, QUANDO e
+# POR QUE. Linha sem justificativa é para ser removida na próxima revisão.
+#
+# ── Autorizado pelo dono em 19/08/2026 · CUMPRIDA em 19/08/2026 ─────────────────
+# Remover a pasta do kit de documentação depois de integrado ao repositório.
+# A pasta não era versionada, então a remoção não deixou rastro em git.
+# Mantida aqui como registro de quem autorizou o quê — é a razão de este arquivo existir.
+# ⚠️ Também é o caso que o guarda `hooks-de-escopo` usa para provar que autorização por
+#    escrito libera o bloqueio. Remover esta linha faz o guarda ficar vermelho.
+git:git rm -r docs/kit-claude-code
+
+# ── Autorizado pelo dono em 20/08/2026, na execução da Sprint 0 ─────────────────
+# Ligar o portão de qualidade ao CI. Sem isto, o Item 3 da Prioridade 1 fica aberto:
+# lint, type-check e teste NÃO rodam antes do deploy, e o único portão real é o build
+# falhar. O dono escolheu o desenho "ci.yml + enxerto no deploy.yml" entre 4 opções
+# comparadas, porque push direto em main não passa por PR — se o portão só existisse
+# no ci.yml, um push em main deployaria sem passar por ele.
+#
+# PERIGO MEDIDO de mexer no deploy.yml:
+#   · é o pipeline de produção (DT-008); push em main dispara deploy com db:migrate
+#     sem rollback num servidor de 2 GB
+#   · o enxerto entra ANTES do build, portanto antes do rsync e antes da migration:
+#     se falhar, NADA chega ao servidor e NENHUMA migration é aplicada
+#   · steps existentes não são alterados nem reordenados — só precedidos
+#   · o YAML foi validado por parser antes de escrever
+# CUSTO DE DEIXAR: todo PR e todo push seguem sem portão; os 35 casos de guarda e o
+# portão de baseline não rodam antes do deploy, e guarda que não roda é documentação.
+#
+# Granularidade deliberada: dois caminhos EXATOS, não o diretório inteiro. Autorizar
+# `.github/workflows/` liberaria qualquer workflow futuro sem nova decisão.
+path:.github/workflows/ci.yml
+path:.github/workflows/deploy.yml
+
+# ── Autorizado pelo dono em 20/08/2026, na auditoria da Sprint 1 ────────────────
+# Corrigir a CLASSE de defeito do Item 11 do 04-LISTA-DE-AFAZERES: autorização por papel
+# sem escopo de objeto (OWASP API1 / BOLA). 7 ocorrências + 4 de auditoria + 1 de
+# consentimento. O dono escolheu "todas as 7", com helper único, entre 4 opções.
+#
+# POR QUE: `app/api/pusher/auth/route.ts:72-80` autoriza qualquer usuário autenticado em
+# QUALQUER sala de teleconsulta, e `sinalizar/route.ts` aceita roomId arbitrário do body.
+# Juntos permitem assistir a consulta médica alheia. Em `aprovar-narrativa`, qualquer
+# médico escreve evolução clínica no prontuário de qualquer paciente.
+#
+# PERIGO MEDIDO de mexer nos dois arquivos protegidos abaixo:
+#   · são ACTIONS de teleconsulta, não telas — 5 funções no total
+#   · a teleconsulta NUNCA foi usada de verdade (DO-02), então não há uso clínico a
+#     quebrar; o risco real é REGRESSÃO: um `where` a mais que passe a negar acesso
+#     legítimo
+#   · mitigação exigida: guarda por função nasce VERMELHO antes da correção, com os 3
+#     controles que já funcionam (criarSalaTeleconsulta, buscarSalaPorRoomId,
+#     transcricao/route) como casos que devem continuar PASSANDO
+#   · nenhuma migration, nenhuma mudança de schema, nenhuma mudança de UI
+# CUSTO DE DEIXAR: dado clínico de videoconsulta exposto a qualquer usuário autenticado.
+path:app/(medico)/_actions/teleconsulta.ts
+path:app/(paciente)/_actions/teleconsulta.ts
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 1 ─────────────────────────────
+# Tirar do código a credencial pública do TURN de terceiro (openrelay.metered.ca, senha
+# `openrelayproject`) e passar o endereço a vir de variável de ambiente, com credencial
+# EFÊMERA gerada no servidor. Provedor escolhido pelo dono entre 4 opções comparadas com
+# preço: Cloudflare Realtime TURN (Item 8 do 04-LISTA-DE-AFAZERES).
+#
+# POR QUE: quando a conexão direta falha, TODA a mídia da consulta médica — áudio e vídeo
+# de médico e paciente — atravessa hoje o relay gratuito de um terceiro sem contrato de
+# operador, sem SLA, com credencial que é pública na internet.
+#
+# PERIGO MEDIDO de mexer na página do paciente:
+#   · o array de iceServers está em 2 arquivos; este é um deles (linhas 156-158)
+#   · a teleconsulta NUNCA foi usada de verdade (DO-02) — não há uso clínico a quebrar
+#   · ⚠️ REGRESSÃO FUNCIONAL ACEITA: sem as variáveis de ambiente configuradas, a chamada
+#     passa a usar só STUN. Conexões que HOJE só funcionam via relay vão falhar até a conta
+#     Cloudflare ser provisionada. É deliberado: melhor falhar do que atravessar relay de
+#     estranho com dado de saúde.
+#   · nenhuma migration, nenhuma mudança de schema, nenhuma mudança de layout
+# CUSTO DE DEIXAR: mídia de consulta médica em relay de terceiro sem contrato, e credencial
+# pública versionada no repositório.
+path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 2 ─────────────────────────────
+# (1) Criar a casa do módulo de IA clínica dentro de `app/(medico)` — nome `ia-clinica`,
+#     escolhido pelo dono entre 4 opções. Base: `DO-11` ("a área nova mora dentro de
+#     (medico), não há sexto route group"). Alinha com lib/ia-clinica/ e __fixtures__/ia-clinica/.
+# (2) Gerar a migration dos campos e enums novos. **Gerar, não aplicar** — o dono escolheu
+#     "gerar agora, aplicar depois": `pnpm db:generate` escreve SQL + snapshot + journal, e
+#     `pnpm db:migrate` só roda no deploy, quando ele mandar.
+#
+# PERIGO MEDIDO da migration:
+#   · é **aditiva**: CREATE TYPE de 2 enums novos + ALTER TABLE ADD COLUMN de 7 colunas
+#     nullable em `teleconsultas`
+#   · nenhuma coluna removida, nenhum tipo alterado, nada renomeado — linhas existentes
+#     seguem válidas sem backfill
+#   · ⚠️ `pnpm db:migrate` roda contra produção sem rollback num servidor de 2 GB (Item 1 do
+#     04-LISTA-DE-AFAZERES). É por isso que gerar e aplicar são passos separados aqui
+#   · sem esta migration, o código do consentimento NÃO funciona: as colunas não existem
+# CUSTO DE DEIXAR: o consentimento LGPD implementado na Sprint 1 fica inerte, e o módulo da
+# Sprint 2 não tem onde morar.
+path:app/(medico)/medico/ia-clinica
+# ⚠️ ESTREITADA em 20/08/2026, logo após a migration ser gerada.
+# A autorização era `path:db/migrations` — o diretório inteiro. O guarda `hooks-de-escopo`
+# ficou VERMELHO no caso "migration gerada", porque a proteção de todas as migrations havia
+# deixado de valer. O guarda estava certo: autorização ampla que sobrevive ao trabalho é
+# autorização esquecida. Restrita aos arquivos QUE ESTA migration produziu.
+path:db/migrations/0018_nifty_xavin.sql
+path:db/migrations/meta/0018_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 20/08/2026, na Sprint 3 ─────────────────────────────
+# Gerar a migration das tabelas da anamnese-baseline. Condição literal do dono:
+#   "contanto que não subamos para main ou para neon, temos que tomar cuidado pois estamos
+#    em uma branch de desenvolvimento e temos que garantir a compatibilidade para quando
+#    (eu mandar) subirmos a main e dps fazermos a reconciliação com banco neon"
+#
+# 🛑 O QUE ESTA AUTORIZAÇÃO **NÃO** COBRE: rodar `pnpm db:migrate`, e push em `main`.
+#    Ambos permanecem bloqueados. O arquivo existe na branch e não tocou banco nenhum.
+#
+# COMPATIBILIDADE VERIFICADA (é o que o dono pediu para garantir):
+#   · 100% ADITIVA: 2 CREATE TABLE + 6 CREATE TYPE + 8 ADD CONSTRAINT (FKs das tabelas NOVAS)
+#   · ZERO `DROP`, ZERO `ALTER COLUMN`, ZERO `SET NOT NULL`
+#   · NENHUMA tabela existente é alterada — só as duas novas
+#   · journal contíguo de 0 a 19, sem lacuna
+#   → um banco que não tenha estas tabelas as recebe sem risco; um que já as tenha falha no
+#     CREATE, o que é falha VISÍVEL, não corrupção silenciosa
+#
+# ⚠️ O RISCO REAL DA RECONCILIAÇÃO, e ele não é desta migration:
+#   Se o Neon de produção tiver divergido do snapshot local (mudança feita à mão, migration
+#   aplicada fora do journal), `db:migrate` pode falhar no meio — e não há rollback (Item 1).
+#   Procedimento antes de aplicar está em `docs/03-CHECKLIST-MESTRE.md`.
+path:db/migrations/0019_cheerful_ricochet.sql
+path:db/migrations/meta/0019_snapshot.json
+
+# ── Modelo, para copiar ─────────────────────────────────────────────────────────
+# Autorizado por {{quem}} em {{dd/mm/aaaa}} — {{por que, e qual o perigo medido}}
+# path:app/(admin)/admin/exemplo
+
+# ── Autorizado pelo dono em 24/08/2026, na Sprint 5 (item 7 da fila) ────────────
+# Frase literal: "PODE SEGUIR COM AS IMPLEMENTAÇÕES", dita depois de responder as três
+# perguntas de regra de negócio que travavam o desenho (DO-46, DO-47, DO-48). O escopo
+# autorizado é o da Sprint 5: a cadeia conduta -> {prescrição, dosagem} -> titulação.
+#
+# POR QUE cada caminho, e não `app/(medico)/` inteiro:
+#   · a Sprint 2 já mostrou que autorização ampla sobrevive ao trabalho e vira autorização
+#     esquecida — foi por isso que `path:db/migrations` foi ESTREITADA naquele dia
+#   · o grosso do código novo mora em `components/conduta/` e `lib/conduta/`, que NÃO são
+#     protegidos: só as páginas finas e as actions precisam de autorização
+#
+# PERIGO MEDIDO, por caminho:
+#   · `_actions/conduta.ts` e `medico/titulacao/` são ARQUIVOS NOVOS — não há
+#     comportamento em produção a quebrar. Nascem com escopo de objeto
+#     (`lib/auth/escopo-paciente.ts`), que as 8 actions existentes NÃO têm (04 Item 13.5)
+#   · `tab-dosagem.tsx` é tela EM PRODUÇÃO com dado clínico já digitado. A mudança é
+#     SUBTRATIVA e deliberada (DO-48): saem "Novo Ajuste", "Editar" e "Excluir"; o
+#     histórico já digitado continua visível e íntegro. Nenhuma linha do banco é tocada,
+#     nenhuma action é removida do módulo — só deixa de ser chamada por esta tela
+#   · `pacientes/[id]/page.tsx` recebe UMA linha: a aba "Dosagem" passa a montar o
+#     componente novo. Nenhuma aba é removida, nenhuma reordenada
+#   · ⚠️ NÃO cobre `prescricoes.medicamentos` (JSONB do Item 4), `lib/receituario/`,
+#     assinatura, SNCR, nem as 8 actions defeituosas do 04 Item 13 — tudo isso segue
+#     catalogado e sem autorização
+# CUSTO DE DEIXAR: a Sprint 5 não sai do papel, e cada linha nova de dosagem continua
+# entrando em texto livre, num formato que nunca sustentará CAN-03 nem CAN-04.
+path:app/(medico)/_actions/conduta.ts
+path:app/(medico)/medico/titulacao
+path:app/(medico)/medico/pacientes/[id]/_components/tab-dosagem.tsx
+path:app/(medico)/medico/pacientes/[id]/page.tsx
+
+# ── Autorizado pelo dono em 24/08/2026, na Sprint 5 ─────────────────────────────
+# Gerar a migration das colunas da cadeia da conduta. Mesma condição das Sprints 2 e 3:
+# GERAR, NÃO APLICAR. `pnpm db:migrate` NÃO foi rodado e continua exigindo ordem expressa.
+#
+# 🛑 O QUE ESTA AUTORIZAÇÃO NÃO COBRE: rodar `pnpm db:migrate`, e push em `main`.
+#
+# COMPATIBILIDADE VERIFICADA — 100% ADITIVA, medida no SQL gerado:
+#   · 4x ADD COLUMN, todas NULLABLE
+#       medicamentos.teor_thc_percentual        (a casa do teor, DO-46 — nasce vazia)
+#       itens_ajuste_dosagem.medicamento_id     (liga ao catálogo, CAN-03)
+#       itens_ajuste_dosagem.dosagem_anterior_id
+#       itens_ajuste_dosagem.nova_dosagem_id    (ligam as duas cadeias, ADR-0012 D-01)
+#   · 3x ADD CONSTRAINT — FKs das colunas NOVAS, nenhuma sobre coluna existente
+#   · 1x CREATE INDEX sobre coluna nova
+#   · ZERO DROP · ZERO ALTER COLUMN · ZERO SET NOT NULL · ZERO RENAME (conferido por grep)
+#   → linha existente fica com as três colunas nulas e continua válida. É EXATAMENTE o que o
+#     `DO-48` exige: o histórico legado em texto livre continua legível e íntegro.
+#
+# PERIGO MEDIDO: baixo para o schema, e o risco real não é desta migration — é o mesmo da
+# Sprint 3: se o Neon de produção tiver divergido do snapshot local, `db:migrate` pode falhar
+# no meio, e não há rollback (Item 1 do 04). Por isso gerar e aplicar seguem separados.
+path:db/migrations/0023_wise_zombie.sql
+path:db/migrations/meta/0023_snapshot.json
+
+# ── Ampliação da autorização da Sprint 5 — 24/08/2026 ──────────────────────────
+# Os entregáveis 3 (ponte conduta -> prescrição, ADR-0005 D-04) e 12 (o anterior no histórico
+# em DUAS superfícies, DO-44 b) exigem a aba de prescrições do prontuário — a "segunda
+# superfície" é literalmente o "historico de prescrições dentro do nome do paciente" da frase
+# do dono. Mesma autorização, mesmo escopo: "PODE SEGUIR COM AS IMPLEMENTAÇÕES".
+#
+# PERIGO MEDIDO em tab-prescricoes.tsx:
+#   · a mudança é ADITIVA: um bloco de leitura com os ajustes de dose, ABAIXO da lista que já
+#     existe. Nenhum campo do formulário de prescrição é alterado, nenhuma action trocada
+#   · NÃO toca `criarPrescricao`, nem o JSONB `prescricoes.medicamentos` (Item 4), nem
+#     `lib/receituario/`, nem assinatura, nem SNCR — a ponte CHAMA o fluxo existente, como a
+#     ADR-0005 D-04 exige, e não o reescreve
+#   · o guarda `a-conduta-avisa-e-nao-decide` já cobra que a action de conduta NÃO escreva em
+#     `prescricoes` nem importe `lib/receituario/`
+# CUSTO DE DEIXAR: a conduta morre sem virar documento legal, que é o objetivo declarado da
+# sprint, e o DO-44 (b) fica cumprido pela metade.
+path:app/(medico)/medico/pacientes/[id]/_components/tab-prescricoes.tsx
+
+# ── Autorizado pelo dev Davi em 25/08/2026, cartões 16 e 17 do Trello ──────────
+# "o que nos faremos agora é colocar em a fazer e ja começar a fazer os cartões 16, 17, 18 e 19
+#  pois eles fecham a sprint 5" — GERAR, NÃO APLICAR EM PRODUÇÃO. `pnpm db:migrate` rodou apenas
+# contra o Postgres LOCAL (localhost:5436), conferido antes; o Neon segue intocado.
+#
+# COMPATIBILIDADE VERIFICADA — 100% ADITIVA, medida no SQL gerado (grep por DROP/ALTER COLUMN/
+# SET NOT NULL/RENAME retorna ZERO):
+#   · 1x CREATE TABLE `rascunhos_revisao_ia` (tabela NOVA — E7/DO-41, rascunho no servidor)
+#   · 5x ADD COLUMN em `revisoes_ia`, todas NULLABLE (E3/DO-40, a divergência alimenta o RAG)
+#   · FKs e índices apenas sobre colunas/tabelas NOVAS
+#   → linha existente de `revisoes_ia` continua válida sem backfill
+#
+# 🔴 `ingerido_no_corpus_em` NASCE E FICA VAZIA de propósito: `GAP-16` (base legal do uso
+#    secundário) bloqueia a INGESTÃO no corpus, não a construção dos campos (ADR-0011 D-02).
+#    O guarda `divergencia-alimenta-o-rag-sem-ingerir` impede que alguém a preencha antes.
+path:db/migrations/0024_strong_komodo.sql
+path:db/migrations/meta/0024_snapshot.json
+
+# ── Autorizado pelo dev Davi em 09/09/2026, integração ChatPro ─────────────────
+# "pode commitar mas ainda não puxe pra main" + "precisamos fazer isso hoje". Gerar a
+# migration das duas tabelas do ChatPro. Aplicada APENAS no Postgres local (localhost:5436),
+# conferido antes; o Neon segue intocado e `pnpm db:migrate` em produção continua exigindo
+# ordem expressa.
+#
+# COMPATIBILIDADE — 100% ADITIVA (grep por DROP/ALTER COLUMN/SET NOT NULL/RENAME = ZERO):
+#   · 3x CREATE TYPE (origem e status da solicitação, status do evento)
+#   · 2x CREATE TABLE — `solicitacoes_cadastro` e `chatpro_eventos`, ambas NOVAS
+#   · 7x índices sobre as tabelas novas
+#   → nenhuma tabela existente é tocada; nada precisa de backfill
+#
+# 🔴 POR QUE UMA TABELA DE LINK NOVA, e não reuso: diferente do greens-corp — onde a ADR-0005
+#    decidiu reusar `MedicationRequest` porque o mecanismo de token JÁ existia — a BeHemp não
+#    tem NENHUMA entidade com token, validade e protocolo (medido: grep por tokenHash/accessUrl
+#    em db/, lib/ e app/ não retorna nada do domínio). Aqui a tabela É o mecanismo, e passa a
+#    ser o único: nenhum outro token de acesso público deve nascer no sistema.
+path:db/migrations/0025_sudden_forge.sql
+path:db/migrations/meta/0025_snapshot.json
+
+# ── Mesma autorização, segunda migration (09/09/2026) ─────────────────────────
+# A 0026 completa o módulo: o processador de eventos precisa do estado intermediário do
+# claim atômico, e da projeção da conversa.
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 1x CREATE TYPE  — `chatpro_diretorio_tipo`
+#   · 1x ALTER TYPE ... ADD VALUE 'processando' — acréscimo a enum, não remove valor algum
+#   · 2x CREATE TABLE — `chatpro_diretorio` e `chatpro_sessoes`, ambas NOVAS
+#   · 1x FK de `chatpro_sessoes.solicitacao_id` → `solicitacoes_cadastro.id` (ON DELETE SET NULL,
+#        aponta para tabela criada na 0025; nenhuma tabela pré-existente é referenciada)
+#   · 4x índices sobre as tabelas novas
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0025_sudden_forge.sql
+path:db/migrations/0026_bumpy_red_hulk.sql
+path:db/migrations/meta/0025_snapshot.json
+path:db/migrations/meta/0026_snapshot.json
+
+# ── Autorizado pelo dono em 09/09/2026, tela de cadastro do link ──────────────
+# "a tela que a dryelle [ia fazer], nós que vamos fazer" — campos: nome, CPF, telefone,
+# email, senha, e "se já faz tratamento" com caixa de texto. Destino: agendar teleconsulta.
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN/SET NOT NULL = ZERO):
+#   · 5x ADD COLUMN, todas anuláveis e sem default:
+#       pacientes.ja_faz_tratamento_cannabis, pacientes.tratamento_atual_descricao,
+#       solicitacoes_cadastro.{cpf, ja_faz_tratamento, tratamento_atual}
+#   → nenhuma linha existente muda de valor; nenhum backfill necessário.
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0027_magenta_shockwave.sql
+path:db/migrations/meta/0027_snapshot.json
+
+# ── Autorizado pelo dono em 09/09/2026, handoff Greens → BeHemp (ADR-0016) ────
+# "nos fechamos tudo daqui da behemp em relação a primeira adr"
+#
+# COMPATIBILIDADE — ADITIVA (grep por DROP/TRUNCATE/ALTER COLUMN/SET NOT NULL = ZERO):
+#   · 1x ALTER TYPE ADD VALUE 'greens_handoff' — acréscimo a enum, não remove valor
+#   · 3x ADD COLUMN anuláveis: parceiro, evento_do_parceiro, pedido_do_parceiro
+#   · 1x índice COMUM (não único) sobre evento_do_parceiro — unique faria reentrega
+#        de webhook virar 500, mesmo motivo do behempReferralId da Greens
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0028_plain_pretty_boy.sql
+path:db/migrations/meta/0028_snapshot.json
+
+# ── Mesma autorização, D-06/D-07/D-08 da ADR-0016 (09/09/2026) ────────────────
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x ADD COLUMN anuláveis: documentos_do_parceiro (jsonb), url_de_retorno (text)
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0029_colorful_zarek.sql
+path:db/migrations/meta/0029_snapshot.json
+
+# ── Mesma autorização, caminho de volta / ADR-0016 D-09 (09/09/2026) ──────────
+# "pode seguir" — o dono, sobre o caminho de volta.
+# COMPATIBILIDADE — ADITIVA (DROP/TRUNCATE/ALTER COLUMN = ZERO):
+#   · 2x CREATE TYPE  — status e tipo do evento de saída
+#   · 1x CREATE TABLE — parceiro_eventos_saida, NOVA
+#   · 1x FK para solicitacoes_cadastro (ON DELETE CASCADE; tabela criada na 0025)
+#   · 2x índices sobre a tabela nova
+#   → aplicada APENAS no Postgres local; Neon intocado.
+path:db/migrations/0030_lame_madripoor.sql
+path:db/migrations/meta/0030_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO DE ESCOPO — o gatilho do aviso ao parceiro (09/09/2026) ────
+# Palavras do dono: "pode colocar os 2, temos que fazer esse fluxo funcionar e conectar
+# eles... claro que vamos fazer QA pra testar e isso não está em produção ativa e teremos
+# que deixar isso pronto até segunda."
+#
+# O QUE ESTA AUTORIZAÇÃO LIBERA: duas chamadas a `notificarParceiro()` — uma quando a
+# receita é assinada, outra quando a autorização da ANVISA é concluída. Uma linha em cada
+# ponto, em área clínica.
+#
+# POR QUE É SEGURO AGORA — dois interruptores independentes, os dois desligados:
+#   · BeHemp: sem PARCEIRO_GREENS_API_URL preenchida, o enviador NEM REIVINDICA da fila
+#   · Greens: ANVISA_HELP_CARD_ENABLED = false — nenhum paciente alcança o caminho
+#   → o gatilho pode ser ligado sem que um único evento saia daqui.
+#
+# A PROTEÇÃO QUE O CÓDIGO CARREGA: `notificarParceiro` NUNCA lança (try/catch em volta de
+# tudo, provado por sabotagem no guarda `o-aviso-ao-parceiro-nao-se-perde`). Se a Greens
+# estiver fora, o médico assina a receita normalmente e o aviso espera na fila.
+#
+# ⚠️ NENHUM `path:` FOI LIBERADO, e isto é a correção de um erro meu.
+# Eu havia escrito `path:lib/receituario/` aqui por antecipação — e o guarda
+# `hooks-de-escopo` ficou VERMELHO acusando que a proteção daquela área tinha caído.
+# Ele estava certo: os dois pontos que a autorização precisava eram
+# `app/(medico)/_actions/prescricoes.ts` e `app/api/anvisa/atualizar-status/route.ts`,
+# **nenhum dos dois em `lib/receituario/`**.
+#
+# Autorização mais larga que a necessidade é buraco: eu teria deixado uma área clínica
+# destravada para sempre por causa de duas linhas que nem moram nela. O `CLAUDE.md` já
+# registra essa classe — "escape amplo virou buraco" — e desta vez quem pegou foi o guarda.
+# A migration que o vínculo exigiu:
+#   · 1x ADD COLUMN anulável (paciente_id) + 1 índice comum. Sem FK de propósito: o
+#     vínculo é rastro, não integridade — e uma FK faria a exclusão de paciente esbarrar.
+path:db/migrations/0031_tranquil_karma.sql
+path:db/migrations/meta/0031_snapshot.json
+
+# ── Mesma autorização, ADR-0018 (10/09/2026) ─────────────────────────────────
+# COMPATIBILIDADE — a 0032 tem um DROP INDEX, e ele é SEGURO:
+#   · DROP + CREATE do MESMO índice no mesmo arquivo — nunca fica sem
+#   · o índice antigo era único em (tipo, chatpro_id); o novo em (conta, tipo, chatpro_id)
+#     com `conta` DEFAULT 'behemp' — acrescentar coluna a uma chave única só pode MANTER
+#     ou afrouxar a unicidade, nunca criar violação. Conferido: linhas == pares únicos.
+#   · 1x ADD COLUMN NOT NULL **com default** — não quebra linha existente
+path:db/migrations/0032_violet_purifiers.sql
+path:db/migrations/meta/0032_snapshot.json
+
+# ── Migration 0033 ESCRITA À MÃO (10/09/2026) ────────────────────────────────
+# O `AGENTS.md` diz: "Não edite migration gerada manualmente sem explicar o motivo".
+# O motivo:
+#
+# O drizzle-kit gerou, para renomear um valor de enum:
+#     ALTER COLUMN tipo SET DATA TYPE text;
+#     DROP TYPE parceiro_evento_tipo;
+#     CREATE TYPE ... AS ENUM('receita_emitida','anvisa_aprovada');
+#     ALTER COLUMN tipo SET DATA TYPE parceiro_evento_tipo USING tipo::...;
+#
+# O último passo FALHA se existir linha com o valor antigo — e existia, aqui, no banco
+# local: uma linha 'anvisa_concluida'. A migration teria quebrado o deploy.
+#
+# Substituída por ALTER TYPE ... RENAME VALUE, que preserva os dados porque é o MESMO
+# valor mudando de rótulo. Envolvida em DO/IF EXISTS para ser idempotente — conferido
+# rodando duas vezes, zero erro.
+path:db/migrations/0033_panoramic_princess_powerful.sql
+path:db/migrations/meta/0033_snapshot.json
+
+# ── 🔴 AUTORIZAÇÃO — corrigir o deploy.yml (10/09/2026) ──────────────────────
+# Palavras do dono: "pode seguir para corrigir mas pesquise e correlacione para
+# conseguirmos fazer a correção correta".
+#
+# O DEFEITO, medido no log do deploy #34481253343:
+#   err: cp: cannot stat '.env': No such file or directory
+#   err: sh: 1: drizzle-kit: not found
+#        ELIFECYCLE Command failed
+#   → e o script SEGUIU, reiniciou o PM2, e o passo foi marcado ✓.
+#   Deploy verde, migrations não aplicadas.
+#
+# A causa da segunda: `pnpm install --prod` no servidor pula devDependencies (o próprio
+# log diz "devDependencies: skipped"), e `drizzle-kit` é devDependency.
+#
+# A CORREÇÃO, fundamentada na documentação do Drizzle: usar o **migrator do drizzle-orm**,
+# que é dependência de produção e precisa apenas dos .sql gerados e de uma conexão. O CLI
+# é ferramenta de desenvolvimento. Fonte: orm.drizzle.team/docs/migrations e a discussão
+# drizzle-team/drizzle-orm#5718 ("awkward inside a slim production container where
+# devDependencies have been pruned").
+#
+# E `set -e` no script remoto, que é a correção que impede a próxima falha de ser invisível.
+path:.github/workflows/deploy.yml
+
+# ── Autorizada pela Dryelle Ebelin em 10/09/2026, feature de pagamento ────────
+# Pedido literal no chat: adicionar etapa de pagamento (sem integração real com o futuro
+# gateway "Gather") ao fluxo de /agendamento, revisar e corrigir bugs desse fluxo, e criar
+# área admin para gerenciar pagamentos de teleconsulta (valor, split médico/plataforma).
+#
+# POR QUE cada caminho:
+#   · `app/(public)/_actions/agendamento.ts` — arquivo EXISTENTE, único caller é o wizard
+#     do site público. Corrige bug de autorização (auth() só rodava num branch condicional
+#     — payload podia trazer pacienteId de qualquer paciente sem checar dono da sessão),
+#     fecha condição de corrida de double-booking, evita evento órfão no Google Calendar,
+#     acrescenta auditoria e remove 2 exports mortos e sem checagem de auth
+#     (`cancelarConsulta`, `listarConsultasMedico` — confirmado zero callers no repo).
+#   · `app/(public)/_actions/pagamentos.ts`, `app/(admin)/_actions/pagamentos.ts`,
+#     `app/(admin)/admin/pagamentos/**` — ARQUIVOS NOVOS, não há comportamento em produção
+#     a quebrar.
+#   · `db/schema/consultas.ts` — aditivo: 2 colunas nullable (timestamp de e-mail enviado)
+#     + 1 índice único PARCIAL em (medico_id, data_hora), só para consulta ativa
+#     (`status <> 'cancelada' and deleted_at is null`) — não rejeita linha existente, só
+#     impede nova colisão.
+#
+# PERIGO MEDIDO:
+#   · nenhuma tabela clínica (pacientes/medicos/prescricoes) é tocada
+#   · pagamento é local/preparatório: sem chamada a gateway externo, sem cobrança real
+#   · migration é 100% aditiva — gerar e revisar o SQL antes de db:migrate; db:migrate
+#     contra o Neon de produção continua exigindo ordem expressa, não coberto aqui
+# CUSTO DE DEIXAR: a feature pedida não sai do papel, e os bugs de autorização/corrida no
+# agendamento público continuam ativos em produção.
+path:app/(public)/_actions/agendamento.ts
+path:app/(public)/_actions/pagamentos.ts
+path:app/(admin)/_actions/pagamentos.ts
+path:app/(admin)/admin/pagamentos
+path:db/schema/consultas.ts
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11/09/2026 — Item 33: a declaração da ANVISA e da receita vira coluna
+#
+# QUEM AUTORIZOU: o dono, em 11/09/2026, nestas palavras:
+#   "vamos resolver isso também, tudo que falta"
+#   "vamos resolver toda pendencia de código e webhook para que os 2 fluxos tanto da
+#    behemp quanto da greens estejam conectados pronto para testar"
+#
+# POR QUÊ: `declarouTerAutorizacaoAnvisa` e `declarouTerReceitaMedica` existiam apenas
+# dentro de `registrarAuditoria`, em `app/_actions/cadastro-por-link.ts`. Log de auditoria
+# não é fonte de leitura de produto — e a ausência já custou uma afirmação falsa no
+# comentário de `components/paciente/AvisoDaProcuracao.tsx`, que dizia que o cadastro
+# gravava a declaração. Não gravava.
+#
+# O QUE A MIGRATION FAZ (medido, `db/migrations/0035_huge_sugar_man.sql`):
+#   ALTER TABLE solicitacoes_cadastro ADD COLUMN declarou_ter_autorizacao_anvisa boolean;
+#   ALTER TABLE solicitacoes_cadastro ADD COLUMN declarou_ter_receita_medica boolean;
+#
+# PERIGO MEDIDO: aditiva. Duas colunas NULLABLE, sem default e sem NOT NULL — o Postgres
+# 11+ faz `ADD COLUMN` nullable sem reescrever a tabela, então não há lock longo. Nenhum
+# DROP, nenhuma alteração de coluna existente. Nada lê estas colunas hoje, portanto nenhum
+# ponto de chamada quebra. Como se desfaz: `ALTER TABLE ... DROP COLUMN`, sem perda de
+# outro dado.
+#
+# ⚠️ TRÊS ESTADOS, e o terceiro é o motivo de existirem: `true` = tem · `false` = declarou
+# que NÃO tem · `null` = nunca respondeu. Sem o `null`, quem não foi perguntado ficaria
+# indistinguível de quem disse não.
+path:db/migrations/0035_huge_sugar_man.sql
+path:db/migrations/meta/0035_snapshot.json
+
+# ── Autorizada pela Dryelle Ebelin em 11/09/2026, ajuste do fluxo de pagamento ──
+# Pedido literal no chat: "Remova a tela de configuração de pagamentos e qualquer
+# configuração de 'valor padrão'. O valor da consulta é individual por médico e já é
+# configurado na tela de Médicos, durante o cadastro/edição do médico."
+#
+# O QUE A MIGRATION FAZ: DROP TABLE pagamentos_config — singleton (no máximo 1 linha,
+# `valorConsultaPadrao`/`moedaPadrao`) que só existia para alimentar um fallback em
+# `reservarConsulta` quando o médico não tinha valor próprio configurado. Esse fallback
+# foi removido: `reservarConsulta` agora exige `medicos.valorConsulta` e recusa a reserva
+# com erro claro se estiver ausente, em vez de usar um valor "mágico" que ninguém escolheu.
+#
+# PERIGO MEDIDO: a tabela tem no máximo 1 linha, sem FK de ninguém apontando para ela
+# (confirmado — nenhuma outra tabela referencia `pagamentos_config`), e nenhum guarda em
+# `__tests__/guardas/` a exercita. Perda de dado possível: só o valor padrão global (ex.
+# R$150) que deixa de ter uso depois desta mudança. Como se desfaz: recriar a tabela e o
+# valor não é recuperável do banco (DROP não tem rollback), mas é reconstituível manualmente
+# se algum dia voltar a fazer sentido.
+path:db/schema/pagamentos-config.ts
+path:db/migrations/0040_flippant_morg.sql
+path:db/migrations/meta/0040_snapshot.json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11/09/2026 — §7 do contrato-ponte com a Greens: o S2 ganha caminho, segredo e gatilho
+#
+# QUEM AUTORIZOU: o dono, em 11/09/2026: "vamos resolver toda pendencia de código e webhook
+# para que os 2 fluxos tanto da behemp quanto da greens estejam conectados pronto para
+# testar" e, ao ler o §7 deles, "sim siga nessa ordem".
+#
+# POR QUÊ: o documento-ponte `greens-corp/docs/CONTRATO-S2-BEHEMP-PARA-GREENS.md` §7 lista
+# três pendências do nosso lado. Duas exigem esta migration:
+#   · o enum `parceiro_evento_tipo` não tem valor para o cadastro
+#   · o consentimento não carrega o idioma, que o §2 deles pede
+#
+# O QUE A MIGRATION FAZ (`db/migrations/0039_secret_randall.sql`):
+#   ALTER TYPE "parceiro_evento_tipo" ADD VALUE 'cadastro_transferido';
+#   ALTER TABLE "consentimentos" ADD COLUMN "idioma" text DEFAULT 'pt' NOT NULL;
+#
+# PERIGO MEDIDO: aditiva nas duas. `ADD VALUE` não reescreve tabela e não invalida linha
+# existente. A coluna nasce com DEFAULT, então o NOT NULL é satisfeito para todas as linhas
+# já gravadas — no Postgres 11+ isso não reescreve a tabela (o default vai no catálogo).
+#
+# ⚠️ O alerta da Greens procede: o valor novo do enum NÃO pode ser USADO na mesma transação
+# em que é criado. Aqui ele é apenas criado; o primeiro uso é em runtime, depois do deploy.
+#
+# COMO SE DESFAZ: a coluna, com DROP COLUMN. O valor do enum NÃO se remove no Postgres —
+# ficaria órfão e inofensivo. É o custo aceito de `ADD VALUE`, e é o motivo de o nome ter
+# sido escolhido com cuidado.
+path:db/migrations/0039_secret_randall.sql
+path:db/migrations/meta/0039_snapshot.json
+
+# ── Retificação em 11/09/2026 — incidente de produção causado por mim (Claude) ──
+# Ao aplicar a migration acima (DROP TABLE pagamentos_config, autorização anterior
+# nesta mesma sessão) contra o banco Neon do .env, não percebi que esse banco é o
+# MESMO que a produção (be4hope.org) usa — e que o código então deployado em `main`
+# (PR #63, sem as mudanças de remoção desta branch) ainda chamava
+# `db.query.pagamentosConfig.findFirst()` dentro de `reservarConsulta`. Resultado:
+# a reserva de horário quebrou em produção com "Erro interno ao reservar horário"
+# até a Dryelle reportar.
+#
+# CORREÇÃO APLICADA (autorizada pela Dryelle em 11/09/2026, no chat, ao ser avisada
+# do incidente): recriei a tabela `pagamentos_config` manualmente, com a estrutura
+# idêntica à original e uma linha padrão (R$150/BRL), restaurando o comportamento
+# do código que está de fato em produção. Esta migration (0040) continua removendo
+# a tabela para quem rodar `db:migrate` do zero — o ponto é que **produção e
+# desenvolvimento compartilham o mesmo banco**, então uma migration destrutiva só
+# deve rodar contra ele quando o código que depende da tabela removida já não
+# estiver mais deployado. Lição para a próxima vez: antes de um DROP, conferir se
+# `main` (produção) ainda depende do que está sendo removido — não basta a branch
+# atual não depender mais.
+
+# ── Autorizada pela Dryelle Ebelin em 11/09/2026, cancelamento/remarcação do paciente ──
+# Pedido literal no chat, depois de eu reportar que hoje o paciente não tem nenhum
+# caminho de cancelar ou remarcar consulta: "implemente a opção 1, opção 2 (paciente
+# não poder cancelar ainda, mostrar algo falando pra entrar em contato com o suporte
+# ou algo do tipo, mas pode mudar o horario e data, apenas uma vez sem custo), opção
+# 3, opção 4, opção 5" — referindo-se às minhas recomendações: paciente cancela reserva
+# pendente livremente; paciente NÃO cancela consulta paga/confirmada (mensagem de
+# suporte); paciente remarca (qualquer status ativo) uma vez sem custo; médico é
+# avisado quando o PACIENTE remarca; status do pagamento sincroniza com o cancelamento.
+#
+# O QUE A MIGRATION FAZ (`db/migrations/0041_soft_thor_girl.sql`):
+#   ALTER TABLE consultas ADD COLUMN remarcada_pelo_paciente_em timestamp with time zone;
+#
+# PERIGO MEDIDO: aditiva, coluna NULLABLE sem default — Postgres 11+ não reescreve a
+# tabela. Nenhuma leitura existente é afetada (coluna nova, ausente = nunca remarcada
+# pelo paciente). Como se desfaz: `ALTER TABLE consultas DROP COLUMN
+# remarcada_pelo_paciente_em`, sem perda de outro dado.
+path:db/migrations/0041_soft_thor_girl.sql
+path:db/migrations/meta/0041_snapshot.json
+
+# ── 12/09/2026 — .github/workflows/deploy.yml: NEXT_DEPLOYMENT_ID ──
+#
+# ESCOPO: o hook `escopo-autorizado` protege `.github/workflows/` como "pipeline de
+# deploy em produção (DT-008)". A mudança aqui é a variável `NEXT_DEPLOYMENT_ID`, no
+# `env:` do passo de build e na lista `gravar` do script remoto.
+#
+# PEDIDO DO DONO (12/09/2026, verbatim): "continue até finalizarmos todas essas
+# pendencias pra eu testar limpo" — e, antes: "isso não pode acontecer em nenhum dos 8
+# fluxos cara".
+#
+# O QUE MOTIVOU: em 11/09/2026 o dono estava preenchendo o cadastro, com uploads já
+# feitos, quando um deploy subiu. O log do servidor encheu de `Failed to find Server
+# Action "008065c0…"`. Os ids de Server Action são hashes gerados NO BUILD; a aba
+# aberta continua chamando o hash antigo. A tela dizia "tente novamente", e tentar de
+# novo não resolve — só recarregar resolve, e ninguém sabe disso.
+#
+# O QUE QUEBRA SE ESTIVER ERRADO, medido: se o id chegar em só UM dos dois lados
+# (build ou runtime), o header do servidor nunca bate com o do cliente e TODA navegação
+# vira recarga completa — o site fica lento sem ninguém entender por quê. É por isso
+# que o guarda exige as duas pontas E que usem a mesma fonte (`github.sha`).
+#
+# QUANTOS ARQUIVOS TOCA: 2 (`deploy.yml`, `next.config.ts`).
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: `a-aba-aberta-sobrevive-ao-deploy`, 8 casos,
+# provado por 6 sabotagens — todas acusadas, inclusive "as duas pontas usam fontes
+# diferentes" e "a fonte não muda a cada deploy".
+#
+# FONTE: doc oficial do Next.js, `deploymentId` — "When the client detects a mismatch
+# between its deployment ID and the server's (via the response header), it triggers a
+# hard navigation (full page reload) instead of a client-side navigation."
+
+# ── 13/09/2026 — Sprint 8: migration da procedência + status da fila ──
+#
+# PEDIDO DO DONO (13/09/2026, verbatim): "eu autorizo e pode seguir para finalizarmos a
+# sprint 8" — em resposta direta a duas coisas que eu tinha dito que exigiam autorização:
+# a coluna de procedência em `pacientes` (S8.2) e o status próprio da fila para evento
+# barrado por revogação (S8.0, que ficou de fora do commit anterior).
+#
+# O QUE AS MIGRATIONS FAZEM:
+#   1. ALTER TABLE pacientes ADD COLUMN origem  <enum>  NULL
+#      ALTER TABLE pacientes ADD COLUMN solicitacao_id text NULL
+#   2. ALTER TYPE parceiro_evento_saida_status ADD VALUE 'cancelado_por_revogacao'
+#
+# PERIGO MEDIDO, item por item:
+#
+#   (1) ADITIVA E NULLABLE, sem default. Postgres 11+ não reescreve a tabela nesse caso —
+#       é mudança de catálogo, não de dados. Nenhuma leitura existente é afetada: toda
+#       query atual lista colunas explicitamente ou usa o query builder tipado. `NULL`
+#       significa "ficha criada antes desta mudança", e o ADR-0022 D-07 exige que esse
+#       caso saia pelo ramo `completo_legado` — nunca tratado como cadastro incompleto.
+#       COMO SE DESFAZ: `ALTER TABLE pacientes DROP COLUMN origem, DROP COLUMN
+#       solicitacao_id`, sem perda de outro dado.
+#
+#   (2) ADD VALUE em enum é aditivo e irreversível no Postgres — não há DROP VALUE. O
+#       risco real é o inverso do usual: código antigo que faça `switch` exaustivo sobre
+#       o status passaria a receber um valor que não conhece. Medido: o único consumidor
+#       do status é `lib/parceiros/enviador.ts`, que compara com literais e não faz
+#       exaustividade. COMO SE DESFAZ: não se desfaz; o valor fica, sem uso, se a decisão
+#       mudar.
+#       ⚠️ ADD VALUE não roda dentro de transação em Postgres < 12. O migrador do
+#       drizzle-orm executa statement a statement, então isto precisa ficar em migration
+#       PRÓPRIA, sem outras instruções junto.
+#
+# QUANTOS ARQUIVOS TOCA: 2 migrations + `db/schema/pacientes.ts` + `db/schema/enums.ts` +
+# `app/_actions/cadastro-por-link.ts` (grava a procedência) + `lib/parceiros/enviador.ts`
+# (usa o status novo).
+#
+# ESTÁ EM PRODUÇÃO? Sim — `main` é produção, e o deploy aplica migration sem rollback.
+# Por isso as duas são aditivas: nenhuma remove nem altera coluna existente.
+#
+# ⚠️ LIÇÃO DE 11/09 QUE SE APLICA AQUI: o banco de desenvolvimento e o de produção são O
+# MESMO (Neon). Uma migration destrutiva contra ele derrubou a reserva de horário naquele
+# dia. Estas duas não removem nada — e é deliberado.
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: os guardas da Sprint 8 —
+# `toda-porta-declara-de-onde-veio`, `a-revogacao-para-a-fila` e o da sentinela.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 15/09/2026 — VER O DOCUMENTO ENVIADO, num modal, nas telas que os listam
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# QUEM AUTORIZOU: o dono, em 15/09/2026, por escrito nesta sessão — "porque você não faz
+# isso... só faça o que eu te pedi até o final, finalizando sempre testando".
+#
+# POR QUÊ: pedido dele em 14/09 — "adicionar a opção de visualizar esses documentos através
+# de um botão que abre um modal com a imagem... isso é essencial até pra validar o que está
+# chegando entre empresas". Hoje a tela diz "✓ rg.jpg", o que afirma que um arquivo CHEGOU,
+# não que ele É o que diz ser: o nome do arquivo é escolhido por quem envia, e um handoff da
+# Greens pode trazer o documento errado sem nada acusar.
+#
+# O QUE MUDA NAS TELAS: acrescenta um botão "Ver". Três delas já linkavam para a MESMA rota
+# (`/api/documentos/{id}/arquivo`) com `target="_blank"` — a mudança é trocar o link pelo
+# modal, não abrir acesso novo. A tela da ANVISA ganha o botão, resolvendo o id pela tabela.
+#
+# QUANTOS ARQUIVOS TOCA: 4 telas. Nenhuma action de escrita, nenhum schema, nenhuma migration.
+#
+# ESTÁ EM PRODUÇÃO? Sim. Por isso a mudança é ADITIVA: nada é removido das telas.
+#
+# ⚠️ NÃO ABRE ACESSO NENHUM. Quem pode ler continua sendo decidido em
+# `garantirLeitorDoDocumento`, na rota — escopo de objeto, 404 para "não é seu", auditoria
+# `visualizar` a cada leitura. O componente não recebe `urlBlob` e a action não o devolve.
+#
+# TESTE QUE PROVA O ANTES E O DEPOIS: `ver-o-documento-passa-pela-porta-autenticada`,
+# 23 casos e 8 sabotagens — inclusive a que troca a rota pela URL do blob.
+#
+path:app/(paciente)/paciente/anvisa/page.tsx
+path:app/(paciente)/paciente/perfil/page.tsx
+path:app/(paciente)/paciente/documentos/page.tsx
+path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx
+
+# ── Autorizado pelo dono em 21/09/2026, na sincronização e no merge do PR #110 ──
+# Reescrever a migration 0044_fancy_galactus.sql para ser IDEMPOTENTE. Palavras dele:
+# "Reescrever a migration 0044 para ser idempotente: ADD COLUMN IF NOT EXISTS ... 
+# CREATE INDEX IF NOT EXISTS ... A FK: envolver em DO $$ BEGIN ... EXCEPTION WHEN
+# duplicate_object THEN NULL; END $$. Não alterar nada além disso na migration."
+#
+# POR QUÊ: medido em 21/09 contra o banco de produção (leitura apenas) — a coluna
+# `autorizacao_anterior_id`, a constraint FK e o índice `autorizacoes_anterior_idx` JÁ
+# EXISTEM lá, sem nenhuma linha correspondente em `drizzle.__drizzle_migrations`. É a
+# assinatura de `drizzle-kit push`, que sincroniza schema direto e não grava journal.
+# O migrator (`dialect.migrate()`) seleciona pendentes por `max(created_at)`, que é
+# 1789271398148 (a 0043) — menor que o `when` da 0044 (1789588306034). Logo a 0044
+# SERÁ tentada, e o `ADD COLUMN` cru falha com `column already exists`.
+#
+# PERIGO MEDIDO de NÃO mexer (o custo de deixar):
+#   · o deploy do merge falha na migration; a transação inteira faz rollback (isso é
+#     correto e não deixa estado parcial), mas o `set -e` para o script DEPOIS de os
+#     steps "Limpar build antigo" (`rm -rf .next`) e "rsync --delete" já terem rodado
+#   · produção fica com o processo PM2 velho servindo HTML cujos chunks foram apagados
+#     do disco → 404 em CSS/JS, sem recuperação automática
+#   · e TODO deploy seguinte falha na mesma migration, inclusive o que corrigiria
+#
+# PERIGO MEDIDO de mexer: baixo e delimitado. Os três statements passam a ser no-op
+# quando o objeto existe e a criar quando não existe — o resultado final do schema é
+# idêntico nos dois casos. Nada é removido, nada é reordenado, o `ALTER ... SET DEFAULT`
+# e o `UPDATE` de dado escrito à mão ficam intactos. O `hash` do arquivo muda, mas a
+# seleção do migrator é por `folderMillis`, não por hash — sem efeito.
+#
+# ⚠️ NÃO É EDIÇÃO DE MIGRATION JÁ APLICADA. A 0044 nunca rodou em lugar nenhum: não
+# está em origin/main e não tem linha no journal do banco. Editá-la agora é corrigir
+# um arquivo que ainda não teve efeito, não reescrever história.
+#
+# PROVA ANTES/DEPOIS: executada contra o banco real dentro de BEGIN … ROLLBACK, com
+# `lock_timeout`, nos dois estados (objeto existente → no-op; objeto ausente → cria).
+#
+# Granularidade deliberada: o ARQUIVO exato, não `db/migrations/`. Autorizar o
+# diretório liberaria qualquer migration futura sem nova decisão.
+path:db/migrations/0044_fancy_galactus.sql
+
+# ── Autorizado pelo dono em 21/09/2026, depois da medição da 0039 ───────────────
+# Criar a migration 0045 para aplicar em produção o que a 0039 nunca aplicou.
+#
+# POR QUE MIGRATION NOVA, E NÃO REESCREVER A 0039: o migrator seleciona pendentes por
+# `max(created_at)` do banco (`dialect.migrate()`), que em produção é 1789271398148 — a
+# 0043. O `when` da 0039 é 1789142042567, MENOR. Ela nunca mais será selecionada, com
+# qualquer conteúdo que tenha. Reescrevê-la seria escrever num arquivo sem efeito.
+# A 0039 fica INTACTA: num banco reconstruído do zero ela aplica, e a 0045 vira no-op.
+#
+# O QUE A 0045 REPARA (medido em produção em 21/09, leitura apenas):
+#   · `consentimentos.idioma` NÃO EXISTE — colunas reais: id, created_at, updated_at,
+#     paciente_id, finalidade, versao, texto_apresentado, concedido_em, revogado_em, origem
+#   · enum `parceiro_evento_tipo` tem só `receita_emitida, anvisa_aprovada` — falta
+#     `cadastro_transferido`
+#
+# PERIGO MEDIDO de NÃO mexer (falha silenciosa ATIVA, não latente):
+#   · `conceder()` (lib/parceiros/consentimento-registrado.ts:104) faz INSERT com `idioma`
+#     → falha SEMPRE. Medido: `consentimentos` tem 0 linhas com 77 solicitações de cadastro
+#   · o chamador (app/_actions/cadastro-por-link.ts:600) envolve em try/catch que só faz
+#     console.error → o cadastro conclui e o consentimento não é gravado, sem ninguém ver
+#   · consequência escrita no próprio código (:593-597): "nada é enviado à Greens" — o S2
+#     não dispara, e a causa está três camadas abaixo de onde se procuraria
+#   · é perda de registro de consentimento LGPD acontecendo em produção agora
+#
+# PERIGO MEDIDO de mexer: baixo. Os dois statements são aditivos e idempotentes. A tabela
+# `consentimentos` tem 0 linhas, então o `NOT NULL DEFAULT 'pt'` não reescreve nada. O
+# `ALTER TYPE ... ADD VALUE` é permitido dentro de transação em PG >= 12 e produção roda
+# PostgreSQL 17.11 (medido) — e o valor novo não é USADO na mesma transação, que é a
+# única restrição que a documentação impõe.
+#
+# SNAPSHOT: o `0044_snapshot.json` JÁ declara `consentimentos.idioma` e o valor de enum.
+# O `0045_snapshot.json` é cópia dele com `id`/`prevId` novos — o estado de schema não
+# muda, muda o banco. Assim um `drizzle-kit generate` futuro não vê diferença pendente.
+#
+# PROVA ANTES/DEPOIS: cenário limpo, cenário repetido, cenário contra o estado real de
+# produção em BEGIN … ROLLBACK, e o cenário VERMELHO que reproduz o INSERT falhando hoje.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0045_idioma_e_cadastro_transferido.sql
+path:db/migrations/meta/0045_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 22/09/2026 ──────────────────────────────────────────
+# A migration da tabela `medicos_mercadopago_conta` (ADR-0024): a conta do médico no
+# Mercado Pago, primeira credencial de terceiro POR MÉDICO e primeira cifra em repouso
+# do repositório (AES-256-GCM, `lib/seguranca/cifra.ts`).
+#
+# PERIGO MEDIDO de mexer: BAIXO, e é o menor possível para uma migration.
+#   · é `CREATE TABLE` de tabela que NÃO EXISTE — nenhuma linha, nenhum consumidor,
+#     nenhuma tela. Puramente aditiva: não altera, não renomeia, não apaga nada
+#   · o único toque em objeto existente é a FK para `medicos(id)`, que só LÊ
+#   · zero código lê ou escreve a tabela hoje — o OAuth e o endpoint de cobrança
+#     ainda não existem (ADR-0024 §9)
+#
+# PERIGO MEDIDO de NÃO mexer: nenhum hoje. A tabela é pré-requisito da integração de
+# pagamento, não correção de falha ativa — ao contrário da 0045, que era.
+#
+# NUMERAÇÃO: nasceu `0046` DE PROPÓSITO. Gerada primeiro como `0044_calm_silver_fox`,
+# ela colidiria com a `0044_fancy_galactus` da ANVISA; foi APAGADA e regerada só depois
+# do merge do PR #110, que levou a 0044 e a 0045 para `main`. Dois arquivos disputando
+# a última entrada do `_journal.json` é conflito que o merge "resolve" enganosamente,
+# porque o arquivo é JSON.
+#
+# PROVA ANTES/DEPOIS: container Postgres 16 descartável — schema real montado com
+# `drizzle-kit push`, a tabela derrubada, a migration aplicada, e conferidos por
+# execução: as 11 colunas, a FK recusando `medico_id` inexistente, o `.unique()`
+# recusando o segundo vínculo do mesmo médico, os defaults, e o migrador de produção
+# rodado DUAS VEZES sem duplicar.
+#
+# ⚠️ A idempotência aqui é do MIGRADOR (o livro-caixa `drizzle.__drizzle_migrations`),
+# não do SQL: o `CREATE TABLE` é cru, sem `IF NOT EXISTS`, como o drizzle-kit gera.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0046_panoramic_chimera.sql
+path:db/migrations/meta/0046_snapshot.json
+
+# ── Autorizado pelo dono em 23/09/2026 ──────────────────────────────────────────
+# A migration preparatória da cobrança real do Mercado Pago (Parte 2, Fase 1 do
+# PLANO_PARTE2_PAGAMENTO_2026-09-23): cartão + PIX, boleto fora desta entrega.
+#
+# O QUE ELA FAZ — tudo aditivo, nada renomeia nem apaga:
+#   · `pagamento_status` ganha 'em_processamento' e 'recusado'
+#   · `pagamentos.gateway_referencia_id` ganha UNIQUE (é por ele que o webhook acha a linha)
+#   · `consultas.pix_valido_ate` (nulo) — a trava da corrida expiração × pagamento: o job
+#     de expiração não pode liberar horário com PIX ainda pagável (Decisão 3)
+#   · `medicos_mercadopago_conta.public_key` (nulo) — guardada, não lida nesta entrega
+#   · tabela nova `mercadopago_eventos_webhook` (fila do webhook, `mp_payment_id` UNIQUE)
+#
+# PERIGO MEDIDO de mexer: BAIXO.
+#   · medido em produção (leitura, BEGIN READ ONLY … ROLLBACK): as 18 linhas de
+#     `pagamentos` têm `gateway_referencia_id` NULO — a UNIQUE nasce sem conflito; o enum
+#     tem só os 5 valores antigos — os `ADD VALUE` crus não colidem
+#   · `ADD VALUE` roda dentro da transação do migrador (permitido desde o PG 12; produção
+#     roda 17.11) e nenhum statement do lote USA o valor novo
+#   · zero código lê ou escreve as colunas/tabela novas hoje — Fases 2 a 5 vêm depois
+#
+# PERIGO MEDIDO de NÃO mexer: nenhum hoje — é pré-requisito, não correção de falha ativa.
+#
+# ⚠️ Para a Fase 3: o MP manda mais de uma notificação por pagamento (created → updated).
+# O conflito em `mp_payment_id` tem de REENFILEIRAR (zerar `processado_em`), nunca
+# `onConflictDoNothing` — senão a notificação da aprovação é descartada.
+#
+# NUMERAÇÃO: `0047`, conferida contra todos os branches remotos e locais em 23/09/2026 —
+# nenhuma outra migration pendente além da `feature/product-catalog-v2` (0018–0020, parada
+# desde 13/08, sem relação).
+#
+# PROVA ANTES/DEPOIS: container Postgres 16 descartável — schema de `origin/main` (SEM a
+# mudança) montado com `drizzle-kit push`, livro-caixa preenchido com 0000–0046 como em
+# produção, e o migrador de produção (`scripts/migrar.mjs`) rodado DUAS VEZES: a 1ª
+# aplica só a 0047 (47 → 48 entradas), a 2ª é no-op. Conferidos por execução, em BEGIN …
+# ROLLBACK: os dois valores novos aceitos em linha, dois NULLs convivendo na UNIQUE de
+# `gateway_referencia_id`, valor repetido recusado nas duas UNIQUE, e o upsert que
+# reenfileira (`on conflict do update set processado_em = null`).
+#
+# ⚠️ A idempotência é do MIGRADOR (`drizzle.__drizzle_migrations`), não do SQL: os
+# statements são crus, como o drizzle-kit gera, sem `IF NOT EXISTS`.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`.
+path:db/migrations/0047_adorable_lily_hollister.sql
+path:db/migrations/meta/0047_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado pelo dono em 23/09/2026, Fase 3 da cobrança do Mercado Pago ─────
+# PEDIDO (verbatim, item 3 da lista da Fase 3): "filas.yml: acrescentar o passo que chama
+# /api/mercadopago/processar".
+#
+# O QUE MUDA: um passo NOVO, independente (`if: always()`), no fim do job — os dois passos
+# existentes (ChatPro e parceiros) não são tocados.
+#
+# PERIGO MEDIDO de mexer: BAIXO. É um `curl` a mais no mesmo cron de 5 min. A rota falha
+# fechada (503 sem CRON_SECRET, 401 com segredo errado) e o passo sai vermelho nesses casos
+# — o mesmo contrato dos outros dois. Não há deploy envolvido: o workflow só chama a URL.
+#
+# PERIGO de NÃO mexer: sem este passo, pagamento cuja notificação se perdeu (webhook mal
+# configurado, `after()` que falhou) nunca se confirma — o paciente paga e fica sem consulta.
+#
+# Granularidade deliberada: o arquivo exato, não `.github/workflows/`.
+path:.github/workflows/filas.yml
+
+# ── Autorizado pelo dono em 23/09/2026 — middleware.ts, caminho EXATO ─────────────
+# PEDIDO (verbatim): "Autorizado explicitamente a editar middleware.ts, só para liberar o
+# caminho exato /api/mercadopago/processar (nunca o prefixo)."
+#
+# O QUE MOTIVOU: medido em produção logo depois do deploy do PR #122 (`d5464fd`):
+# `GET /api/mercadopago/processar` → `307 /entrar`. O Clerk exige sessão antes da rota
+# rodar; o cron do `filas.yml` não tem sessão e exige 200. Reproduzido localmente com o
+# build standalone, com o CRON_SECRET certo: 307.
+#
+# O QUE MUDA: UMA entrada no `isPublicRoute`, o caminho exato. A rota continua autenticada
+# pelo CRON_SECRET (503 sem ele, 401 com o errado, comparação em tempo constante).
+#
+# PERIGO MEDIDO: BAIXO. `'/api/mercadopago/processar'` sem `(.*)` não casa com nenhuma outra
+# rota — provado pelo `createRouteMatcher` do Clerk no guarda
+# `o-cron-chama-rota-que-o-middleware-deixa-passar` (4 controles de prefixo).
+# `/api/medico/mercadopago/*` (OAuth do médico) continua exigindo sessão.
+#
+# Granularidade deliberada: `middleware.ts` NÃO está na lista do hook `escopo-autorizado`;
+# este registro documenta a autorização, não destrava nada.
+
+# ── Autorizado pelo dono em 24/09/2026 — worker das filas no deploy (ADR-0027) ─────
+# PEDIDO (verbatim): "Ajustar deploy.yml para também subir/reiniciar esse segundo processo a
+# cada deploy — sem duplicar o build (o worker usa o Node direto, não precisa do build do
+# Next)". E, na revisão: "No deploy.yml, subir o worker com env -i, passando explicitamente só
+# PATH, HOME (se o Node precisar), PORT e CRON_SECRET — não herdar o ambiente inteiro do .env."
+# E o pedido deste registro: "quero o rastro específico desta mudança."
+#
+# O QUE MUDA: no passo "Reiniciar Servidor (PM2)", depois do behemp-site e antes do
+# `pm2 save`: `pm2 delete behemp-filas` + `env -i … pm2 start scripts/worker-filas.mjs`. A
+# falha do worker é marcada e denunciada DEPOIS do save, para o dump nunca ficar com o
+# caminho antigo do site. Nenhum step existente é removido ou reordenado.
+#
+# PERIGO MEDIDO: BAIXO para o site — o worker sobe depois dele, e sua falha não impede o
+# save. O worker só chama rotas que o filas.yml já chama (FOR UPDATE SKIP LOCKED), e recebe
+# só PATH, HOME, PORT e CRON_SECRET (o resto do ambiente não duplica no dump — Item 43).
+# Guarda: `o-worker-das-filas-nao-para-numa-rota`.
+#
+# (O caminho já estava autorizado desde 20/08; este registro documenta a mudança.)
+path:.github/workflows/deploy.yml
+
+# ── Pedido do usuário em 28/09/2026 — Fase 4 (expiração de reservas), filas.yml e agendamento.ts ─
+# PEDIDO (verbatim): "Adicionar ao filas.yml também (rede de segurança, mesmo padrão das outras
+# 3)" e "Liberar no middleware.ts (mesma correção do Item 41 — caminho exato, nunca prefixo)".
+# REGRA CRÍTICA do mesmo pedido: "nunca cancelar uma reserva com pix_valido_ate > now() nem com
+# pagamento.status = 'em_processamento'".
+#
+# O QUE MUDA:
+#   · `.github/workflows/filas.yml` — um passo NOVO no fim (`if: always()`) que chama
+#     `GET /api/agendamento/expirar`. Os três passos existentes não são tocados.
+#   · `app/(public)/_actions/agendamento.ts` — `expirarReservasVencidasDoPaciente` passa a usar a
+#     MESMA trava (`semPagamentoEmCurso`) nas duas queries. Sem isso, o paciente que volta à tela
+#     para ver o QR code do PIX cancelaria a própria reserva — violaria a regra crítica acima.
+#   · `middleware.ts` (fora do hook) — o caminho EXATO `/api/agendamento/expirar`.
+#
+# PERIGO MEDIDO: a rota cancela reservas e envia e-mail. Remedido em produção (leitura, 28/09):
+# 8 reservas vencidas, 0 com PIX, 0 em_processamento, 7 com o horário JÁ PASSADO — o primeiro
+# ciclo enviaria 8 e-mails de "reserva expirada", o mais antigo com 18 dias de atraso. NÃO
+# COMMITADO; aplicar em produção depende de decisão do dono sobre esses e-mails.
+#
+# (Os dois caminhos já estavam autorizados em 23/09; este registro documenta a mudança.)
+
+# ── Autorizado pelo dono em 28/09/2026 — Fase 5 (Payment Brick), a página do agendamento ────
+# PEDIDO (verbatim, do prompt da Fase 5): "Public key entregue por prop do servidor (Server
+# Component pai busca do ambiente, passa para o Client Component) — nunca hardcoded".
+# RESPOSTA do dono à pergunta sobre o bloqueio do hook: "Authorize page.tsx (Recommended)".
+#
+# O QUE MUDA: a Server Component lê MERCADOPAGO_PUBLIC_KEY_{TESTE,PRODUCAO} — escolhida por
+# MERCADOPAGO_AMBIENTE, como decide `lib/env.ts:120-125` — e passa por prop ao wizard.
+# Nenhuma outra parte da página muda.
+#
+# PERIGO MEDIDO: BAIXO. A public key é pública por natureza (identifica a conta, não autoriza
+# cobrança). O que cobra é o access token do MÉDICO, no servidor. Granularidade: o arquivo exato.
+path:app/(paciente)/paciente/agendamento/page.tsx
+
+# ── Pedido do dono em 28/09/2026 — Fase 5, o schema da action de cobrança ───────────────────
+# PEDIDO (verbatim): "Parcelamento: confirmar na doc do SDK se maxInstallments no Brick fixa em
+# 1, e também capar no schema da action (que hoje aceita até 12) — o servidor decide, não o
+# cliente." DECISÃO DE NEGÓCIO do mesmo dono: "parcelamento só à vista (installments: 1)".
+#
+# O QUE MUDA: `esquemaCartao.installments` passa de `.max(12)` para `.max(1)`. Nada mais no
+# arquivo. PERIGO MEDIDO: BAIXO — nenhuma tela cobra em produção hoje (0 pagamentos
+# `em_processamento`, medido em 28/09); o Brick passa a oferecer só 1x; um envio com mais
+# parcelas é recusado ANTES de chamar o Mercado Pago. Granularidade: o arquivo exato.
+path:app/(public)/_actions/pagamento.ts
+
+# ── Autorizado por DAVI em 29/09/2026, no chat, ADR-0029 D-05 ──────────────────
+# Palavras dele: "temos que tomar cuidado e fazer testes além de pesquisas de técnicas para
+# conseguirmos fazer isso mantendo a integridade dos dados", e em seguida: "eu autorizo".
+#
+# O QUE MUDA: uma migration SÓ ADITIVA — tabela nova `pedidos_atendimento_assistido` e o enum
+# novo do status. Nenhuma coluna, tabela ou valor de enum EXISTENTE é alterado, e nenhuma
+# linha existente é tocada. Desfazer é apagar a tabela e o tipo novos.
+#
+# PERIGO MEDIDO: BAIXO para os dados que existem, porque nada existente muda. O ponto de
+# atenção é o lock: criar a chave estrangeira pede `SHARE ROW EXCLUSIVE` em
+# `autorizacoes_anvisa` e `pacientes` (doc do PostgreSQL 16, CREATE TABLE), por instantes, no
+# deploy. As condições do Davi viram o roteiro da ADR-0029 D-05, item 6: provar em Postgres de
+# Docker com o schema REAL de produção (as migrations não rodam do zero, achado de 13/09), pelo
+# MESMO migrator (`scripts/migrar.mjs`), medir as tabelas existentes antes e depois (contagem e
+# hash), conferir que o `when` da 0050 supera o max(created_at) de produção (senão o migrator a
+# pula em silêncio, como a 0039), e backup conferido antes do deploy.
+#
+# Granularidade deliberada: os arquivos exatos, não `db/migrations/`. O nome sai de
+# `drizzle-kit generate --name pedidos_atendimento_assistido`. ⚠️ Se outra branch gerar a 0050
+# antes, o número muda e esta autorização precisa ser reescrita, não estendida.
+# ⚠️ 30/09/2026: a 0050 foi GERADA DE NOVO nos mesmos três arquivos, depois do DO-76 (rejeitado
+# ANVISA), antes de chegar a produção. Mesma autorização, mesmos caminhos; a prova foi refeita.
+path:db/migrations/0050_pedidos_atendimento_assistido.sql
+path:db/migrations/meta/0050_snapshot.json
+path:db/migrations/meta/_journal.json
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 D-01, D-04.3, D-03 e D-06 ──────────
+# Palavras dele: "pode seguir eu autorizo mas claro com cuidado e revisao".
+#
+# O QUE MUDA, e SÓ ISTO (DO-35: só as linhas do conteúdo, sem formatador no arquivo inteiro):
+#   · app/(paciente)/_actions/anvisa.ts — `definirModalidadeAnvisa` passa a recusar
+#     'representacao' sem pedido de atendimento ativado (`podeEntrarNaRepresentacao`). Quem já
+#     está em 'representacao' (12 em produção, medido em 30/09) segue liberado (D-08);
+#   · app/(paciente)/paciente/anvisa/page.tsx — a etapa 'escolha' sai do caminho; a etapa
+#     'guiada' ganha a área de vídeo, o botão "Atendimento com suporte" (registra o pedido) e,
+#     no fim, "Be4Hope faz por mim" só com o pedido ativado;
+#   · app/(admin)/admin/anvisa/page.tsx — seção nova "Pedidos de atendimento assistido", lista
+#     expansível (Accordion) com Ativar / Desativar. O que já existe na tela não muda.
+#
+# PERIGO MEDIDO: as três estão em produção. A página do paciente tem 1030 linhas e é destino de
+# três caminhos (aviso do painel, destino pós-cadastro, pós-login). A regra do servidor já está
+# provada pelo guarda `o-pedido-de-atendimento-abre-a-procuracao` (33) e pela integração
+# homônima (16), com 9 sabotagens. A condição do Davi, "com cuidado e revisão", vira: build de
+# produção local, os guardas da tela da ANVISA verdes, e revisão do diff antes do commit.
+#
+# Granularidade deliberada: os três arquivos exatos, não as pastas.
+path:app/(paciente)/_actions/anvisa.ts
+path:app/(paciente)/paciente/anvisa/page.tsx
+path:app/(admin)/admin/anvisa/page.tsx
+
+# ── Autorizado por DAVI em 30/09/2026, no chat, ADR-0029 §10 (Fase 2, a chamada de atendimento) ──
+# Palavras dele: "pode seguir para terminar vai ser tudo no mesmo deploy, teste tudo, temos que
+# fazer com segurança e disciplina… você está autorizado a utilizar todo o CLAUDE.md para terminar
+# isso com um código de qualidade e lógica ideal baseada nos nossos alinhamentos".
+#
+# O QUE MUDA: DUAS páginas NOVAS, finas — cada uma só lê o id do pedido e renderiza o componente
+# `components/atendimento/ChamadaDeAtendimento.tsx`. Nenhum arquivo existente dessas pastas muda.
+# O escopo (paciente dono do pedido ou admin) é conferido no servidor, em `lib/auth/escopo-chamada.ts`.
+#
+# PERIGO MEDIDO: baixo para o que existe — rotas novas, que nada no produto chama até o botão
+# "Entrar no atendimento" existir. A 0050 continua só aditiva e ganhou as duas tabelas da chamada
+# (mesmos três arquivos já autorizados, gerados de novo; a prova da D-05 se refaz).
+#
+# Granularidade deliberada: os dois arquivos exatos.
+path:app/(paciente)/paciente/anvisa/atendimento/[pedidoId]/page.tsx
+path:app/(admin)/admin/anvisa/atendimento/[pedidoId]/page.tsx
+
+# ── Autorizado por Davi em 01/10/2026 ───────────────────────────────────────────
+# A espera da teleconsulta (ADR-0029 D-30). Davi escolheu, entre opções: "Autorizo esse arquivo",
+# depois de pedir "vamos aplicar as mesmas telas de animações que montamos aqui na teleconsulta,
+# só que personalizado o texto para médico paciente".
+#
+# O QUE MUDA: no lado do paciente, o bloco "Aguardando médico..." (spinner) vira a espera da
+# chamada, no fundo escuro; e a faixa do microfone passa a existir em estado, para o indicador.
+# Não mudam: a negociação, a sinalização, o consentimento, a sala de espera de antes de entrar.
+#
+# PERIGO MEDIDO: baixo. O bloco trocado só aparece com `!remoteConnected`; o arquivo está fora do
+# Prettier e não será formatado (DO-35); só as linhas do conteúdo mudam.
+#
+# Granularidade deliberada: o arquivo exato.
+path:app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx
+
+# ── Autorizado por Dryelle em 02/10/2026 ────────────────────────────────────────
+# Pedido dela na tarefa "Implementar funcionalidade de criar usuário Admin" e confirmado no chat
+# ("autorizo, pode seguir com o plano"): em Controle > Usuários, um admin cria outro admin pela
+# interface, sem mexer na base. Hoje só dá para criar médico (`criarMedico`) ou PROMOVER quem já
+# existe (`alterarRoleUsuario`).
+#
+# O QUE MUDA: action nova `criarAdminUsuario` em usuarios.ts (Clerk + banco + auditoria), botão
+# "Novo admin" no cabeçalho da página e um diálogo novo. Nenhuma action existente muda de
+# comportamento; `auditarUsuario` só ganha criar no tipo da ação.
+#
+# PERIGO MEDIDO: médio-baixo. Quem cria admin cria acesso total — por isso a action é só do admin
+# (`verificarAdmin`), valida com Zod, NÃO pula a checagem de senha vazada do Clerk e audita
+# (e-mail mascarado). Não toca em migration, schema nem na rota de login.
+#
+# Granularidade deliberada: os três arquivos exatos.
+path:app/(admin)/_actions/usuarios.ts
+path:app/(admin)/admin/usuarios/page.tsx
+path:app/(admin)/admin/usuarios/_components/dialogo-criar-admin.tsx
+
+# ── Autorizado por Dryelle em 15/10/2026 ────────────────────────────────────────
+# Pedido dela na tarefa "Implementar fluxo de envio e assinatura de documentos via DocuSign"
+# (comunicado "Atualização do Programa de Doação") e confirmado no chat ("Autorizo") depois de eu
+# listar os arquivos: o admin dispara o envio manual por paciente, o paciente assina pelo
+# DocuSign em /paciente/documentos e o status volta por webhook + consulta direta à API.
+#
+# O QUE MUDA:
+#   · lib/docusign/docusign-service.ts — só ACRESCENTA: exporta o token JWT que já existia e
+#     adiciona as funções do comunicado (criar envelope, link de assinatura, ler status, baixar
+#     PDF). `criarEnvelopeEmbedded` e `downloadPdfAssinado` da procuração NÃO mudam.
+#   · a tela do paciente ganha a seção do comunicado em /paciente/documentos.
+#   · a aba Documentos do detalhe do paciente (reaproveitada pelo admin) ganha o cartão do
+#     comunicado, com o botão de envio visível só para admin.
+#
+# PERIGO MEDIDO: médio-baixo. A procuração está em produção e usa o mesmo serviço, por isso a
+# mudança é aditiva e sem renomear nada existente. Migration nova (tabela nova, sem alterar as
+# existentes) gerada pelo drizzle-kit — nenhuma migration existente é editada.
+#
+# Granularidade deliberada: os três arquivos exatos.
+path:lib/docusign/docusign-service.ts
+path:app/(paciente)/paciente/documentos/page.tsx
+path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx

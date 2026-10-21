@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Epilogue, JetBrains_Mono, Outfit } from 'next/font/google';
+import { Epilogue, JetBrains_Mono, Outfit, Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 import { ClerkProvider } from '@clerk/nextjs';
 import { ptBR } from '@clerk/localizations';
@@ -41,6 +41,22 @@ const fraunces = localFont({
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains-mono',
   subsets: ['latin'],
+  display: 'swap',
+});
+
+/* ── Sora — display/headings do ambiente interno (sistema Âmbar) ── */
+const sora = Sora({
+  variable: '--font-sora',
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  display: 'swap',
+});
+
+/* ── Plus Jakarta Sans — corpo do ambiente interno (sistema Âmbar) ── */
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: '--font-jakarta',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
@@ -92,7 +108,7 @@ export default function RootLayout({
       <html
         lang="pt-BR"
         suppressHydrationWarning
-        className={`${epilogue.variable} ${fraunces.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full`}
+        className={`${epilogue.variable} ${fraunces.variable} ${outfit.variable} ${jetbrainsMono.variable} ${sora.variable} ${plusJakarta.variable} h-full`}
       >
         <body className="flex min-h-full flex-col bg-background font-sans text-foreground antialiased">
           <Providers>{children}</Providers>

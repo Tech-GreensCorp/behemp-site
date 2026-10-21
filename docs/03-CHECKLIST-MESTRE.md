@@ -1,0 +1,1549 @@
+# Checklist Mestre — Be4Hope / BeHemp
+
+> **Leitura obrigatória em toda sessão.** Diz **o quê** e **quando**.
+> O _como_ está na [LISTA-DE-AFAZERES](04-LISTA-DE-AFAZERES.md). O _por quê_ em [adr/](adr/).
+>
+> 1. Todo achado novo entra aqui, na seção e prioridade certas.
+> 2. Item concluído: `[x]` + data + branch.
+> 3. A **Fila de execução** no rodapé é a ordem oficial. Reordenar é decisão de quem manda.
+> 4. **A fila é atualizada no mesmo commit que conclui o item.**
+
+**Atualizado em 15/10/2026** (achados do guia do Admin e do Médico catalogados: Itens 82 a 87, **não corrigidos**; a fila não mudou). Produção: `main` `6065964` (valor da atualização anterior, **não reconferido** nesta data).
+
+_Versão anterior: "Atualizado em 01/10/2026 (ADR-0029 D-28, a espera da chamada: Item 76 feito local, sem commit; Item 77 catalogado). Produção: `main` `6065964`."_
+
+_Versão anterior: "Atualizado em 30/09/2026 (ADR-0029 entregue; Item 56 fechado na fila). Produção: `main` `6065964`."_
+
+_Versão anterior deste cabeçalho: "Atualizado em 20/08/2026 (execução da Sprint 0). Branch atual: `feat/flow-representatives`."_
+
+---
+
+## Baseline declarada
+
+Números do repositório, para o portão do CI falhar quando **piorar**, não quando estiver
+vermelho.
+
+**Medida por execução em 20/08/2026**, na Sprint 0, com `node_modules` presente. Toda linha
+abaixo é resultado de comando rodado nesta data — nenhuma é copiada de outra doc.
+
+| medição                      | valor                                            | comando                                                                                                                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| problemas de `pnpm lint`     | **342** = **210 erros** + 132 warnings           | `pnpm lint` · 20/08                                                                                                                                                                                                                                            |
+| arquivos fora do Prettier    | **359**                                          | `pnpm format:check` · 20/08 — era 360; o `deploy.yml` entrou em conformidade ao receber o portão, e o teto foi **apertado**                                                                                                                                    |
+| erros de `tsc --noEmit`      | ✅ **0**                                         | `pnpm typecheck` · 20/08 — **primeira medição da história do repo**                                                                                                                                                                                            |
+| runner de teste              | **Vitest 4.1.11**, script `pnpm test`            | `package.json`                                                                                                                                                                                                                                                 |
+| casos de guarda verdes       | **37**, 1 arquivo                                | `pnpm test` · 20/08                                                                                                                                                                                                                                            |
+| arquivos de teste de produto | **0**                                            | `find` por `*.test.ts*`/`*.spec.ts` em `app/ db/ lib/ components/`                                                                                                                                                                                             |
+| passos de verificação no CI  | **4** — type-check, guardas, baseline e build    | `deploy.yml` + `ci.yml` novo · 20/08                                                                                                                                                                                                                           |
+| tabelas em `db/schema`       | **44**, em **33** arquivos                       | `grep -c 'pgTable(' db/schema/*.ts` · **remedido em 25/08/2026** — eram 40 em 20/08; as 4 novas vieram das Sprints 3, 4 e 5 (`medidas_desfecho`, `rastreio_uso_cannabis`, `revisoes_ia`, `rascunhos_revisao_ia`). A doc não estava errada: ficou desatualizada |
+| valores em `userRoleEnum`    | 3                                                | `db/schema/enums.ts:9`                                                                                                                                                                                                                                         |
+| linhas do `CLAUDE.md`        | **205**                                          | alvo documentado: **200** — 🔴 acima                                                                                                                                                                                                                           |
+| skills instaladas            | 20 (7 `agente-*` · 7 `caveman-*` · 6 `metodo-*`) | `.claude/skills/`                                                                                                                                                                                                                                              |
+| `node_modules`               | ✅ presente                                      | `pnpm install` · 20/08, 9,4 s                                                                                                                                                                                                                                  |
+
+### 🔴 O que a medição real desmentiu
+
+A baseline anterior vinha do `AGENTS.md` e **nunca havia sido conferida**. Os dois números
+estavam otimistas — o portão de CI construído sobre eles nasceria vermelho no primeiro dia:
+
+| medição                            | declarado | **real** | diferença |
+| ---------------------------------- | --------- | -------- | --------- |
+| erros de lint                      | 117       | **210**  | **+79 %** |
+| arquivos fora do Prettier          | 233       | **360**  | **+55 %** |
+| arquivos com tabela em `db/schema` | 29        | **33**   | +4        |
+| linhas do `CLAUDE.md`              | 192       | **205**  | +13       |
+
+⚠️ **O `AGENTS.md` continua afirmando 117 e 233.** Ele é protegido por hook de propósito, e
+corrigi-lo é trabalho próprio, com autorização — não se faz de passagem. Até então, vale esta
+tabela, por precedência (`.claude/rules/precedencia-das-instrucoes.md` §1: o código vence a doc).
+
+✅ **A boa notícia é o type-check.** `tsc --noEmit` está em **zero erros**, o que permite pô-lo
+no CI como portão **absoluto** — falha em qualquer erro novo, sem teto de tolerância. Lint e
+Prettier precisam de teto, porque estão vermelhos por baseline.
+
+---
+
+## 🔴 Prioridade 1 — risco agora
+
+- [x] **Item 32 — ✅ CORRIGIDO em 21/09/2026** (causa; efeito ainda não confirmado no fluxo
+      real): **o consentimento LGPD não era gravado em produção**, e o cadastro não
+      acusava. A migration `0039_secret_randall` tem entrada no journal e **nunca foi aplicada**:
+      `consentimentos.idioma` **não existia** e o enum `parceiro_evento_tipo` **não tinha**
+      `cadastro_transferido`. `conceder()` (`lib/parceiros/consentimento-registrado.ts:104`)
+      faz `INSERT` com `idioma` → falha sempre; o chamador
+      (`app/_actions/cadastro-por-link.ts:600`) envolve num `try/catch` que só faz
+      `console.error`. **Medido em 21/09/2026: 0 linhas em `consentimentos` para os 7
+      cadastros que chegaram a ter paciente** (das 77 solicitações, 70 pararam antes). É perda de registro de consentimento acontecendo agora, e é
+      também por isso que a transferência S2 para a Greens nunca dispara — o comentário do
+      próprio código (`:593-597`) escreve o desfecho: _"nada é enviado à Greens"_.
+      🔴 **Reescrever a 0039 não resolve:** o migrator seleciona por `max(created_at)`, que já
+      é o da 0043 — ela é pulada em silêncio para sempre. Correção preparada e provada com 5
+      cenários (`db/migrations/0045_idioma_e_cadastro_transferido.sql`), **aplicada em
+      produção em 21/09** com backup conferido pelo dono, por `pnpm db:migrate:prod`. Depois:
+      a coluna existe, o enum tem o valor, o journal foi de 46 para 48 linhas com as entradas
+      44 e 45, e o `INSERT` do `conceder()` passa. ⚠️ **A 0044 veio junto** — o migrator não
+      aplica uma só, e ela era no-op medido. 🔴 **Falta confirmar o EFEITO:** que um cadastro
+      real deixe linha em `consentimentos`. Diagnóstico e a medição antes/depois em
+      [04 — Item 32](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 40 — ✅ CORRIGIDO na Fase 4, 28/09/2026** · `feat/fase4-expiracao-reservas`: o
+      job `liberarReservasExpiradas` do Inngest **nunca rodou em produção**, e as reservas
+      vencidas travavam horário (**8** remedidas em 28/09, a mais antiga de 10/09). A expiração
+      agora roda no **worker das filas** (ADR-0027), a cada ~60 s, pela rota
+      `GET /api/agendamento/expirar` — sem depender do Inngest nem do `filas.yml`, que roda a
+      cada ~4 h. 🔴 **A regra da Fase 4:** não libera reserva com PIX ainda pagável
+      (`pix_valido_ate > agora`) nem com pagamento `em_processamento`
+      (`semPagamentoEmCurso`, `lib/agendamento/liberar-reservas-expiradas.ts:49`). **Achado no
+      caminho:** `expirarReservasVencidasDoPaciente` (roda a cada vez que o paciente abre a tela)
+      também violava a regra, e passou a usar a mesma trava. O Inngest **continua desligado**, e
+      o job dele delega à mesma função. **Antes do deploy**, as 8 reservas antigas foram
+      canceladas à mão, **sem e-mail**, COMMIT em 28/09 às 08:10 (Brasília), pagamentos
+      intactos (hash antes/depois). Integração 13 casos, guarda novo 5, 12 sabotagens vermelhas.
+      **1538 casos em 68 arquivos** (portão) · **integração 108 em 11**. Ficaram os Itens 45 e 46. Detalhe, IDs e o adendo em
+      [04 — Item 40](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 44 — ⏳ IMPLEMENTADO em 24/09/2026, aguardando o primeiro deploy** ·
+      `feat/worker-filas-pm2`: o **worker das filas no PM2** (`behemp-filas`,
+      [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md), agora
+      aceita). O `filas.yml` roda a cada ~4 h em vez de 5 min; o worker chama as mesmas três
+      rotas a cada 60 s em `127.0.0.1:3000`, e o cron fica como rede. **Sobe com `env -i`** —
+      só `CRON_SECRET/HOME/PATH/PORT` —, para não duplicar no `dump.pm2` os segredos do site
+      (Item 43): medido com PM2 7.0.4, herdando vazava, com `env -i` não. **Não segue
+      redirect**, para o 307 do Item 41 não virar "sucesso". Provado local contra o standalone
+      isolado e sob PM2, com `pm2 resurrect` religando pelo dump. Guarda
+      `o-worker-das-filas-nao-para-numa-rota` (27 casos, 17 sabotagens). **1525 casos em 67
+      arquivos.** 🔴 **Antes do merge:** confirmar `pm2 --version` na EC2. **Depois do deploy:**
+      os dois `online`, `200` nas três rotas e memória (R-01). Detalhe em
+      [04 — Item 44](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 42 — ✅ CORRIGIDO em 24/09/2026, com prova real**: o `pm2 startup` **nunca tinha
+      sido configurado** na EC2 (unit `pm2-ubuntu` `not-found`, máquina de pé havia 49 dias), e
+      um reboot derrubaria produção sem religar. O `pm2 save` de cada deploy gravava um dump que
+      ninguém lia no boot. Correção na EC2, pelo dono:
+      `pm2 startup systemd -u ubuntu --hp /home/ubuntu` + o `sudo` impresso + `pm2 save` →
+      `systemctl is-enabled pm2-ubuntu` = `enabled`. **Prova:** `sudo reboot` às 12:10
+      (Brasília, inferido); `curl` a cada 5 s deu o primeiro 200 às 12:10:44, ~46 s de queda,
+      **zero intervenção manual**. Nenhum arquivo do repositório mudou. Destrava a R-03 da
+      [ADR-0027](adr/ADR-0027-o-worker-das-filas-roda-no-pm2-e-o-github-vira-rede.md).
+      Detalhe em [04 — Item 42](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 41 — ✅ CORRIGIDO em 23/09/2026** · `fix/mercadopago-processar-publico`: o
+      processador do Mercado Pago **exigia login em produção** (`307 → /entrar`, medido logo
+      depois do deploy do PR #122). O cron do `filas.yml` receberia 307 a cada execução e a
+      conciliação nunca rodaria. Defeito meu: a integração chama o handler sem o middleware, e
+      eu não subi o `server.js` antes do deploy. Correção: o caminho **exato** no
+      `middleware.ts` (autorizado), e o guarda `o-cron-chama-rota-que-o-middleware-deixa-passar`,
+      que deriva as URLs do `filas.yml` e casa com o matcher do próprio Clerk (11 casos, 8
+      sabotagens). Provado local: 307 antes; 503/401/200 depois. **Segunda vez desta classe**
+      (Item 21). Detalhe em [04 — Item 41](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 39 — ✅ ENTREGUE em 23/09/2026** · PR #122, **em produção** (`d5464fd`); o
+      processador exigia login até o Item 41: a Fase 3 da cobrança do Mercado Pago. **Rota nova**
+      `POST /api/webhooks/mercadopago` (assinatura `x-signature` conferida com o `data.id` da
+      URL, fila, processamento em `after()`) e `GET /api/mercadopago/processar` (fila +
+      conciliação, chamada pelo `filas.yml`). **Variável nova** `MERCADOPAGO_WEBHOOK_SECRET`
+      (`lib/env.ts`, `deploy.yml`). **Guarda novo** `o-webhook-do-mercado-pago-nao-e-forjavel`
+      (36 casos, 14 sabotagens). **Guardas estendidos:** `as-rotas-sensiveis-tem-limite` (19;
+      achou o `processar` sem limite) e `o-segredo-cadastrado-chega-ao-servidor` (33).
+      Integração contra Postgres real: 13 casos, 12 sabotagens. **1478 casos em 64 arquivos.**
+      🔴 **Antes do deploy:** cadastrar o secret e a URL do webhook no painel do MP. Detalhe em
+      [04 — Item 39](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 48 — ✅ IMPLEMENTADO em 28/09/2026 · ⏳ aguardando merge** ·
+      `feat/fase5-payment-brick`: o **Payment Brick real** na tela do paciente (Parte 2, Fase 5).
+      Antes, a etapa de pagamento era só layout desabilitado e o backend da Fase 2 não tinha quem o
+      chamasse. Crédito e PIX, **só à vista** (no Brick e no servidor), public key do integrador por
+      prop, aviso do webhook por Pusher (só id e estado). 🔴 **"aprovado" não vira "confirmado"**
+      antes do webhook, e **o prazo da reserva não expulsa quem está pagando** — antes, a tela
+      voltava ao começo aos 30 min com o PIX valendo 31. **Médico sem conta do MP** não recebe oferta
+      de pagamento: na escolha (com o interruptor do Item 38 ligado) e na tela (sempre). Guarda 39,
+      integração 13, 17 sabotagens. **1577 casos em 69 arquivos** · **integração 121 em 12**. ⚠️ O
+      Brick real não renderizou local (sem public key). Ficaram os Itens 46 e 47. Detalhe em
+      [04 — Item 48](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 38** — ⏳ **o bloqueio de agendamento do Mercado Pago está PRONTO e DESLIGADO**,
+      e ligar cedo para a plataforma inteira. `reservarConsulta`
+      (`app/(public)/_actions/agendamento.ts`) recusa a reserva quando o médico não tem conta
+      do Mercado Pago conectada — é a regra final, e é também mudança visível ao paciente.
+      🔴 **A tabela `medicos_mercadopago_conta` está VAZIA** (medido em produção em 22/09/2026,
+      logo depois da migration `0046`): com o bloqueio ativo, **nenhum paciente agenda com
+      nenhum médico**, no mesmo segundo. Por isso a checagem passa por
+      `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO`, cujo padrão é `inativo` — mesmo desenho de
+      `PARCEIRO_TRANSFERENCIA_ATIVA`: a trava fica no código e o que muda é o valor.
+      ⚠️ **Antes de ligar há um passo manual que NENHUM código confere:** todo médico ativo
+      precisa ter conectado a conta. Com a flag desligada, o agendamento grava `console.warn`
+      a cada reserva de médico sem conta **sem bloquear ninguém** — é por ali que se mede
+      quantos faltam, em vez de descobrir pelo paciente. ⛔ **Não ligar junto do merge:** merge
+      e ativação são dois eventos, e o interruptor existe para separá-los. Procedimento, a
+      query de conferência e o que não fazer em [04 — Item 38](04-LISTA-DE-AFAZERES.md).
+      ⚠️ **Falta guarda:** nada impede alguém de trocar `podeAgendarCom` por `estaConectado` e
+      ressuscitar o bloqueio incondicional.
+- [ ] **Item 33** — 🔴 **`erro.name` num `new Error` é sempre `'Error'`**, e foi isso que
+      escondeu o Item 32. `app/_actions/cadastro-por-link.ts:606-609` loga
+      `erro: erroDoConsentimento.name` — em produção, `{ erro: 'Error' }` para qualquer causa.
+      A mensagem real nunca chegou a lugar nenhum. É a mesma classe que o guarda
+      `o-motivo-do-erro-diagnostica-sem-vazar` existe para impedir, voltando por uma porta que
+      ele não olha: ele cobre o helper de formatação, não um `console.error` escrito à mão.
+      Correção proposta e o equilíbrio entre "dizer de menos" e "vazar PII" em
+      [04 — Item 33](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido.**
+
+- [x] **Item 37 — ✅ RESOLVIDO em 12/09/2026:** seis defeitos que quebravam o fluxo da Greens
+      de ponta a ponta. O cadastro virava falha **depois** de gravar tudo (conta, ficha e link
+      consumido) e a tela negava, sem volta; os **dois** destinos pós-cadastro levavam a 404
+      (`/agendamento` e `/paciente/teleconsulta`), o que atingia quase todo paciente da Greens;
+      a tela da ANVISA pedia documento que o parceiro já mandou; o login não voltava ao cadastro
+      e podia levar **para fora** (OWASP A01); uma aba aberta durante o deploy quebrava; e o
+      Firefox não conseguia se cadastrar. Diagnóstico e o que ficou de fora em
+      [04 — Item 37](04-LISTA-DE-AFAZERES.md). **7 guardas novos, 1104 casos em 42.**
+      ⚠️ **Um guarda existente CONGELAVA um dos defeitos** — comparava os destinos com uma lista
+      fixa que continha os dois 404. Ficava verde com o paciente caindo em 404, e ficou vermelho
+      quando o defeito foi corrigido. Retificado.
+- [ ] **Item 36** — 🔴 **produção autentica por uma instância de DESENVOLVIMENTO do Clerk**
+      (`relative-blowfish-96.clerk.accounts.dev`, `pk_test`). Medido na própria instância:
+      `instance_environment_type = "development"` e `captcha_enabled = true`. O cadastro falha
+      com `captcha_missing_token` (400) depois de o Turnstile recusar o challenge (401) — os
+      dois códigos reproduzidos fora do navegador. O `clerk.be4hope.org` está no CSP
+      (`next.config.ts:108,112`) e **não resolve**: a instância de produção nunca foi criada.
+      🔴 **Risco aberto não medido:** se a base de usuários atravessa de uma instância para a
+      outra. **Decisão do dono**, com o custo em [04 — Item 36](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 6** — 🔴🔴 **todo upload está em store PÚBLICO do Vercel Blob**: 10+ pontos, com
+      RG, comprovante de residência, laudo médico, receita, exames e procuração assinada. Quem
+      tem a URL lê **sem autenticação**. E `db/schema/prescricoes.ts:23` **afirma** _"URL
+      privada, acesso autenticado"_ — o código contradiz a doc. Diagnóstico e perigo medido em
+      [04 — Item 6](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 11 — ✅ CORRIGIDO em 20/08** (autorizado pelo dono; commit pendente, `DO-20`):
+      **qualquer usuário autenticado podia entrar na teleconsulta de qualquer outro.** `app/api/pusher/auth/route.ts:72-80` autoriza o canal
+      `presence-sala-{roomId}` **sem verificar vínculo com a sala**, e
+      `app/api/teleconsulta/sinalizar/route.ts:8-30` aceita `roomId` arbitrário do body. Juntos,
+      permitem assinar o canal de uma consulta alheia e negociar WebRTC nela. Mais 5 ocorrências
+      da mesma classe — incluindo `aprovar-narrativa`, onde **qualquer médico escreve evolução
+      clínica no prontuário de qualquer paciente**. O consentimento LGPD é **autodeclarado pelo
+      cliente**, e a auditoria **não registra quem agiu**. Diagnóstico completo, com os 3
+      controles corretos e o perigo medido, em [04 — Item 11](04-LISTA-DE-AFAZERES.md).
+      **Corrigido com o helper único `garantirDonoDaSala` + guarda de 19 casos, nascido
+      vermelho nas 7 e provado por 8 sabotagens.** A baseline **melhorou** em 2 warnings; o
+      type-check segue em 0.
+- [ ] 🔴🔴 **Dois dos três seeds NÃO recusam rodar em produção** — medido em 25/08/2026.
+      `db/seed.ts` e `db/seed-produtos.ts` não têm nenhuma trava; só `db/seed-perfis-teste.ts`
+      tem, e a dele é **dupla** (`NODE_ENV=production` **e** URL de Neon — a segunda existe
+      porque `NODE_ENV` pode não estar definido num terminal qualquer). `pnpm db:seed` com a
+      variável de produção carregada insere **paciente fictício no banco real**: num sistema de
+      saúde isso é **contaminação de prontuário**, não incômodo de ambiente.
+      ⚠️ **Agravado pelo momento:** o próximo passo do projeto é rodar seed para preparar o QA
+      (`DO-53`) — exatamente quando alguém digita o comando sem pensar. **Perigo de mexer:
+      BAIXO** (bloco aditivo, padrão já existe em `seed-perfis-teste.ts:60`).
+      Ver [04 — Item 17.1](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴 **37 de 44 tabelas ficam sem dado de seed** — os três seeds populam 7. Ficam vazias
+      `triagens`, `consultas`, `teleconsultas`, `anamneses`, `dosagens`, `prescricoes`,
+      `revisoes_ia`, `notificacoes` e mais 29. **Bloqueia o QA de ponta a ponta**: tela vazia é
+      indistinguível de bug para quem testa. Ver [04 — Item 17.2](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴🔴 **PENDÊNCIA 1 DO TURN — criar a conta na Cloudflare e provisionar as chaves.**
+      `CLOUDFLARE_TURN_KEY_ID` e `CLOUDFLARE_TURN_API_TOKEN` estão **vazias**. Enquanto
+      estiverem, a videochamada usa **só STUN**: funciona na maioria das redes, mas **conexão
+      que precise de retransmissão falha**, com aviso na tela. Onde obter: painel da Cloudflare
+      → Realtime → TURN. O token é de servidor e nunca vai ao cliente. **Responsável: dono /
+      infra.** Ver [ADR-0008](adr/ADR-0008-turn-contratado-para-a-midia-da-teleconsulta.md) §4.
+- [ ] 🔴🔴 **PENDÊNCIA 2 DO TURN — o Jurídico assinar o DPA da Cloudflare.** 🛑 **Nenhuma
+      consulta real deve trafegar por lá antes disso.** A Cloudflare **não lê** a mídia (cifrada
+      por DTLS), mas **vê o IP** de médico e paciente — e IP é dado pessoal, o que a torna
+      **operadora** sob a LGPD. Sem contrato, é o mesmo defeito que a troca do relay público veio
+      corrigir. **Responsável: Jurídico** (mesma trilha de `CF-01` e `GAP-06`).
+- [ ] 🔴 **`GAP-15` — quem recusar o consentimento tem outra via de atendimento?** Decide se o
+      bloqueio de `DO-22` é **válido**: consentimento obtido sob pena de perder a consulta não é
+      livre (LGPD art. 8º, §3º) e é **nulo**. Havendo alternativa real, o bloqueio é legítimo.
+      **Responsável: dono.**
+- [x] **✅ FEITO em 20/08 — o consentimento LGPD passou a ser perguntado, e bloqueia a IA**
+      (`DO-23`, [ADR-0007](adr/ADR-0007-consentimento-da-gravacao-de-teleconsulta.md)). Tela nas
+      **duas** pontas, botão grande, o efeito da recusa dito **antes** da escolha, aceite dos
+      **dois** lados, registro com **quem/quando/versão do texto**, e revogação. A **consulta
+      não é bloqueada** — base legal própria (LGPD art. 11, II, "f"), o que mantém o aceite
+      livre e portanto válido. Guarda de **20 casos**, 7 sabotagens. ⚠️ **O texto é rascunho e
+      não coleta aceite em produção** até revisão jurídica.
+- [ ] 🔴 **`ADR-0007` §4 — falta o texto definitivo do consentimento e 3 decisões:** granularidade
+      (aceite único × separado), **prazo de retenção**, e se a revogação apaga evolução clínica já
+      assinada. **Responsável: dono + Jurídico.** Enquanto não vier, o recurso fica desligado em
+      produção por `CONSENTIMENTO_PRONTO_PARA_USO = false`.
+- [ ] ⚖️ **DECISÃO DE NEGÓCIO/JURÍDICA PENDENTE (não é achado técnico) — NFS-e automática para o
+      paciente, em nome de cada médico.** Hoje o sistema não emite nota nenhuma, e o split já está em
+      produção. Faltam 4 respostas: PF ou PJ, municípios, guarda do certificado A1 e nome na nota
+      quando o cartão é de terceiro. **Responsável: Diniz + Jurídico da Greens** (reunião em
+      01/10/2026). 🛑 Nada se implementa antes disso. Ver [04 — NFS-e](04-LISTA-DE-AFAZERES.md).
+- [x] ~~O consentimento LGPD da teleconsulta não é perguntado a ninguém~~ —
+      `components/teleconsulta/GlobalTeleconsultaHost.tsx:83` é `useState(true)`, **sem setter
+      e sem UI**. O campo existe no schema e é gravado sempre como aceito. A LGPD (art. 5º,
+      XII) exige manifestação **livre, informada e inequívoca**. 🔴 **Não corrigido de
+      propósito:** criar a tela e o texto do consentimento é decisão de produto e do Jurídico.
+      Ver [04 — Item 11](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 1** — `pnpm db:migrate` roda contra produção **sem ensaio**, e sem rollback, num
+      servidor de 2 GB. Ver [04 — Item 1](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 3 — FEITO em 20/08 (Sprint 0).** O portão existe, está provado por sabotagem e
+      **está ligado ao CI em dois lugares** (`DO-18`): `ci.yml` novo (PR e push de branch) e
+      enxertado no `deploy.yml` nos steps 5–7, **antes** do build, do rsync e do `pnpm
+db:migrate`. Se falhar, nada chega ao servidor e nenhuma migration é aplicada.
+      Autorização escrita em `.claude/autorizacoes.txt`, com granularidade de **dois caminhos
+      exatos** — qualquer outro workflow continua bloqueado. ⚠️ Os workflows **ainda não
+      rodaram no GitHub**: nada foi commitado nem enviado (`DO-20`).
+
+## 🟠 Prioridade 2 — custa depois
+
+- [ ] **Item 50 — 🟡 IMPLEMENTADO em 28/09/2026, tela não provada no navegador** ·
+      `docs/adr-0028-identidade-na-etapa-1` (não commitado): **a identidade se confere na
+      ETAPA 1 do cadastro**
+      ([ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md),
+      plano em [PDF](planos/PLANO-IDENTIDADE-NA-ETAPA-1.pdf)). **O pedido** (`DO-59` a `DO-63`):
+      conferir CPF, telefone e e-mail (sem nome parecido), conta existente e sessão aberta
+      **antes** de a pessoa preencher o resto; logado em outra conta, "é você?" com **Sair que
+      continua no formulário**; CPF que bate vai ao **suporte da BeHemp**; vale para **todas** as
+      portas. **Entregue:** a etapa 1 confere no servidor; o "é você?" abre a etapa 1 e o "Sair"
+      fica na página; CPF em outra conta vai ao suporte com o protocolo, e a action final recusa
+      **antes** de escrever; o limite para de responder depois de 5 conferências, sem travar;
+      respostas A, B, C e E em `DO-64` a `DO-67`. **O desenho:** a conferência fica no nosso
+      formulário, nunca no handoff nem no `/bot-link` (a Greens perderia a jornada e o desconto),
+      e a tela recebe **veredito, nunca o dado** da outra conta (`OWASP-01`, `LGPD-06` a
+      `LGPD-09`). **Provado:** guarda de 36 casos, integração de 21, 16 sabotagens vermelhas,
+      `pnpm build` verde. **Segunda rodada e revisão pelos quatro agentes (ADR-0028
+      §9.1–9.2):** o telefone de outra conta trava o campo, com saída (`DO-68`); a senha some
+      com qualquer aviso; as recusas da action final têm limite; o login não recria a ficha; a
+      referência do CPF é o e-mail do link. Guarda 49, integração 28, **33 sabotagens**, suíte
+      1587/69. 🔴 **Falta:** ver o clique rodando (exige `CLERK_SECRET_KEY` de desenvolvimento no
+      `.env`), o `SELECT` do passo 0 na VPS (já testado local), o complemento de _"o que eu
+      quero que você tome cuidado"_, e commit e PR. O que ficou de fora é o Item 54. Detalhe em
+      [04 — Item 50](04-LISTA-DE-AFAZERES.md).
+- [ ] **Item 2** — 8 uniões literais de role escritas à mão divergem do `userRoleEnum` em
+      silêncio; `app/(admin)/_actions/usuarios.ts:66` é **cast**, não validação.
+- [ ] **Item 4** — `prescricoes.medicamentos` é JSONB de texto livre sem FK para `medicamentos`:
+      nenhuma soma por medicamento é confiável.
+- [ ] 🔴🔴🔴 **O MÓDULO DE IA CLÍNICA PODE SER DISPOSITIVO MÉDICO — ANVISA RDC 657/2022.**
+      Descoberto em 20/08 ao esgotar as fontes do domínio. **Esta norma não estava no plano.**
+
+      A RDC 657/2022 regula **software como dispositivo médico** (`ANV-01`), e as exclusões do
+      Art. 1º §2º (`ANV-03`) cobrem bem-estar, administrativo-financeiro e processamento
+      demográfico **sem finalidade clínica**. Um módulo que **sugere hipóteses diagnósticas** não
+      se encaixa em nenhuma delas. Se é SaMD, exige **regularização** — notificação ou registro,
+      com classe pela RDC 185/2001 (`ANV-04`).
+
+      🎯 **Ainda não há risco em operação:** o motor não está ligado, e tela sem motor não tem
+      finalidade diagnóstica ativa. Foi a ordem da ADR-0002 (UI antes da inteligência) que deu
+      essa folga — sem querer, ela protegeu o projeto.
+
+      🔴 **O que precisa acontecer antes da Metade 2 (ligar o motor):**
+      1. **Assuntos Regulatórios determinar o enquadramento** e a classe. Não é engenharia que
+         decide, e não é leitura de blog que resolve — a RDC 185/2001 precisa ser lida
+      2. se for SaMD, **regularizar antes do uso clínico** — não depois
+      3. reavaliar o cronograma da Metade 2 com o prazo regulatório dentro dele
+
+      ⚠️ **Não é bloqueio da Metade 1.** Construir tela sem motor segue permitido. O que não pode
+      é **ligar o motor** e atender paciente sem essa resposta.
+
+- [x] **✅ FEITO em 20/08 — consentimento de TELECONSULTA implementado** (CFM 2.314/2022 Art. 15,
+      `CFM-01`/`CFM-02`). Tela própria no lobby do paciente, **bloqueando a entrada na sala**;
+      aceite só do paciente (a norma nomeia o titular); exceção de **emergência médica** com
+      motivo obrigatório; e o texto diz que dados podem ser compartilhados e que **negar é
+      direito**. Migration `0020` aplicada **em localhost**. ⚠️ O texto é **rascunho** e não
+      coleta aceite em produção até revisão jurídica.
+- [x] ~~FALTA O CONSENTIMENTO DE TELECONSULTA — exigido pela CFM 2.314/2022, Art. 15~~
+      (`CFM-01`, `CFM-02`). Descoberto em 20/08 ao transcrever a norma, **depois** de a
+      implementação do consentimento de IA estar pronta. São **dois** consentimentos distintos:
+
+      | # | consentimento | fundamento | bloqueia |
+      |---|---|---|---|
+      | 1 | atendimento por telemedicina | **CFM 2.314 Art. 15** | 🔴 a teleconsulta — **falta** |
+      | 2 | transcrição e IA | LGPD art. 11, I | só a IA — ✅ feito em 20/08 |
+
+      ⚠️ **A análise que levou a `DO-23` estava incompleta:** olhou LGPD e não olhou CFM. Base
+      legal dispensa consentimento como fundamento de tratamento de dado; **não dispensa norma
+      ética que exige autorização para o ato**. Retificação em
+      [ADR-0007 D-08](adr/ADR-0007-consentimento-da-gravacao-de-teleconsulta.md).
+
+      **O que falta:** tela própria bloqueando a entrada na sala · o aceite **no prontuário**
+      (`CFM-01` diz "SRES", não coluna solta) · o texto dizendo que dados podem ser compartilhados
+      e que **negar é direito** (`CFM-02`) · a exceção de **emergência médica**.
+
+- [ ] 🔴🔴 **PROVA DE QUE O NEON DIVERGIU DO JOURNAL — achado em 20/08/2026.**
+      `db/migrations/0007_add_medico_ordem.sql` existe **no disco e FORA do journal**: a posição
+      0007 registra `0007_wet_sharon_ventura`, outro nome. É uma migration **escrita à mão**, que
+      `pnpm db:migrate` **nunca aplica**.
+
+      O conteúdo dela não é inócuo:
+      ```sql
+      ALTER TABLE "medicos" ADD COLUMN "ordem" integer;
+      ALTER TABLE "medicos" ALTER COLUMN "crm" DROP NOT NULL;
+      ```
+
+      **Como isso apareceu:** ao subir o localhost, a home quebrou com
+      `column medicos.ordem does not exist` — porque o banco local tem só o que o journal manda.
+      **Em produção a coluna existe**, logo alguém rodou aquele SQL à mão no Neon.
+
+      🔴 **Consequência para a reconciliação:** o risco que o procedimento abaixo prevê **está
+      confirmado**, não é hipótese. O Neon tem ao menos uma alteração fora do journal, e um
+      `db:migrate` que suponha o contrário pode falhar no meio — sem rollback.
+
+      **O que fazer:** decidir se a 0007 manual entra no journal (com o snapshot recalculado) ou
+      se o journal é reconciliado contra o estado real do Neon. É trabalho próprio, e precisa de
+      autorização — mexer em journal é mexer no que o `db:migrate` acredita.
+
+- [ ] 🔴 **QUATRO migrations aplicadas em LOCALHOST, nunca no Neon** (`DO-34`) — `0018`
+      (consentimento IA + enums), `0019` (anamnese-baseline), `0020` (consentimento teleconsulta),
+      `0021` (revisão humana). Banco: container `behemp-postgres-dev`, porta 5436, criado para
+      isto. **Nada foi aplicado no Neon e nada foi para `main`.** Todas 100 % aditivas —
+      conferido linha por linha: zero `DROP`, zero `ALTER COLUMN`, zero `SET NOT NULL`.
+
+      🔴 **Ainda falta aplicar no Neon**, quando o dono mandar. Procedimento de reconciliação:
+
+- [ ] ~~DUAS migrations geradas e NÃO aplicadas~~ — `0018_nifty_xavin` (consentimento + enums
+      de IA clínica) e `0019_cheerful_ricochet` (anamnese-baseline: 2 tabelas, 6 enums).
+      🛑 **Condição do dono em 20/08:** _"contanto que não subamos para main ou para neon (…)
+      temos que garantir a compatibilidade para quando (eu mandar) subirmos a main e dps
+      fazermos a reconciliação com banco neon"_.
+
+      **Antes de aplicar — procedimento de reconciliação:**
+
+      1. **Conferir se o Neon divergiu do journal.** `db/migrations/meta/_journal.json` tem 20
+         entradas (0–19). Se o banco tiver mudança feita à mão, ou migration aplicada fora do
+         journal, `db:migrate` falha no meio — e **não há rollback** (Item 1).
+      2. **Ensaiar num banco de cópia primeiro.** É o próprio Item 1 desta lista, ainda aberto.
+      3. **Aplicar na ordem**: 0018 antes de 0019.
+      4. **Verificar o que cada uma faz** — as duas são **aditivas**, conferido linha por linha:
+         `CREATE TABLE`, `CREATE TYPE` e `ADD COLUMN` nullable. Zero `DROP`, zero `ALTER COLUMN`,
+         zero `SET NOT NULL`. Nenhuma coluna existente muda de tipo ou de obrigatoriedade.
+      5. Se uma tabela já existir no Neon, o `CREATE` **falha visivelmente** — não corrompe.
+
+      ⚠️ **Sem estas duas, o código novo compila mas não grava:** o consentimento LGPD da Sprint 1
+      e toda a anamnese-baseline da Sprint 3 dependem de colunas e tabelas que ainda não existem
+      no banco.
+
+- [ ] ~~Aplicar a migration `0018_nifty_xavin.sql`~~ — gerada em 20/08, **não aplicada**.
+      Traz os 2 enums de IA clínica **e** as 7 colunas de consentimento. Sem ela, o consentimento
+      LGPD da Sprint 1 fica **inerte**: as colunas não existem no banco. É aditiva (só `CREATE
+TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem rollback (Item
+      1). **Quando aplicar é decisão do dono.**
+- [x] **Runner de teste instalado** — Vitest 4.1.11, `pnpm test`, e o guarda dos hooks migrado
+      de bash para Vitest com **35 casos** (os 34 originais + 1 que a sabotagem exigiu) · 20/08
+
+## 🟡 Prioridade 3 — dívida que encarece o resto
+
+- [ ] `interface ActionResult` duplicada em **10+** arquivos de action.
+- [ ] Sidebar duplicado em 3 arquivos (284 + 221 + 219 linhas). Extrair genérico tocaria 3 áreas
+      em produção.
+- [ ] `components/ui/table.tsx` existe e é usado em **0** arquivos.
+- [ ] `docs/historico/2026-09-organizacao/integracoes.md` (pré-existente, commit `f49f4bb`; arquivado em 21/09/2026) cita três arquivos que **não
+      existem**: `lib/integrations/resend/client.ts`, `.../google-calendar/client.ts`,
+      `.../blob/client.ts`. E o de Resend contradiz o `AGENTS.md`, que diz que o e-mail é Brevo.
+- [ ] 🔴 **A skill `cavecrew` está quebrada como instalada:** o `README.md` dela referencia
+      `.claude/agents/cavecrew-{investigator,builder,reviewer}.md`, e **esses arquivos não
+      existem**. Mais 5 skills `caveman-*` com link morto para `../../README.md`. Pré-existentes,
+      não corrigidos.
+
+## ⚪ Achados catalogados, sem data
+
+Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
+de passagem.**
+
+- [ ] ⚪ **Item 56 — CATALOGADO, 30/09/2026 (baixa prioridade): o Brick promete "Parcelamento
+      disponível" num pagamento só à vista.** Medido no Payment Brick real (chave `TEST-`,
+      Chrome headless): com `minInstallments: 1` e `maxInstallments: 1`, o seletor de parcelas
+      **some** (o controle com 12 o mostra), mas o selo verde sob "Cartão de crédito" continua.
+      A doc tem a chave — `texts.paymentMethods.creditCardValueProp` — e ela **não está tipada**
+      no `@mercadopago/sdk-react@1.0.7` (os textos do Payment só cobrem pagador e endereço); a
+      doc diz ainda que texto vazio é ignorado. **Decisão do dono, 30/09: sem cast neste SDK.**
+      Caminhos: atualizar o SDK se uma versão tipar a chave, e trocar o texto (ex.: "À vista").
+      Nenhuma opção `hide*` tipada cobre o selo. O servidor já recusa mais de 1 parcela
+      (`app/(public)/_actions/pagamento.ts:38`), e o `formData` chega com `installments: 1`
+      (`number`) — medido submetendo com cartão de teste.
+- [ ] 🟠 **Item 55 — CORRIGIDO no código em 28/09/2026 · ⏳ falta a prova manual**: **todo
+      pagamento com cartão parava antes do servidor.** O Brick envia
+      `selectedPaymentMethod: 'credit_card'` (enum `dm` do bundle servido em `http2.mlstatic.com`),
+      e nós comparávamos com
+      `'creditCard'` — a tipagem do `@mercadopago/sdk-react`, errada em relação ao runtime. A tela
+      dizia _"Este meio de pagamento não está disponível"_ e a cobrança nem era pedida; o PIX não
+      era afetado. Os testes tinham a mesma premissa e passavam. Corrigido (aceita os dois; débito
+      segue fora), com log do porquê no navegador, sem dado de cartão. **A prova real é manual**
+      (iframes cross-origin): os passos, com os cartões de teste da doc oficial, em
+      [04 — Item 55](04-LISTA-DE-AFAZERES.md). `25003100` não identificado.
+- [ ] ⚪ **Item 54 — CATALOGADO, 28/09/2026: o que a revisão do Item 50 deixou fora dele.** São
+      nove pontos: o `x-forwarded-for` no nginx (medir na VPS); telefone de médico ou admin
+      trava paciente (**dono, 28/09: não agora**); `porClerk` sem `deletedAt`; TOCTOU sem índice;
+      varredura sem índice; auditoria do `limite` sem teto; **a Greens com handoff pendente sem
+      motivo visível (avisar pela Ponte)**; `emailAddresses[0]` em vez do principal; e o texto
+      sob o ícone de check. Detalhe em [04 — Item 54](04-LISTA-DE-AFAZERES.md).
+- [ ] ⚪ **Item 53 — CATALOGADO, 28/09/2026: o guarda de limite só enxerga Route Handler.** A
+      lista é fixa (`__tests__/guardas/as-rotas-sensiveis-tem-limite.test.ts:30`), e nenhuma Server
+      Action usa `consumir`, nem as públicas do `/cadastro`. O Item 50 cobre a dele. Derivar as
+      actions é trabalho próprio. Também registra que o Strict do Clerk fica para decisão do dono
+      (ADR-0028 D-10). Detalhe em [04 — Item 53](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 52 — CATALOGADO, 28/09/2026: o CPF não tem unique, e é gravado em dois formatos.**
+      `pacientes.cpf` é texto, sem índice (`db/schema/pacientes.ts:30`). O perfil
+      (`app/_actions/perfil-paciente.ts:200`) grava o CPF como foi digitado, e o handoff grava só
+      dígitos. Ficha duplicada nasce sem erro. O Item 50 contorna com `regexp_replace`, sem migrar.
+      A causa fica aqui: normalizar, unique e cifra são três trabalhos com migration. Detalhe em
+      [04 — Item 52](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 51 — CATALOGADO, 28/09/2026: o ChatPro reaproveita a solicitação pelo telefone
+      sem conferir se o e-mail é de outra pessoa.** `buscarAtiva` (`lib/chatpro/solicitacao.ts:159`)
+      reaproveita pelo telefone e faz `email: params.email ?? existente.email` (`:243`). O handoff
+      tem a trava (`lib/parceiros/handoff.ts:422-434`), e o ChatPro não. Duas pessoas no mesmo
+      aparelho podem receber a mesma solicitação: é OWASP API1. Achado no Item 50. **Autorização**
+      antes de mexer. Detalhe em [04 — Item 51](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 49 — ✅ CORRIGIDO em 28/09/2026 · aguardando merge (PR #131)**: `POST /api/pusher/auth`
+      **negava todo canal pessoal e todo chat desde 09/09**. Os ramos `private-user-` e
+      `private-chat-` só recusavam e, na permissão, caíam no default que `e65771d` passou a fazer
+      negar (`Canal não reconhecido`, `:108`). Afetava o aviso de pagamento, o aviso de
+      teleconsulta e o chat em tempo real. Cada ramo agora autoriza no próprio ramo; o default segue
+      negando. Integração nasceu vermelha (6 casos) e guarda no portão (6 casos, vermelho contra a
+      rota de produção). Ficaram catalogados: `private-sala-*` sempre 403 (`CopilotClinico.tsx:44`,
+      ninguém publica) e `users.clerk_id` sem `unique` (0 duplicatas hoje). Detalhe em
+      [04 — Item 49](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 47 — CATALOGADO, 28/09/2026: o PIX pedido de novo depende da memória do Mercado
+      Pago sobre a chave de idempotência.** O QR code não é gravado; depois de um reload, _"Mostrar
+      o QR code de novo"_ refaz o pedido e só recebe o MESMO PIX se o MP lembrar da chave, e a doc
+      não diz por quanto tempo. Se não lembrar, um segundo PIX sobrescreve a referência, e pagar o
+      primeiro vira `'desconhecido'` no webhook. 🔴 E o comentário de `cobranca.ts:333-334` promete
+      um fallback por `external_reference` que o processamento **não** tem. **Decisão do dono:**
+      guardar o QR code — **não implementar agora**. Detalhe em
+      [04 — Item 47](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 45 — CATALOGADO, 28/09/2026: um PIX que nunca se resolve trava o horário além
+      da janela da conciliação.** A Fase 4 não libera reserva com pagamento `em_processamento`,
+      mesmo com o PIX vencido (é a regra). Se a notificação de cancelamento do MP se perder, a
+      conciliação só olha as últimas **24 h** (`lib/mercadopago/notificacoes.ts:88-99`): depois
+      disso o pagamento fica `em_processamento` para sempre e o horário nunca é liberado.
+      Precisa de verificação periódica contra a API, a desenhar. **Hoje: 0 casos** (nenhuma tela
+      cobra ainda). Query de medição e diagnóstico em [04 — Item 45](04-LISTA-DE-AFAZERES.md).
+- [ ] 🟠 **Item 46 — CATALOGADO, 28/09/2026: três outros caminhos cancelam reserva sem olhar o
+      pagamento em curso** — `confirmarConsultaPaga` sem `ignorarPrazo`
+      (`lib/agendamento/confirmar-consulta-paga.ts:102`), `iniciarAguardoPagamento`
+      (`app/(public)/_actions/agendamento.ts:377`) e `cancelarReserva` (`:704`, que ainda marca
+      o pagamento `cancelado`). Mesma classe do defeito corrigido em
+      `expirarReservasVencidasDoPaciente`. **Decisão de UX pendente** (o que a tela diz quando há
+      PIX pagável ou cartão em análise), antes da Fase 5. Detalhe em
+      [04 — Item 46](04-LISTA-DE-AFAZERES.md).
+
+- [ ] ⏳ **PENDENTE DE APROVAÇÃO — depois da teleconsulta, a ANVISA vira a única pendência, e a
+      tela precisa dizer isso.** Descrito pelo dono em 14/09/2026: _"depois que ele termina a
+      teleconsulta que ele agendou com médico, fica o status de ANVISA tanto na tela quanto no
+      ícone de ANVISA, que falta somente a procuração da ANVISA"_.
+
+      **Por que isto existe:** o `DO-57` tira a pergunta da ANVISA do cadastro — quem não tem
+      receita não pode ter autorização. Mas a autorização **continua sendo necessária**, e some
+      da vista do paciente até a consulta acontecer. Sem este item, o paciente termina a
+      teleconsulta, recebe a receita, e **nada na tela diz que ainda falta a procuração**.
+
+      **O que já existe e serviria:** `pendenciasDe` deriva a pendência do manifesto, e
+      `/paciente/anvisa` já é rota. Falta o gatilho — o que marca "a consulta aconteceu e a
+      receita saiu" — e o ponto da interface (tela + ícone).
+
+      **Perigo de mexer: MÉDIO.** Toca a área do paciente, que a Dryelle está redesenhando.
+      Precisa de aprovação e de combinar o gatilho antes de escrever qualquer coisa.
+
+- [ ] 🔴 **O `.env` do servidor diverge do ambiente do processo PM2 nos DOIS segredos do
+      ChatPro** — medido em 14/09/2026, comparando impressão SHA-256 dos 12 primeiros hex:
+
+      | variável                       | processo PM2              | `.next/standalone/.env`   |
+      | ------------------------------ | ------------------------- | ------------------------- |
+      | `CHATPRO_INTAKE_SECRET`        | `31686aa52e50` · 64 chars | `d1fa8e494609` · 68 chars |
+      | `CHATPRO_INTAKE_SECRET_GREENS` | `ed4673dad328` · 64 chars | `03113af79d44` · 68 chars |
+
+      **O processo está certo** — o `_GREENS` bate com a impressão que a Greens conferiu no
+      painel deles. Ele herdou o valor de um `pm2 start` anterior, e é por isso que o
+      `identificarConta` reconhece a conta Greens hoje.
+
+      🔴 **O perigo é o PRÓXIMO deploy.** O `deploy.yml` faz `pm2 delete` + `pm2 start`, e o
+      `preservar-ambiente-do-pm2.mjs` existe justamente para o ambiente não se perder nesse
+      intervalo. Se em algum caminho o `.env` prevalecer, o segredo que **hoje funciona** é
+      substituído pelo de 68 caracteres — e o Fluxo 2 volta a dar 401 sem ninguém ter tocado
+      em nada. Falha silenciosa da mesma família das quatro de 10/09.
+
+      ⚠️ **Os 4 caracteres a mais nos dois não foram explicados.** 64 hex é o que
+      `openssl rand -hex 32` produz; 68 não corresponde a aspas (2) nem a `\r\n` (2). Medir o
+      que são ANTES de sobrescrever qualquer coisa — pode ser um valor legado inteiro, e
+      apagá-lo cega o diagnóstico.
+
+      **Perigo de mexer: MÉDIO.** Tocar em segredo em produção derruba a integração se errar,
+      e a conferência de impressão precisa ser feita com a MESMA fórmula dos dois lados
+      (`tr -d '\n' | sha256sum | cut -c1-12`). Corrigir **depois** do Fluxo 2 funcionar.
+
+- [ ] ⚠️ **Recebemos webhook do ChatPro SEM `sessionId`** — medido em 14/09/2026:
+      `[chatpro] webhook sem chave de deduplicação completa { temEvento: true, temSessao: false,
+temTs: true }`, repetido. Sem sessão, o evento não se correlaciona com conversa nenhuma —
+      é processado e fica órfão.
+      🔴 **E há uma pergunta aberta que vale medir antes de mexer:** a Greens descobriu em
+      14/09 que o _Webhook url_ da instância **deles** nunca foi cadastrado (`0 registros` no
+      histórico inteiro). Se a conta `greens` nunca mandou webhook, **esses eventos sem sessão
+      são da instância da BeHemp** — e os 377 em `chatpro_eventos` também. Medir a coluna
+      `conta` antes de concluir.
+      **Perigo de mexer: BAIXO.** A Greens registra que a tabela deles tem a mesma exigência
+      (`event` + `sessionId` + `eventTs` como chave única), então vão bater no mesmo caso ao
+      ligar o webhook — e ficaram de mandar qual evento chega sem sessão.
+
+- [ ] 🔴 **SÃO DOIS PRODUTOS ChatPro, com hosts de naturezas diferentes** — explicado pela Greens
+      em 14/09/2026, e é a peça que faltava:
+
+      | produto          | host                                              | header           |
+      | ---------------- | ------------------------------------------------- | ---------------- |
+      | CHATPRO CHAT API | `https://<subdominio-da-conta>.chatpro.com.br`    | `instance-token` |
+      | CHATPRO API      | `https://v5.chatpro.com.br/{instance_id}/api/v1`  | `Authorization`  |
+
+      🔴 **O segundo leva o `instance_id` no CAMINHO, então um host serve todo mundo. O primeiro
+      resolve a conta pelo HOST** — por isso o subdomínio não é adivinhável, e por isso o nosso
+      default era fatal.
+      ⚠️ **Corolário da Greens, e ele vale como regra:** _"se o envio funcionar enquanto o chat
+      não funciona, não é coincidência"_ — são produtos diferentes, e um pode estar de pé com o
+      outro morto.
+      **Como achar o nosso subdomínio, sem suporte:** painel do ChatPro → F12 → Rede → F5 →
+      qualquer XHR → o host dela é o `CHATPRO_CHAT_API_URL`. ⚠️ **Não filtrar por `sparks`** — a
+      lista viria vazia e pareceria que o método não funciona.
+
+- [ ] **Item 43 — ROTACIONAR a senha da `DATABASE_URL` de produção (Neon)**, catalogado em
+      24/09/2026. A senha apareceu em texto puro no terminal durante a investigação do Item 42
+      (`head -c 300 ~/.pm2/dump.pm2`, JSON com todo o ambiente do processo). **Sem urgência,
+      por decisão do Diniz: tratar depois.** Rotacionar exige janela, porque derruba o acesso
+      ao banco até o processo subir com a URL nova, e medir antes se o
+      `preservar-ambiente-do-pm2.mjs` copia de volta a URL antiga. Detalhe em
+      [04 — Item 43](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴 **ROTACIONAR o `CHATPRO_INSTANCE_TOKEN` da BeHemp** — recomendação da Greens em
+      14/09/2026, e ela é correta. Nosso token trafegou **repetidamente** para um host da conta
+      deles, por semanas. Eles registram que nada nosso entrou lá e nada deles saiu — o 401 em
+      100% das chamadas é o registro de que a fronteira segurou —, mas ninguém pode afirmar que
+      o painel não expõe requisições recusadas ao dono da conta.
+      **Ordem: trocar o host primeiro, rotacionar depois.** Rotacionar antes de saber o
+      subdomínio só produziria um token novo batendo no host errado, com o mesmo 401 — e a
+      leitura voltaria a ser "credencial errada".
+- [ ] ⚠️ **A assimetria do host guarda uma armadilha, e ela tem data** — apontada pela Greens.
+      Hoje o host é opcional por conta, e isso está certo: sem ele, cai no default `sparks`, que
+      é justamente o subdomínio da Greens — a conta `greens` acerta host e credencial de uma vez.
+      🔴 **Mas no dia em que alguém configurar o token da BeHemp SEM o host, volta o 401 — mesma
+      mensagem, causa oposta.** Com o subdomínio catalogado, o host deve virar **obrigatório por
+      conta** e o default deve ser **apagado**. Sem o default, faltar o host vira erro alto em vez
+      de chamada silenciosa ao servidor de outra empresa.
+
+- [ ] 🔴🔴 **O default de `CHATPRO_CHAT_API_URL` aponta para o host de OUTRA empresa** — medido
+      em 14/09/2026, e é a causa do 401 que estava sendo atribuído ao token.
+      `lib/env.ts:45` e `lib/chatpro/cliente.ts:78` trazem
+      `.default('https://sparks.chatpro.com.br')`. **`sparks` é o subdomínio da conta da
+      GREENS**, não um host do produto — a Greens descobriu isso e avisou. A variável nunca foi
+      configurada na nossa VPS (medido: `AUSENTE`), então **toda** chamada à CHAT API sempre foi
+      para o servidor deles, que responde `401 "Token inválido"` — corretamente, porque não
+      conhece o nosso token.
+      **Provado**: com o token da BeHemp contra `sparks`, `instance-token` **e** `Authorization`
+      dão 401 com a mesma mensagem. Não é o header, não é o token: é o host.
+      **E explica `chatpro_diretorio` vazia** — a CHAT API nunca funcionou do nosso lado, nem uma
+      vez, desde sempre.
+      🔴 **O perigo do default não é ele estar errado; é ele ser PLAUSÍVEL.** Um host inexistente
+      daria erro de DNS e alguém teria olhado no primeiro dia. Um host real de outra conta
+      responde 401, e 401 se lê como "credencial errada" — foi o que aconteceu, por semanas.
+      **Correção: descobrir o subdomínio da nossa instância no painel do ChatPro** e cadastrar
+      `CHATPRO_CHAT_API_URL`. ⚠️ E trocar o default por algo que **falhe alto**: sem a variável,
+      o cliente devia recusar-se a chamar, não adivinhar um host. Falha silenciosa que aponta
+      para o servidor de outra empresa é pior que falha ruidosa.
+
+- [ ] 🔴 **O `CHATPRO_INSTANCE_TOKEN` da BeHemp está RECUSADO na CHAT API** — medido pela Greens
+      na nossa VPS em 14/09/2026: `/departments/list → 401` e `/endings/list → 401`. Esses dois
+      endpoints **não dependem de lead nenhum** — listam o que é da própria instância. Dar 401
+      neles significa que o token não autentica, ponto.
+      ⚠️ **Não confundir com o defeito da instância por conta** (corrigido em `contas.ts`): são
+      dois, empilhados. O token da Greens resolve a conta `greens`; **o nosso continua morto** e
+      afeta todo caminho da conta `behemp` que dependa de confirmação reversa — `/intake`,
+      `/start`, e a tradução de UUID do diretório (que por isso nunca sincronizou: a tabela
+      `chatpro_diretorio` está vazia).
+      **Hoje degrada em silêncio**, porque o código foi desenhado para isso: `post` devolve
+      `null` em 4xx e a tradução nunca bloqueia o processamento. O custo é diagnóstico, não
+      dado — relatório de funil mostra UUID em vez de nome.
+      **Perigo de mexer: BAIXO** — é renovar a credencial no painel do ChatPro e recadastrar o
+      secret. ⚠️ Mas confirme primeiro que o token novo autentica (`/departments/list → 200`)
+      **antes** de trocar, como a Greens fez com o deles. Trocar um token morto por outro morto
+      gasta uma rodada e não ensina nada.
+
+- [ ] 🔴 **`/intake` e `/start` do ChatPro têm o mesmo defeito de instância, latente** — achado
+      em 14/09/2026 pelo guarda `o-cliente-fala-com-a-instancia-da-conta`, que nasceu vermelho e
+      apontou os dois. O `/bot-link` foi corrigido (o cliente segue a conta), mas
+      `lib/chatpro/solicitacao.ts:429-432` (`intake`) e `:476-479` (`start`) seguem usando
+      `this.cliente` — o do ambiente, sempre a instância da BeHemp.
+      **Hoje não quebra** porque nenhuma das duas rotas identifica a conta:
+      `app/api/chatpro/intake/route.ts:87` e `start/route.ts:41` chamam o serviço sem ela. No
+      dia em que a Greens passar a usar qualquer um dos dois, o `leadId` deles será procurado na
+      instância errada e o fluxo trava do mesmo jeito — `throw` antes do insert, 422, paciente
+      transferido para atendente.
+      **Perigo de mexer: MÉDIO** — exige acrescentar `conta` ao contrato de entrada dos dois
+      métodos e fazer as rotas identificarem a conta pelo segredo, como o `/bot-link` já faz.
+      ⚠️ O guarda recorta o **método** do bot-link de propósito: acusar o arquivo inteiro o
+      deixaria vermelho por um defeito que ninguém autorizou corrigir, e guarda que acusa o que
+      não se pode consertar é guarda que alguém desliga.
+
+- [ ] **A tela da ANVISA lista o documento recebido mas não deixa VER a imagem** — pedido do dono
+      em 14/09/2026, ao validar o SOL-000065: _"falta só adicionar uma opção de visualizar a
+      imagem enviada para revisão"_. Hoje a tela mostra `✓ nome-do-arquivo.png` e um botão
+      **Substituir**; não há como abrir o que chegou. O paciente precisa decidir se substitui sem
+      ver o que está lá — e no fluxo da Greens ele **nunca viu** aquele arquivo nesta tela, porque
+      quem enviou foi o parceiro.
+      **Perigo de mexer: BAIXO no código, ALTO se feito errado.** A URL crua do blob NÃO pode ir
+      para a tela: o store é privado justamente para que o arquivo não abra por link
+      (`fetch` sem auth → 403, medido em 13/09). A entrega tem de passar por
+      `/api/documentos/<id>/arquivo`, que autentica, confere escopo de objeto e audita — a mesma
+      rota que o guarda `o-documento-do-paciente-nao-abre-sem-escopo` protege.
+      ⚠️ E há uma decisão de produto junto: abrir em aba nova, modal, ou miniatura? Miniatura
+      significa a imagem renderizada na listagem, e aí o documento aparece na tela sem ato
+      deliberado de quem olha.
+
+- [ ] 🔴 **A tela do cadastro diz "✓ Laudo médico" para um documento que NÃO chegou** — medido em
+      13/09/2026 no SOL-000046, com o fluxo real. `recebidosDe` (`lib/parceiros/documentos.ts:111`)
+      lista os **nomes** do manifesto via `normalizarManifesto` e nunca pergunta se o item tem
+      `urlBlob`. A Greens mandou 4 tipos e conseguiu anexar 3 — o `laudo_medico` saiu com
+      `tipo_nao_suportado` do lado deles. A tela mostra os quatro com ✓ e diz _"Chegaram junto com
+      o seu cadastro. Você não precisa enviar de novo."_
+      **O dano é diferido e caro:** o paciente acredita, não envia o laudo, e a falta só aparece
+      na ANVISA — quando ele já saiu da tela e a conversa recomeça do zero. É a mesma classe do
+      guarda `o-que-nao-chegou-e-dito-como-nosso`, que cobre o painel e **não** cobre esta tela.
+      **Perigo de mexer: BAIXO** — `recebidosDe` tem um ponto de chamada
+      (`app/(auth)/cadastro/[token]/page.tsx:218`), e a correção é filtrar por quem tem arquivo.
+      ⚠️ Mas exige decidir o que a tela diz do terceiro estado: _"o parceiro mandou e não
+      conseguimos buscar"_ não é nem "recebido" nem "falta você enviar" — e essa distinção é a
+      razão de a terceira forma do manifesto existir.
+
+- [ ] 🔴 **Onze pontos ainda logam `erro.name`, que é sempre `'Error'`** — catalogado em
+      13/09/2026, depois de esse mesmo defeito esconder por quatro dias a falha que impedia
+      **todo** documento de paciente de ser gravado. Os do caminho do Fluxo 1 · Portão 1 foram
+      corrigidos com `lib/erros/motivo-legivel.ts`; ficam: `lib/parceiros/notificar.ts:93`,
+      `enfileirar-transferencia.ts:84`, `cadastro-pendente.ts:102`, `enviador.ts:261`,
+      `lib/anvisa/avisar-aprovacao.ts:79,95,103`,
+      `app/(paciente)/_actions/consentimento.ts:201`,
+      `app/api/parceiros/greens/cadastro/route.ts:196`, `app/api/chatpro/triagem/route.ts:74`,
+      `app/api/parceiros/enviar/route.ts:32`. **Perigo de mexer: BAIXO, mas não zero** — trocar
+      por `erro.message` VAZA: medido contra Postgres real em 13/09, o Drizzle monta a mensagem
+      com a query inteira e os valores inline (`Failed query: insert into … values ('529.982.
+247-25', …)`). A troca correta é `motivoLegivel`, que já trata isso; cada ponto precisa
+      ser conferido pelo que ele pode carregar.
+- [ ] ⚠️ **`app/_actions/cadastro-por-link.ts:646` fica com `erro.name` DE PROPÓSITO** — não é
+      esquecimento, e o guarda `cadastro-por-link-abre-sem-conta` o exige. As colunas daquela
+      transação são CPF, telefone e texto clínico. Melhorar o diagnóstico ali sem vazar exige
+      usar `code`/`constraint` do driver e **nunca** a mensagem — `motivoLegivel` já faz isso
+      para erro de banco, mas aquele `catch` cobre a transação inteira, não só o `insert`, e
+      trocar sem medir cada caminho é o tipo de "melhoria" que vira incidente de LGPD.
+
+- [ ] 🔴 **`BLOB_READ_WRITE_TOKEN` não está na lista `gravar` do `deploy.yml`** — medido em
+      13/09/2026: `grep -n BLOB .github/workflows/deploy.yml` dá **zero**. Hoje funciona porque o
+      token vive no `.env` da VPS, herdado de um `pm2 start` antigo e copiado a cada deploy pelo
+      `preservar-ambiente-do-pm2.mjs`. **É a mesma classe que já mordeu três vezes**
+      (`PARCEIRO_ORIGENS_DE_DOCUMENTO`, `PARCEIRO_TRANSFERENCIA_ATIVA`,
+      `PARCEIRO_GREENS_SEGREDO_CADASTRO`), com um agravante: o dia em que esse `.env` for
+      reescrito sem preservação, **todo upload do produto para de funcionar de uma vez** — e
+      cinco dos seis pontos engolem o erro. **Perigo de mexer: BAIXO** — acrescentar uma linha
+      `gravar` e cadastrar o secret. Espera a decisão do store privado, para gravar os dois
+      tokens no mesmo movimento.
+      ⚠️ **MEDIDO em 13/09/2026, e muda o que fazer:** `gh secret list` mostra que
+      `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **estão cadastrados no GitHub
+      desde 22/06** — o que falta é só a linha `gravar`. Mas acrescentá-la agora é aposta: o
+      GitHub não deixa **ler** o valor de um secret, e o `.env` da VPS vem de um `pm2 start`
+      anterior a isso. Se os valores divergirem, o próximo deploy sobrescreve o token que hoje
+      funciona e quebra avatar, exame e procuração. **Fechar isto exige confirmar ou renovar os
+      dois valores primeiro** — o que é seguro fazer é gerar tokens novos no painel, cadastrá-los
+      e só então acrescentar as linhas, num movimento só e com o site observado.
+- [ ] 🔴 **O guarda `o-segredo-cadastrado-chega-ao-servidor` não vê variável lida por DEPENDÊNCIA**
+      — achado em 13/09/2026 ao investigar o item acima. Ele deriva de `process.env.X` dentro de
+      cinco áreas (`lib/parceiros`, `lib/chatpro`, `app/api/parceiros`, `app/api/chatpro`,
+      `lib/anvisa`). `BLOB_READ_WRITE_TOKEN` escapa por **duas** razões independentes: mora fora
+      dessas áreas, e **quem o lê é o SDK do `@vercel/blob`**, não o nosso código — nenhum
+      `process.env.BLOB_READ_WRITE_TOKEN` existe no repositório. O guarda ficou verde com o
+      defeito presente, medido: 27/27 passando. **A classe é nova:** variável que uma biblioteca
+      lê por conta própria. `lib/env.ts` a declara, e é de lá que a derivação deveria sair.
+      **Perigo de mexer: BAIXO** — é teste, não produção; mas nasce vermelho, então entra junto
+      da correção do item acima.
+
+- [ ] **Fluxo de comprovação de renda / medicamento gratuito não existe** — `DO-28`, catalogado
+      em 20/08 e **fora de escopo por decisão do dono**. Medido: `app/(public)/programa-acesso-solidario/page.tsx`
+      é institucional (612 linhas, **zero formulário**), e `db/schema/pacientes.ts:55` tem
+      `rendaFamilia` como **texto livre**, sem tabela de elegibilidade, aprovação ou gratuidade.
+      Se o programa for operar de verdade, isso é sprint própria.
+- [ ] 🔴🔴 **`app/(paciente)/_actions/dosagem.ts` não tem autenticação nenhuma** — medido em
+      24/08/2026: grep por `auth()`, `verificarMedico`, `verificarPaciente`, `verificarRole` e
+      `currentUser` no arquivo inteiro dá **zero**. `criarDosagem:43` aceita `pacienteId` do
+      cliente e insere; `listarDosagensPaciente:129` devolve o plano terapêutico de qualquer
+      paciente. `'use server'` publica todo export como **endpoint POST** — nenhum componente
+      importar reduz a descoberta, não o acesso. **Perigo de mexer: BAIXO**, zero pontos de
+      chamada. Ver [04 — Item 13.1](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴 **As 8 actions de dosagem autorizam por PAPEL, sem escopo de objeto** (OWASP API1/BOLA)
+      — `app/_actions/dosagens.ts:47,120,190,225` e `app/_actions/ajustes-dosagem.ts:34,72,108,152`
+      usam `verificarMedicoOuAdmin`. Médico A opera o paciente do médico B. Mesma classe do Item 11,
+      **mas com uso real em produção**, ao contrário da teleconsulta. E o
+      `garantirMedicoDoPaciente` existe **duplicado** em `revisao-ia.ts:33` e
+      `anamnese-baseline.ts:52`, nunca em `lib/auth/`. ⚠️ Corrigir exige decidir se **admin**
+      continua vendo dosagem de qualquer paciente — regra de negócio, vai ao dono.
+      Ver [04 — Item 13.5](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴 **Dois rejeitados da ADR-0005 estão implementados** — `atualizarDosagem`
+      (`app/_actions/dosagens.ts:120-159`) faz `UPDATE` em `gotasPorDia`, que é o **R-03**
+      (_"apaga a curva de titulação"_); e `editarAjusteDosagem`
+      (`app/_actions/ajustes-dosagem.ts:127`) faz **`DELETE` físico** dos itens do ajuste antes de
+      reinserir — proibição nº 4 do `CLAUDE.md`. ⚠️ E a UI mente nos dois sentidos:
+      `tab-dosagem.tsx:144` avisa _"removido permanentemente"_ para uma exclusão que é **soft
+      delete** (`:159`), e não avisa nada da edição que **apaga de verdade**.
+      Ver [04 — Item 13.3 e 13.4](04-LISTA-DE-AFAZERES.md).
+- [ ] **Duas `criarDosagem` divergentes e as duas chamáveis** — `app/_actions/dosagens.ts:47` (a
+      que a UI usa, com `verificarMedicoOuAdmin`) e `app/(paciente)/_actions/dosagem.ts:43` (sem
+      auth). Só a segunda cria `recompras`. Unificar exige decidir qual comportamento é o certo —
+      criação automática de recompra é **regra de negócio**. Ver [04 — Item 13.2](04-LISTA-DE-AFAZERES.md).
+- [ ] `package-lock.json` (587 KB) convive com `pnpm-lock.yaml` — dois lockfiles no mesmo repo.
+- [ ] `.nvmrc` = 18 e o CI usa Node 20 (`deploy.yml:24`). 🔴 **Agravado em 20/08:** Vitest 4
+      exige Node `^20 || ^22 || >=24`. Quem rodar `nvm use` pega o 18 e **`pnpm test` nem
+      inicia** — e o `.npmrc` tem `engine-strict=true`. O CI (Node 20) e a máquina do dono
+      (Node 24) estão bem; só o `.nvmrc` mente. Trocar 18 → 20 é uma linha, mas é fora do
+      escopo da Sprint 0, que declara explicitamente _"não mexer aqui"_.
+- [ ] `AGENTS.md` diz heading em **Fraunces**; `app/globals.css:19-20` aponta para **Outfit**.
+- [ ] `AGENTS.md` diz _"prefira Server Components"_; **11 de 16** páginas de `(admin)` são `'use client'`.
+- [ ] `AGENTS.md` diz deploy na **Vercel**; produção é AWS EC2 (DT-006/DT-008), e `vercel.json` ainda existe.
+- [ ] Swap de 8 GB **não persistido** no `/etc/fstab` (DT-006) — build falha após restart.
+- [ ] IP público **dinâmico** sem Elastic IP (DT-006) — stop/start muda o IP e o site sai do ar.
+- [x] **✅ CORRIGIDO em 20/08** — TURN público gratuito hardcoded na teleconsulta:
+      `openrelay.metered.ca` com credencial pública `openrelayproject`. Provedor escolhido pelo
+      dono: **Cloudflare Realtime TURN** (grátis no volume desta plataforma; ver a comparação
+      com preço em [04 — Item 8](04-LISTA-DE-AFAZERES.md)). Credencial agora é **efêmera**,
+      gerada no servidor, só para quem está na sala. Guarda `sem-relay-de-terceiro` com 13
+      casos e 5 sabotagens. ⚠️ **falta o DPA pelo Jurídico e provisionar as env vars** — sem
+      elas a chamada usa só STUN e avisa.
+      Eram **DOIS arquivos**, não
+      um — `components/teleconsulta/GlobalTeleconsultaHost.tsx:194-196` **e**
+      `app/(paciente)/paciente/teleconsulta/[roomId]/page.tsx:156-158` (este em área
+      protegida). Existe ainda uma **terceira** implementação de `RTCPeerConnection` em
+      `app/(medico)/medico/teleconsulta/page.tsx:160`, só com STUN — provável código legado.
+      A mídia da consulta médica atravessa relay de terceiro **sem contrato de operador**, sem
+      SLA, com credencial compartilhada. Ver [04 — Item 8](04-LISTA-DE-AFAZERES.md).
+- [ ] ⚠️ **O mascaramento de PII da transcrição protege menos do que o comentário afirma** — não
+      há regex de endereço apesar de o comentário citar endereços; telefone só casa com DDD
+      entre parênteses; nome próprio não é mascarado. E o áudio bruto vai ao **Google STT antes**
+      de qualquer máscara, então **dois** operadores externos recebem dado de saúde nesta rota.
+      Ver [04 — Item 12](04-LISTA-DE-AFAZERES.md).
+- [ ] 🔴🔴 **O hook `escopo-autorizado` só vê escrita por ferramenta, não por ação — medido em
+      20/08/2026.** `FERRAMENTAS_DE_ESCRITA` em `.claude/hooks/escopo-autorizado.py:44` lista
+      `Write|Edit|MultiEdit|NotebookEdit`. Então:
+
+      | ação | decisão do hook |
+      |---|---|
+      | `Write` em `app/(medico)/medico/x.tsx` | ✅ BLOQUEIA |
+      | `cat > "app/(medico)/medico/x.tsx" <<EOF` via Bash | 🔴 **PASSA** |
+      | `sed -i s/a/b/ AGENTS.md` via Bash | 🔴 **PASSA** |
+
+      O `git-perigoso`, que é quem olha Bash, não confere caminho de escrita — só comando
+      destrutivo. Ou seja: **a proteção das áreas clínicas, das migrations e do `AGENTS.md`
+      vale para as ferramentas de edição e não vale para o shell.** Nesta sessão a disciplina
+      foi de quem editava, não do mecanismo.
+
+      **PERIGO DE MEXER:** alto, e é por isso que fica catalogado. Cobrir Bash exige decidir a
+      granularidade de *"este comando escreve em tal caminho?"* — o mesmo problema que já
+      produziu **dois incidentes de falsa acusação** em 19/08 (redirecionamento em heredoc,
+      `sed` cujo argumento menciona um caminho, `tee`, `mv`, `cp`, `>>`, `python3 -c` com
+      `open(...,'w')`). Guarda mal fatiado aqui bloqueia trabalho legítimo e acaba desligado.
+      Trabalho próprio, com os casos de falsa acusação escritos **antes** da regra.
+
+- [ ] 🔴 **Credenciais em texto claro no projeto de origem VidAI** — senha root de VPS em
+      `deploy-novo-vps.sh:16`, senhas de Postgres/Redis no `docker-compose.prod.yml`, e **6
+      arquivos `.env`** nas duas árvores. Não é código deste repo, mas **rotacionar as chaves é
+      recomendação registrada**, e nenhuma configuração do VidAI é importada (ADR-0001 D-08).
+
+> As três divergências do `AGENTS.md` estão resolvidas por precedência em
+> `.claude/rules/precedencia-das-instrucoes.md`, sem editar o arquivo — ele é protegido por hook
+> de propósito.
+
+---
+
+### ✅ Feito em 15/10/2026 (local, sem commit) — comunicado "Atualização do Programa de Doação" por DocuSign
+
+Pedido da Dryelle: o admin dispara, **um paciente por vez**, o comunicado da carta
+`CARTA-PACIENTES-DOACAO.docx`; o paciente assina em `/paciente/documentos` pelo DocuSign; o
+admin acompanha na aba Documentos do paciente.
+
+- **Tabela nova** `comunicados_assinatura` (migration `0051`, aditiva): uma linha por **envio**, nada se
+  apaga. O índice único parcial `comunicados_assinatura_ativo_unq` faz o **banco** recusar um segundo
+  envio enquanto houver um `pendente` ou `assinado` — o clique duplo não cria dois envelopes.
+- **Reaproveita** a integração DocuSign da procuração (mesmo JWT, mesma conta): `lib/docusign/docusign-service.ts`
+  só **ganhou** funções (`obterAccessToken` passou a ser exportada; nada existente mudou).
+- 🔴 **Quem diz que assinou é o DocuSign.** O retorno do paciente à tela e o corpo do webhook são
+  **gatilhos**: `sincronizarComunicado` consulta a API com as nossas credenciais e só ela muda o status.
+  Um webhook forjado ou `?event=signing_complete` digitado não assinam nada (provado no teste de integração).
+- **Idempotência:** cada passo pós-assinatura (PDF no store privado, e-mail ao paciente, e-mail a
+  `docs@`) reivindica a sua trava com `UPDATE … WHERE marcador IS NULL RETURNING`; falha devolve a trava
+  e o webhook responde 500 para o DocuSign reentregar.
+- **Código:** `lib/comunicados/` (catálogo, PDF, núcleo, funções puras), `lib/email/comunicados.ts`,
+  `app/_actions/comunicados.ts`, `app/api/comunicados/[id]/{arquivo,retorno}`, ramo novo no
+  `app/api/webhooks/docusign/route.ts`, `components/admin/comunicados/`, `components/paciente/comunicados/`,
+  item **Documentos** na `paciente-sidebar`.
+- **Testes:** guarda `o-comunicado-assina-so-pelo-docusign` (28) e integração contra Postgres real
+  `o-comunicado-so-assina-quem-o-docusign-confirma` (22), ambos **provados vermelhos por sabotagem**.
+  ⚠️ As fronteiras de rede (API do DocuSign, Brevo, store privado) são **duplos** nesses testes.
+- ⚠️ **O que NÃO foi provado:** envio real pelo DocuSign, e-mail real pelo Brevo e a tela com sessão
+  (não há credencial DocuSign, `CLERK_SECRET_KEY` nem `BLOB_TOKEN_PRIVADO` locais; o Brevo bloqueia o IP
+  da máquina de desenvolvimento).
+- **Pendências de configuração para produção:** (1) `docs@be4hope.org` autenticado como remetente no Brevo;
+  (2) credenciais `DOCUSIGN_*` **de produção** e `DOCUSIGN_BASE_URL`/`DOCUSIGN_OAUTH_BASE_URL` de produção
+  (os padrões do código são o sandbox); (3) `BLOB_TOKEN_PRIVADO` no processo; (4) consentimento JWT do
+  aplicativo na conta DocuSign. O webhook é registrado **por envelope** (`eventNotification`) — não exige
+  Connect configurado na conta.
+- **Não feito, de propósito:** validação HMAC do webhook (a `DOCUSIGN_HMAC_KEY` não existe e entrar no
+  `deploy.yml` é decisão própria); como o status é lido da API, o HMAC é defesa em profundidade, não
+  controle de integridade. O texto da carta tem uma inconsistência **de conteúdo**: o exemplo diz
+  "paciente que toma 6 frascos por semestre" e calcula 12 frascos + 2 fretes — ficou como no `.docx`.
+- ⚠️ **Achado de ambiente:** nesta máquina o `python` não existe, então o hook `escopo-autorizado.py`
+  **não executa** (os 18 casos de `hooks-de-escopo` falham por isso) — a autorização por escrito foi
+  registrada em `.claude/autorizacoes.txt` mesmo assim. E 58 casos falham **também no `main` limpo**
+  (CRLF do checkout no Windows), com o conjunto idêntico antes e depois desta mudança.
+
+### 🔴 Feito em 19/10/2026 (local, sem commit) — ajustes urgentes: texto da carta, GovBr e e-mail de aviso
+
+- **Texto:** "para quem aderir ao Collab anual" → "para quem aderir ao **plano anual**", a pedido da Dryelle (que
+  mandou o texto correto). **Alterado no próprio `.docx`** de `lib/comunicados/modelo/`, não no código;
+  o modelo foi regenerado e o guarda `a-carta-do-docusign-e-a-carta-aprovada` confere a frase.
+- **GovBr:** o parágrafo "(assinar pelo GovBr)" foi **removido do `.docx`** (última página). A âncora da data da
+  assinatura passou a ficar no parágrafo vazio logo abaixo de "Ciente dos novos termos…".
+- **E-mail de aviso que não chegou ao paciente em produção:** a causa NÃO foi confirmada (sem acesso ao Brevo
+  nem ao log da VPS). O DNS de `be4hope.org` tem o DKIM do Brevo, e a hipótese mais provável é o endereço
+  `docs@be4hope.org` **não estar cadastrado como remetente** no Brevo (erro "valid sender email required").
+  Mudanças: (1) o Brevo recusando o remetente, há **uma nova tentativa** pelo remetente que o produto já usa
+  (`BREVO_FROM_EMAIL`), com `docs@` em `replyTo`; (2) o motivo real da recusa (HTTP, código e mensagem do
+  Brevo, sem dado pessoal) vai ao log e ao cartão do admin, em vez de "falha no serviço de e-mail";
+  (3) o aviso ganhou botão para a seção Comunicados do site, passo a passo de onde achar e assinar,
+  endereço por extenso e versão em texto. Guarda `o-email-do-comunicado-chega-ou-diz-por-que` (23).
+  **Pendência no Brevo:** cadastrar `docs@be4hope.org` como remetente; enquanto isso, o aviso sai por `tech@`.
+
+- 🔴 **Retificação (mesmo dia): o remetente voltou a ser o PADRÃO do produto.** A nova tentativa por remetente
+  alternativo não bastou — o aviso seguiu sem chegar em produção (e o Brevo pode aceitar a chamada e bloquear
+  o envio depois, caso em que nenhuma tentativa "falha"). Agora **todas as mensagens do fluxo saem por
+  `BREVO_FROM_EMAIL`/`BREVO_FROM_NAME`**, o mesmo remetente de `lib/email/brevo.ts`, que já entrega. `docs@be4hope.org`
+  ficou só como `replyTo` (para onde o paciente responde) e como destinatário da notificação de conclusão. O
+  fallback foi removido; a mensagem de erro do Brevo no cartão do admin foi mantida. Para `docs@` voltar a ser
+  remetente: cadastrá-lo antes em Senders, Domains & Dedicated IPs do Brevo.
+
+### ✅ Feito em 19/10/2026 (local, sem commit) — carta atualizada ("VF atualizada teste")
+
+A Dryelle mandou uma versão nova do .docx. Diferenças encontradas, parágrafo a parágrafo (o resto é igual):
+
+- **Texto novo:** "E as consultas de acompanhamento **para quem aderir ao Collab anual** continuam gratuitas…".
+- **Dois campos novos no quadro do cabeçalho, abaixo do nome:** `e-mail:` e `cpf:`. O PDF passa a mostrar o
+  e-mail e o **CPF do paciente**. Sem CPF cadastrado o envio é **recusado antes de criar o envelope**
+  (a carta sairia com a linha em branco). O CPF é dado pessoal que segue para o DocuSign e para o PDF
+  anexado a `docs@`, como já ocorre na procuração.
+- ⚠️ **O arquivo veio preenchido com dados de teste** (data "15/10/2026", nome "André Laragnoit Fernande",
+  "Querido(a) [" sem o fim do campo, `e-mail:` e `cpf:` vazios). O .docx guardado é exatamente o recebido;
+  `CAMPOS_DA_CARTA_DE_TESTE` (`lib/comunicados/docx-para-modelo.ts`) devolve cada trecho ao campo que ele
+  ocupava. Quando chegar uma carta com os campos em branco, **remover essa tabela** — o guarda avisa.
+- Quadro do cabeçalho com a 2ª coluna mais larga (o e-mail não quebra no meio).
+
+### ✅ Feito em 20/10/2026 — admin não conseguia cadastrar paciente (era campo em branco, não o papel)
+
+Relatado pela Dryelle: "o admin não consegue cadastrar, o médico consegue; e o paciente novo não vai para o começo
+da lista".
+
+- **Medido, não suposto:** reproduzido contra Postgres real com **os dois papéis** — os dois falham igual. A
+  tela exige só nome e e-mail; todo campo em branco vai como `''`, e `criarPaciente` o gravava cru.
+  `dataNascimento: ''` e `dataAssociacao: ''` em coluna `date` dão `invalid input syntax for type date: ""`, e a tela
+  mostrava só "Erro ao criar paciente". Quem preenchia as duas datas conseguia (admin **e** médico); quem as deixava
+  em branco, não. **Não há diferença de permissão:** a action usa `verificarMedicoOuAdmin`.
+- **A lista:** a do admin já ordena por `createdAt` decrescente e não filtra por médico. O paciente "não ia para o
+  começo" porque **não era criado**. Com a criação funcionando, o último cadastrado aparece primeiro (provado).
+- **A única diferença real entre os papéis:** o paciente do **médico** nasce com `medicoId`; o do **admin** nasce
+  **sem médico** e cai na fila "Atribuir Médico" (comportamento já documentado em `admin/pacientes/novo/page.tsx`).
+- **Correção:** `semCamposVazios` (`lib/pacientes/edicao.ts`) tira o `''` antes do `INSERT`; a coluna fica NULL. Mesmo
+  princípio da edição (acima). 🔴 Se o admin ainda falhar depois do deploy, o texto do aviso na tela diz qual é o outro
+  motivo — esta correção cobre só o campo em branco.
+- **Testes:** integração `o-cadastro-de-paciente-aceita-campo-vazio` (**7**, Postgres real, vermelha antes) e 2 casos
+  novos no guarda `a-edicao-do-paciente-aceita-campo-vazio` (agora **9**); 4 sabotagens vermelhas.
+- **Não verificado:** o clique na tela (depende do login no Clerk).
+
+### ✅ Feito em 20/10/2026 — editar paciente antigo (sem dado nenhum) não salvava
+
+Relatado pela Dryelle com print: na tela do paciente (`/admin/pacientes/[id]`), num cadastro antigo vazio,
+"Editar" → preencher qualquer campo → salvar dava _"Invalid enum value. Expected 'cbd' | 'thc' | 'cbd_thc', received ''"_.
+
+- **Causa:** `syncForm` (`app/(medico)/medico/pacientes/[id]/page.tsx`, a mesma tela serve admin e médico) converte
+  `null` em `''` e a tela manda o formulário **inteiro**. `atualizarPaciente` validava `tratamentoTipo` com enum
+  puro. E havia mais dois defeitos atrás do primeiro: `dataNascimento: ''` e `dataAssociacao: ''` vão a colunas
+  `date` (o Postgres recusa), e os campos de texto gravariam `''` em vez de NULL.
+- **Correção na action** (vale para admin e médico): `lib/pacientes/edicao.ts` — `''`/só espaços **esvazia o
+  campo (NULL)**; `status` vazio é **ignorado** (coluna obrigatória); valor preenchido continua validado como
+  antes. ⚠️ Mudança de comportamento: apagar um campo no formulário agora grava NULL, não `''`.
+- **Testes:** integração `a-edicao-do-paciente-aceita-campo-vazio` (**5**, Postgres real, **vermelha antes** com a
+  mensagem exata do print) e guarda `a-edicao-do-paciente-aceita-campo-vazio` (**7**, 5 sabotagens vermelhas).
+  A sabotagem que afrouxa o enum para `z.string()` só o guarda pega; na integração o Postgres ainda recusa o
+  valor inválido, só que com erro genérico.
+- 🔴 **Achado catalogado, não corrigido:** `app/(medico)/_actions/pacientes.ts` tem **outra cópia** de
+  `atualizarPaciente`/`criarPacienteSchema` que **nenhum arquivo importa** (código morto). Tem o mesmo enum puro;
+  se alguém a religar, o erro volta. Remover é decisão de quem manda.
+
+### ✅ Feito em 20/10/2026 (local, sem commit) — envio em lote do comunicado, nas telas de Pacientes e Triagens
+
+Pedido da Dryelle. 🔴 **Muda a regra do pedido original ("um paciente por vez", acima)** — confirmado por
+ela em 20/10/2026: o lote é permitido; o envio individual no cartão continua.
+
+- **Decisões dela:** (1) lote permitido; (2) **25 pacientes por disparo** (`LIMITE_DO_LOTE`, só em
+  `lib/comunicados/lote.ts`, e conferido **também no servidor**); (3) na triagem, quem não tem cadastro de
+  paciente é **listado e ignorado** ("Sem cadastro de paciente"). Triagem não tem FK para paciente: o elo é o
+  e-mail (`lib/triagens/e-paciente.ts`), casado no servidor por `resolverPacientesDasTriagens`.
+- **Desenho (opção B de três):** o **navegador** envia um paciente por vez pela action **individual**
+  (`enviarComunicadoAtualizacaoDoacao`), com pré-checagem, barra de progresso e resultado por linha. Rejeitadas:
+  (A) uma action em laço — a request longa estoura o timeout do proxy e perde o lote ao fechar; (C) fila no
+  servidor — tabela, migration e cron de 5 min do GitHub, desproporcional para lotes de 25. O lote **não é
+  caminho novo de envio**: mesma autorização, mesma trava de duplicidade no banco, mesma auditoria por envelope.
+  Cada envio é um envelope no DocuSign (limite de 3.000 chamadas/hora e 500 por 30 s, segundo o blog do
+  DocuSign; duas fontes de terceiros dizem 1.000/h, não confirmado) — por isso é sequencial.
+- **Código:** `lib/comunicados/lote.ts` (regra pura), `app/_actions/comunicados.ts` (+`previaDoLoteDeComunicados`, +`resolverPacientesDasTriagens`, só leitura, só admin), `components/admin/comunicados/DialogoEnvioEmLote.tsx`,
+  seleção nas duas telas, e `DataRow` ganhou o slot opcional `leading`.
+- **Testes:** guarda `o-lote-do-comunicado-passa-pelo-envio-individual` (**16**, provados por 10 sabotagens —
+  uma sobreviveu e achou um defeito do guarda: `toContain('<DialogoEnvioEmLote')` casava `<DialogoEnvioEmLoteX`);
+  integração `o-lote-do-comunicado-so-envia-a-quem-pode` (**10**, Postgres real, 3 sabotagens de SQL — uma
+  sobreviveu porque a ficha de teste já tinha e-mail normalizado). `tsc` 0 erros; lint sem piora.
+- **Ficou de fora:** sem registro de auditoria **do lote** como evento (cada envelope audita o seu, com quem e
+  quando); sem "enviar a todos os filtrados" (de propósito, pelo teto); a tela **não foi vista rodando**
+  (depende de login no Clerk, sem chave local).
+- 🔴 **Achados catalogados, não corrigidos:** (a) a integração `o-comunicado-so-assina-quem-o-docusign-confirma`
+  tem **2 casos vermelhos desde o PR #164**: a rota `arquivo` passou a ler `request.nextUrl` e o teste a chama
+  com `Request` simples (vira 502). Não afeta produção. (b) o mock dessa integração não tinha
+  `LINK_DOS_COMUNICADOS` (regressão do botão "Copiar link"); corrigido junto. A integração **não roda no
+  portão de CI** — por isso (a) passou despercebido.
+
+### ✅ Feito em 19/10/2026 (local, sem commit) — a carta vem do .docx e o admin reinicia o fluxo
+
+Dois ajustes pedidos pela Dryelle no comunicado acima (branch `feat/comunicado-assinatura-docusign`).
+
+- **A carta enviada ao DocuSign é a do `CARTA PACIENTES DOACAO _VF.docx`, sem alterar texto.** O PDF não
+  tem mais o texto digitado em TSX: `lib/comunicados/docx-para-modelo.ts` extrai o .docx para
+  `modelo/carta-doacao.json` (`scripts/gerar-modelo-da-carta.ts`) e `carta-doacao-pdf.tsx` só desenha.
+  Só mudam os campos que o autor marcou em amarelo (data, nome, bloco de atendimento). Logo e
+  "Associação Behemp | Be4Hope" no topo de **todas** as páginas, como no .docx.
+  Guarda `a-carta-do-docusign-e-a-carta-aprovada` (13): texto do PDF = texto do .docx, parágrafo a
+  parágrafo, por leitura independente; modelo/logo atualizados; campo vazio ou sobrando **lança**.
+  ⚠️ O texto aprovado tem coisas que parecem erro e **foram mantidas**: "Vice Presidnete",
+  "(assinar pelo GovBr)" (a assinatura é pelo DocuSign) e o exemplo "6 frascos por semestre" com
+  12 frascos e 2 fretes. Corrigir é decisão de quem aprova a carta; trocar o .docx e rodar o script basta.
+- **Reiniciar o fluxo (só admin, só comunicado `assinado`, com motivo).** A linha passa a `cancelado`
+  com `cancelado_em`, `cancelado_por_user_id` e `motivo_cancelamento` (migration `0052`, aditiva);
+  **nada é apagado**: o PDF assinado, o envelope e o vínculo com o paciente ficam. O índice único
+  parcial deixa de enxergar a linha, e o admin pode enviar de novo. O paciente deixa de ver o
+  comunicado; só o admin abre o PDF arquivado. UPDATE condicional: dois reinícios simultâneos
+  resultam em um. Webhook tardio do envelope antigo não muda nada nem manda e-mail.
+- **Ficou de fora:** reiniciar comunicado **pendente** (exigiria anular o envelope no DocuSign);
+  o paciente não é avisado do reinício.
+- **Testes:** integração contra Postgres real agora com 31 casos, 9 deles do reinício (provados vermelhos
+  por sabotagem). `next build` passou na segunda tentativa: a primeira falhou ao buscar a fonte Sora no
+  Google Fonts (transitório). Full suite: as mesmas 58 falhas do `main` limpo, nenhuma nova.
+
+### ✅ Feito em 01/10/2026 (local, sem commit) — a espera da chamada (Item 76)
+
+- [x] **Item 76** — o palco da chamada de atendimento dizia _"{outro} está sem câmera"_ antes de o outro
+      lado entrar. Agora, antes de conectar, mostra a espera do canvas aprovado por Davi (`DO-86`), com
+      as barras do microfone medindo a voz de verdade e o contador contando. 01/10/2026, worktree da
+      branch `docs/fase-2-2-em-producao`. [ADR-0029 §12.6, D-28](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      [04 — Item 76](04-LISTA-DE-AFAZERES.md). **Falta:** commit, PR e deploy, com ordem e nome.
+
+- [x] **Item 78** — conectado sem vídeo vira "os dois, ligados" no padrão da espera, e o palco deixa
+      de quebrar em janela estreita (relatado por Davi com capturas de produção). 01/10/2026, local, sem
+      commit. [ADR-0029 §12.7, D-29](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      [04 — Item 78](04-LISTA-DE-AFAZERES.md).
+
+- [x] **Item 79** — a espera na teleconsulta, no escuro, com textos de médico e paciente (`DO-88`).
+      01/10/2026, local. [ADR-0029 §12.8, D-30](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) ·
+      [04 — Item 79](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 80** — a câmera do paciente ficava por baixo da espera da teleconsulta desde 13/08. Corrigida
+      (`z-10`) a pedido de Davi, com guarda. [04 — Item 80](04-LISTA-DE-AFAZERES.md).
+- [x] **Item 81** — criar usuário **Admin** pela interface (Controle > Usuários > "Novo admin"), pedido
+      de Dryelle em 02/10/2026. Antes só dava para criar médico ou promover quem já existia. A action
+      `criarAdminUsuario` é só do admin, fixa o papel no servidor, **não** pula a checagem de senha
+      vazada do Clerk, tolera a corrida com o webhook do Clerk, desfaz o login se o banco falhar e
+      audita com e-mail mascarado. Guarda `criar-admin-e-so-do-admin-e-nao-orfana` (17 casos, medido).
+      02/10/2026, local, branch `feat/admin-cria-admin`, sem commit. **Falta:** commit, PR e deploy,
+      com ordem e nome; prova com sessão de admin real (a instância local é de desenvolvimento).
+      **Fora, de propósito:** e-mail de convite (a senha temporária vai por outro canal) e
+      forçar a troca de senha no primeiro acesso (o Clerk não faz isso na criação).
+
+### 🔴 Achados de 15/10/2026 — o levantamento para o guia do Admin e do Médico (Itens 82 a 87)
+
+Ao ler o código e conferir as telas **no ambiente local** (Postgres de teste, dados fictícios) para escrever os
+dois guias de treinamento, apareceram seis achados. **Catalogados, nenhum corrigido; nenhum entra na fila sem
+ordem de quem manda.** A numeração pula o 81 de propósito: ele é o "Novo admin" (linha acima), que só tem entrada
+aqui. Diagnóstico, `caminho:linha` e o perigo de mexer de cada um em [04 — Itens 82 a 87](04-LISTA-DE-AFAZERES.md).
+
+- [ ] 🔴 **Item 82 — quatro grupos de Server Actions do admin não exigem admin.** `listarLogs` (auditoria) não
+      checa nem login (`app/(admin)/_actions/auditoria.ts:66`, TODO); as 6 de alertas chamam `verificarAdmin()`
+      **sem usar o retorno** (`alertas.ts:15`…`:135`), e a `dispararVerificacaoManual` envia o digest real; as de
+      recompras e as de e-mails de notificação só exigem sessão (`recompras.ts:345`, `emails-notificacao.ts:42`).
+      Lido, **não executado como paciente**. Perigo de mexer: baixo.
+- [ ] 🔴 **Item 83 — leituras e escritas de paciente e usuário sem escopo de vínculo.** `obterPaciente`
+      (`app/_actions/pacientes.ts:545`) e as actions legadas de anamnese, evolução, exames e documentos checam só o
+      papel; `buscarUsuariosChat` e `listarPacientesParaRecompra` entregam usuários e pacientes a qualquer logado.
+      Estende o Item 13. Perigo de mexer: médio a alto; **depende de decisão do dono** (o admin vê a ficha?).
+- [ ] 🟠 **Item 84 — ações de admin sem auditoria, ou auditadas sem dizer quem.** Status da ANVISA grava
+      `ATUALIZAR_STATUS` sem `userId` (`app/api/anvisa/atualizar-status/route.ts:131`); "Reatribuir todos" move até
+      arquivados sem log; excluir triagem é físico; importar e exportar CSV (com CPF e histórico) não são auditados.
+- [ ] 🟠 **Item 85 — as migrations não cobrem o schema.** O `_journal.json` tem as entradas 36, 37 e 38 com data
+      anterior à da 35, e o migrator do Drizzle as pula; `emails_notificacao` e as 8 `invoice_*` não têm migration;
+      `recompras` tem 9 colunas a mais que a `0000`. **Não verificado em produção**: medir antes
+      (`drizzle.__drizzle_migrations`). Perigo de mexer: **alto**, exige autorização e migration aditiva.
+- [ ] 🔴 **Item 86 — `seed-test-pagamentos.mjs`, na raiz e sem rastreio, lê o `.env` e apaga e insere no banco de
+      produção.** Não foi executado. **Não rodar.** Perigo de mexer: baixo (apagar ou travar o arquivo).
+- [ ] ⚪ **Item 87 — defeitos de tela do admin, não de segurança:** link do Monitoramento ANVISA para rota que não
+      existe, Invoices que falha sem mensagem e sem exclusão, botões da Auditoria que voltam vazios, tela de
+      Configurações estática, aba Prescrições que manda o admin para o login (**medido**).
+
+### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
+
+Os dois hooks se localizam pelo `git rev-parse` do diretório atual (`.claude/settings.json:9`, `:20`).
+Com o shell fora do repositório, os dois falham, e todo `Bash` e `Write` é recusado, até o `cd` de
+volta. Falha fechado, que é o lado seguro, mas trava a sessão. Diagnóstico em
+[04 — Item 77](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido**: hook é área protegida.
+
+### 🔴 Achado de 01/10/2026 — o levantamento dos consentimentos (Itens 67 a 73)
+
+Pedido por Davi: onde a plataforma pede aceite, de qual perfil, e o que cada um destrava. Resultado em
+[`levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf`](levantamentos/LEVANTAMENTO-DOS-CONSENTIMENTOS.pdf):
+6 aceites ou autorizações gravados, 7 funcionalidades que dependem deles, 11 lugares nos três perfis.
+Sete achados, **lidos e não medidos**: o mais grave é que, em produção, o botão "Entrar na Consulta" do
+paciente espera um aceite que a tela não pede (Item 67). Os de perigo alto são o OAuth do Google Agenda
+sem sessão (Item 71) e a procuração cumprida sem DocuSign (Item 72). Diagnóstico em
+[04 — Itens 67 a 73](04-LISTA-DE-AFAZERES.md). **Catalogados, não corrigidos.**
+
+Do mesmo pedido saiu a versão **para o advogado**:
+[`levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf`](levantamentos/CONSENTIMENTOS-E-LGPD-PARA-O-JURIDICO.pdf),
+com o texto vigente de cada termo e as perguntas **J-01 a J-25**. Cada uma diz o que a TI constrói com
+a resposta, e as respostas voltam pelo Davi. O que depende só da TI ficou na
+[ADR-0030](adr/ADR-0030-o-que-depende-da-ti-no-levantamento-dos-consentimentos.md), como proposta, para depois (`DO-84`). Dois achados novos: "Excluir Minha Conta" promete apagar
+tudo e mantém (Item 74), e a Política não lista todos os destinatários (Item 75).
+
+### ⚪ Achado de 30/09/2026 — apagar a autorização deixa o pedido e a chamada abertos (Item 65)
+
+Do PR #143: `apagarAutorizacaoAnvisaAdmin` não encerra o pedido de atendimento da autorização. A lista
+esconde, mas a linha e a chamada ficam abertas. Detalhe em [04 — Item 65](04-LISTA-DE-AFAZERES.md).
+**Catalogado, não corrigido**; o desfecho é pergunta para Davi.
+
+### 🟠 Achado de 30/09/2026 — o "Registre-se" falha na confirmação do código (Item 64)
+
+Relatado por Davi em produção: `JSON.parse: unexpected character…` ao confirmar o código em
+`/registrar-se`. Vem das chamadas ao Clerk; hipóteses e o que medir em [04 — Item 64](04-LISTA-DE-AFAZERES.md).
+**Catalogado, não corrigido.**
+
+### 🔴 Achado de 30/09/2026 — o anexo do chat vai para store público (Itens 60, 61 e 62)
+
+Três achados do código antigo, ao investigar a chamada da ADR-0029 §10: o anexo do chat sobe para
+store **público** e não confere participação (Item 60); a tela do paciente na teleconsulta liga uma
+gravação sem consentimento (Item 61); o id da sala da teleconsulta sai de `Math.random` (Item 62).
+Diagnóstico e perigo em [04](04-LISTA-DE-AFAZERES.md). **Catalogados, não corrigidos.**
+
+### ⚪ Achado de 30/09/2026 — enviar documento no checklist devolve o paciente ao passo a passo
+
+Anterior à ADR-0029; achado na revisão independente dela. Navegação, sem perda de dado.
+Diagnóstico em [04 — Item 58](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido.**
+
+### 🔴 Achado de 30/09/2026 — duas actions da ANVISA aceitam autorização de outro paciente
+
+`salvarFormulario8833` e `confirmarEnvioAnvisa` gravam pelo `autorizacaoId` vindo do navegador,
+sem conferir o paciente da sessão (OWASP API1). Diagnóstico e perigo medido em
+[04 — Item 57](04-LISTA-DE-AFAZERES.md). **Catalogado, não corrigido**: fora do escopo da ADR-0029,
+e a correção pede autorização própria.
+
+### ⚪ Achado de 30/09/2026 — produção tem 4 migrations que a `main` não conhece
+
+**[medido]** pela medição da ADR-0029 D-05, rodada por Davi na VPS: `drizzle.__drizzle_migrations`
+tem **52** linhas para **50** entradas no journal. Quatro linhas não correspondem a nada da
+`main`:
+
+- `1786630506718`, `1786634498375` e `1786643162091` são as migrations 0018, 0019 e 0020 da branch
+  `origin/feature/product-catalog-v2` (commit `7f6c682`, Dryelle, 13/08/2026). O banco de produção
+  tem as tabelas `produtos` e `produto_arquivos` e o enum `produto_arquivo_categoria`, que o schema
+  da `main` não declara;
+- `1787338669959` (21/08/2026 18:57 UTC) **não está em nenhuma branch remota**. Origem
+  desconhecida.
+
+**Perigo de hoje:** nenhum para o migrator, porque o `max(created_at)` continua sendo o da 0049.
+**Perigo latente:** o `drizzle-kit` compara com o snapshot, não com o banco. Se alguém um dia
+declarar `produtos` na `main` com outra forma, a migration gerada vai tentar criar o que já existe.
+E um `drizzle-kit push` contra produção proporia **apagar** as duas tabelas.
+
+**Não corrigido, não é escopo da ADR-0029.** Pergunta para a Dryelle: o catálogo de produtos está em
+uso em produção? E a quarta linha, de onde veio?
+
+### 🔴 Achado de 22/09/2026 — a lição mais cara da semana: sintoma funcionando não prova schema
+
+Em 21/09, o Desktop e este Code concluíram que a `0039` **estava aplicada** em produção. O
+raciocínio: _"`app/_actions/cadastro-por-link.ts:600` chama `conceder()`, que insere
+`consentimentos.idioma`; o cadastro por link funciona em produção; logo a coluna existe."_
+
+**Estava errado.** O cabeçalho de `db/migrations/0045_idioma_e_cadastro_transferido.sql` registra
+a medição: `consentimentos.idioma` **não existia**, e o enum `parceiro_evento_tipo` tinha só
+`receita_emitida` e `anvisa_aprovada`.
+
+🔴 **O que essa inferência custou:** ela foi usada para **reduzir a urgência** da frente de
+migrations, quando o dono perguntou se o diagnóstico era necessário. A análise **mecânica** — o
+`when` da `0039` (1789142042567) é menor que o marco de produção (1789271398148), e o migrator
+escolhe pelo `max(created_at)` lido uma vez antes do loop — estava correta desde o começo.
+
+**A regra que sai daí:** _o código diz o que ele FAZ com o dado; só o banco diz que COLUNA existe_.
+Um fluxo que completa não prova que toda escrita dele foi aceita — pode haver `catch` no caminho,
+ou o trecho pode não ter sido exercitado. **Estado de schema se mede com `SELECT`, nunca com
+"o sintoma não aparece".**
+
+### ⚪ Achado de 22/09/2026 — um paciente tem 23 procurações, os outros quatro têm 3, 1, 1 e 1
+
+Medido no banco de produção em 22/09: `procuracoes_especificas` tem **25** com
+`docusign_status = 'concluido'`, distribuídas entre **4** pacientes distintos — e a distribuição é
+23 / 1 / 1 / ... contra 3 / 1 / 1 / 1 nos demais.
+
+**Se cada procuração dispara um envelope DocuSign, há custo por envelope e e-mail repetido para a
+mesma pessoa.** ⚠️ **A confirmar com o dono** se esse paciente é o de teste — não presumir.
+
+### 🔴 Achado de 13/09/2026 — o Clerk roda com instância de DESENVOLVIMENTO
+
+Medido no `.env` da VPS: `pk_test_` / `sk_test_`. E no painel: a aplicação **Be4hope** tem
+ambiente Production **vazio** (0 sign-ups), com domínio apontando para `behemp-site.vercel.app`
+— enquanto o site vive em `be4hope.org`.
+
+⚠️ **NÃO é o que bloqueia o cadastro** — isso foi medido e retratado (ADR-0022 §54). Há
+`sign_up.completed` e `user.created` no log. É higiene, não urgência.
+
+**O perigo de mexer:** as contas existentes vivem no ambiente Development e **não migram
+sozinhas**. Trocar as chaves sem corrigir o domínio derruba o login em `be4hope.org`, porque
+chave `pk_live_` só funciona no domínio registrado.
+
+**Ordem correta, quando for feito:** corrigir o domínio no painel → configurar DNS → decidir o
+que fazer com as contas atuais (o Clerk tem API de migração) → trocar os secrets no GitHub.
+
+🔴 **E uma armadilha medida:** `CLERK_SECRET_KEY` e `CLERK_WEBHOOK_SECRET` **não estão na lista
+`gravar` do `deploy.yml`** — vêm do `preservar-ambiente-do-pm2.mjs`. Trocar o secret no GitHub
+**não os leva ao servidor**. É a mesma classe que já mordeu três vezes
+(`o-segredo-cadastrado-chega-ao-servidor`), e o guarda não pega porque a chave é lida pelo SDK
+do Clerk, nunca pelo nosso código.
+
+### 🔴 Achado de 13/09/2026 — as migrations NÃO RODAM DO ZERO
+
+**Medido** ao subir um Postgres em Docker para provar as migrations da Sprint 8 sem gastar
+deploy. Contra banco **vazio**, o histórico quebra numa migration antiga:
+
+```
+ALTER TABLE consultas ALTER COLUMN status SET DEFAULT 'reservada'
+```
+
+⚠️ **O que isso significa, e é maior que parece:** um banco novo **não pode ser criado a partir
+do histórico de migrations**. Hoje produção está de pé porque o banco dela foi evoluindo junto;
+mas um ambiente de homologação, um restore limpo, ou a máquina de um dev novo não têm como
+chegar ao schema atual pelo caminho oficial.
+
+**O perigo de mexer:** as migrations já aplicadas em produção **não podem ser reescritas** — o
+`drizzle` guarda o hash no journal, e alterar uma aplicada faz o próximo deploy divergir. A
+correção é uma migration nova que torne o estado alcançável, ou um dump de baseline versionado.
+
+**Custo de deixar:** nenhum ambiente novo nasce. Custo de mexer: uma sessão, sem tocar em nada
+que já rodou. **Não é escopo da Sprint 8** — catalogado, não corrigido.
+
+### 🔴 Achado de 13/09/2026 — um guarda CONGELAVA o defeito que devia impedir (corrigido)
+
+`a-revogacao-para-a-fila` afirmava `expect(bloco).toMatch(/marcarFalha/)` — exigia a
+implementação de então. O D-14 da ADR-0022 decidira o contrário (`cancelado_por_revogacao`), a
+migration `0043` fora autorizada para isso, e o valor ficou no enum com **zero** usos.
+
+O guarda ficava **verde com o defeito** e vermelho quando a correção chegou.
+
+⚠️ **Segunda ocorrência desta classe** — a primeira foi
+`o-destino-do-paciente-segue-o-que-falta`, que comparava destinos com uma lista fixa contendo os
+dois 404. **A regra que sai:** guarda mede a PROPRIEDADE, nunca o nome do método que a produz.
+Corrigido em 13/09; ver ADR-0022 §33.2.
+
+### ⚪ Achado de 13/09/2026 — a chave do Clerk não destrava o teste local
+
+O `.env` local tem **zero** variáveis do Clerk, e por isso nenhuma tela com sessão renderiza
+localmente. O secret existe no GitHub — mas **não é legível** (a API devolve nome e datas, valor
+nenhum) e, mais decisivo, **não serviria**: a doc do Clerk diz que chave de produção só funciona
+no domínio de produção, com erro literal _"Production Keys are only allowed for domain
+'…'"_.
+
+**O que destrava** é uma chave de **desenvolvimento** (`sk_test_`/`pk_test_`), grátis, de uma
+instância separada — só o dono pega no dashboard. Sem ela, o Nível 3 (Chromium) da regra de
+provar local alcança só tela sem sessão. Ver ADR-0022 §33.4.
+
+### ⚪ Achado de 09/09/2026 — sem data
+
+**`users.telefone` é texto livre** (`04` Item 26). Quatro caminhos gravam, nenhum normaliza — e
+isso impede reconhecer paciente por telefone em **qualquer** lugar do sistema, não só no bot.
+A proporção de dados sujos **não foi medida**: o banco local tem 1 paciente e 0 telefones.
+Normalizar o campo exige migração de dados e autorização.
+
+### 🔴 Achado de 10/09/2026 — CORRIGIDO no mesmo dia
+
+**Nenhum deploy chegou a produção entre 14/08 e 10/09.** O Actions reportava sucesso e o site
+servia um build antigo: `pm2 restart` reusa o caminho gravado e não relê o script
+(Unitech/pm2#3054), o `pnpm build` perdoava a própria falha com `|| true`, e nada conferia se
+produção passou a servir o build novo.
+
+⚠️ **Consequência para o planejamento:** os 19 commits do PR #36 — IA clínica com revisão
+humana, cadeia conduta-prescrição-titulação, `tab-prescricoes`, `tab-dosagem`, ChatPro,
+cadastro por link e handoff de parceiros — **nunca estiveram em produção**. Não se perdeu
+nada: está tudo na `main`. O que faltava era o processo executar o que já lhe entregavam.
+
+Diagnóstico completo, risco medido e o que ficou de fora: `docs/04-LISTA-DE-AFAZERES.md`
+Item 28. Guarda: `o-deploy-entrega-o-que-buildou` (21 casos, 9 sabotagens).
+
+### ⚪ Achado de 10/09/2026 — o índice de ADRs está 11 entradas atrás
+
+> ✅ **Retificado em 21/09/2026:** o `adr/README.md` passou a listar as 23 ADRs em
+> 19/09/2026 (commit d88d825). O parágrafo abaixo descreve o estado de 10/09 e fica como registro.
+
+`docs/adr/README.md` lista até a **0007**. As ADRs **0008 a 0018** existem em disco e não estão
+lá. Quem consultar o índice para saber se algo já foi decidido vai concluir que não foi.
+
+**O custo já apareceu:** ao responder sobre o wizard da IA clínica, eu li o documento que
+descreve o VidAI e não a ADR-0004 que decidiu o que fazer com ele — e afirmei ao dono que
+faltava implementar algo que tinha sido **rejeitado com fundamento**. Índice incompleto não é
+desorganização: é decisão perdida.
+
+Correção: uma linha por ADR, e o status conferido contra o arquivo. Trabalho próprio.
+
+### 🔴 Achado de 10/09/2026 — os crons NUNCA rodaram neste servidor
+
+`vercel.json` declara três crons — validade de documento, recompra e revisão de dosagem. **O
+projeto não roda na Vercel** (EC2 + PM2, DT-006/DT-008), e não existe nenhum workflow com
+`schedule:`. Logo: os três nunca foram executados.
+
+E as duas filas novas herdam o mesmo buraco: `/api/chatpro/processar` e `/api/parceiros/enviar`
+existem, funcionam quando chamados, e **ninguém os chama**. O webhook do ChatPro aceita com 202 —
+medido em produção — e o evento fica `pendente` para sempre.
+
+Bloqueia o QA. Diagnóstico, as três opções e a recomendação: `docs/adr/ADR-0020-ajustes-pre-QA.md`
+§4.
+
+### 🔴 Achado de 10/09/2026 — NÃO LIGAR os 3 crons antigos sem medir antes
+
+Ao criar o workflow que esvazia as filas novas, a tentação óbvia era ligar junto os três crons
+que estavam no `vercel.json` e nunca rodaram: `verificar-validade-documentos`,
+`verificar-recompra-medicamentos` e `verificar-revisoes-dosagem`.
+
+⚠️ **Não foram ligados, de propósito.** O primeiro deles chama
+`enviarEmailRenovacaoDocumentoEquipe` via Brevo (`app/api/cron/verificar-validade-documentos/route.ts:308`).
+Ele nunca rodou **neste servidor** — então há meses de documentos vencidos acumulados, e a
+primeira execução dispararia a enxurrada toda de uma vez, para pessoas reais.
+
+**Antes de ligar, medir:** quantos registros a query devolveria hoje · quantos e-mails sairiam ·
+para quem. Se for volume grande, o primeiro disparo precisa de janela ou de corte por data.
+
+Ligar um cron parado não é retomar de onde parou: é executar meses de acúmulo em um minuto.
+
+## Concluído
+
+- [x] 🔴 **A TELA DO CONSENTIMENTO — o ato que faltava** · 11/09 · `feat/a-tela-do-consentimento`.
+      A P5 lia um consentimento que **nenhuma tela colhia**: havia módulo, tipo e regra, e não
+      havia lugar onde o paciente dissesse sim. Pior, `prepararTransferencia` recebia as
+      finalidades **por parâmetro** — quem envia alegava o consentimento de quem é enviado.
+      Entregue: tabela `consentimentos` (migration `0034`), leitura/escrita em
+      `lib/parceiros/consentimento-registrado.ts`, bloco no **cadastro por link**, tela
+      `/paciente/privacidade` com **revogação** (art. 8º §5º), e a P5 passando a **ler** do
+      banco — inclusive o `texto` e a `versao` que o paciente leu, não os de hoje. Guarda
+      `o-consentimento-e-colhido-antes-de-sair` com **45 casos**, provado por **17 sabotagens**
+      (uma achou defeito meu: o caso do `revalidatePath` media presença, e havia duas chamadas).
+      Decisão nova: **ADR-0021 D-06** — caixas desmarcadas, e o consentimento **não trava** o
+      cadastro.
+- [x] 🔴 **RASTREIO DE DECISÕES — buraco encontrado e fechado** · 24/08. O dono cobriu:
+      _"você está atualizando as docs obrigatórias... inclusive criando as ADRs com nossas
+      decisões certo?"_. **Ele estava certo.** As decisões dele de 24/08 estavam só nas ADRs
+      técnicas e na minha memória, **sem `DO-nn` citável** — o catálogo tinha **uma** menção a
+      24/08. Registradas **`DO-36` a `DO-45`** (10 decisões). Catálogo: 34 → **44 `DO-nn`**.
+- [x] **ADR-0010** — a análise assistida é **aba do sidebar** da teleconsulta, etapas dentro dela
+      (`DO-39`). O design do chefe não se altera · 24/08
+- [x] **ADR-0011** — a **divergência alimenta o RAG** (`DO-40`) e o **rascunho persiste no
+      servidor com histórico** (`DO-41`). `localStorage` **rejeitado com motivo**: dado de saúde
+      em navegador de consultório compartilhado. Abriu **`GAP-16`** (Jurídico: base legal do uso
+      secundário) · 24/08
+- [x] **ADR-0005 D-03 retificada — `GAP-14` RESOLVIDO** por `DO-44` · 24/08. As duas versões
+      ficam. O dono não delimitou _quando_ gerar prescrição: definiu o que **sempre** acontece —
+      notifica o paciente, o anterior fica no histórico em **dois** lugares, visão por paciente
+      com filtro geral, desenho não sobrecarregado.
+- [x] 🔴 **AS TRÊS RDCs TRANSCRITAS** (`DO-45`) · 24/08 — e a primeira coisa que a transcrição
+      achou foi **erro nosso**: a **RDC 327/2019 está REVOGADA** pela **RDC 1.015/2026** (Art. 76,
+      `CAN-00`). Catálogo, plano de sprints e Sprint 5 citavam **norma morta**. 17 IDs novos:
+      `CAN-00`…`CAN-06`, `IMP-01`…`IMP-04`, `REC-01`…`REC-06`.
+      ⚠️ **`CAN-04` muda a Sprint 5:** o **tipo de receituário é derivado do teor de THC**
+      (≤0,2 % Controle Especial · >0,2 % **Notificação de Receita "A"**), e `CAN-05` restringe
+      THC alto a **doença debilitante grave**. Cinco entregáveis novos na Sprint 5.
+
+- [x] 🔴 **RETRATAÇÃO — o guarda do contrato existia e deixou passar** · 24/08. Um fixture novo
+      com **5** valores inexistentes no contrato derrubou o preview
+      (`can't access property 'icone'`) com o guarda **verde**. Causa: `toBeTruthy()` verificava
+      existência, não validade, e ele lia **um** fixture pelo nome. Corrigido como guarda de
+      duas pontas — deriva os válidos do contrato, varre **todos** os `.json`, e tem caso de
+      cobertura que acusa tipo de união novo sem varredura. **9 sabotagens** provam. Guardas:
+      **199 casos** em 8 arquivos.
+- [x] **Componentes denunciam valor fora do contrato** · 24/08 — `ChipAchado` e
+      `MedicacoesSugeridas` renderizam "origem/procedência desconhecida: X" em vermelho em vez de
+      estourar. Cair para um padrão silencioso foi rejeitado: afirmaria origem que ninguém
+      declarou, e origem é o que separa sugestão de fato.
+- [x] **ADR-0006 D-01 estava sendo violada sem ninguém notar** · 24/08 — a tela nascia com
+      **nenhuma** hipótese aberta; a ADR decidiu "primeira aberta, demais fechadas". Corrigido.
+
+- [x] **Opções de medicamento dentro de cada hipótese** · 24/08 — pedido do dono: até 3,
+      ranqueadas, com o porquê e o que pesa contra. **Sem dose**, e o critério não é de gosto:
+      `IMD-01` (informar opções) × `IMD-02` (dose = dirigir), catalogado e decidido em
+      **ADR-0009**. Novo: `MedicacoesSugeridas.tsx`, tipo `MedicamentoSugerido` no contrato,
+      fixture `resposta-canabidiol-dor-cronica.json` com os 3 estados (3 opções, 2, e **zero**).
+- [x] **Botão de revisar dentro de cada opção da tela "Sua decisão"** · 24/08 — abre o **mesmo**
+      componente de evidência do painel (`EvidenciaDaHipotese.tsx`), não uma cópia. Abrir para
+      reler **não** seleciona: dois botões irmãos, estados separados (ADR-0009 D-06).
+- [x] **Modo `denso` para o sidebar da teleconsulta** · 24/08 — cartões fechados, tipografia um
+      passo menor, rótulo do botão vira ícone. **Nenhum conteúdo sai** para caber (D-07).
+- [x] **Preview separado por perfil, com switch** · 24/08 — Médico · Paciente · Admin. Entraram
+      os dois que faltavam (`RastreioUso`, `FormMedidas`), o caso de canabidiol e a simulação do
+      sidebar em 380 px. A aba do admin **diz que não há tela** e por quê, em vez de ficar vazia.
+- [x] **Guarda `medicacao-informa-nao-prescreve`** · 24/08 — **44 casos**. ⚠️ Primeira versão
+      tinha detector defeituoso: `doseMg` sobreviveu à sabotagem. Corrigido por token+radical,
+      com 18 casos de controle. Retratação na ADR-0009 §4.
+- [x] **RETRATAÇÃO — três contagens de guarda no `CLAUDE.md` estavam erradas** · 24/08:
+      autorização 19→**16**, relay 13→**17**, anamnese 23→**27**. Sem perda de cobertura (os
+      arquivos nunca foram commitados); eu contei casos **planejados** como se fossem medidos.
+      Total real medido: **191 casos em 8 guardas**.
+
+- [x] **Como VER as telas sem login — `/preview`** · 24/08. Rota que renderiza os **componentes
+      reais** (não cópia) com dado de fixture, em 7 seções, cada uma nomeando o arquivo que
+      desenha. `notFound()` em produção **e** só entra nas rotas públicas do middleware fora de
+      produção. A alternativa que o dono propôs — copiar as telas, aprovar a cópia, transicionar
+      depois — foi **recusada com motivo**: a cópia e o original divergem, e o que foi aprovado
+      deixa de ser o que vai a produção.
+- [x] **Credenciais de teste, uma por papel, que fazem login de verdade** · 24/08.
+      `scripts/criar-usuarios-clerk-teste.mjs` cria as contas no Clerk, define
+      `publicMetadata.role` e casa o `clerk_id` com as linhas do seed. **Provado** por sign-in
+      completo na Frontend API (`status: complete`, sessão criada), não afirmado.
+      ⚠️ **Login é e-mail + código `424242`, não senha** — a aplicação de desenvolvimento tem
+      `password.used_for_first_factor: false`, medido no `/v1/environment` dela.
+- [x] **Guarda `banco-usa-driver-certo` NÃO RODAVA** · 24/08 — e mostrava `Tests 133 passed` ao
+      lado de `Test Files 1 failed`. Corrigido extraindo a decisão para `lib/db/driver.ts`
+      (módulo puro) + 5 casos que impedem a volta, dos quais **2 de controle contra falsa
+      acusação**. Lição registrada em `docs/TECNICA-DOS-GUARDAS.md` §5-bis.
+      ⚠️ O total "147 casos, 7 arquivos" escrito aqui na hora **está superado**: a medição de
+      24/08 dá **191 casos em 8 guardas**. Ver a retratação das contagens acima.
+
+- [x] **Método de documentação instalado** — princípios, árvore do conhecimento, técnica dos
+      guardas, ADR com rejeitados, catálogo com ID citável · 19/08
+- [x] **`CLAUDE.md` com índice, proibições e regras de trabalho** — só por acréscimo · 19–20/08
+- [x] **2 hooks `PreToolUse`** (`git-perigoso`, `escopo-autorizado`) + guarda com **34 casos**,
+      incluindo 3 regressões de falsa acusação · 19/08
+- [x] **6 skills `metodo-*`** instaladas, com avaliação por 3 cenários cada · 19/08.
+      ⚠️ baseline sem a skill **não medida**
+- [x] **`06-PADROES-DO-CODIGO.md`** — o sistema visual, as convenções e o padrão de action,
+      todos **medidos** · 19/08
+- [x] **Achados 1, 2, 3, 4 e 6 diagnosticados** com `caminho:linha` e perigo de mexer medido ·
+      19–20/08. ⚠️ **Não existe Item 5** — era de outro domínio; os números não foram
+      reaproveitados para não quebrar citação
+- [x] **Item 7 — RETRATAÇÃO por escrito:** eu afirmei 31 tabelas em `db/schema`; **são 40**.
+      Contei arquivos em vez de tabelas · 20/08
+- [x] **Domínio comercial removido deste repositório** — pertence a outro projeto · 20/08
+- [x] **Sprint 0 — baseline MEDIDA** e não mais copiada: `pnpm install` (9,4 s), lint **210
+      erros**, Prettier **360 arquivos**, `tsc --noEmit` **0 erros** (primeira medição já
+      feita). Os dois primeiros desmentiram o `AGENTS.md` em +79 % e +55 % · 20/08
+- [x] **Sprint 0 — runner + guarda migrado**: Vitest 4.1.11, `pnpm test` (~1 s), 35 casos
+      verdes. 🔴 **A prova de sabotagem encontrou um mutante sobrevivente**: neutralizar
+      `sem_heredoc` mantinha os 34 casos verdes, porque nenhum deles punha o comando perigoso
+      no INÍCIO de uma linha do heredoc. Virou a REGRESSÃO 4; agora as 5 sabotagens ficam
+      vermelhas · 20/08
+- [x] **Sprint 0 — portão de baseline**: `scripts/conferir-baseline.mjs` + `baseline.json`.
+      Falha quando **piora**, não quando está vermelho; type-check entra como portão
+      **absoluto** porque está em zero. Provado por sabotagem: 1 erro novo de lint → vermelho,
+      removido → verde · 20/08
+- [x] **Sprint 0 — portão LIGADO ao CI** (`DO-18`): `ci.yml` novo + enxerto no `deploy.yml`
+      antes do build/rsync/migration. Autorização com granularidade de dois caminhos exatos ·
+      20/08
+- [x] **Sprint 0 — os dois guardas ficam** (`DO-19`), com **caso de paridade** que fica vermelho
+      nomeando o caso que faltar. Provado: caso órfão no `.sh` → Vitest acusa pelo nome ·
+      20/08. **37 casos**, e as **6 sabotagens** morrem
+
+---
+
+## 🎯 Fila de execução (atualizada **24/08/2026**)
+
+**Um item por vez.** O detalhe de cada fatia está em
+[`sprints/00-PLANO-DE-SPRINTS.md`](sprints/00-PLANO-DE-SPRINTS.md).
+Branch: `feat/flow-representatives`. **82 arquivos não commitados** — nada vai sem ordem do dono (`DO-20`).
+
+### ✅ Concluídas
+
+| #     | item                                                                                                                                                                                                                                                                                                                                                        | sprint                                                   |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| ~~1~~ | `pnpm install`, baseline **medida** · 20/08                                                                                                                                                                                                                                                                                                                 | [S0](sprints/SPRINT-0-fundacao.md)                       |
+| ~~2~~ | Vitest, portão de baseline, CI nos dois workflows · 20/08. ⚠️ **falta commitar e enviar** para rodar no GitHub                                                                                                                                                                                                                                              | [S0](sprints/SPRINT-0-fundacao.md)                       |
+| ~~3~~ | Auditoria da teleconsulta — 7 defeitos de BOLA corrigidos (`garantirDonoDaSala`), TURN Cloudflare com credencial efêmera, consentimento CFM bloqueando a sala · 20–24/08                                                                                                                                                                                    | [S1](sprints/SPRINT-1-auditoria-da-teleconsulta.md)      |
+| ~~4~~ | Contrato congelado + 3 fixtures + módulo em `/medico/ia-clinica` · 20–24/08                                                                                                                                                                                                                                                                                 | [S2](sprints/SPRINT-2-contrato-e-fundacao.md)            |
+| ~~5~~ | Anamnese como série + rastreio de uso (`DO-26`) + primeiro uso (`DO-27`) · 20/08                                                                                                                                                                                                                                                                            | [S3](sprints/SPRINT-3-anamnese-assistida.md)             |
+| ~~6~~ | Hipóteses, evidência, **opções de medicamento** (ADR-0009) e revisão humana · 20–24/08. ⚠️ **E3, E7 e E8 NÃO feitos** — viram os itens 7, 8 e 9 abaixo                                                                                                                                                                                                      | [S4](sprints/SPRINT-4-hipoteses-e-revisao-humana.md)     |
+| ~~7~~ | 🔴 **Conduta, prescrição e titulação** (S5) — **13 de 15** entregáveis · 25/08. Retificada por `DO-46`/`DO-47`: o teor é campo do **médico** e o sistema **avisa** em vez de derivar ou travar. ⚠️ **Ficaram o 10** (aviso do `CAN-05` — falta ler a RDC 38/2013 **e** perguntar ao dono) **e o 13** (conferir `lib/receituario/`, que é o Item 11 do `04`) | [S5](sprints/SPRINT-5-conduta-prescricao-e-titulacao.md) |
+
+### 🎯 A fazer, nesta ordem
+
+| #         | item                                                                                                                                                                                                                                                                                                                          | sprint                                                                                         | bloqueado por                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ~~8~~ ✅  | **E3 da S4** — divergir com "por que a IA errou" (opcional) + medicamento a prescrever, alimentando o RAG                                                                                                                                                                                                                     | S4 · [ADR-0011](adr/ADR-0011-a-divergencia-do-medico-alimenta-o-rag.md)                        | `GAP-16` bloqueia só a **ingestão**, não os campos                             |
+| ~~9~~ ✅  | **E7 da S4** — rascunho da revisão **no servidor**, com histórico                                                                                                                                                                                                                                                             | S4 · ADR-0011 D-03/D-04                                                                        | prazo de retenção = Jurídico (campo fica vazio)                                |
+| 10        | **E8 da S4** — urgência na tela, 4 níveis, com o mapa **7→4 escrito antes**. É gatilho contra medicamento errado (`DO-42`, `CAN-05`)                                                                                                                                                                                          | S4                                                                                             | escrever o mapa 7→4                                                            |
+| 11        | **Análise assistida como ABA do sidebar da teleconsulta**, etapas dentro dela                                                                                                                                                                                                                                                 | S1/S4 · [ADR-0010](adr/ADR-0010-analise-assistida-e-uma-aba-do-sidebar-da-teleconsulta.md)     | rótulo e posição da aba = perguntar ao dono                                    |
+| 12        | **Área do paciente** — diário, dose, resumo                                                                                                                                                                                                                                                                                   | [S6](sprints/SPRINT-6-area-do-paciente.md)                                                     | `GAP-12` · **exige a S5 pronta** (entregável 7 dela)                           |
+| 13        | **Exames** — anexar, ver, vincular. A última da Metade 1                                                                                                                                                                                                                                                                      | [S7](sprints/SPRINT-7-exames.md)                                                               | 🔴 conversa do dono com o chefe (`DO-13`)                                      |
+| 14        | **Metade 2** — motor, RAG, corpus, exames com IA                                                                                                                                                                                                                                                                              | S8–S12                                                                                         | 🔴 AWS (`GAP-11`) · Jurídico (`CF-01`, `GAP-06`, `GAP-16`)                     |
+| 15        | **Item 6** — store privado nos 10+ uploads existentes                                                                                                                                                                                                                                                                         | —                                                                                              | autorização                                                                    |
+| 16        | **Item 11** — conferir `lib/receituario/` contra `REC-02`/`REC-03`                                                                                                                                                                                                                                                            | —                                                                                              | ler a RDC 873/2024 primeiro · autorização                                      |
+| 17        | **Item 50** — 🟡 implementado em 28/09/2026; falta ver a tela e o passo 0 (a posição na fila é decisão de quem manda)                                                                                                                                                                                                         | [ADR-0028](adr/ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | `CLERK_SECRET_KEY` de dev para provar a tela · `SELECT` do passo 0 · commit/PR |
+| ~~18~~ ✅ | **Item 56** — prioridade 1 definida por Davi em 29/09/2026: a ANVISA abre no "Faço eu mesmo", vídeo, pedido de atendimento assistido, a procuração ativada pelo admin, e a chamada com câmera, tela dos dois lados e print. **Tudo em produção** (PRs #141, #144 e #145, 30/09/2026); Davi: _"tudo funcionando corretamente"_ | [ADR-0029](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | o que ficou de fora está na ADR-0029 §5; a próxima demanda, Davi indica        |
+| 19 ✅     | **Item 76** — a espera da chamada (ADR-0029 D-28, `DO-86`, aprovada por Davi em 01/10/2026). **Em produção** (PR #147, 01/10/2026)                                                                                                                                                                                            | [§12.6](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | fora: a moldura do palco, os botões e o `<p>` justificado no celular (D-28)    |
+| 20 ✅     | **Item 78** — conectado sem vídeo, "os dois, ligados", e o palco em janela estreita (D-29, `DO-87`). Em produção (PR #148)                                                                                                                                                                                                    | [§12.7](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | Firefox e Safari não medidos                                                   |
+| 21 🟡     | **Itens 79 e 80** — a espera na teleconsulta (D-30, `DO-88`) e a câmera do paciente por cima. Feito local                                                                                                                                                                                                                     | [§12.8](adr/ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md)    | sem "conectando" na teleconsulta                                               |
+
+### ✅ Fora da fila original — feito em 09/09/2026 a pedido do dono
+
+| item                                                                                                   | estado                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Integração ChatPro** — link único de cadastro entregue pelo WhatsApp, com nome completo **e e-mail** | ✅ **código pronto e testado**. [ADR-0015](adr/ADR-0015-o-chatpro-entrega-o-link-e-o-webhook-nunca-e-verdade.md) · diagnóstico no [`04` Item 18](04-LISTA-DE-AFAZERES.md) |
+
+**O que falta, e é do dono, não do código:**
+
+| #        | pendência                                                                                                                                                                                        | dono              | bloqueia                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | --------------------------------------- |
+| 1        | Configurar o painel do ChatPro — guia pronto em [`COMO-CONECTAR-NO-PAINEL.md`](chatpro/COMO-CONECTAR-NO-PAINEL.md)                                                                               | dono              | o link chegar ao paciente               |
+| ~~2~~ ✅ | A tela `/cadastro/{token}` — **construída em 09/09/2026** por decisão do dono: nome, CPF, telefone, e-mail, senha e a pergunta sobre tratamento em curso. Fica em `app/(auth)/cadastro/[token]/` | —                 | —                                       |
+| 3        | Ligar o cron de `/api/chatpro/processar`                                                                                                                                                         | dono/deploy       | o funil se mover (nada se perde até lá) |
+| 4        | Migration `0026` no Neon — só rodou no Postgres **local**                                                                                                                                        | deploy            | tudo, em produção                       |
+| 5        | 🔴 Base legal da LGPD art. 11 para dado sensível de saúde                                                                                                                                        | chefia + jurídico | operação com paciente real              |
+
+### 📋 Handoff Greens → BeHemp (decidido em 09/09/2026)
+
+| item                                                    | estado                                             |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| **ADR-0016** — back-channel assinado, só o token na URL | ✅ escrita, com pesquisa fundamentada              |
+| **ADR-0027** no `greens-corp` — o lado de quem envia    | ✅ escrita (espelho; a fonte do contrato é a 0016) |
+| Implementação                                           | 📋 **bloqueada** — ver `04` Item 22                |
+
+🔴 **Não começar a implementar antes de:** a Dryelle subir a atualização do formulário da Greens
+(a lista de campos de 09/09 precisa ser reconferida), o aceite existir no fluxo do intake, e o
+segredo compartilhado estar nos dois `.env`.
+
+**As três ADRs estão escritas** (09/09/2026), e a ordem de EXECUÇÃO está no `04` Item 23:
+
+| #   | ADR      | o quê                                                                         | espelho no greens-corp |
+| --- | -------- | ----------------------------------------------------------------------------- | ---------------------- |
+| 1   | **0016** | cadastro da Greens chega por back-channel · **e o retorno automático** (D-09) | ADR-0027               |
+| 2   | **0017** | o bot da BeHemp oferece o link quando falta receita nossa ou ANVISA           | —                      |
+| 3   | **0018** | o bot da Greens usa o link da BeHemp e devolve o paciente                     | ADR-0028               |
+
+🔴 **O canal de VOLTA (0016 D-09) vem antes da 0018**, senão a 0018 cria um segundo caminho de
+retorno — que é o rejeitado R-05 dela.
+
+### Trabalho próprio que precede itens da lista
+
+🔴 **Transcrever normas** ([`02`](02-CATALOGO-DE-REGRAS.md)):
+
+- ✅ **RDC 1.015/2026** (revogou a 327/2019), **660/2022** e **1.000/2025** — transcritas 24/08 (`DO-45`)
+- ⏳ **RDC 38/2013** — define "doença debilitante grave", régua do `CAN-05`. **Precede o entregável 10 da S5**
+- ⏳ **RDC 873/2024** — institui o SNCR, citada pelo `REC-05`. **Precede o Item 11**
+- ⏳ **RDC 185/2001** — classes de risco SaMD, completa o `ANV-04`. Não bloqueia telas; bloqueia **ligar o motor**
+- ⏳ **CFM 2.299/2021** na parte de documento eletrônico — só o **objeto** foi lido
+
+> 🎯 **O próximo NÃO é a Sprint 6.** Entre ela e o que já foi feito entram **quatro etapas em
+> sequência**, decididas em 25/08/2026 (`DO-52`, `DO-53` · [ADR-0014](adr/ADR-0014-o-qa-de-ponta-a-ponta-precede-a-sprint-6.md)):
+>
+> | #   | etapa                       | por que precede a seguinte                                            |
+> | --- | --------------------------- | --------------------------------------------------------------------- |
+> | A   | **Mapear os dados do seed** | seed escrito sem mapa descobre o que falta na execução — duas rodadas |
+> | B   | **Escrever o seed**         | sem dado, o QA falha por **estado vazio**, que parece bug e não é     |
+> | C   | **QA de ponta a ponta**     | primeiro teste humano das 5 sprints; achado aqui é mais barato        |
+> | D   | **Visualizar as telas**     | o aceite visual, que é do dev Davi                                    |
+>
+> 🔴 **O encadeamento de bloqueios é a razão de B vir antes de C:** paciente sem triagem não
+> chega à teleconsulta, sem consentimento a sala não abre, sem conduta não há titulação. Testar
+> a tela 6 exige que 1 a 5 tenham dado.
+>
+> Só depois vêm os **`GAP-nn`** (um cartão só, `DO-54`) e as **transcrições** — que agora só
+> terminam quando o ID aparece **no código**, não só no catálogo (`DO-55`).
+>
+> ✅ **Itens 8, 9, 10 e 11 concluídos em 25/08/2026** — E3, E7, E8 e a aba `IA Clínica`.
+> Com eles, **a Sprint 4 fecha** e a Metade 1 fica só com as Sprints 6 e 7.
+>
+> ⚠️ **Trabalho próprio que passou a preceder o item 10 da S5:** ler a **RDC 38/2013** e
+> **perguntar ao dono** se o `CAN-05` também é aviso, como ele decidiu para o `CAN-04`.
+>
+> ⚠️ Fila desatualizada faz o projeto trabalhar na prioridade errada. Se houver item concluído
+> com data mais recente que a do cabeçalho, **a fila está mentindo**.

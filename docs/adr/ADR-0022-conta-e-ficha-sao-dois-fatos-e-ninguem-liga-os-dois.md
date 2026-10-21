@@ -1,0 +1,2064 @@
+# ADR-0022 — Conta e ficha são dois fatos, e ninguém liga os dois
+
+> **Status:** aceita · **Data:** 12/09/2026 · **Revisada:** 13/09/2026 (Parte VII)
+> **Contexto:** o dono percorreu o fluxo 1 da Greens de ponta a ponta e ficou com uma conta
+> funcionando, um painel vazio e um cadastro que não podia mais ser concluído. Nenhuma das
+> peças estava quebrada. O que faltava era a ligação entre elas.
+
+## §0 — O relato, que é o dado primário
+
+> _"funcionou mas de um jeito estranho: eu precisei clicar no botão de sair, entrar na conta
+> e aí eu fui redirecionado para área do meu usuário, mas eu não fui pra tela de confirmação
+> de código do e-mail, que foi a etapa que eu parei. Eu entrei na conta e vim na área de meus
+> documentos: nenhum dos documentos que eu enviei chegaram na minha conta."_
+
+Três perguntas saem daí, e as três têm a mesma raiz.
+
+## §1 — O que foi MEDIDO, antes de qualquer hipótese
+
+Tudo abaixo foi medido em 12/09/2026 contra produção e contra a instância do Clerk, não
+inferido do código.
+
+### 1.1 A conta existe, e com senha
+
+```
+POST /v1/client/sign_ins  identifier=<e-mail do dono>
+  status: needs_first_factor
+  first factor: password
+  first factor: email_code
+  first factor: reset_password_email_code
+```
+
+**Ela foi criada em alguma tentativa anterior que completou a verificação.** É por isso que ele
+entrou sem confirmar código nenhum: não havia código a confirmar — a conta já existia, e a
+senha funcionava.
+
+### 1.2 O link do cadastro continua ABERTO
+
+```
+GET /cadastro/<token>  →  200, "Confirme seus dados"
+```
+
+`marcarComoUtilizada` roda **depois** da ficha gravar (`cadastro-por-link.ts`, etapa 6). O
+cadastro nunca chegou lá, então o token nunca foi consumido. **Os dados da Greens não se
+perderam** — estão em `solicitacoes_cadastro`, esperando.
+
+### 1.3 A ficha do painel é uma casca
+
+`app/(auth)/redirect/page.tsx:138-144`, no fallback de sincronização:
+
+```ts
+await db.insert(pacientes).values({
+  userId: novoUser.id,
+  medicoId: null,
+  status: 'aguardando_consulta',
+  jornadaFase: 'acolhimento',
+});
+```
+
+Sem CPF, sem telefone, sem endereço, sem documento. **E é exatamente o que a tela dele mostra.**
+
+### 1.4 A materialização dos documentos tem um único gatilho
+
+```
+materializarDocumentosDoParceiro  ← chamada em 1 lugar:
+  app/_actions/cadastro-por-link.ts:434
+```
+
+Ela roda **dentro** de `concluirCadastroPorLink`. Cadastro não concluído ⇒ documentos do
+parceiro nunca viram linha em `documentos` ⇒ o painel diz "Faltam 4 de 4".
+
+### 1.5 Ninguém pergunta se há cadastro pendente
+
+`grep solicitacoesCadastro` em `app/(paciente)` e em `app/(auth)/redirect`: **zero
+ocorrências**. O painel não tem como saber que existe um cadastro esperando por aquele
+usuário.
+
+> ✅ **RETIFICADO em 13/09/2026 — fechado.** `app/_actions/dashboard-paciente.ts` chama
+> `situacaoDoFluxo`. A medição acima vale para 12/09; ver §34.
+
+## §2 — As etapas, e o gap de cada uma
+
+O cadastro por link tem **cinco** fatos, e cada um pode acontecer sem os outros:
+
+| #   | fato                                   | onde nasce                            | pode existir sozinho?        |
+| --- | -------------------------------------- | ------------------------------------- | ---------------------------- |
+| 1   | **solicitação** com os dados da Greens | `POST /api/parceiros/greens/cadastro` | sim — é o estado inicial     |
+| 2   | **tentativa** de cadastro no Clerk     | `signUp.create`                       | sim, e **prende o e-mail**   |
+| 3   | **conta** (User do Clerk)              | status `complete`                     | sim, e foi o caso aqui       |
+| 4   | **ficha** (`pacientes` + dados)        | `concluirCadastroPorLink`             | sim, vazia, pelo `/redirect` |
+| 5   | **documentos materializados**          | dentro do fato 4                      | não — depende do 4           |
+
+**O gap não está em nenhuma etapa. Está entre a 3 e a 4.**
+
+| gap                                                                    | consequência medida                                       |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| **G1** — a conta pode existir sem a ficha do cadastro                  | o paciente entra e vê um painel vazio                     |
+| **G2** — o `/redirect` cria uma ficha **casca** ao ver conta sem ficha | o sistema passa a acreditar que o cadastro está feito     |
+| **G3** — nada liga a conta de volta à solicitação pendente             | o link continua válido e **ninguém diz isso ao paciente** |
+| **G4** — a materialização só roda dentro do fato 4                     | documentos que a Greens já entregou ficam invisíveis      |
+
+⚠️ **O G2 é o mais traiçoeiro.** Ele não deixa o sistema quebrado: deixa o sistema **mentindo**.
+Há uma linha em `pacientes`, então toda tela que pergunta "esse usuário tem ficha?" responde
+que sim. O cadastro real fica órfão sem que nada acuse.
+
+## §3 — Por que ele "entrou sem confirmar o código"
+
+Não entrou. A conta já existia (§1.1) de uma tentativa anterior bem-sucedida, e ele entrou com
+a senha dela. **A etapa do código não foi pulada — ela já tinha sido cumprida, noutro momento.**
+
+O que faltou não foi verificação: foi o sistema perceber que **aquela conta tem um cadastro
+pendente** e levá-lo de volta (G3).
+
+## §4 — Por que o código "não era confirmado antes"
+
+Duas causas distintas, as duas já corrigidas hoje, e que se somaram:
+
+1. **`session_exists`** — o Clerk não completa um `signUp` com sessão ativa. O `create` passa,
+   o `attempt` falha. Corrigido saindo da sessão antes dos dois passos.
+2. **e-mail, senha e nome iam juntos no `create`** — então uma falha depois disso deixava uma
+   conta sem senha utilizável. Corrigido enviando a senha no `update`, depois da verificação
+   (ADR desta série; a doc do Clerk garante que `complete` = _"The user has been created"_).
+
+⚠️ **Nenhuma das duas explica o painel vazio.** Elas explicam por que ele não conseguia
+concluir; o painel vazio é o G1/G2/G4, que são de desenho, não de bug.
+
+## §5 — A decisão
+
+**D-01 — Conta sem ficha de cadastro é um estado RECONHECIDO, não um estado inválido.**
+Ele vai acontecer: o Clerk cria conta, o webhook chega assíncrono, o paciente fecha a aba. O
+erro não é ele existir — é o sistema fingir que não existe.
+
+**D-02 — O painel pergunta se há cadastro pendente, e oferece o caminho de volta.**
+Quem entra com solicitação aberta vê um aviso com o link, em vez de um painel vazio sem
+explicação. Fecha o G3, e é o que o dono pediu: _"o sistema saber quando tiver faltando algo de
+uma etapa e continuar a partir disso"_.
+
+**D-03 — A ficha casca do `/redirect` continua existindo, e passa a ser DECLARADA como casca.**
+Removê-la quebraria o login de quem não veio por link (o webhook do Clerk é assíncrono e pode
+falhar). Mas ela não pode mais mentir: quem a cria marca que ela nasceu vazia, e quem lê sabe
+distinguir "ficha preenchida" de "casca esperando cadastro". Fecha o G2.
+
+⚠️ **Rejeitado:** deixar de criar a ficha no `/redirect`. Mede-se o custo: toda tela do
+paciente assume que a linha existe, e sem ela o login quebra para quem se cadastrou por fora
+do link. O remédio seria pior.
+
+**D-04 — A materialização deixa de depender só do cadastro por link.**
+Documento que a Greens entregou é fato dela, não do nosso fluxo. Quando a ficha existir e
+houver solicitação com documentos não materializados, materializa. Fecha o G4.
+
+⚠️ **Rejeitado:** materializar no `/redirect`. É caminho de login — trabalho de rede ali atrasa
+toda entrada no sistema, e falha de rede viraria falha de login.
+
+## §6 — O que fica para depois, e por quê
+
+| item                                           | por quê                                                                 |
+| ---------------------------------------------- | ----------------------------------------------------------------------- |
+| apagar o `signUp` pendente que prende o e-mail | exige Backend API do Clerk e decisão sobre retenção                     |
+| unificar conta e ficha num ato só              | exige sair do fluxo padrão do Clerk — medido e rejeitado hoje por custo |
+| notificar quem ficou órfão antes desta ADR     | precisa de varredura no banco e decisão do dono sobre contatar paciente |
+
+## §7 — Como se sabe que funcionou
+
+- quem entra com solicitação aberta **vê** o caminho de volta ao cadastro
+- o painel distingue ficha preenchida de casca
+- documento entregue pela Greens aparece no painel mesmo que o cadastro tenha sido concluído
+  por outro caminho
+- e os guardas: `o-painel-diz-o-que-falta`, `a-anvisa-aproveita-o-que-ja-chegou`,
+  `a-conta-nasce-na-confirmacao-do-email`, `o-cadastro-retoma-de-onde-parou`
+
+## §8 — Princípio e fase
+
+Princípio **C** (o sistema informa, não esconde) e **H** (estado parcial é estado, e se declara).
+Fase 7 — integração entre empresas.
+
+> 🔴 **RETIFICADO em 13/09/2026 — as três glosas acima são INVENTADAS.** Medido em
+> `docs/PRINCIPIOS.md`: **C** é _Ambientes e CI/CD_, **H** é _Segurança_, e a **fase 7** é _Erros
+> e resiliência_. O número da fase estava certo; a descrição, não — que é o jeito mais fácil de
+> alguém acreditar. O princípio correto para esta parte é **D** (Tratamento de erros, resiliência
+> e HTTP). A atribuição completa, decisão por decisão, está no §35.1.
+
+---
+
+# PARTE II — A sentinela e a procedência
+
+> **Acrescentado em 12/09/2026**, depois de o dono percorrer o fluxo 1 inteiro e apontar o que
+> a Parte I não cobria. Ele aprovou os cinco entendimentos abaixo e acrescentou quatro.
+
+## §9 — O que está aprovado, nas palavras do dono
+
+Estes cinco foram escritos por mim, lidos e **confirmados** por ele ("entendeu exatamente
+correto"). Ficam aqui como contrato, não como resumo:
+
+| #      | o requisito                                                                                          |
+| ------ | ---------------------------------------------------------------------------------------------------- |
+| **R1** | o fluxo tem que sobreviver ao **caminho ruim**, não só ao feliz                                      |
+| **R2** | o sistema tem que saber **em que etapa** o paciente parou — e **retomar dali**, não recomeçar        |
+| **R3** | nenhum estado intermediário pode virar armadilha: conta pela metade fica **bloqueada e recuperável** |
+| **R4** | a criação entre os dois sistemas tem que ser **rastreável de ponta a ponta**                         |
+| **R5** | o estudo dos modos de falha por etapa vira ADR **e** sprints com testes                              |
+
+E os quatro que ele acrescentou:
+
+| #      | o requisito                                                                     | nas palavras dele                                                                                                                                  |
+| ------ | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R6** | **verdade sobre o dado que não chegou**                                         | _"é importante que o sistema reconheça e seja verdadeiro quando os dados não chegarem ao fluxo da BeHemp"_                                         |
+| **R7** | **procedência**: o sistema sabe de onde o paciente veio                         | _"se ele veio do link do ChatPro, se veio do webhook do site da Greens (se veio ou não veio os documentos), ou se veio do próprio site da BeHemp"_ |
+| **R8** | uma **sentinela** que monitora e entrega a tela certa                           | _"o certo é criarmos uma sentinela que é capaz de monitorar isso e entregar a tela certa para cada usuário"_                                       |
+| **R9** | **conta antiga não é bloqueada**; conta nova pelos formulários carrega o status | _"usuários antigos que já possuem a conta criada não terão esse bloqueio"_                                                                         |
+
+⚠️ **R6 é o mais exigente, e é o que a Parte I errou.** Não basta não quebrar: a tela tem de
+**dizer** que o dado não chegou. O painel dele mostrava "0 enviados" — o que é verdade sobre o
+banco e **mentira sobre o mundo**, porque a Greens tinha entregado quatro documentos.
+
+## §10 — A procedência JÁ EXISTE, e morre antes de chegar ao paciente
+
+Medido em 12/09/2026, e é a melhor notícia desta ADR:
+
+```ts
+// db/schema/enums.ts:330
+export const solicitacaoCadastroOrigemEnum = pgEnum('solicitacao_cadastro_origem', [
+  'painel_admin',
+  'chatpro_bot',
+  'chatpro_start',
+  'chatpro_start_nao_verificado',
+  'chatpro_webhook',
+  'greens_handoff',
+]);
+```
+
+**O enum cobre exatamente os três casos que o dono pediu no R7** — ChatPro, webhook da Greens,
+e origem própria. O comentário dele no schema já dizia por quê: _"distinguir a origem não é
+telemetria: é o que permite responder 'por que este paciente não recebeu o link' sem
+adivinhar"_.
+
+🔴 **E `pacientes` não tem nenhuma coluna de origem.** Medido: `grep origem db/schema/pacientes.ts`
+não devolve coluna nenhuma. A procedência nasce na solicitação, é usada durante o cadastro, e
+**morre ali**. Depois disso, um paciente vindo da Greens é indistinguível de um que se cadastrou
+sozinho — e é por isso que nenhuma tela sabe que há documentos esperando.
+
+**G5 — a procedência não sobrevive à criação da ficha.**
+
+> ✅ **RETIFICADO em 13/09/2026 — fechado pelo S8.2.** `db/schema/pacientes.ts:107,117` tem
+> `origem` e `solicitacaoId` (migration `0042`). Ver §34.
+
+## §11 — O que falta medir, e que eu NÃO vou supor
+
+Registrado como pendência aberta, porque afirmar sem medir foi o erro do dia:
+
+**G6 — o aviso de cadastro pendente não apareceu na tela do dono.** Ele subiu em produção
+(deploy `0147e294`) e a tela dele seguiu mostrando só o aviso da ANVISA. Três hipóteses, nenhuma
+verificada:
+
+1. o e-mail da solicitação não casa exatamente com o da conta (caixa, espaço, ou endereço
+   diferente — ele usou três);
+2. a solicitação já tem `pacienteId` preenchido, e a condição a exclui;
+3. defeito no meu código.
+
+⚠️ **Exige acesso ao banco de produção, que não tenho daqui.** Fica como primeiro item da
+sprint — e a lição: um aviso que depende de três condições precisa de um jeito de saber **qual**
+delas o barrou. Hoje ele só some.
+
+> ✅ **RETIFICADO no mesmo dia — contornado pelo D-16.** O acesso não veio; o instrumento sim.
+> `GET /api/fluxo/situacao` responde o ponto **e o porquê** sem tocar no banco de produção.
+
+## §12 — A decisão: a sentinela
+
+**D-05 — Existe UMA função que responde "em que ponto do fluxo esta pessoa está".**
+
+Não uma tela, não um componente: uma função pura, que recebe o estado e devolve o ponto. Todas
+as telas perguntam a ela; nenhuma decide por conta própria.
+
+```
+    conta?  ficha?  documentos?  solicitação aberta?
+                      │
+                 [ sentinela ]
+                      │
+        ┌─────────────┼─────────────┐
+     retomar      continuar      seguir
+   (etapa X)      (o que falta)   (tudo certo)
+```
+
+**Por que uma função e não uma tela:** hoje a decisão está espalhada — `/redirect` decide papel,
+`destinoDepoisDoCadastro` decide destino, o painel decide avisos, e nenhum deles vê o quadro
+inteiro. Foi assim que a ficha casca do `/redirect` (G2) passou a mentir para todos os outros.
+
+**D-06 — A sentinela responde com o PONTO e o PORQUÊ, nunca só com um booleano.**
+`{ ponto: 'aguardando_codigo', porque: 'signUp pendente e e-mail não verificado' }`. Sem o
+porquê, o G6 se repete: a tela some e ninguém sabe qual condição a barrou.
+
+**D-07 — Conta ANTIGA passa pela sentinela e sai por um ramo próprio** (R9). Ela não tem
+solicitação, não tem procedência, e **não pode ser bloqueada** — o ponto dela é `completo_legado`.
+Sem esse ramo, a sentinela trataria todo paciente pré-existente como cadastro pela metade.
+
+**D-08 — A procedência passa a viver no paciente** (R7, fecha o G5). A ficha guarda de onde ela
+veio e qual solicitação a originou. É o que permite a uma tela saber que há documentos da Greens
+esperando — hoje, ninguém sabe.
+
+**D-09 — A reconciliação é um ato explícito, não um efeito colateral.** Para quem já ficou órfão
+(os três e-mails de teste), existe um caminho que liga a conta à solicitação e materializa o que
+chegou. O dono já concluiu isto sozinho: _"o máximo que eu possa fazer é ver a reconciliação"_.
+
+⚠️ **Rejeitado: reconciliar automaticamente no login.** É trabalho de rede e escrita no caminho
+de entrada — mesma razão pela qual materializar no `/redirect` foi rejeitado (§5, D-04). Falha
+de rede viraria falha de login.
+
+## §13 — Os modos de falha, etapa por etapa
+
+O estudo que o R1 e o R5 pedem. Cada linha é um estado que **acontece**, não um exercício.
+
+| #   | etapa                           | o que pode falhar                                              | hoje                                           | com a sentinela                                              |
+| --- | ------------------------------- | -------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| 1   | Greens cria a solicitação       | assinatura inválida, documento recusado (SSRF, 403, sem HTTPS) | recusa e loga                                  | igual — já é o certo                                         |
+| 1b  | documento do parceiro não baixa | `origem_nao_autorizada`, `http_403` — **medido no log**        | manifesto diz que veio, arquivo não existe     | ponto **dado_incompleto**, e a tela diz **qual** faltou (R6) |
+| 2   | paciente abre o link            | link expirado, já usado, token inválido                        | mensagem certa                                 | igual                                                        |
+| 3   | `signUp.create`                 | e-mail já tem conta; sessão de outro                           | tratado hoje                                   | ponto **conta_existente** ou **sessao_alheia**               |
+| 4   | código do e-mail                | expira, chega tarde, aba fecha, troca de aparelho              | retomada **só na mesma aba** (senha em estado) | ponto **aguardando_codigo**, retomável de qualquer lugar     |
+| 5   | `update` completa a conta       | rede cai entre verificar e completar                           | cadastro pendente sem conta                    | ponto **conta_incompleta**, com caminho                      |
+| 6   | ficha grava                     | exceção pós-transação                                          | preserva o cadastro (corrigido hoje)           | ponto **ficha_gravada_parcial**                              |
+| 7   | materialização                  | link do parceiro expirou, MIME recusado                        | **silenciosa** — `{inseridos: 0}`              | ponto **documentos_nao_materializados** (R6)                 |
+| 8   | transferência S2                | sem consentimento, trava desligada                             | não enfileira, loga `info`                     | visível ao paciente e ao admin                               |
+
+> ⚠️ **RETIFICADA A LINHA 4 em 13/09/2026.** Ela prometia _"retomável de qualquer lugar"_.
+> Medido: retomar com o formulário zerado **gravaria ficha vazia**, porque a confirmação do
+> código chama `gravarFicha()`, que lê anexos, consentimento e respostas clínicas do estado do
+> React. O que se entrega é retomada de qualquer lugar **refazendo a etapa 1**, com a tela
+> dizendo o que aconteceu. Ver §33.3 e o D-17.
+
+🔴 **As linhas 1b e 7 são o R6 inteiro.** As duas falham em silêncio hoje, e as duas produzem
+exatamente o que o dono viu: o sistema afirmando "0 documentos" enquanto quatro tinham sido
+entregues. **Não basta não quebrar — tem que dizer.**
+
+## §14 — O que isto NÃO resolve
+
+- **não recupera** documento cujo link do parceiro já expirou; recupera a **informação** de que
+  ele existiu e não chegou
+- **não desfaz** os três e-mails de teste já quebrados — para eles vale a reconciliação (D-09), e
+  o teste do fluxo real pede e-mail novo, como o próprio dono concluiu
+- **não cria** verificação de e-mail própria; a conta continua nascendo no Clerk, na confirmação
+  (medido e decidido hoje)
+
+---
+
+# PARTE III — A investigação exaustiva
+
+> **Acrescentado em 12/09/2026**, depois de o dono recusar a Parte II por ela ter parado cedo:
+> _"o suficiente nunca é suficiente se ele já não teve todas as formas de pesquisa e busca de
+> dados possíveis"_. A regra que saiu disso está no `CLAUDE.md`, e esta parte é a primeira
+> aplicação dela.
+
+## §15 — Correlação com a literatura (pergunta 4 da regra)
+
+Duas coisas que eu vinha tratando como problema nosso **têm nome, e solução conhecida**.
+
+### 15.1 O fluxo entre as empresas é uma SAGA distribuída
+
+O padrão descreve exatamente o que temos: _"uma transação que abrange vários serviços como uma
+sequência de transações locais, cada uma commitando no seu próprio serviço e publicando um
+evento que dispara o passo seguinte"_.
+
+🔴 **E o nosso é o pior dos dois estilos.** A literatura separa **coreografia** (cada serviço
+reage a eventos) de **orquestração** (um coordenador central manda). O nosso é coreografia —
+e **sem compensação**: quando um passo falha, nada desfaz nem marca os anteriores.
+
+> _"Quando um passo falha, a saga executa transações compensatórias para desfazer os passos já
+> completados… Um passo de compensação é uma ação nova com significado de negócio: estornar,
+> liberar estoque, enviar evento de correção, ou **marcar a requisição como cancelada**."_
+
+**Nós não temos nenhuma das três.** O cadastro do dono ficou parado no meio: a Greens acha que
+enviou, a BeHemp tem a solicitação aberta, a conta existe, a ficha não, e ninguém marca nada.
+
+#### 🔴 RETIFICAÇÃO, no mesmo dia: "orquestração ganha" estava errado pela metade
+
+Escrevi acima, numa primeira leitura, que **orquestração ganha**. Aprofundando a pesquisa — o
+passo 3 da regra do `CLAUDE.md`, julgar em vez de copiar — a literatura diz o contrário para
+metade do problema:
+
+> _"Coreografia pode ser mais adequada para preservar independência e alinhamento se os
+> serviços pertencem a **times ou organizações diferentes**, enquanto orquestração pode ser
+> mais conveniente se pertencem ao **mesmo time ou organização**."_
+
+**Greens e BeHemp são duas empresas.** Pelo critério da literatura, a integração entre elas
+**deve continuar coreografada** — e é o que já é: eventos assinados, cada lado reagindo ao seu.
+Trocar isso por um orquestrador central criaria acoplamento entre organizações que hoje não
+existe, e daria a uma empresa controle sobre o fluxo da outra.
+
+E a mesma fonte dá a saída: _"Você pode usar uma abordagem **híbrida**, com partes da saga
+coreografadas e outras orquestradas, conforme o contexto."_
+
+**D-10 (retificado) — Híbrido, com a fronteira na empresa.**
+
+| onde                      | estilo                         | por quê                                                                                     |
+| ------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| **entre** Greens e BeHemp | **coreografia** — como já é    | organizações diferentes; independência é requisito, não acidente                            |
+| **dentro** da BeHemp      | **orquestração** — a sentinela | mesmo time; e é um fluxo _stateful_ e crítico, onde a literatura diz que orquestração vence |
+
+🔴 **A sentinela é o orquestrador de DENTRO, e só dele.** Ela não manda na Greens nem pergunta
+nada a ela: lê o que já chegou e responde em que passo **o nosso lado** está. É o que o R8
+pediu — e a fronteira é o que impede a solução de virar acoplamento entre empresas.
+
+⚠️ **O que a coreografia entre as empresas ainda não tem é compensação** (§15.1). Isso continua
+valendo, e não exige orquestrador: é o evento de correção que falta — _"marcar a requisição como
+cancelada"_ — e ele vai na direção BeHemp → Greens, pelo mesmo canal assinado de hoje.
+
+**Fonte:** [Saga Orchestration vs Choreography — Temporal](https://temporal.io/blog/to-choreograph-or-orchestrate-your-saga-that-is-the-question) ·
+[Choreography vs Orchestration — trade-offs](https://dev.to/aloknecessary/saga-orchestration-vs-choreography-making-the-right-trade-off-in-event-driven-systems-5fmm)
+
+### 15.2 O estado do dono tem nome: ORPHANED ACCOUNT
+
+> _"Contas de usuário são consideradas órfãs quando não têm contraparte numa fonte autoritativa
+> externa… Contas órfãs são identificadas durante a RECONCILIAÇÃO."_
+
+E a prática estabelecida é reconciliação **periódica** contra a fonte autoritativa, não
+correção manual caso a caso.
+
+**Aqui a fonte autoritativa é `solicitacoes_cadastro`** — o que a Greens mandou. A conta no
+Clerk é o _account_. Ligar os dois é literalmente o que a literatura chama de reconciliação.
+
+⚠️ **Isto confirma o D-09 e muda o peso dele:** reconciliação não é um script de emergência
+para os três e-mails de teste. É uma rotina que o sistema precisa ter para sempre.
+
+**Fontes lidas:** [Saga pattern — microservices.io](https://microservices.io/patterns/data/saga.html) ·
+[Saga — Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/patterns/saga) ·
+[Identity Reconciliation — OpenIAM](https://www.openiam.com/workforce-identity-concepts/identity-lifecycle-management/reconciliation) ·
+[Reconcile orphaned accounts — Google Cloud](https://docs.cloud.google.com/architecture/identity/reconciling-orphaned-managed-user-accounts)
+
+## §16 — SETE criadores de ficha, sete estados diferentes (G7)
+
+Medido em 12/09/2026 — e é a causa estrutural do G2, que a Parte I só tinha descrito.
+
+| quem cria `pacientes`                      | campos que grava                              |
+| ------------------------------------------ | --------------------------------------------- |
+| `app/(auth)/redirect/page.tsx`             | `userId`, `medicoId`, `status`, `jornadaFase` |
+| `app/(medico)/_actions/pacientes.ts`       | `medicoId`, `dataNascimento`, `cpf`, `status` |
+| `app/_actions/perfil-paciente.ts`          | `userId`                                      |
+| `app/_actions/documentos-paciente-self.ts` | `userId`, `status`, `jornadaFase`             |
+| `app/_actions/pacientes.ts`                | `dataNascimento`, `cpf`, `genero`             |
+| `app/_actions/cadastro-por-link.ts`        | `userId` (+ os demais no mesmo bloco)         |
+| `app/api/webhooks/clerk/route.ts`          | `medicoId`, `status`, `jornadaFase`           |
+
+🔴 **Sete pontos, sete conjuntos de campos, e NENHUM marca que a ficha nasceu incompleta.**
+Depois que a linha existe, toda tela que pergunta "tem ficha?" recebe sim — e não há como
+distinguir a ficha do cadastro completo da casca criada no login.
+
+**G7 — não existe o conceito de "ficha completa".** É o que permite ao G2 mentir, e é por isso
+que remover só o criador do `/redirect` (o rejeitado do §5) não resolveria: sobrariam seis.
+
+> ⚠️ **RETIFICADO em 13/09/2026 — parcial, E O PARCIAL É DE PROPÓSITO.** Hoje **1 dos 7** grava
+> procedência (`cadastro-por-link.ts`). Os outros seis continuam sem — e é o que o D-11 quis:
+> `origem IS NULL` **é** a declaração de que a ficha nasceu de lado. O que faltava era o
+> documento dizer que o nulo carrega significado. Ver §34.
+
+**D-11 — A ficha declara se está completa, e quem a completou.** Não um booleano solto: a
+mesma coluna de procedência do D-08 responde as duas perguntas — de onde veio e por qual
+caminho nasceu. Uma ficha sem procedência é uma ficha que nasceu de lado.
+
+## §17 — Nenhuma varredura existe (G8)
+
+Medido:
+
+```
+scripts/       — nenhum script de reconciliação
+app/api/cron/  — verificar-recompra-medicamentos
+                 verificar-revisoes-dosagem
+                 verificar-validade-documentos
+grep solicitacoesCadastro em app/api/cron e app/api/parceiros — ZERO
+```
+
+O único agendamento que toca o fluxo do parceiro é `filas.yml`, a cada 5 minutos, e ele só
+**esvazia eventos de saída**. Ninguém olha para trás.
+
+**G8 — solicitação parada não é vista por ninguém, nunca.** Ela expira em 7 dias e continua no
+banco, sem que nada a marque como perdida nem avise quem a criou. Do lado da Greens, o pedido
+fica esperando um cadastro que já não pode acontecer (§13, linha 5).
+
+⚠️ **É exatamente o que a literatura de reconciliação resolve com varredura periódica** — e o
+que a saga resolveria com uma compensação: _"marcar a requisição como cancelada"_.
+
+### 15.3 🔴 E o passo 4: adotar saga DENTRO de casa nos deixaria PIORES
+
+O quarto trabalho da regra do `CLAUDE.md` é julgar se o padrão nos deixa melhores — ou só mais
+parecidos com o mercado. Aqui a resposta é **não adotar**, e a literatura dá o critério:
+
+> _"A melhor opção é frequentemente **evitar transações distribuídas inteiramente**, movendo as
+> escritas relacionadas para um único serviço… Se você não está de fato numa arquitetura de
+> microsserviços, pergunte se consegue mover as escritas relacionadas para um serviço só. Essa
+> abordagem mantém as propriedades ACID sem a complexidade da saga."_
+
+> _"Use sagas quando precisa manter dados consistentes entre serviços que **têm bancos
+> próprios**, e consegue conviver com consistência eventual."_
+
+**Medido:** dentro da BeHemp, `users`, `pacientes`, `documentos`, `consentimentos` e
+`solicitacoes_cadastro` vivem **no mesmo Postgres**. Não há serviço separado, não há banco
+próprio, não há nada a distribuir. **Saga aqui seria complexidade sem o problema que ela
+resolve** — e traria junto a pior parte dela: _"falta de rollback automático e de isolamento…
+o desenvolvedor precisa implementar contramedidas de design"_.
+
+**D-12 — Dentro de casa: transação e máquina de estados. Saga só na fronteira.**
+
+| camada            | o padrão certo                                   | por quê                                                                    |
+| ----------------- | ------------------------------------------------ | -------------------------------------------------------------------------- |
+| entre as empresas | **saga coreografada** (o que já é) + compensação | bancos diferentes, empresas diferentes, consistência eventual é inevitável |
+| dentro da BeHemp  | **transação** + **máquina de estados**           | um banco só; ACID está disponível e é mais forte que qualquer compensação  |
+
+🔴 **Isto muda o que a sentinela É.** Ela não é um orquestrador de saga — é a **máquina de
+estados** que lê o estado consolidado de um banco só e diz em que ponto a pessoa está. Mais
+simples, mais barata, e sem o débito que a saga cobra.
+
+⚠️ **E acende um alerta sobre o que já temos.** Os passos pós-transação do
+`concluirCadastroPorLink` — anexos, consentimento, materialização — estão **fora** da transação,
+cada um com o seu `catch`. Isso é, de fato, uma saga caseira dentro de um banco que suporta
+ACID. Foi decisão consciente (_"anexo que falha não desfaz cadastro que deu certo"_) e continua
+defensável: são efeitos externos (upload em blob, rede), que não pertencem a uma transação de
+banco. **Mas o que falta é a outra metade da saga: quando um deles falha, nada marca.** É o G7
+e o R6 pelo mesmo caminho.
+
+⚠️ **Um dado que a literatura dá e que vale como aviso:** _"sagas coreografadas são simples de
+começar, e difíceis de depurar a partir de cinco passos"_. O nosso fluxo tem **exatamente cinco
+fatos** (§2). Estamos no limite onde o padrão começa a cobrar.
+
+**Fontes lidas:** [The limits of the Saga pattern — Uwe Friedrichsen](https://www.ufried.com/blog/limits_of_saga_pattern/) ·
+[Distributed Transactions: The Trade-Off Most Miss](https://medium.com/beyond-localhost/distributed-transactions-the-trade-off-most-miss-a10da4f47053)
+
+---
+
+# PARTE IV — O outro lado (pergunta 2 da regra)
+
+> Varredura do repositório `greens-corp` em 12/09/2026. É a pergunta que eu não tinha feito:
+> **examinei o que vem do outro lado?** As respostas mudam o desenho, e duas delas são graves.
+
+## §18 — Vocabulário: o que chamamos de S2 lá se chama E1
+
+Primeira coisa que a varredura corrigiu, e vale registrar para não errarmos nas conversas:
+
+| nós chamamos                              | eles chamam  | direção                                |
+| ----------------------------------------- | ------------ | -------------------------------------- |
+| **S2 / handoff** (cadastro indo para nós) | **E1 (ida)** | Greens → BeHemp                        |
+| —                                         | **S2**       | BeHemp → Greens (cadastro entrando lá) |
+
+Fonte: `greens-corp-backend/src/modules/parceiros/behemp/BehempController.ts:14-17`.
+
+## §19 — O contrato real da ida, medido no código deles
+
+`HandoffService.ts:233-249` — **sete campos**, e nenhum a mais:
+
+```
+nomeCompleto · email · telefone · cpf · pedidoDoParceiro · documentos · urlDeRetorno
+```
+
+Assinatura (`assinatura.ts`): `HMAC-SHA256` sobre `` `${eventoId}.${timestamp}.${corpoCru}` ``,
+timestamp em **segundos**, janela ±300 s, `eventoId` = `medicationRequest.id` — **estável por
+encaminhamento**, que é a chave de idempotência deles.
+
+⚠️ **O `eventoId` estável é bom para nós e vale preservar:** reenvio do mesmo encaminhamento
+chega com o mesmo id, e o nosso índice já trata como reentrega.
+
+## §20 — O que eu suspeitei e ESTAVA ERRADO (medido, não suposto)
+
+Duas hipóteses minhas que a varredura derrubou. Ficam escritas porque supor sem medir foi o
+erro do dia.
+
+### 20.1 O e-mail divergente NÃO explica o G6
+
+A varredura achou que **a Greens envia o e-mail cru** — `medicationRequestValidator.ts:57-59`
+aceita `" Joao@Gmail.COM "` sem `trim` nem `toLowerCase`. Pareceu a causa do aviso não aparecer.
+
+**Não é.** Nós normalizamos nas **duas** pontas de entrada:
+
+```
+app/api/parceiros/greens/cadastro/route.ts:43   z.string().trim().toLowerCase().email()
+lib/parceiros/handoff.ts:119                    entrada.email?.trim().toLowerCase() || null
+```
+
+🔴 **Mas o achado continua valendo como risco do lado deles:** quem casar paciente por e-mail
+sem normalizar vai divergir de nós. Já está no §12 do documento-ponte como coisa a avisar.
+
+### 20.2 A URL de documento expirando em 1 h NÃO nos atinge
+
+Eles assinam URLs S3 com **TTL de 1 hora** (`HandoffService.ts:193`), e o paciente tem **7 dias**
+para abrir o link. Pareceu buraco garantido.
+
+**Não é**, porque baixamos na **entrada**, não no cadastro: `handoff.ts:157,186` chamam
+`manifestoComArquivos` durante o handoff, dentro da janela. O comentário do nosso código já
+dizia (`handoff.ts:85`): _"baixado e re-hospedado aqui, e o paciente não precisa reenviar"_.
+
+⚠️ **E isso decide uma coisa que estava aberta:** a materialização em background que o §12 do
+documento-ponte propõe **não pode** buscar na URL do parceiro depois — ela já estaria morta.
+Tem de partir do que re-hospedamos.
+
+## §21 — O que o outro lado NÃO tem, e que muda o nosso desenho
+
+| #      | achado no lado deles                                                                                            | onde                                                  | o que significa para nós                                                                         |
+| ------ | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **X1** | **falha na ida não persiste nada** — `behempJourney` fica `NONE`, só `logger.error`, e o log some a cada deploy | `HandoffService.ts:386-408`, `:290-292`               | se o POST falhar, **nem eles nem nós** sabemos que existiu um paciente. Não há o que reconciliar |
+| **X2** | **paciente que nunca conclui: nada acontece** — `SENT_TO_BEHEMP` para sempre, sem timeout, sem expiração        | `schema.prisma:1362-1364`                             | o pedido fica aberto lá indefinidamente. **Só nós podemos avisar**                               |
+| **X3** | **nenhuma reconciliação, nenhum cron toca a integração** — `grep -ril behemp src/jobs/` vazio                   | 12 crons, nenhum do parceiro                          | a varredura tem de ser **nossa**; esperar por eles é esperar por nada                            |
+| **X4** | a saúde deles é **agregada**: dá para ver que 40 foram e 3 voltaram, **não quais 37** faltam                    | `SaudeService.ts:195-199`                             | eles não conseguem nos dizer quem parou. A lista tem de sair do nosso lado                       |
+| **X5** | **sem retry, sem fila** na ida — o único retry é um botão no navegador do paciente                              | `SaudeService.ts:50`, `PatientIntakeFlow.tsx:599-612` | um handoff perdido **só volta se o paciente clicar**. Se ele fechou a aba, acabou                |
+
+🔴 **X2 + X3 + X4 juntos dizem uma coisa só: do lado deles, o paciente que para no meio é
+invisível por construção.** Não é descuido — é ausência de mecanismo. Qualquer aviso sobre
+cadastro parado tem de nascer aqui.
+
+**D-13 — A compensação da saga (§15.1) sai da BeHemp para a Greens, e é nossa responsabilidade.**
+Quando a sentinela detectar cadastro abandonado, o evento de correção — _"marcar a requisição
+como cancelada"_ — viaja pelo canal assinado que já existe. Eles não têm como descobrir sozinhos.
+
+⚠️ **Exige acordo com a Greens:** o validador deles hoje aceita só `receita_emitida` e
+`anvisa_aprovada` (`behempValidator.ts:30`). Um tipo novo é mudança dos dois lados. Entra no §12
+do documento-ponte como proposta, não como fato.
+
+## §22 — O que achamos do lado deles e é problema DELES (comunicar, não corrigir)
+
+Registrado aqui porque afeta o fluxo do paciente, e porque o §12 do documento-ponte é o canal.
+
+| #      | achado                                                                                                                                                    | gravidade                             |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **Y1** | o S2 **nunca marca `CAME_FROM_BEHEMP`** — e a jornada é o insumo do roteamento de gateway e do desconto. Todo paciente vindo de nós cai no gateway errado | 🔴 afeta cobrança                     |
+| **Y2** | `behempReferralId` **sem `@unique`**, e a volta usa `findFirst` — colisão aplica o evento no pedido errado, em silêncio                                   | 🔴 já catalogado como R8 lá, e adiado |
+| **Y3** | **S2 sem allowlist configurada aceita o cadastro e descarta 100% dos documentos sem erro**                                                                | 🔴 silencioso                         |
+| **Y4** | `503` para "2xx sem referralId" faz a tela oferecer "tentar de novo" para um erro que retry nunca resolve                                                 | 🟠 paciente em loop                   |
+| **Y5** | a ADR-0027 deles diz que o envio automático foi **rejeitado**; o código envia automático desde 11/09                                                      | 🟠 doc mente                          |
+| **Y6** | `window.location.href = data.urlDeContinuacao` sem conferir origem                                                                                        | 🟠 confiam na URL que mandamos        |
+
+⚠️ **O Y6 é sobre nós:** eles consomem a URL que **a BeHemp** devolve, sem validar. Se o nosso
+lado for comprometido, o paciente deles vai para onde mandarmos. Não é defeito nosso, mas a
+confiança é — e vale dizer a eles.
+
+---
+
+# PARTE V — Os modos de falha do nosso lado (perguntas 5 e 6)
+
+> Varredura exaustiva do fluxo em 12/09/2026. **22 falhas silenciosas** e **14 gaps**. Aqui
+> ficam os que mudam decisão; a lista inteira está no §24.
+
+## §23 — 🔴 O achado mais grave, e ele é de LGPD
+
+**G9 — revogar o consentimento NÃO impede o envio de um evento já enfileirado.**
+
+Medido:
+
+```
+lib/parceiros/enviador.ts        — nenhuma releitura de consentimento antes do POST
+db/schema/parceiro-eventos-saida.ts:52 — `payload` é jsonb, congelado no enfileiramento
+```
+
+O consentimento é conferido **uma vez**, quando o evento entra na fila. O `enviador` pega o
+payload gravado e envia. **Entre os dois momentos o paciente pode revogar — e o dado sai assim
+mesmo.**
+
+⚠️ **A LGPD art. 8º §5º diz que a revogação é "a qualquer momento".** Um consentimento que só
+vale até o evento entrar na fila não é revogável a qualquer momento: é revogável até a fila
+rodar, e o paciente não tem como saber quando isso foi.
+
+⚠️ **E a janela não é teórica.** A fila anda por GitHub Actions a cada 5 minutos
+(`filas.yml:26`), com retry de até 6 tentativas e backoff até 60 minutos (`enviador.ts:17,57`).
+Um evento pode sair **horas** depois de enfileirado.
+
+🔴 **Isto é mais urgente que tudo o mais desta ADR.** Não é experiência ruim: é dado de saúde
+saindo da empresa sem autorização válida.
+
+**D-14 — O enviador relê o consentimento imediatamente antes do POST, e recusa se foi
+revogado.** O evento vira `cancelado_por_revogacao`, não `falhou` — a diferença importa para
+quem lê a fila depois.
+
+⚠️ **Custo aceito:** uma consulta a mais por evento enviado. Barato perto do que evita.
+
+## §24 — Os outros gaps, em ordem de risco ao paciente
+
+| #       | gap                                                               | onde                                    | por que importa                                                                                                                                                                        |
+| ------- | ----------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **G10** | o link é **queimado antes** de o `pacienteId` ser gravado         | `cadastro-por-link.ts:327` vs `:342`    | se a gravação seguinte falhar: link morto **e** `pacienteId` nulo. O aviso de pendência nunca aparece (exige `usadoEm IS NULL`) e o parceiro nunca é avisado da receita                |
+| **G11** | corrida webhook × transação viola o unique de `pacientes.userId`  | `:304` sem `onConflictDoNothing`        | o webhook do Clerk insere entre o `SELECT` e o `INSERT` → transação aborta → paciente lê "não conseguimos concluir" **com a conta já criada**. É um candidato ao erro original do dono |
+| **G12** | eventos presos em `enviando`/`processando` **para sempre**        | `enviador.ts:136`, `processador.ts:117` | não existe reaper. Crash ou deploy no meio do lote e "receita pronta" some                                                                                                             |
+| **G13** | "cadastro concluído" com documentos, consentimento ou S2 perdidos | `cadastro-por-link.ts:500-502`          | é a decisão de hoje (preservar o cadastro), mas **nenhuma tela mostra o que faltou**                                                                                                   |
+| **G14** | webhook do Clerk sem idempotência por `svix-id`                   | `webhooks/clerk/route.ts`               | reentrega duplica notificação e **sobrescreve o `clerkId`** de um usuário existente                                                                                                    |
+| **G15** | crons do `vercel.json` **nunca rodam** e são _fail-open_          | `vercel.json:3-17`                      | validade de documento e revisão de dosagem nunca avisam; e sem `CRON_SECRET` o endpoint é público                                                                                      |
+| **G16** | solicitação nunca usada fica **para sempre**                      | `enums.ts:348`                          | o status `expirada` nunca é atribuído, não há expurgo: nome, e-mail, CPF e blobs ficam indefinidamente                                                                                 |
+| **G17** | `solicitacoes_cadastro.pacienteId` **sem FK**                     | `solicitacoes-cadastro.ts:209`          | ponteiro morto silencioso                                                                                                                                                              |
+| **G18** | painel vazio **sem erro**                                         | `paciente/page.tsx:109-111`             | a action falha, `dados` fica `null`, e a tela renderiza vazia sem mensagem — foi o que o dono viu                                                                                      |
+| **G19** | `laudo_medico` sem destino no enum                                | `anexo-do-cadastro.ts:79`               | o laudo enviado **desaparece** da ficha                                                                                                                                                |
+
+> ✅ **RETIFICADO em 13/09/2026 — o G18 está fechado.** O painel guarda `res.erro` e mostra um
+> aviso que assume o problema como nosso, com "Tentar de novo". Era o quarto estado que o S8.4
+> não cobria: os três dele supunham que a consulta **funcionou**.
+
+⚠️ **O G18 explica metade do relato do dono.** Ele viu painel vazio; nós nunca soubemos se foi
+ausência de dado ou falha da consulta. **São coisas diferentes, e a tela mostrava a mesma
+coisa** — que é exatamente o R6.
+
+## §25 — Onde o silêncio é decisão e onde é descuido
+
+A varredura achou **22 falhas silenciosas**. Elas não são todas iguais, e tratá-las igual seria
+errado:
+
+| categoria                                   | exemplos                                                                                             | o que fazer                                      |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **silêncio deliberado e correto**           | `enfileirarTransferencia` não lança (derrubaria o cadastro); `registrarAuditoria` não falha a action | **manter** — e está documentado no código        |
+| **silêncio deliberado, informação perdida** | materialização devolve `{inseridos:0}`; anexo devolve `false`                                        | **manter o não-lançar, registrar o motivo** (R6) |
+| **silêncio por descuido**                   | `catch {}` no revogar (`consentimento.ts:143`); webhook engolindo tudo                               | **corrigir**                                     |
+
+🔴 **A regra que sai:** não lançar é decisão legítima; **não registrar não é**. Toda falha
+engolida tem de deixar rastro consultável — senão o sistema não tem como responder "o que deu
+errado com este paciente", que é a pergunta que o dono fez o dia inteiro.
+
+## §26 — O que isto muda na Sprint 8
+
+A ordem da sprint estava errada. Com os achados:
+
+| ordem         | item                                                     | por quê mudou                                           |
+| ------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| **0 (novo)**  | **G9 — revogação vs fila**                               | LGPD. Precede tudo                                      |
+| 1             | G6 — por que o aviso não apareceu                        | inalterado, ainda bloqueia a sentinela                  |
+| **1b (novo)** | **G10 — inverter a ordem do consumo do link**            | uma linha, e fecha um estado irrecuperável              |
+| **1c (novo)** | **G11 — `onConflictDoNothing` no insert de `pacientes`** | uma linha, e é candidato ao erro original               |
+| 2             | S8.2 procedência                                         | inalterado                                              |
+| 3             | S8.3 sentinela                                           | agora é **máquina de estados**, não orquestrador (D-12) |
+| 4             | S8.4 verdade sobre o que não chegou                      | ganhou o G18: distinguir ausência de falha              |
+| **4b (novo)** | **G12 — reaper de `enviando`/`processando`**             | sem ele, a fila perde evento em silêncio                |
+| 5             | S8.5 retomada                                            | inalterado                                              |
+| 6             | S8.6 reconciliação                                       | e agora com fundamento: §15.2                           |
+
+⚠️ **Os itens 1b e 1c são de uma linha cada e fecham buracos graves.** Vão antes de qualquer
+coisa estrutural — é o oposto de começar pela arquitetura.
+
+---
+
+# PARTE VI — O planejamento, e como ele fecha as quatro portas
+
+> **Escrito em 13/09/2026**, a pedido do dono, depois de ele informar a peça que faltava:
+> **quatro caminhos diferentes chegam na mesma tela** `/cadastro/[token]`.
+
+## §27 — As quatro portas, e como cada uma se identifica hoje
+
+| a porta                                                | grava origem?                    | onde                           |
+| ------------------------------------------------------ | -------------------------------- | ------------------------------ |
+| 1. link automático do ChatPro (requisição externa)     | ✅ `chatpro_bot`                 | `lib/chatpro/solicitacao.ts`   |
+| 2. redirect do formulário da Greens                    | ✅ `greens_handoff`              | `lib/parceiros/handoff.ts`     |
+| 3. link do admin em solicitação de medicação           | ⚠️ **só pelo default da coluna** | `solicitacoes-cadastro.ts:132` |
+| 4. link do ChatPro da BeHemp (paciente sem procuração) | ✅ `chatpro_start`               | `lib/chatpro/solicitacao.ts`   |
+
+🔴 **A porta 3 funciona por acidente.** Ninguém grava `painel_admin` — ela cai no `default()` da
+coluna. Se alguém mudar esse default amanhã, **todo link de admin passa a mentir sobre de onde
+veio**. E `chatpro_webhook` existe no enum e ninguém grava: valor morto.
+
+**Isso não é detalhe:** todo o planejamento depende de saber de onde o paciente veio. Uma porta
+que só acerta por omissão é uma porta que vai errar.
+
+**G20 — a porta do admin não declara a própria origem.**
+**Decisão do dono, 13/09/2026:** _"sim, deve gravar"_. Vira o **D-15**.
+
+## §28 — O problema em uma frase
+
+**A BeHemp trata "conta criada" e "cadastro concluído" como se fossem a mesma coisa — e não
+são.** Entre os dois existe um vão onde o paciente cai, e ninguém olha para dentro dele.
+
+Foi exatamente onde o dono caiu: conta funcionando, painel vazio, documentos invisíveis, e o
+link ainda válido. **As três coisas verdadeiras ao mesmo tempo, e nenhuma tela ligando uma à
+outra.**
+
+## §29 — O plano, em três movimentos
+
+### Movimento 1 — Tapar os buracos que já estão sangrando
+
+Três itens, **dois deles de uma linha**. Antes de qualquer arquitetura.
+
+| item      | o quê                              | por que primeiro                                                                                                                                                                 |
+| --------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S8.0**  | a revogação tem que parar a fila   | o consentimento é conferido ao enfileirar, e o enviador **não relê**. Entre os dois passam horas. Revogar nesse intervalo não impede o envio — e a LGPD diz "a qualquer momento" |
+| **S8.1b** | inverter duas linhas               | o link é queimado **antes** de gravar o `pacienteId`. Falha ali e o paciente perde o link **e** o vínculo — some o aviso de pendência **e** o retorno ao parceiro, de uma vez    |
+| **S8.1c** | uma linha de `onConflictDoNothing` | o webhook do Clerk pode inserir a ficha no meio da transação e abortá-la inteira. **É candidato ao erro que o dono viu**                                                         |
+
+### Movimento 2 — Fazer o sistema saber de onde você veio e onde você está
+
+**S8.2 — a procedência sobrevive.** Hoje a origem morre quando a ficha nasce: depois disso, um
+paciente da Greens é indistinguível de quem se cadastrou sozinho. Vira coluna em `pacientes`,
+junto com o id da solicitação. **E é aqui que as quatro portas entram** — cada uma grava a sua,
+inclusive a 3.
+
+**S8.3 — a sentinela.** Uma função que responde _"em que ponto do fluxo esta pessoa está, e por
+quê"_. Todas as telas perguntam a ela; nenhuma decide sozinha — que é como a ficha casca do
+`/redirect` passou a mentir para todas as outras.
+
+⚠️ **A pesquisa mudou o que ela é** (§15.3). Eu ia construir um "orquestrador de saga". A
+literatura mostrou que saga serve para bancos separados, e dentro da BeHemp está tudo num
+Postgres só. **É uma máquina de estados** — mais simples e mais barata.
+
+### Movimento 3 — Verdade e recuperação
+
+| item     | o quê                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S8.4** | dizer o que **não chegou**. Hoje a tela mostra "0 documentos" tanto quando o paciente não enviou quanto quando a Greens enviou e não chegou. São coisas diferentes, e a tela dizia a mesma — foi o que o fez parar |
+| **S8.5** | retomar de qualquer lugar. Hoje só funciona na mesma aba                                                                                                                                                           |
+| **S8.6** | reconciliação — o ato que liga conta e solicitação para quem já ficou órfão                                                                                                                                        |
+
+## §30 — Como isso se encaixa nos quatro fluxos
+
+| fluxo                         | o que ele precisa                                                              | o que o plano entrega                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| **1 — sem ANVISA, da Greens** | documentos já preenchidos na tela da ANVISA; notificação; envio automático     | **S8.2** (a ficha sabe que veio da Greens) + **S8.4** (se um documento não chegou, **diz**) |
+| **2 — sem receita**           | pendências como aviso; vai ao agendamento; receita volta com consentimento     | **S8.0** — é aqui que a receita vai para a Greens, e é aqui que a revogação tem de valer    |
+| **3 — recompra**              | receber o paciente **já roteado** pela Greens                                  | **S8.3** — a sentinela confirma o que a Greens supôs, e corrige quando ela errar            |
+| **4 — paciente novo**         | formulário completo; agendamento; aviso da ANVISA depois; consentimento no fim | **S8.5** (retomar) + **S8.3** (o aviso da ANVISA aparece no momento certo, não sempre)      |
+
+#### 🔴 RETIFICAÇÃO do fluxo 3, 13/09/2026 — a escolha é DELES, não nossa
+
+Escrevi acima, numa primeira versão, que o fluxo 3 precisava de _"dois caminhos: tem conta /
+não tem"_ do nosso lado. **Errado.** Correção do dono:
+
+> _"isso é feito dentro da Greens, não da BeHemp, no fluxo 3"_ — e, sobre a tela de escolha:
+> _"isso já existe lá"_.
+
+**A tela dos dois botões é da Greens, e já está pronta lá.** Quando o paciente chega aqui, ele
+**já foi roteado**: ou veio para o login, ou veio para o cadastro. A BeHemp não escolhe — recebe.
+
+⚠️ **E isto resolve uma pendência aberta desde 12/09:** a tela `/acesso` da BeHemp (a P4 do
+`docs/11`, marcada "feita" e sem nenhuma navegação apontando para ela) **duplica** o que já
+existe do outro lado. Fica como está — decisão do dono: _"se você já fez, deixa lá"_ —, mas
+**sai da lista de coisas a ligar**, e o `docs/11` precisa dizer que a P4 é responsabilidade da
+Greens.
+
+🔴 **O que continua sendo nosso no fluxo 3, e é onde a sentinela entra:** a Greens roteia com o
+que ela sabe — e ela **não sabe** se o cadastro daqui foi concluído. Um paciente que ela mandar
+para o login pode ter conta **sem ficha** (o vão do §28). A sentinela é quem confirma o
+roteamento dela e corrige quando ele estiver errado.
+
+🔴 **O que é comum aos quatro:** todos chegam na mesma tela, todos podem parar no meio, e hoje
+**nenhum deles sabe dizer onde parou**. A sentinela é a peça que serve aos quatro — **não é uma
+por fluxo**.
+
+## §31 — Por que isso resolve, e não só remedia
+
+Os seis defeitos achados em 12/09 eram sintomas do mesmo vão: destino 404, documentos
+invisíveis, sessão trocada, conta sem senha, aviso que não aparece, painel vazio. Cada um tinha
+correção própria — e eu fui corrigindo um por um, enquanto o dono achava o seguinte.
+
+**A sentinela ataca a causa:** se existe uma função que sabe em que ponto a pessoa está, nenhuma
+tela precisa adivinhar — e **a próxima porta de entrada que criarem já nasce coberta**.
+
+## §32 — 🔴 Sem banco e sem VPS: o S8.1 muda de forma
+
+**Restrição do dono, 13/09/2026:** _"eu não tenho acesso ao banco de produção agora nem à VPS e
+não vou conseguir; temos que contornar isso"_.
+
+O S8.1 dependia de consultar a solicitação em produção para descobrir **qual** das três condições
+barra o aviso. Sem banco, ele para — e ele **bloqueia a sentinela**.
+
+**D-16 — Constrói-se o instrumento, em vez de esperar o acesso.**
+
+É a mesma lição que o `%3F` cobrou caro em 11/09: duas correções falharam por adivinhação, e o
+que resolveu foi criar `GET /api/chatpro/eco` e **perguntar ao servidor o que ele via**. O
+comentário que ficou no módulo diz: _"eu gastei dois deploys porque não havia como perguntar ao
+servidor o que ele via. O instrumento custou menos que a segunda tentativa."_
+
+**O que muda no S8.1:**
+
+| antes                            | agora                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| consultar o banco de produção    | rota de diagnóstico **autenticada** que responde por que o aviso não apareceu |
+| descobrir qual condição barrou   | a própria função devolve **o motivo**, e a rota o expõe                       |
+| depende de acesso que não existe | depende de um deploy, que já temos                                            |
+
+⚠️ **E isto não é contorno temporário — é o D-06 antecipado.** A sentinela já ia ter de
+responder "o ponto **e o porquê**". Construir o porquê agora, pelo instrumento, é construir a
+metade da sentinela antes dela.
+
+**Regras do instrumento**, iguais às da rota de eco: exige o mesmo segredo, tem limite de
+requisição, **não ecoa cabeçalho nem corpo**, e nunca devolve dado pessoal — só o **fato** de
+cada condição ter passado ou não.
+
+---
+
+# PARTE VII — A revisão do documento inteiro
+
+> **Escrita em 13/09/2026**, a pedido do dono: _"eu quero que você revise todo documento da ADR
+> do jeito que o `@CLAUDE.md` orienta, para que nós possamos finalizar esse fluxo"_.
+>
+> Não é releitura: é o documento medido contra o código, item por item, com as seis perguntas.
+> **A precedência nº 1 diz que o código vence a doc** — então onde os dois divergem, quem muda é
+> a doc. Exceto onde o código divergiu de uma decisão já tomada: aí quem muda é o código, e os
+> dois casos abaixo são disso.
+
+## §33 — O que a revisão ACHOU, e que não era releitura
+
+### 33.1 🔴 O D-14 estava escrito e não implementado
+
+O D-14 decidiu, com todas as letras: _"o evento vira `cancelado_por_revogacao`, não `falhou` — a
+diferença importa para quem lê a fila depois"_. A migration `0043` foi autorizada pelo dono
+**para isso**.
+
+Medido em 13/09: `cancelado_por_revogacao` existia em `db/schema/enums.ts` e em **zero** arquivos
+de `lib/` ou `app/`. O enviador chamava `marcarFalha`.
+
+⚠️ **É a mesma classe que esta ADR nomeia no §27** sobre o `chatpro_webhook`: _"existe no enum e
+ninguém grava: valor morto"_. Eu escrevi aquele parágrafo e cometi o mesmo defeito quatro seções
+depois.
+
+**Três consequências, e nenhuma é de rótulo:**
+
+| #   | o que `falhou` causa                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **mente para quem investiga** — quem abre a fila procurando o que não chegou persegue um envio que não devia ter saído, junto de falhas reais |
+| 2   | **convida a reenviar** — o reaper que o G12 pede pegaria este evento e tentaria de novo contra uma decisão do titular                         |
+| 3   | **apaga a prova** — "vocês pararam quando ele revogou?" precisa de resposta no banco, não numa linha de log que some no deploy                |
+
+**Corrigido**: `marcarCancelado` grava o status próprio, e o `enviarLote` conta `cancelados`
+separado de `falharam` — somar repetiria o erro uma camada acima, com o cron dizendo "3 falharam"
+sobre três pacientes que exerceram um direito.
+
+### 33.2 🔴 E o guarda CONGELAVA esse defeito
+
+`a-revogacao-para-a-fila` afirmava `expect(bloco).toMatch(/marcarFalha/)`. Ele ficava **verde
+porque o código contrariava o D-14**, e ficou vermelho quando a correção chegou — o sinal
+invertido.
+
+⚠️ **Mesma classe do `o-destino-do-paciente-segue-o-que-falta`**, que comparava destinos com uma
+lista fixa contendo os dois 404. **A regra que sai, e que vale para todo guarda:** medir a
+**propriedade**, nunca o **nome do método** que a produz.
+
+🔴 **E a sabotagem achou um terceiro defeito meu no mesmo guarda:** `toMatch(/ultimoErro:/)`
+sobrevivia a `ultimoErro: 'cancelado'` — um literal fixo, sem motivo nenhum, com 40 cancelamentos
+indistinguíveis no banco. **Existir não é carregar.** É a mesma classe da segunda retratação do
+`CLAUDE.md`, onde `toBeTruthy()` checava que o campo existisse em vez de o valor ser válido.
+
+### 33.3 🔴 O S8.5 — e por que a correção óbvia produziria o G2
+
+O dono declarou pendência real: _"retomar da mesma aba deve funcionar em todas as instâncias"_. A
+retomada dependia de `Boolean(senha)` no estado do React, o que a prendia à mesma aba. A correção
+óbvia seria pedir a senha na etapa do código e pular para lá.
+
+🔴 **Medido antes de mexer, e é o que inverte a decisão:** confirmar o código **não termina no
+Clerk**. Ele chama `gravarFicha()`, que monta a ficha inteira a partir do estado do React —
+`anexos`, `finalidadesConsentidas`, `jaFazTratamento`, `temAnvisa`, `temReceita`,
+`tratamentoAtual`. Pular para a etapa do código com o estado zerado gravaria ficha **sem
+documento, sem consentimento e sem as respostas clínicas**, e queimaria o link de uso único.
+
+⚠️ **Ou seja: a correção ingênua do S8.5 produziria a FICHA CASCA (G2) pelo caminho principal,
+com o paciente lendo "pronto".** O defeito que esta ADR inteira existe para fechar, entrando pela
+porta da correção dele.
+
+**A senha não era condição por ser senha — era proxy para "o formulário inteiro está em mãos".**
+
+⛔ **Rejeitado: persistir o formulário no navegador.** `File` de documento clínico não é
+serializável, e senha em `localStorage`/`sessionStorage` é o que a regra de segurança proíbe.
+Persistir para conveniência sairia mais caro que o problema.
+
+**D-17 — A retomada exige o formulário em mãos, e quando não o tem, DIZ.**
+
+O comportamento já estava certo: sem formulário, fica na etapa 1, e ao enviar de novo o
+`pendenteDoMesmoEmail` reconhece o cadastro e só reenvia o código. **O defeito era o silêncio** —
+o paciente voltava, via a etapa 1 do zero e concluía que tinha perdido tudo.
+
+Agora a tela diz os dois lados: o que sobreviveu (o cadastro, o código reenviado) e o que não (os
+documentos, que precisam voltar). **Avisar só a boa notícia faria o paciente chegar ao fim sem os
+arquivos** — que é como a ficha casca nasce.
+
+⚠️ **Retifica o §13, linha 4**, que prometia _"ponto `aguardando_codigo`, retomável de qualquer
+lugar"_. Retomável de qualquer lugar **com o formulário zerado** é uma ficha vazia. O que se
+entrega é: retomável de qualquer lugar, **refazendo a etapa 1**, com o sistema dizendo o que
+aconteceu.
+
+### 33.4 A chave do Clerk: a pergunta estava errada
+
+O dono informou que a `CLERK_SECRET_KEY` está nos secrets do GitHub. Duas medições fecham o
+assunto, e a segunda é a que importa:
+
+1. **Secret do GitHub não é legível.** `GET /repos/.../actions/secrets/CLERK_SECRET_KEY` devolve
+   `{"name":"CLERK_SECRET_KEY","created_at":…}` — nome e datas, valor nenhum. É write-only por
+   construção.
+2. 🔴 **E não serviria.** A doc do Clerk: _"Production keys (`pk_live_`and`sk*live*`) only work
+   with your configured production domain. This means localhost won't work with production
+   keys"_, com o erro literal _"Clerk: Production Keys are only allowed for domain
+   'your-domain.com'"\_.
+
+**O que serve é uma chave de DESENVOLVIMENTO** (`sk_test_`/`pk_test_`), que toda aplicação do
+Clerk tem de graça, numa instância separada — _"a Development instance… allowing HTTP connections"_.
+
+⚠️ **Registrado como o que é: um bloqueio de acesso, não um bloqueio técnico.** E o
+`NEXT_PUBLIC_CLERK_API_URL` existe (default `https://api.clerk.com`, _"sets the Clerk API URL for
+debugging"_) — é o caminho para um duplo local, se a instância de desenvolvimento não vier.
+
+**Fontes:** [Using production keys in development — Clerk](https://clerk.com/docs/guides/development/troubleshooting/using-production-keys-in-development) ·
+[Clerk environment variables](https://clerk.com/docs/guides/development/clerk-environment-variables) ·
+[Managing environments](https://clerk.com/docs/guides/development/managing-environments)
+
+## §34 — O que a implementação tornou obsoleto no documento
+
+Medido em 13/09 contra o código. **A doc mentia em quatro pontos** — todos por estar desatualizada,
+não por estar errada quando foi escrita.
+
+| §           | o que a ADR afirma                                                        | o que o código mostra hoje                                        | estado                                     |
+| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------ |
+| **1.5**     | _"`grep solicitacoesCadastro` em `app/(paciente)`: **zero** ocorrências"_ | `app/_actions/dashboard-paciente.ts` chama `situacaoDoFluxo`      | ✅ fechado pelo S8.3/S8.4                  |
+| **10**      | _"`pacientes` **não tem** nenhuma coluna de origem"_                      | `db/schema/pacientes.ts:107,117` — `origem` e `solicitacaoId`     | ✅ fechado pelo S8.2 (migration `0042`)    |
+| **16**      | _"sete criadores, e **NENHUM** marca que a ficha nasceu incompleta"_      | 1 de 7 grava `origem` (`cadastro-por-link.ts`); os outros 6 não   | ⚠️ **parcial — e o `null` é que responde** |
+| **11 (G6)** | _"exige acesso ao banco de produção, que não tenho daqui"_                | `app/api/fluxo/situacao/route.ts` responde o ponto **e o porquê** | ✅ contornado pelo D-16                    |
+
+🔴 **O §16 merece leitura, porque "parcial" aqui é de propósito e a ADR não dizia.** Seis
+criadores continuam sem gravar procedência — e é isso que o D-11 quis: _"uma ficha sem procedência
+é uma ficha que nasceu de lado"_. `origem IS NULL` **é** a declaração de casca. O que faltava era
+o documento dizer que o nulo carrega significado, em vez de parecer campo não preenchido.
+
+### 34.1 O D-15 foi implementado por TIPAGEM, não por gravação
+
+O §27 diz que a porta 3 _"funciona por acidente… cai no `default()` da coluna"_. Continua verdade
+sobre o default — mas a decisão foi cumprida por um caminho mais forte que gravar um literal:
+`lib/chatpro/solicitacao.ts` deriva `type Origem` do **próprio enum** e a torna obrigatória, então
+**a porta 3 não consegue nascer sem declarar de onde veio**. Ela ainda não existe como tela.
+
+⚠️ **Falha fechada por tipo vale mais que gravação correta**: gravação se esquece no código novo,
+tipo não compila.
+
+## §35 — Onde a ADR desobedecia ao próprio `CLAUDE.md`
+
+A revisão virou o documento contra as regras que ele mesmo invoca. Três achados.
+
+### 35.1 🔴 Princípio e fase citados com glosa INVENTADA
+
+A §8 escreve: _"Princípio **C** (o sistema informa, não esconde) e **H** (estado parcial é estado,
+e se declara). Fase 7 — integração entre empresas."_
+
+Medido em `docs/PRINCIPIOS.md`:
+
+| citado | a glosa que escrevi                     | o que **é**             |
+| ------ | --------------------------------------- | ----------------------- |
+| C      | "o sistema informa, não esconde"        | **Ambientes e CI/CD**   |
+| H      | "estado parcial é estado, e se declara" | **Segurança**           |
+| Fase 7 | "integração entre empresas"             | **Erros e resiliência** |
+
+⚠️ **É exatamente o que o `CLAUDE.md` proíbe** na seção de fundamentação: _"não inventar
+fundamento"_ e conferir o **objeto** antes de citar. Eu inventei três glosas que soavam certas —
+e a fase 7 estava certa pelo número e errada pela descrição, que é o jeito mais fácil de alguém
+acreditar.
+
+**Retificado, com os princípios reais:**
+
+| decisões                 | princípio                                       | por quê                                                         |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------------------------- |
+| D-01…D-07, D-12, D-17    | **D** — Tratamento de erros, resiliência e HTTP | é o assunto da ADR: estado parcial, modo de falha, recuperação  |
+| D-08, D-11, D-15         | **F** — Banco de dados e arquitetura de dados   | procedência e completude são modelagem, não tela                |
+| D-09, D-13, D-16         | **D** + **C** — Ambientes e CI/CD               | reconciliação e instrumento são rotina de operação              |
+| **D-14**                 | **H** — Segurança                               | LGPD art. 8º §5º: é dado de saúde saindo sem autorização válida |
+| todos os guardas citados | **I** — Testes automatizados e qualidade        | a classe, não o caso                                            |
+
+**Fase 7 — Erros e resiliência**, cujo grupo no roadmap é justamente **D**. O número estava certo
+desde o começo; só a descrição era inventada.
+
+### 35.2 As perguntas 1 e 3 da regra não tinham dono no documento
+
+A Parte III declara a pergunta 4, a Parte IV a pergunta 2, a Parte V as perguntas 5 e 6. **As
+perguntas 1 (_"examinei todo o escopo do código?"_) e 3 (_"segui a lógica do começo ao fim?"_)
+não tinham seção.**
+
+Não é formalidade: foi por elas que os dois achados do §33 escaparam. O D-14 não implementado é
+pergunta 1 — **o escopo do código incluía conferir se a decisão virou linha**. E o S8.5 é
+pergunta 3: seguir a lógica até o fim mostrou que a confirmação do código **continua** em
+`gravarFicha()`, que é onde a correção óbvia quebraria.
+
+**Esta Parte VII é a resposta às duas.**
+
+### 35.3 A definição de saga veio de blog, não da fonte canônica
+
+O §15.1 abre com a definição do padrão citando **Temporal** e **dev.to**. A ordem de autoridade do
+`CLAUDE.md` põe blog de engenharia **abaixo** de autor canônico — e as fontes canônicas estavam
+citadas quatro parágrafos depois, no §15.2, como "fontes lidas": microservices.io (Chris
+Richardson, que nomeou o padrão) e o Azure Architecture Center.
+
+⚠️ **A decisão não muda** — coreografia entre empresas, orquestração dentro, e o D-12 continua de
+pé. Mas a hierarquia da citação estava invertida, e quem lê a ADR para decidir de novo tem de
+saber qual fonte pesa.
+
+## §36 — O estado real de cada decisão, medido
+
+**A tabela que faltava.** Sem ela, quem lê a ADR não distingue decidido de feito — e foi assim
+que o D-14 passou.
+
+| decisão  | o que decide                                        | estado em 13/09/2026                                                    |
+| -------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| D-01     | conta sem ficha é estado reconhecido                | ✅ na sentinela (`lib/fluxo/sentinela.ts`)                              |
+| D-02     | o painel pergunta se há cadastro pendente           | ✅ `dashboard-paciente.ts`                                              |
+| D-03     | a ficha casca se declara como casca                 | ⚠️ **parcial** — `origem IS NULL` a declara; nenhuma tela lê isso ainda |
+| D-04     | materialização deixa de depender do link            | ⚠️ **pendente** — segue com gatilho único                               |
+| D-05     | uma função responde o ponto do fluxo                | ✅ `situacaoDoFluxo`                                                    |
+| D-06     | responde o ponto **e o porquê**                     | ✅ campo `porque`, com guarda por ramo                                  |
+| D-07     | conta antiga sai por ramo próprio                   | ✅ `completo_legado`, antes de cobrar documento                         |
+| D-08     | a procedência vive no paciente                      | ✅ migration `0042`                                                     |
+| D-09     | reconciliação é ato explícito                       | ❌ **S8.6, não começou**                                                |
+| D-10     | híbrido, fronteira na empresa                       | ✅ é o desenho vigente                                                  |
+| D-11     | a ficha declara se está completa                    | ⚠️ **parcial** — ver §34, o nulo é a declaração                         |
+| D-12     | transação dentro, saga só na fronteira              | ✅ sentinela é máquina de estados                                       |
+| D-13     | a compensação sai daqui para a Greens               | ❌ **pendente — exige acordo** (tipo novo no validador deles)           |
+| D-14     | revogação vira status próprio                       | ✅ **corrigido nesta revisão** (§33.1)                                  |
+| D-15     | a porta do admin declara a origem                   | ✅ por tipagem (§34.1)                                                  |
+| D-16     | constrói-se o instrumento                           | ✅ `GET /api/fluxo/situacao`                                            |
+| **D-17** | **retomada exige formulário, e diz quando não tem** | ✅ **desta revisão** (§33.3)                                            |
+
+🔴 **O que sobra, em ordem:** D-09 (reconciliação, S8.6) · D-04 (materialização) · D-13 (acordo
+com a Greens). Os dois primeiros são nossos e cabem na sprint; o terceiro depende de conversa.
+
+## §37 — O que esta revisão NÃO fez
+
+- **não rodou o fluxo de ponta a ponta** — falta a chave de desenvolvimento do Clerk (§33.4), e
+  sem ela nenhuma tela com sessão renderiza localmente. O que se provou aqui foi por leitura de
+  código, medição e guarda; **não por execução do caminho do paciente**
+- **não mexeu nos seis criadores de ficha** que não gravam procedência — é escopo próprio, e o
+  nulo já significa o que precisa significar
+- **não corrigiu os achados do lado da Greens** (Y1…Y6) — continuam para comunicar, não corrigir
+
+---
+
+# PARTE VIII — A medição em PRODUÇÃO, e o que ela desmente
+
+> **Escrita em 13/09/2026**, depois de o dono conseguir acesso ao servidor e pedir: _"vamos
+> investigar mais nos logs do servidor, não só esse problema mas todos que podem englobar os 4
+> fluxos com seus portões da Greens"_.
+>
+> 🔴 **É a primeira vez nesta ADR que os números vêm do banco de produção.** Tudo antes daqui
+> foi lido no código. Vários parágrafos das partes anteriores **estavam errados**, e esta parte
+> diz quais.
+
+## §38 — 🔴 O achado que reorganiza tudo: NINGUÉM nunca concluiu
+
+```
+origem            status          qtd   concluidas
+greens_handoff    link_gerado      27       0
+chatpro_bot       link_acessado    18       0
+chatpro_bot       link_gerado      11       0
+greens_handoff    link_acessado     8       0
+```
+
+**64 solicitações. Zero concluídas.** Nenhum paciente, desde que o fluxo existe, chegou ao fim
+do cadastro por link.
+
+⚠️ **Isto muda o peso de tudo que foi escrito antes.** As partes I a VII trataram o problema do
+dono como um caso — três e-mails de teste, um estado sujo. **Não é um caso: é o comportamento
+de todos.** O cadastro por link nunca funcionou para ninguém.
+
+E explica um silêncio que devia ter chamado atenção: `usadas_sem_vinculo: 0` em todas as
+linhas. Não há cadastro meio-feito no banco porque **não há cadastro feito**.
+
+## §39 — 🔴 E não há documento nenhum para materializar
+
+```
+protocolo     itens  com_arquivo  so_declaracao  tipos
+SOL-000063      1         0             1        [autorizacao_anvisa]
+SOL-000056      1         0             1        [receita_medica]
+SOL-000050      2         0             2        [documento_identidade, receita_medica]
+…
+```
+
+**Em DEZ solicitações medidas, `com_arquivo` é ZERO em todas.**
+
+O campo `documentos_do_parceiro` guarda uma lista mista de propósito: **string** para o que o
+parceiro só declarou ter, **objeto com `urlBlob`** para o que ele mandou de fato. E
+`materializarDocumentosDoParceiro` filtra por `ehArquivo`, que exige `urlBlob`.
+
+🔴 **Todo o manifesto em produção é declaração. Nenhum arquivo.**
+
+⚠️ **E aqui está a correção mais importante desta ADR:** o relato que a abriu — _"nenhum dos
+documentos que eu enviei chegaram na minha conta"_ — **não tem a causa que eu atribuí**. Não foi
+a materialização que falhou, nem a reconciliação que não rodou. **Não havia o que materializar.**
+
+Passei as partes IV a VII construindo sentinela, procedência, reconciliação e instrumento para
+um problema cuja causa estava um passo antes.
+
+### 39.1 Por que os arquivos não chegam — as duas pontas
+
+**Do lado da Greens** (`HandoffService.ts:180-210`): ela monta `{ tipo, url }` quando consegue
+assinar a URL do S3, e devolve **só o tipo** quando não consegue — com um log próprio
+_"documentos sem arquivo"_ e o motivo em `semUrl`.
+
+**Do nosso lado** (`handoff.ts:62`), o log de produção mostra:
+
+```
+[parceiros] documentos recusados: receita_medica:Error,comprovante_residencia:Error,documento_identidade:Error
+```
+
+🔴 **E o motivo é ILEGÍVEL, por um defeito que esta ADR já documentou e eu repeti:**
+
+```ts
+motivo: erro instanceof Error ? erro.name : 'erro_desconhecido';
+```
+
+`erro.name` de um `new Error()` é **sempre** `'Error'`. É exatamente o defeito do guarda
+`o-cadastro-feito-nao-vira-falha` — _"o log dizia só `{ erro: 'Error' }`"_ — cometido de novo,
+no módulo ao lado.
+
+**Consequência prática:** temos a prova de que os documentos são recusados e **nenhuma
+informação sobre por quê**. `origemAutorizada` sabe distinguir seis motivos
+(`sem_origens_configuradas`, `origem_nao_autorizada`, `http_403`, `tipo_de_arquivo_recusado`,
+`tamanho_fora_do_limite`, `dns_nao_resolveu`) — e o `catch` final joga todos fora.
+
+**G21 — o motivo da recusa de documento é `erro.name`, que não distingue nada.**
+
+## §40 — A ficha casca não é exceção: é a regra
+
+```
+total_fichas    154
+sem_origem      154
+sem_cpf          19
+sem_solicitacao 154
+```
+
+**As 154 fichas do sistema não têm procedência nem vínculo com solicitação.** O G2 e o G5, que
+as partes I e II trataram como defeito a corrigir daqui para frente, descrevem **o banco
+inteiro**.
+
+⚠️ A coluna `origem` existe desde a migration `0042` (12/09) e só é gravada por
+`cadastro-por-link.ts` — que, pelo §38, **nunca completou uma execução**. Daí 154 de 154.
+
+## §41 — Zero consentimentos no banco
+
+```
+===== F. CONSENTIMENTOS (0) =====
+(vazio)
+```
+
+Nenhuma linha em `consentimentos`, de nenhuma finalidade, para nenhum paciente.
+
+🔴 **Isto significa que o S8.0 — a revogação que para a fila — nunca teve o que barrar.** E que
+a transferência de cadastro para a Greens, que exige finalidade consentida, **não pode ter
+acontecido nenhuma vez**. Consistente com o §38.
+
+⚠️ **E dá a dimensão certa ao bloco `ConsentimentoQueFaltou`:** ele não é um remendo para o caso
+do dono. É o único caminho pelo qual um consentimento pode existir hoje, já que o do formulário
+depende de uma conclusão que nunca ocorre.
+
+## §42 — O que os LOGS dizem, em ordem de gravidade
+
+Medido com `pm2 logs --lines 3000`, agrupado por padrão:
+
+| ocorrências | linha                                                                                        | o que significa                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **254**     | `[chatpro] resposta de erro não recuperável { caminho: '/leads/findById', status: 401 }`     | 🔴 **o token do ChatPro está inválido** — 401 é credencial recusada, não indisponibilidade |
+| **~200**    | `[chatpro] contato não confirmado por findById`                                              | consequência direta do 401 acima                                                           |
+| 52          | `[parceiros] handoff recebido`                                                               | a Greens **está** chamando; a entrada funciona                                             |
+| 13          | `[chatpro] falha de conexão esgotou as tentativas`                                           | idem 401, por outro caminho                                                                |
+| 13+13+8     | `401` em `/endings/list`, `/departments/list`, `/sessions/getSessionById`                    | **toda** a API do ChatPro recusa                                                           |
+| 5+4+2       | `[chatpro] bot-link: documentos não reconhecidos { ignorados: ['autorizacao_anvisa?ses…'] }` | 🔴 **o `?sessionId` colado no valor — o bug do separador AINDA acontece**                  |
+| 6           | `[chatpro] bot-link com segredo inválido`                                                    | alguém chama com segredo errado                                                            |
+| 7           | `[chatpro] bot-link: contato não identificado`                                               | consequência do 401                                                                        |
+| 5           | `duplicate key … "consultas_medico_da…"` + `[Action] Erro ao reservar consulta`              | 🔴 agendamento falha por índice único                                                      |
+| 2           | `[parceiros] documentos recusados: …:Error`                                                  | §39.1                                                                                      |
+
+### 42.1 🔴 G22 — a credencial do ChatPro está recusada, e há 254 provas
+
+`401` não é rede instável: é o servidor dizendo que a credencial não vale. Toda a integração de
+leitura do ChatPro está fora do ar — e como `bot-link` depende de `findById` para identificar o
+contato, **o fluxo 2 (bot da Greens) e o fluxo 4 (ChatPro da BeHemp) estão comprometidos na
+origem**.
+
+⚠️ E o sistema **não avisa ninguém**. Ele degrada: loga, segue, e o paciente recebe um link sem
+manifesto ou não recebe link nenhum.
+
+### 42.2 🔴 G23 — o bug do `?sessionId` sobreviveu ao guarda
+
+```
+[chatpro] bot-link: documentos não reconhecidos no manifesto
+{ ignorados: [ 'autorizacao_anvisa?ses…' ] }
+```
+
+O `a-query-do-painel-aguenta-o-separador-errado` foi escrito para isto, com 28 casos e 13
+sabotagens. **E o log mostra que continua acontecendo.**
+
+Duas leituras possíveis, e não dá para escolher sem medir: ou o painel do ChatPro manda por um
+caminho que a correção não cobre, ou a correção não está no caminho que o `bot-link` usa. **Não
+vou supor qual** — o §43 diz como medir.
+
+### 42.3 G24 — reserva de consulta viola índice único
+
+`duplicate key value violates unique constraint "consultas_medico_da…"` com
+`[Action] Erro ao reservar consulta`. O paciente tenta agendar e recebe erro. Toca os **quatro**
+fluxos, porque todos terminam em consulta.
+
+## §43 — O que ainda NÃO foi medido, e como medir
+
+Aplicando a pergunta 6 da regra — listar o que falta, em vez de parar no que já explica:
+
+| #   | pergunta aberta                                               | como responder                                                                                                 |
+| --- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | **por que** os documentos são recusados                       | corrigir o `motivo` (G21) e ler o próximo handoff                                                              |
+| 2   | o `PARCEIRO_ORIGENS_DE_DOCUMENTO` tem o host do S3 da Greens? | conferir no servidor — `sem_origens_configuradas` e `origem_nao_autorizada` são as duas hipóteses mais baratas |
+| 3   | o token do ChatPro expirou ou mudou?                          | é credencial, não código — decisão do dono                                                                     |
+| 4   | o `?sessionId` chega por qual caminho hoje                    | logar a URL crua recebida pelo `bot-link`, uma vez                                                             |
+| 5   | a Greens loga `documentos sem arquivo`?                       | está no `HandoffService` deles — pedir o log                                                                   |
+
+🔴 **A 1 e a 2 são o caminho crítico do fluxo 1.** Sem elas, a reconciliação pode funcionar
+perfeitamente e continuar não trazendo documento nenhum — porque não há nenhum.
+
+## §44 — O que isto muda nas decisões já tomadas
+
+| decisão                            | continua valendo?                                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| D-05…D-08 (sentinela, procedência) | ✅ sim — mas operam sobre um banco onde 154/154 fichas não têm procedência                                                            |
+| D-09 (reconciliação)               | ⚠️ **sim, e insuficiente**: ela liga conta e solicitação, mas o manifesto não tem arquivo                                             |
+| D-14 (revogação para a fila)       | ✅ sim — sem efeito prático hoje (§41), e é isso que se quer                                                                          |
+| D-17 (retomada)                    | ✅ sim                                                                                                                                |
+| **D-18 (nova)**                    | 🔴 **o motivo da recusa de documento tem de ser o motivo, não `erro.name`**                                                           |
+| **D-19 (nova)**                    | 🔴 **falha de credencial de integração não pode degradar em silêncio** — 254 `401` sem um alerta é o sistema aceitando estar quebrado |
+
+⚠️ **E a lição de método, que é a mais cara:** eu construí quatro partes desta ADR — sentinela,
+reconciliação, instrumento, confirmação — em cima de uma causa que **nunca medi**. O código
+dizia que documentos eram materializados a partir do manifesto; eu nunca perguntei ao banco **o
+que havia no manifesto**. A resposta era zero, e estava a um `SELECT` de distância desde o
+começo.
+
+---
+
+# PARTE IX — O transporte do documento, pelas quatro etapas
+
+> **Escrita em 13/09/2026**, depois de o dono cobrar o método: _"e quanto ao nosso método
+> utilizado na ADR que é justamente aquelas 4 etapas envolvendo pesquisa, melhoria, adaptação?
+> isso está no claude.md certo? logo porque você não está aplicando?"_
+>
+> ⚠️ **Ele estava certo.** As partes VIII e anteriores corrigiram defeitos um a um, de forma
+> reativa. Esta parte aplica o método — nomear · comparar · julgar · decidir — ao problema que
+> a medição revelou: **os documentos da Greens não chegam**.
+
+## §45 — E o dono derrubou uma premissa do código antes de tudo
+
+Três arquivos diziam, em comentário: _"documento é conveniência; o cadastro é o que importa"_.
+
+> _"O envio do documento é tão necessário quanto a criação da conta. O paciente passa por 2
+> formulários e 1 se torna à toa e o outro mentiroso, já que os dados nunca chegam. Para que
+> serve então esse fluxo todo que estamos criando?"_
+
+🔴 **Ele tem razão, e os dados são piores que o argumento:** dos 67 itens de documento recebidos
+da Greens, **zero** tinham arquivo — e a nossa tela chega a dizer _"o que já recebemos: receita
+médica"_ sobre uma palavra, não sobre um arquivo.
+
+**D-20 — Documento do parceiro não é conveniência. A falha é fato a cobrar, não custo aceito.**
+
+⚠️ **O que NÃO muda:** continuar não lançando. Derrubar o cadastro porque um arquivo não copiou
+deixa o paciente sem conta **e** sem documento, que é pior. O que muda é o destino da falha:
+motivo legível, visível na tela (S8.4) e cobrável da origem.
+
+## §46 — 1. NOMEAR: é um Claim Check, e a referência é perecível
+
+O que Greens e BeHemp fazem com documento tem nome: **Claim Check** (Hohpe & Woolf, _Enterprise
+Integration Patterns_). O produtor não põe o arquivo na mensagem — guarda num store e manda uma
+**referência**; o consumidor busca. É literalmente o `{ tipo, url }` do handoff.
+
+## §47 — 2. COMPARAR: onde o padrão cobre, e onde ele não cobre
+
+| o que o padrão prevê            | o que temos                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| referência pequena na mensagem  | ✅ `{ tipo, url }`                                     |
+| payload em store externo        | ✅ S3 da Greens                                        |
+| consumidor busca quando precisa | 🔴 **não** — a URL expira em 1 h                       |
+| store acessível às duas pontas  | ⚠️ parcial — é o bucket **deles**, e nós re-hospedamos |
+
+🔴 **A divergência que importa: o padrão supõe a referência DURÁVEL.** A nossa é uma URL assinada
+de S3 com TTL de 1 h. Referência perecível quebra a premissa, e é a origem da fragilidade.
+
+⚠️ **E a doc da AWS traz um agravante que pode explicar `403` inesperado:** _"a presigned URL
+expires at either its configured expiration time or when its associated credentials expire,
+whichever occurs first"_. Se a Greens assina com credencial temporária (role de container ou
+Lambda), a URL pode morrer **antes** da hora que ela pediu — e nós veríamos apenas um 403, sem
+saber que a culpa não é do prazo.
+
+## §48 — 3. JULGAR: três caminhos, e o que havia era o pior
+
+| #   | caminho                                                         | custo                                                | veredicto                                  |
+| --- | --------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------ |
+| a   | uma tentativa síncrona na entrada                               | zero                                                 | 🔴 **era o que existia, e é indefensável** |
+| b   | a Greens faz PUSH do arquivo no handoff                         | muda o contrato, pesa o POST, cria limite de tamanho | troca um problema por outro                |
+| c   | referência **durável**: endpoint autenticado deles, sob demanda | trabalho do lado deles                               | 🥇 mais robusto, e não depende de nós      |
+
+🔴 **Por que (a) é indefensável, e foi medido:** `fetch` único, timeout de 30 s, **zero
+retentativa**. Uma queda de rede de um segundo perdia o documento **para sempre** — na próxima
+vez que alguém tentasse, a URL já teria expirado. Não havia caminho de volta.
+
+## §49 — 4. DECIDIR: adotar, com duas adaptações — e por que ficamos melhores
+
+**D-21 — Claim Check com referência perecível exige retentativa na janela e registro da recusa.**
+
+| adaptação                         | por que o padrão puro não basta                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **retentativa dentro da janela**  | a URL vale ~1 h; insistir por 1 s é gratuito e cobre a classe inteira de falha transitória        |
+| **a recusa vira fato registrado** | o padrão supõe que o consumidor sempre consegue buscar, e não diz o que fazer quando não consegue |
+
+⚠️ **O que NÃO se retenta, de propósito:** `403` e `404`. Expirada é expirada, ausente é ausente
+— insistir contra veredicto definitivo gasta a janela de que os transitórios precisam, e no caso
+do 403 martela a assinatura do parceiro à toa.
+
+🔴 **Ficamos melhores, ou só mais parecidos com o mercado?** (a pergunta 4, que impede pesquisa
+de virar enfeite) — **melhores, e de forma verificável:**
+
+- antes: falha de rede ⇒ documento perdido **para sempre**, sem rastro
+- depois: três tentativas; e se ainda falhar, o banco guarda `{ tipo, recusadoPorque, recusadoEm }`
+
+**E a segunda adaptação corrige um apagamento de prova.** Antes, o item recusado voltava ao banco
+como a mesma `string` do documento que o parceiro **nunca mandou**: _"a Greens não mandou"_ e _"a
+Greens mandou e nós não conseguimos buscar"_ viravam o mesmo registro. Foi isso que fez 67 itens
+passarem semanas sem dono — e o que quase me fez escrever aqui que ela _"nunca manda arquivo"_,
+quando o log provava o contrário em pelo menos dois casos.
+
+## §50 — O que fica para a Greens, e o que é decisão deles
+
+O caminho (c) do §48 — referência durável — é a solução completa, e é do lado deles. O pedido
+está em `docs/integracao-greens/PROMPT-PARA-A-GREENS-documentos-nao-chegam.md`, com o `grep` que
+responde a pergunta em uma linha:
+
+```bash
+grep "Handoff Be4Hope: documentos sem arquivo" <log> | tail -30
+```
+
+O campo `semUrl` deles traz `tipo:motivo` e separa as três causas: `falha_ao_assinar` (S3 ou
+credencial), `motivoSemUrl` (o pedido não tinha anexo — caso legítimo), ou nenhuma linha (o
+`plano` chega vazio).
+
+⚠️ **Nossa allowlist está correta e medida:**
+`PARCEIRO_ORIGENS_DE_DOCUMENTO = https://greens-site-bucket.s3.us-east-1.amazonaws.com`. Se
+vierem URLs assinadas desse bucket, elas passam.
+
+---
+
+# PARTE X — O Fluxo 1 · Portão 1, de ponta a ponta
+
+> **O documento vivo deste fluxo**, por decisão do dono em 13/09/2026. Cada etapa abaixo foi
+> conferida no código, não descrita de memória — e a Etapa 2 existe aqui porque eu a havia
+> omitido, e ele corrigiu: _"ele ainda vai para aquela tela da BeHemp onde ele coloca e-mail,
+> consente, informa se já faz tratamento e aí depois ele confirma, recebe o código do e-mail e
+> aí com código válido e o sistema reconhecendo ele vai pra procuração da ANVISA"_.
+
+## §51 — As cinco etapas
+
+**Etapa 0 — Greens.** O admin gera o link pela solicitação de medicamento. Chega aqui um POST
+assinado (HMAC) com sete campos: `nomeCompleto · email · telefone · cpf · pedidoDoParceiro ·
+documentos · urlDeRetorno`. Nasce a solicitação (`SOL-0000xx`, origem `greens_handoff`) e um
+token de 7 dias. O link vai ao paciente por WhatsApp.
+
+**Etapa 1 — a tela da BeHemp** (`/cadastro/[token]`). Ele:
+
+- **confirma os dados** que vieram da Greens (nome, CPF, telefone) e **o e-mail** — campo
+  editável, e é o login
+- **cria a senha**
+- vê **"O que já recebemos"** e **"O que ainda vamos precisar"**
+- anexa o que faltar
+- **consente** o compartilhamento com a Greens — caixas desmarcadas, e **não é pedágio**
+- **informa se já faz tratamento** — obrigatório, e `null` significa "não respondeu"
+- confirma
+
+**Etapa 2 — o código.** `signUp.create({ emailAddress })` → o Clerk envia o código. Ele digita.
+
+🔴 **É aqui que o fluxo morre hoje**, com `sign_ups → 400`.
+
+**Etapa 3 — a conta nasce.** `attemptEmailAddressVerification` valida o código →
+`signUp.update({ password, firstName, lastName })` → a conta é criada **nesse instante**, já com
+senha → `setActive`.
+
+**Etapa 4 — a ficha.** `gravarFicha()` → `concluirCadastroPorLink`: garante `users`, cria
+`pacientes` com procedência, grava a declaração, **consome o link**, grava o consentimento,
+**materializa os documentos da Greens**.
+
+**Etapa 5 — o destino.** `destinoDepoisDoCadastro(pendências)` → **`/paciente/anvisa`**, com os
+documentos já lá.
+
+## §52 — 🔴 D-22: a confirmação do e-mail é REQUISITO, não detalhe de implementação
+
+**Decisão do dono, 13/09/2026**, respondendo à pergunta direta de por que a Etapa 2 existe:
+
+> _"é por conta do (a), pois tudo chega no e-mail do paciente, logo é necessário que ele confirme
+> o e-mail."_
+
+**O e-mail não é só o login.** É por onde chega a aprovação da ANVISA, o aviso de receita pronta,
+o lembrete de consulta. Um endereço não confirmado é um paciente que não recebe o tratamento —
+não apenas alguém que não consegue entrar.
+
+### 52.1 O que esta decisão REJEITA, e eu havia proposto
+
+⛔ **Criar a conta pela Backend API do Clerk** (`clerkClient.users.createUser()`), que eu
+propusera horas antes para contornar o `400`.
+
+Ela resolve de fato a classe inteira de falha — sem navegador no caminho, some o cookie
+cross-site, a bot protection, o `session_exists` e o `signUp`. E está disponível: o SDK já
+instalado (`@clerk/backend@3.4.4`) aceita `emailAddress`, `password`, `firstName`, `lastName`.
+
+🔴 **Mas ela cria a conta com o e-mail NÃO verificado** — e é exatamente o que o D-22 proíbe.
+
+⚠️ **A lição de método, e ela é minha:** eu propus a Backend API descrevendo o fluxo como
+_"confirma os dados e cai na procuração"_ — **omitindo a Etapa 2**. A solução parecia elegante
+porque o problema estava descrito errado. Quando o dono corrigiu a descrição, a solução caiu
+junto: eu não estava contornando um obstáculo, estava **amputando um requisito**.
+
+**Descrever o fluxo errado produz solução que resolve o problema errado** — e ela chega
+convincente, porque é coerente com a descrição.
+
+## §53 — O que sobra, então
+
+Com a Etapa 2 como requisito, o `400` do Clerk **tem de ser consertado**, não contornado. O que
+está medido sobre ele:
+
+| fato                                                                                         | medido em                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------ |
+| o servidor roda `pk_test_` / `sk_test_` — **instância de desenvolvimento**                   | `.env` da VPS, 13/09           |
+| a aplicação **Be4hope** TEM ambiente Production, e ele está **vazio** (0 sign-ups, 0 active) | painel do Clerk                |
+| o domínio do Production é **`behemp-site.vercel.app`** — e o site vive em **`be4hope.org`**  | painel + `deploy.yml`          |
+| **"Verify at sign-up"** está ligado, por código de e-mail                                    | painel → User & authentication |
+
+> 🔴 **RETRATAÇÃO, no mesmo dia — esta hipótese estava ERRADA, e eu a apresentei como causa.**
+>
+> O parágrafo abaixo atribuía o `400` ao cookie cross-site da instância de desenvolvimento.
+> **Não é.** O log do Clerk, aberto pelo dono horas depois, traz o motivo literal:
+>
+> ```json
+> {
+>   "email_address": "davimartins1110@gmail.com",
+>   "reason": "That email address is taken. Please try another."
+> }
+> ```
+>
+> **É `form_identifier_exists`** — o e-mail já tem conta. Os eventos `sign_up.captcha.passed`
+> aparecem em **todos** os casos, inclusive nos que falham, o que já derrubava a teoria do
+> cookie e eu não havia notado.
+>
+> ⚠️ E a causa estava escrita nesta ADR desde o §1.1: _"a conta existe, e com senha — foi criada
+> em alguma tentativa anterior que completou a verificação"_. **Eu tinha o diagnóstico no próprio
+> documento e fui procurar causa em infraestrutura.**
+>
+> **O que isso muda:** a instância de desenvolvimento **não é o bloqueio**. Migrar para produção
+> continua sendo o certo (§53), mas por higiene — não para destravar o fluxo.
+>
+> Ver a retificação completa no §54.
+
+🔴 **Em desenvolvimento o FAPI fica em `accounts.dev`, que é cross-site.** Navegador com
+proteção de rastreamento (Firefox estrito, Safari, Brave) bloqueia o cookie, e o
+`signUp.create` responde `400`.
+
+⚠️ **E não é bloqueio absoluto** — o dono conseguiu criar conta. É intermitente, e depende do
+navegador de quem tenta. Num fluxo com 35 pacientes, basta uma fração usar Firefox.
+
+**Fica aberto, e não vou supor:** quantos dos 8 links acessados morreram no `400` e quantos nos
+nove defeitos corrigidos em 13/09. O log não guarda o corpo da resposta, e os defeitos já foram
+consertados — **a única forma de separar é testar de novo**.
+
+## §54 — 🔴 A causa real do `sign_ups → 400`, medida no log do Clerk
+
+**13/09/2026.** O dono abriu o painel do Clerk (ambiente **Development**, que é onde o site
+roda) e clicou num evento `sign_up.failed`. O payload:
+
+```json
+{
+  "email_address": "davimartins1110@gmail.com",
+  "reason": "That email address is taken. Please try another.",
+  "sign_up_id": "sua_3JFlZK14e6423tdDb8OJXzbzV0p"
+}
+```
+
+**Timestamps: 12/09, 22:58 e 22:59** — os testes do próprio dono, com os e-mails que ele vinha
+reusando.
+
+### 54.1 A sequência que os logs mostram
+
+**Quando falha:**
+
+```
+sign_up.created → captcha.required → captcha.passed → sign_up.failed
+```
+
+**Quando funciona:**
+
+```
+sign_up.created → email_address.created → captcha.required → captcha.passed
+→ code_sent → email_address.verified → password.created → sign_up.completed
+→ user.created → session.created
+```
+
+🔴 **`sign_up.captcha.passed` aparece nos DOIS.** O Turnstile e o CSP corrigido funcionam. A
+falha vem depois do captcha e antes do `code_sent` — e o motivo é o e-mail tomado.
+
+### 54.2 O que isto corrige no diagnóstico
+
+| eu afirmei                                           | é                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| o `400` vem do cookie cross-site da instância de dev | **não** — vem de e-mail já cadastrado                             |
+| a instância de desenvolvimento bloqueia o cadastro   | **não bloqueia** — há `sign_up.completed` e `user.created` no log |
+| os 35 links com 0 concluídos são do Clerk            | **não** — são os nove defeitos do §3, todos corrigidos em 13/09   |
+
+⚠️ **E o nosso código já tratava este erro corretamente:**
+
+```ts
+if (e?.errors?.[0]?.code === 'form_identifier_exists') setJaTemConta(true);
+```
+
+A tela responde _"Você já tem uma conta na BeHemp com este e-mail. Entre com a sua senha para
+continuar de onde parou"_, com o botão de login **levando o token junto** (Item 35). O
+comportamento estava certo; faltava o diagnóstico.
+
+### 54.3 A lição, e ela é de método
+
+**Eu tinha três sinais apontando para a causa certa e segui uma hipótese de infraestrutura:**
+
+1. o §1.1 desta ADR já dizia que a conta existia de tentativa anterior
+2. o `captcha.passed` aparecia em todos os eventos de falha
+3. o dono havia dito, no começo da sessão: _"será se é porque eu já tentei criar uma conta com
+   esse e-mail antes?"_ — **e ele estava certo desde então**
+
+🔴 **A hipótese do cookie cross-site era mais interessante, e por isso sobreviveu mais do que
+devia.** Causa sistêmica explica um número grande (35 links, 0 concluídos); causa banal explica
+só os testes do dono. Escolhi a que explicava mais — sem medir qual explicava **o quê**.
+
+**A regra que sai:** quando o próprio usuário oferece uma hipótese simples no começo, ela se
+testa primeiro. Custa um clique no log e teria poupado dois dias.
+
+---
+
+# Parte XI — O último elo: o acesso não é do upload, é do store
+
+## §55 — 🔴 D-23: um terceiro store, privado, e o acesso deixa de ser escolha do ponto de chamada
+
+**Medido em 13/09/2026**, depois de a Greens reenviar o SOL-000021 e o reenvio **funcionar**.
+
+O `porEvento` corrigido no §51 gravou o manifesto com três `{tipo, url}`, a allowlist deixou
+passar, o presigned do S3 abriu e os bytes chegaram. E aí:
+
+```
+[parceiros] documentos recusados: receita_medica:Vercel Blob: Cannot use private
+access on a public store. The store must be configured with private access.
+```
+
+### O que o erro ensina, e não é sobre o parceiro
+
+**Acesso não é propriedade do upload. É propriedade do STORE**, escolhida na criação e imutável.
+A doc da Vercel: _"You select a store's access mode, public or private, when you create it. If
+your app needs both public and private files, provision two separate stores from the start."_ Não
+existe `update-store` — só `create-store`, `get-store`, `delete-store` e `empty-store`.
+
+Passar `access: 'private'` num `put` contra um store público não configura nada: **declara uma
+intenção que o SDK recusa**. E recusa corretamente.
+
+### O alcance, e ele é maior que o handoff
+
+Seis caminhos deste repositório faziam exatamente isso:
+
+| caminho                                    | token que passava | desde |
+| ------------------------------------------ | ----------------- | ----- |
+| `lib/documentos/anexo-do-cadastro.ts`      | nenhum → default  | 10/09 |
+| `app/_actions/documentos.ts`               | nenhum → default  | 11/09 |
+| `lib/parceiros/documentos-do-parceiro.ts`  | nenhum → default  | 13/09 |
+| `app/api/upload-documento/route.ts`        | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente.ts`      | `BLOB_BEHEMP_…`   | —     |
+| `app/_actions/documentos-paciente-self.ts` | `BLOB_BEHEMP_…`   | —     |
+
+🔴 **E `BLOB_BEHEMP_READ_WRITE_TOKEN` não servia como store privado**, o que só apareceu ao
+varrer quem mais a usava: `app/api/upload-avatar/route.ts` e `app/api/upload-exame/route.ts`
+gravam `access: 'public'` com ela. Um token resolve um store; um store tem um acesso. **As duas
+coisas não podem coexistir**, e reaproveitá-la teria quebrado avatar e exame para consertar
+documento.
+
+Por isso o D-23 é um **terceiro** store — `BLOB_TOKEN_PRIVADO` — e não um remanejamento.
+
+### A decisão
+
+**Um módulo único, `lib/documentos/store-privado.ts`, e o acesso deixa de ser parâmetro.**
+
+`guardarDocumentoPrivado(caminho, corpo, { contentType })` não aceita `access` nem `token`. Quem
+chama **não pode** escolher gravar em público — se pudesse, o módulo seria documentação em vez de
+garantia.
+
+🔴 **E ele falha FECHADO.** Sem `BLOB_TOKEN_PRIVADO`, lança `StorePrivadoNaoConfigurado` com o
+nome da variável que falta. Nunca cai para público. O que está em jogo é RG, laudo, receita e
+procuração assinada — e, no caminho do parceiro, documentos de pacientes de **outra empresa**.
+
+### §55.1 — O segundo elo, que ninguém tinha medido
+
+A entrega em `app/api/documentos/[id]/arquivo/route.ts` fazia `fetch(url)` **cru**. Isso abre blob
+público; blob privado responde **401** sem `Authorization: Bearer`.
+
+⚠️ **Esse defeito não teria aparecido em teste nenhum**, porque o primeiro elo impedia que
+qualquer blob privado chegasse a existir. Um defeito escondido atrás do outro — e é o argumento
+para corrigir a **classe** em vez do caso: consertar só o caminho da Greens teria trocado
+"documento não grava" por "documento não abre", com o paciente descobrindo qual dos dois.
+
+Corrigido com `get(url, { access: 'private', token })`, que o SDK 2.3.3 já expõe.
+
+## §56 — A retratação: dois guardas ficavam VERDES com os seis quebrados
+
+| guarda                                        | exigia                           | por que não valia                          |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------ |
+| `o-documento-do-paciente-nao-abre-sem-escopo` | `toContain("access: 'private'")` | a intenção estava escrita; o resultado não |
+| `documento-do-parceiro-nao-vira-ssrf`         | `/ACESSO_DO_BLOB = 'private'/`   | idem, com uma constante no meio            |
+
+**Os dois mediam FORMA.** E a forma estava perfeita: cada um dos seis pontos declarava
+`private`, com comentário explicando por quê. O que falhava era o efeito — e nenhum guarda
+executava nada.
+
+🔴 **É a mesma classe do §37 e da retratação de 24/08:** teste que congela como o código está
+escrito fica verde exatamente quando mais importa ficar vermelho.
+
+**Retificados para a propriedade:** o ponto **não chama `put`** e **não nomeia token**. E
+acrescentado um bloco que **executa** o módulo — sem token lança; `ehDoStorePrivado` decide pelo
+`host.endsWith`, provado contra `…public…/private/rg.pdf`,
+`https://private.blob.vercel-storage.com.evil.com/x` e a URL com o host na query string.
+
+**36 casos, provados por 8 sabotagens.** Duas sobreviveram à primeira rodada: `toContain(
+'lerDocumentoPrivado')` fica verde com o corpo trocado por `fetch(url)`, porque o nome continua
+no `import`. **Menção não é uso** — a mesma armadilha, pela oitava vez neste repositório, e a
+correção foi medir o corpo sem as linhas de import.
+
+Mais um caso de **cobertura**, derivado do código: quem importar `put` do SDK e gravar em
+`documentos` fica vermelho **com o nome do arquivo**. Provado criando um ponto sétimo.
+
+## §57 — O que isto NÃO resolve, e fica escrito
+
+- **Os arquivos do SOL-000046 não foram guardados.** O download aconteceu, a gravação falhou, e
+  não há o que recuperar deste lado. A Greens precisa reenviar depois que o store existir.
+- **Os blobs antigos continuam no store público** — Item 6 do `04`. A entrega os serve pelo
+  caminho legado, e migrá-los é trabalho próprio, não passageiro.
+- **`BLOB_READ_WRITE_TOKEN` nunca esteve no `deploy.yml`.** Hoje funciona por herança do `.env`
+  da VPS. Catalogado no `03`, com o agravante de que, no dia em que esse `.env` for reescrito sem
+  preservação, todo upload do produto para de funcionar de uma vez.
+- **O guarda dos segredos não vê variável lida por DEPENDÊNCIA.** Ele deriva de `process.env.X`
+  no nosso código, e o `@vercel/blob` lê o token por conta própria: ficou verde com o defeito
+  presente, medido em 27/27. Classe nova, catalogada no `03`.
+
+## §58 — 🔴 D-24: o log diz o que aconteceu sem entregar o paciente junto
+
+**Achado ao seguir o fluxo até o fim**, logo depois do D-23 — e é o que a regra
+_"parar no primeiro achado"_ existe para evitar.
+
+Corrigido o `put`, o elo **seguinte** (`materializar-documentos.ts:141`) repetia exatamente o
+defeito que acabara de custar quatro dias: `erro instanceof Error ? erro.name : 'erro'`. Se o
+`insert` falhasse depois do store privado existir, o log diria `'Error'` e voltaríamos ao mesmo
+lugar. **Catorze pontos do repositório faziam isso.**
+
+### A correção óbvia estava errada, e um guarda provou
+
+Troquei quatro pontos por `motivoLegivel`. O guarda `cadastro-por-link-abre-sem-conta` ficou
+vermelho, com a explicação escrita nele: _"`erro.message` do Postgres carrega o valor que violou
+a constraint — e as colunas aqui são CPF, telefone e texto clínico."_
+
+**Medi contra um Postgres real em vez de decidir pelo comentário.** O comentário estava
+impreciso, e a realidade era **pior**:
+
+| camada                 | o que chega                                                           | vaza? |
+| ---------------------- | --------------------------------------------------------------------- | ----- |
+| `pg` cru, `message`    | `duplicate key value violates unique constraint "t_cpf_key"`          | não   |
+| `pg` cru, `detail`     | `Key (cpf)=(529.982.247-25) already exists.`                          | 🔴    |
+| **Drizzle, `message`** | `Failed query: insert into t2 values ('529.982.247-25', 'rg_maria…')` | 🔴🔴  |
+
+Não é o `detail` do Postgres — é o **Drizzle**, que monta a mensagem com a query inteira e os
+valores inline. Num `insert` de paciente isso é CPF, telefone, endereço e queixa clínica direto
+no log, e redigir por regex não resolve: os valores chegam **sem rótulo**, e uma regex de CPF não
+reconhece nome de arquivo nem texto clínico.
+
+### A decisão
+
+**Erro de banco não usa a mensagem. Nada dela.** O motivo sai de `code` + `constraint` + `table`,
+que o driver expõe separadamente e que **não carregam valor nenhum**:
+
+```
+banco:23505:pacientes_cpf_key:pacientes
+```
+
+⚠️ **E isso diagnostica MELHOR que a mensagem**, o que é o ponto que fecha a decisão. `23505` é
+`unique_violation` e a constraint diz qual campo — a pergunta fica respondida. `Failed query:
+insert…` responde a mesma pergunta **e entrega o paciente junto**.
+
+Distinguir erro de banco de erro de rede é por SQLSTATE (cinco caracteres começando por dígito),
+porque os dois usam o mesmo campo `cause.code` — rede traz `ECONNREFUSED`, `ENOTFOUND`,
+`UND_ERR_CONNECT_TIMEOUT`, e esses continuam valendo a pena.
+
+Mais uma rede de segurança: mensagem que **comece** com `Failed query:` não passa inteira, mesmo
+sem `cause` para reconhecê-la — driver diferente, versão nova do Drizzle, erro reembrulhado.
+
+### §58.1 — O que fica com `erro.name`, e por quê
+
+`app/_actions/cadastro-por-link.ts:646` **mantém** `erro.name`, com o motivo escrito no código.
+Aquele `catch` cobre a transação inteira do cadastro, não só um `insert`, e o guarda o exige.
+Melhorá-lo é trabalho próprio — catalogado no `03`, junto dos **onze** pontos restantes.
+
+🔴 **Isto não é dívida esquecida: é dívida medida.** O ponto ruim de diagnóstico continua ruim
+de propósito, porque a alternativa disponível hoje seria pior — e a diferença entre as duas está
+escrita onde quem for mexer vai ler.
+
+### §58.2 — O guarda
+
+`o-motivo-do-erro-diagnostica-sem-vazar` — **15 casos, provados por 7 sabotagens**, e todos
+**executam** a função. Fica vermelho nas duas direções: se o motivo voltar a ser `'Error'`, e se
+CPF, telefone, nome de arquivo ou queixa clínica aparecerem nele.
+
+⚠️ **As duas direções no mesmo guarda são de propósito.** Separadas, alguém "resolve" uma
+passando a logar a mensagem crua, e o outro guarda é que fica vermelho — em outro arquivo, em
+outro PR, talvez em outra semana.
+
+## §59 — O store criado, e a prova contra o serviço real
+
+**13/09/2026, 18:32.** `behemp-documentos-privados` · `store_i9Cq0YBERLypCKIm` · `iad1` ·
+**Access: Private** · base URL `i9cq0yberlypckim.private.blob.vercel-storage.com`.
+
+### §59.1 — Por que `iad1` e não `gru1`, que é onde estão os outros dois
+
+Os dois stores que já existiam — `be4hope-public` (88 arquivos) e `medgreens-public` (31) —
+estão em **`gru1`**, São Paulo. A escolha faz sentido para eles e **não** para este:
+
+|                     | store público                       | store privado     |
+| ------------------- | ----------------------------------- | ----------------- |
+| quem busca os bytes | o **navegador do paciente**, direto | a **VPS**, sempre |
+| onde convém estar   | perto do paciente (Brasil)          | perto da VPS      |
+
+Blob privado não abre por link: a entrega passa obrigatoriamente por
+`/api/documentos/[id]/arquivo`, que roda na VPS em **us-east-1** — a mesma região do bucket de
+onde a Greens serve os documentos (`greens-site-bucket.s3.us-east-1`). Com `gru1`, cada arquivo
+faria Virginia→São Paulo ao gravar e São Paulo→Virginia→paciente ao ler. Com `iad1`, a gravação
+é local e a leitura sai de onde o servidor está.
+
+⚠️ **Isto fica escrito porque a inconsistência é aparente.** Quem olhar a lista de stores daqui
+a três meses vai ver dois em `gru1` e um em `iad1`, e a tentação é "padronizar". Região, como
+acesso, é **imutável** — padronizar custaria um store novo e uma migração de arquivos.
+
+### §59.2 — A prova, e ela não é guarda estrutural
+
+Executado contra o store real, com o código deste PR, antes de qualquer deploy:
+
+```
+✅ gravou no store privado
+   host: i9cq0yberlypckim.private.blob.vercel-storage.com
+✅ host é .private.
+✅ ehDoStorePrivado() reconhece a URL real
+✅ fetch sem autenticação é RECUSADO (HTTP 403)
+✅ lerDocumentoPrivado devolveu os bytes certos
+✅ teste apagado do store
+```
+
+🔴 **A quarta linha é a que fecha a decisão inteira.** Um `fetch` sem `Authorization` responde
+**403** — o arquivo não é legível por quem tem a URL. É precisamente o que o store público não
+garantia, e a razão de tudo isto existir. As outras cinco provam que o caminho funciona; essa
+prova que ele **protege**.
+
+E `ehDoStorePrivado`, escrito por dedução a partir da doc antes de o store existir, reconheceu o
+host real na primeira tentativa.
+
+### §59.3 — O que a criação do store revelou de graça
+
+`gh secret list` mostra `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` **cadastrados
+desde 22/06/2026** — e nenhum dos dois na lista `gravar` do `deploy.yml`. O achado do §57 ganha
+evidência: os segredos existem, o deploy simplesmente não os escreve, e produção vive da herança
+do `.env` antigo.
+
+⚠️ **E fechar isso não é acrescentar duas linhas.** O GitHub não deixa **ler** o valor de um
+secret, e o `.env` da VPS é anterior ao cadastro — não há como confirmar que batem. Se
+divergirem, a próxima linha `gravar` sobrescreve o token que funciona e derruba avatar, exame e
+procuração. Trocar fragilidade latente por falha real é mau negócio: o caminho seguro é gerar
+tokens novos no painel, cadastrá-los e então acrescentar as linhas, num movimento só.
+
+---
+
+# Parte XII — A causa raiz: o driver não implementa transação
+
+## §60 — 🔴 D-25: transação exige um cliente que saiba fazer transação
+
+**Medida em 13/09/2026, depois de cinco falhas idênticas em produção e cinco hipóteses
+derrubadas.**
+
+```js
+// drizzle-orm/neon-http/session.js:152
+async transaction(_transaction, _config = {}) {
+  throw new Error('No transactions support in neon-http driver');
+}
+```
+
+`lib/db/index.ts` resolve para `neon-http` em produção. **`db.transaction()` lança na primeira
+linha, sempre.** Não é limitação de borda nem condição de corrida: o método inteiro é um `throw`.
+
+### §60.1 — Isto explica o D-16 inteiro, e explica melhor que tudo que escrevemos antes
+
+O §38 registrou a medição que orientou dias de trabalho:
+
+```
+com_arquivo: 0   em TODAS as solicitações
+concluidas:  0   em TODAS as 64 solicitações
+```
+
+Concluímos dali que faltava dado. **Faltava execução.** Nenhum dos 35 handoffs concluiu porque
+`concluirCadastroPorLink` nunca passou da primeira linha da transação — desde sempre, para todo
+paciente, por qualquer porta.
+
+⚠️ **E nada disso aparecia como erro legível**, por uma razão exata: é um `new Error(…)`, e
+`erro.name` disso é `'Error'`. O `catch` registrava `erro.name` (pelo motivo correto do §58: a
+mensagem do Drizzle carrega valores de coluna). O log rodou por semanas dizendo `{ erro:
+'Error' }` sobre a mensagem que descrevia o problema com todas as letras.
+
+### §60.2 — Por que nenhum teste pegou, e é a lição que fica
+
+O guarda `banco-usa-driver-certo` existe e está **correto**: URL de Neon → HTTP, qualquer outra
+→ TCP. É exatamente o desenho pretendido.
+
+O efeito colateral é que **em teste a URL nunca é de Neon**. Todo teste roda contra
+`node-postgres`, que implementa transação. O código passava local e lançava em produção, e a
+diferença não estava no código — estava na URL.
+
+🔴 **Nenhuma quantidade de guarda estrutural teria pego isto.** O código estava escrito
+corretamente; a chamada existia, a ordem estava certa, a atomicidade declarada. O que falhava
+era o **runtime**, e só em um ambiente.
+
+### §60.3 — A decisão
+
+**Um cliente transacional separado** — `lib/db/transacional.ts`, com `drizzle-orm/node-postgres`
+sobre um `Pool` do `pg`. `lib/db/index.ts` não muda: toda query que não precisa de transação
+segue pelo caminho de sempre.
+
+**Rejeitado — `neon-serverless` (WebSocket).** Suporta transação e é o que a doc do Neon
+recomenda. Exige o pacote `ws` no Node, que **não é dependência deste projeto**: seria
+dependência nova, em produção, num caminho de dado clínico, na véspera de um prazo. `pg` já é
+`dependencies` (`^8.23.0`), sobrevive ao `pnpm install --prod`, e **já rodou contra este banco** —
+todos os diagnósticos desta sessão na VPS usaram `require('pg')`, inclusive um `BEGIN`/`ROLLBACK`
+com três `update` reais.
+
+**Rejeitado — trocar o driver global para TCP.** Provavelmente é o certo a prazo: o neon-http
+existe para serverless, onde não se mantém conexão, e produção é EC2 com PM2, um processo longo.
+Mas isso toca **toda** query do produto e precisa ser medido em latência — não é mudança para
+fazer junto de uma correção urgente. **Fica catalogado.**
+
+**Rejeitado — reescrever sem transação.** Perderia a atomicidade entre `users` e `pacientes`. O
+§53 já registrou o custo de um cadastro meio gravado; em dado clínico isso não se negocia.
+
+### §60.4 — O guarda, e por que ele é estrutural
+
+`a-transacao-usa-um-driver-que-a-suporta` — **10 casos, provados por 5 sabotagens.** Fica
+vermelho se alguém chamar `db.transaction(` em qualquer arquivo (derivado do código, então
+nomeia o arquivo NOVO), se o cliente transacional voltar a ser HTTP, se o pool deixar de ser
+único por processo, ou se perder o timeout de conexão.
+
+Mais um bloco que cobre a armadilha do deploy: `pg` precisa estar em `dependencies`, porque
+`pnpm install --prod` poda `devDependencies` — um driver que só exista ali funcionaria em teste e
+sumiria em produção, que é exatamente a classe de falha silenciosa deste §60.
+
+⚠️ **É estrutural de propósito, e isso é uma limitação assumida:** executar a transação exigiria
+um Postgres, e executá-la contra o Neon exigiria produção. O que se garante aqui é que ninguém
+volte a pedir transação ao cliente errado.
+
+**A execução foi provada à parte**, contra Postgres 15 em Docker, antes do commit:
+
+```
+✅ transação executou e devolveu o resultado (n=1)
+✅ erro dentro da transação desfaz tudo (rollback real)
+✅ chamadas repetidas não estouram
+```
+
+E contra o **Neon de produção**, o `BEGIN` + três `update` + `ROLLBACK` do diagnóstico já havia
+provado que TCP com transação funciona naquele banco.
+
+## §61 — Cinco hipóteses medidas e derrubadas, e por que isso vale ser escrito
+
+Antes de achar a causa, cinco explicações foram levantadas e **medidas contra o banco de
+produção**. Nenhuma virou correção especulativa:
+
+| #   | hipótese                                                   | medição                              | veredicto |
+| --- | ---------------------------------------------------------- | ------------------------------------ | --------- |
+| 1   | duplicata de usuário ou ficha                              | `users: 1 · fichas: 1 · apagados: 0` | ❌        |
+| 2   | soft delete colidindo com o unique de `pacientes.userId`   | `ativas: 1 · apagadas: 0`            | ❌        |
+| 3   | e-mail com maiúscula, que o `eq()` case-sensitive não acha | `acha_como_o_codigo_busca: 1`        | ❌        |
+| 4   | `greens_handoff` fora do enum de `pacientes.origem`        | mesmo enum, valor presente           | ❌        |
+| 5   | índice unique em `clerk_id` que o schema não declara       | `pg_indexes`: não existe             | ❌        |
+
+🔴 **A quinta foi a mais útil**, e não por acertar: ela listou o que existe **no banco** em vez do
+que o schema declara. Foi ao eliminá-la que ficou claro que o problema não era de dado — e a
+atenção virou para o runtime.
+
+⚠️ **O custo disso foi alto e é honesto registrar:** cada hipótese exigiu uma rodada de comando
+na VPS do dono. E antes delas, quatro comandos meus tinham defeito próprio — nome de coluna
+inventado (`criado_em` por `created_at`), filtro por `created_at` que esconde reenvio (reenvio
+move `updated_at`), campo do manifesto errado (`url` por `urlBlob`) e `!!` em shell interativo,
+que o bash expande como histórico. **A partir da quinta, os comandos passaram a ser validados
+localmente (`node --check`, `bash -n`, contagem de `!`) antes de serem enviados** — e nenhum
+falhou depois disso.
+
+## §62 — 🟢 O Fluxo 1 · Portão 1 fechou. Medido em 14/09/2026, 00:0x UTC
+
+```
+protocolo: SOL-000046  ·  status: 'enviada'  ·  na_ficha: 3
+```
+
+**Os três documentos que a Greens enviou estão na ficha do paciente.** É a primeira vez, em 35
+handoffs e várias semanas, que o caminho completa:
+
+```
+formulário da Greens → handoff assinado (E1) → allowlist → download do S3 presignado
+  → store privado (403 sem autenticação) → transação → ficha do paciente
+```
+
+### O que foi preciso, na ordem em que apareceu
+
+| #   | defeito                                                | onde                        | §     |
+| --- | ------------------------------------------------------ | --------------------------- | ----- |
+| 1   | o reenvio não atualizava o manifesto                   | `handoff.ts` (`reemitir`)   | §51   |
+| 2   | o `400` do Clerk era e-mail já cadastrado, não cookie  | diagnóstico                 | §54   |
+| 3   | a origem recusada não ia no motivo                     | `documentos-do-parceiro.ts` | §52   |
+| 4   | **o store era público e o código pedia privado**       | 6 caminhos                  | §55   |
+| 5   | a entrega fazia `fetch` cru, que não abre blob privado | rota do arquivo             | §55.1 |
+| 6   | o log dizia `'Error'` e escondia tudo                  | 4 pontos                    | §58   |
+| 7   | 🔴 **o driver de produção não implementa transação**   | `db.transaction`            | §60   |
+
+⚠️ **Os sete estavam empilhados, e cada um só apareceu depois do anterior.** O §61 registra as
+cinco hipóteses medidas e derrubadas entre o 6 e o 7 — nenhuma virou correção especulativa, e a
+causa real não era nenhuma delas.
+
+🔴 **O defeito 7 é o que explica o D-16 inteiro.** Ele estava lá desde sempre, para todo
+paciente, por qualquer porta. Os defeitos 1 a 6 são reais e precisavam ser corrigidos — mas
+nenhum deles, sozinho, teria feito um cadastro concluir.
+
+### A lição que sai, e ela vale mais que a correção
+
+**Os guardas estruturais estavam verdes durante todas as semanas.** 1212 casos no dia em que
+zero cadastros concluíam. Eles liam o código, e o código estava escrito certo: a chamada existia,
+a ordem estava correta, a atomicidade declarada, o `access: 'private'` no lugar.
+
+O que falhava era o **efeito**, e em três dos sete casos o guarda ficava verde **exatamente
+porque** media a forma:
+
+- `o-documento-do-paciente-nao-abre-sem-escopo` exigia o literal `access: 'private'`
+- `documento-do-parceiro-nao-vira-ssrf` exigia `ACESSO_DO_BLOB = 'private'`
+- `cadastro-por-link-abre-sem-conta` exigia `erro instanceof Error ? erro.name`
+
+Os três foram retificados para medir propriedade, e dois ganharam casos que **executam**.
+
+⚠️ **E o defeito 7 nenhum guarda teria pego**, por um motivo estrutural: em teste a URL nunca é
+de Neon, então `db` resolve para `node-postgres`, que suporta transação. A diferença não estava
+no código — estava no ambiente. **É o limite do que teste estático alcança, e fica escrito.**
+
+### O que continua aberto
+
+- **P8 (procuração da ANVISA)** — destravado, nunca executado
+- Os **11 pontos com `erro.name`**, e o `cadastro-por-link.ts` que o mantém de propósito (§58.1)
+- A tela que diz **"✓ Laudo médico"** para um documento que não chegou
+- `BLOB_READ_WRITE_TOKEN` e `BLOB_BEHEMP_READ_WRITE_TOKEN` fora do `gravar` do `deploy.yml`
+- O **driver global**: `neon-http` existe para serverless, e produção é EC2 com PM2. Um pool TCP
+  provavelmente é melhor em tudo — mas toca toda query e precisa de medição
+
+## §63 — 🟢 E o teste LIMPO, com paciente novo, passou de primeira
+
+**14/09/2026, 01:02 UTC.** Depois do SOL-000046 — que fechou, mas com conta pré-existente —, um
+pedido inteiramente novo foi criado no formulário da Greens: nome, e-mail, CPF e telefone que
+nunca existiram neste banco.
+
+```
+protocolo     status     criado         com_arquivo   na_ficha
+SOL-000065    enviada    14/09 01:02    3             3
+```
+
+⚠️ **Este é o teste que vale, e a diferença importa.** O SOL-000046 exercitava o caminho de quem
+_já tem conta_ — útil, porque era onde o dono travava, mas não é o caminho comum. O SOL-000065
+percorre o que um paciente real percorre: formulário da Greens, handoff, download, store privado,
+criação de conta no Clerk, confirmação por e-mail, transação, ficha.
+
+**Sete portões, primeira tentativa, sem intervenção.**
+
+### O que isso prova que o anterior não provava
+
+|                        | SOL-000046                    | SOL-000065           |
+| ---------------------- | ----------------------------- | -------------------- |
+| conta no Clerk         | já existia                    | **criada agora**     |
+| `users`                | já existia                    | **inserido**         |
+| `pacientes`            | ficha ativa, ramo do `update` | **ramo do `insert`** |
+| confirmação por e-mail | pulada (sessão ativa)         | **percorrida**       |
+
+🔴 **O ramo do `insert` da transação nunca tinha executado.** Era exatamente onde o D-25
+(`neon-http` sem transação) mordia primeiro, e onde as hipóteses 1 e 2 do §61 imaginavam
+colisões. Nenhuma delas existia — e agora está provado pelo caminho, não por consulta.
+
+### O que continua sem prova
+
+**P8 — a procuração da ANVISA.** O cadastro concluiu e o paciente chegou ao destino; o que
+acontece dali em diante ainda não foi exercitado nesta sessão.

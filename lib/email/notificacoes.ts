@@ -510,3 +510,64 @@ export async function enviarEmailMedicoNovoPaciente(params: {
     });
   }
 }
+
+// ── E-mail: Autorização da ANVISA aprovada ────────────────────
+
+/**
+ * AVISA O PACIENTE DE QUE A AUTORIZAÇÃO SAIU (Item 29).
+ *
+ * Pedido pelo dono em 10/09/2026, no passo 7 do fluxo Greens 1 — _"recebe notificação email,
+ * celular e no sistema"_ — e adiado por ele na mesma conversa: _"isso nós fazemos depois,
+ * deixe anotado como pendência"_.
+ *
+ * 🔴 O NÚMERO DO PROCESSO VAI NO CORPO, e é de propósito: é com ele que o paciente acompanha
+ * na ANVISA e é o que o despachante pede. Sem ele, o e-mail obriga a entrar no sistema para
+ * descobrir o que já se sabia.
+ *
+ * ⚠️ E NADA CLÍNICO ENTRA AQUI. Nem medicamento, nem dosagem, nem CID. E-mail atravessa
+ * servidores que não controlamos, e o paciente pode ler em tela compartilhada — o que se diz
+ * é que **a autorização saiu**, não para o que ela serve.
+ */
+export async function enviarEmailAnvisaAprovada(params: {
+  emailPaciente: string;
+  nomePaciente: string;
+  numeroProcesso?: string | null;
+}): Promise<void> {
+  const corpo = `
+    <p style="margin:0 0 24px;font-size:14px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      Olá, <strong style="color:${CORES.textPrimary};">${escapeHtml(params.nomePaciente)}</strong>!
+      A sua autorização de importação foi <strong style="color:${CORES.textPrimary};">aprovada</strong> pela Anvisa.
+    </p>
+    ${
+      params.numeroProcesso
+        ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr><td style="background:${CORES.goldBg};border-radius:12px;padding:20px 24px;border-left:3px solid ${CORES.gold};">
+        <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;color:${CORES.textMuted};">Número do processo</p>
+        <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:${CORES.textPrimary};">${escapeHtml(params.numeroProcesso)}</p>
+      </td></tr>
+    </table>`
+        : ''
+    }
+    <p style="margin:0 0 24px;font-size:13px;color:${CORES.textSecondary};text-align:center;line-height:1.6;">
+      A autorização vale por dois anos. Guarde este número — é com ele que você acompanha o
+      processo e é o que o despachante pede na importação.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+      <a href="${APP_URL()}/paciente/anvisa" style="display:inline-block;background:${CORES.gold};color:#fff;font-size:13px;font-weight:600;padding:12px 28px;border-radius:50px;text-decoration:none;">✅ Ver minha autorização</a>
+    </td></tr></table>`;
+
+  const html = templateBase({
+    emoji: '✅',
+    badgeCor: CORES.goldBg,
+    titulo: 'Sua autorização da Anvisa foi aprovada',
+    corpo,
+  });
+
+  const client = criarClienteBrevo();
+  await client.transactionalEmails.sendTransacEmail({
+    subject: '✅ Sua autorização da Anvisa foi aprovada',
+    htmlContent: html,
+    sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },
+    to: [{ email: params.emailPaciente, name: params.nomePaciente }],
+  });
+}

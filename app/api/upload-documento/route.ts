@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { documentos } from '@/db/schema';
@@ -21,13 +21,26 @@ const TIPOS_VALIDOS = [
   'autorizacao_anvisa',
   'documento_pessoal',
   'oficio_anvisa',
+  'contrato_termos',
+  'laudo_relatorio',
+  'orcamento',
+  'outro',
 ] as const;
+
+/** Nome livre do tipo "outro": texto curto, sem caractere de controle. */
+const tipoPersonalizadoSchema = z
+  .string()
+  .trim()
+  .min(2, 'Informe o nome do tipo de documento (mín. 2 caracteres)')
+  .max(60, 'O nome do tipo de documento aceita até 60 caracteres')
+  .refine((v) => !/\p{Cc}/u.test(v), 'Nome do tipo contém caracteres inválidos');
 
 const uploadSchema = z.object({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
   tipo: z.enum(TIPOS_VALIDOS),
   dataEmissao: z.string().min(1, 'Data de emissão é obrigatória'),
   observacoes: z.string().optional(),
+  tipoPersonalizado: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -51,9 +64,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (file.size > 100 * 1024 * 1024) {
+    if (file.size > 200 * 1024 * 1024) {
       return NextResponse.json(
-        { sucesso: false, erro: 'Arquivo excede 100MB' },
+        { sucesso: false, erro: 'Arquivo excede 200MB' },
         { status: 400 },
       );
     }
@@ -71,6 +84,7 @@ export async function POST(request: Request) {
       tipo: formData.get('tipo') ?? '',
       dataEmissao: formData.get('dataEmissao') ?? '',
       observacoes: formData.get('observacoes') ?? undefined,
+      tipoPersonalizado: formData.get('tipoPersonalizado') ?? undefined,
     };
 
     const parsed = uploadSchema.safeParse(dados);
@@ -81,15 +95,34 @@ export async function POST(request: Request) {
       );
     }
 
+    // "Outro" com nome livre é cadastro de tipo novo: só o admin. A UI esconde o campo, mas é
+    // aqui que se decide — o cliente nunca é confiável.
+    let tipoPersonalizado: string | null = null;
+    if (parsed.data.tipo === 'outro') {
+      if (auth.role !== 'admin') {
+        return NextResponse.json(
+          { sucesso: false, erro: 'Apenas administradores podem cadastrar um novo tipo de documento' },
+          { status: 403 },
+        );
+      }
+      const nome = tipoPersonalizadoSchema.safeParse(parsed.data.tipoPersonalizado ?? '');
+      if (!nome.success) {
+        return NextResponse.json(
+          { sucesso: false, erro: nome.error.errors[0].message },
+          { status: 400 },
+        );
+      }
+      tipoPersonalizado = nome.data;
+    }
+
     // Upload para Vercel Blob Storage
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
     const nomeSeguro = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const blobPath = `documentos/${parsed.data.pacienteId}/${nomeSeguro}`;
 
-    const blob = await put(blobPath, file, {
-      access: 'public',
-      token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
-    });
+    // O store sai de `store-privado`: `BLOB_BEHEMP_READ_WRITE_TOKEN` é a mesma
+    // variável com que avatar e exame gravam `public`, e um store tem um só acesso.
+    const blob = await guardarDocumentoPrivado(blobPath, file);
 
     // Calcular data de validade baseada no tipo
     const emissao = new Date(parsed.data.dataEmissao);
@@ -111,6 +144,7 @@ export async function POST(request: Request) {
         pacienteId: parsed.data.pacienteId,
         tipo: parsed.data.tipo as typeof documentos.$inferInsert.tipo,
         urlBlob: blob.url,
+        tipoPersonalizado,
         nomeArquivo: file.name,
         dataEmissao: parsed.data.dataEmissao,
         dataValidade: validade.toISOString().split('T')[0],

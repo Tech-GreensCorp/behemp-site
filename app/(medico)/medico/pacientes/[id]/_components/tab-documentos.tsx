@@ -18,10 +18,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { listarDocumentos, excluirDocumento } from '@/app/_actions/documentos-paciente';
+import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
+import { useUser } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { CartaoComunicadoDoacao } from '@/components/admin/comunicados/CartaoComunicadoDoacao';
 import {
   Download,
-  ExternalLink,
   FileCheck,
   Loader2,
   Plus,
@@ -32,7 +36,26 @@ const TIPO_LABELS: Record<string, string> = {
   documento_pessoal: 'Documento Pessoal', comprovante_residencia: 'Comprovante de Residência',
   oficio_anvisa: 'Ofício da Anvisa', receita_medica: 'Receita Médica',
   rg: 'RG', rg_responsavel: 'RG Responsável', autorizacao_anvisa: 'Autorização Anvisa',
+  // Entrou no enum em 23/09/2026 — ADR-0026.
+  laudo_medico: 'Laudo Médico',
+  contrato_termos: 'Contrato e termos',
+  laudo_relatorio: 'Laudo / relatório',
+  orcamento: 'Orçamento',
+  outro: 'Outro',
 };
+
+const NOME_TIPO_MAX = 60;
+
+/** Chave de agrupamento: cada nome livre do tipo "outro" vira o seu próprio grupo. */
+function chaveDoTipo(d: { tipo?: string; tipoPersonalizado?: string | null }): string {
+  if (d.tipo === 'outro' && d.tipoPersonalizado) return `outro:${d.tipoPersonalizado}`;
+  return d.tipo || 'outro';
+}
+
+function rotuloDaChave(chave: string): string {
+  if (chave.startsWith('outro:')) return chave.slice('outro:'.length);
+  return TIPO_LABELS[chave] ?? chave;
+}
 
 interface TabDocumentosProps { pacienteId: string }
 
@@ -42,12 +65,21 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [tipo, setTipo] = useState('');
+  const [tipoPersonalizado, setTipoPersonalizado] = useState('');
   const [dataEmissao, setDataEmissao] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Estado de exclusão
   const [docParaExcluir, setDocParaExcluir] = useState<{ id: string; nome: string } | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+
+  // Só controla o que a tela mostra; quem recusa o cadastro de tipo novo é a API (role no servidor).
+  const { user } = useUser();
+  const pathname = usePathname();
+  const ehAdmin =
+    (user?.publicMetadata as { role?: string } | undefined)?.role === 'admin' ||
+    pathname.startsWith('/admin/');
+  const nomeDoTipoOk = tipoPersonalizado.trim().length >= 2;
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -61,11 +93,13 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
   async function handleUpload() {
     const file = fileRef.current?.files?.[0];
     if (!file || !tipo || !dataEmissao) { toast.error('Preencha todos os campos obrigatórios'); return; }
+    if (tipo === 'outro' && !nomeDoTipoOk) { toast.error('Informe o nome do tipo de documento'); return; }
     setSalvando(true);
     try {
       const fd = new FormData();
       fd.append('pacienteId', pacienteId);
       fd.append('tipo', tipo);
+      if (tipo === 'outro') fd.append('tipoPersonalizado', tipoPersonalizado.trim());
       fd.append('dataEmissao', dataEmissao);
       fd.append('arquivo', file);
 
@@ -77,7 +111,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
 
       if (res.sucesso) {
         toast.success('Documento enviado com sucesso!');
-        setMostrarForm(false); setTipo(''); setDataEmissao('');
+        setMostrarForm(false); setTipo(''); setTipoPersonalizado(''); setDataEmissao('');
         if (fileRef.current) fileRef.current.value = '';
         await carregar();
       } else {
@@ -130,7 +164,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
 
   // Agrupar por tipo
   const agrupados = docs.reduce((acc: Record<string, any[]>, d) => {
-    const key = d.tipo || 'outro';
+    const key = chaveDoTipo(d);
     if (!acc[key]) acc[key] = [];
     acc[key].push(d);
     return acc;
@@ -140,6 +174,9 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
 
   return (
     <div className="space-y-6">
+      {/* Comunicado para assinatura (DocuSign) — a action só responde ao admin; para os demais o cartão some */}
+      <CartaoComunicadoDoacao pacienteId={pacienteId} />
+
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold">Documentos</h2>
         {!mostrarForm && <Button size="sm" className="gap-2 rounded-xl" onClick={() => setMostrarForm(true)}><Plus size={14} /> Enviar Documento</Button>}
@@ -152,7 +189,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Tipo de Documento *</Label>
-                <Select value={tipo} onValueChange={v => setTipo(v ?? '')}>
+                <Select value={tipo} onValueChange={v => { setTipo(v ?? ''); if (v !== 'outro') setTipoPersonalizado(''); }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione">
                       {tipo ? (TIPO_LABELS[tipo] ?? tipo) : undefined}
@@ -163,18 +200,36 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                     <SelectItem value="comprovante_residencia">Comprovante de Residência</SelectItem>
                     <SelectItem value="oficio_anvisa">Ofício da Anvisa</SelectItem>
                     <SelectItem value="receita_medica">Receita Médica</SelectItem>
+                    <SelectItem value="contrato_termos">Contrato e termos</SelectItem>
+                    <SelectItem value="laudo_relatorio">Laudo / relatório</SelectItem>
+                    <SelectItem value="orcamento">Orçamento</SelectItem>
+                    {/* "Outro" existe para cadastrar um tipo novo — por isso só o admin o vê */}
+                    {ehAdmin && <SelectItem value="outro">Outro</SelectItem>}
                   </SelectContent>
                 </Select>
+                {ehAdmin && tipo === 'outro' && (
+                  <div className="mt-3">
+                    <Label htmlFor="doc-tipo-personalizado">Nome do novo tipo *</Label>
+                    <Input
+                      id="doc-tipo-personalizado"
+                      value={tipoPersonalizado}
+                      maxLength={NOME_TIPO_MAX}
+                      onChange={e => setTipoPersonalizado(e.target.value)}
+                      placeholder="Ex.: Termo de consentimento"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
               </div>
               <div><Label>Data do Documento *</Label><Input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)} /></div>
             </div>
             <div>
-              <Label>Arquivo (máx. 100MB) — PDF, JPG, PNG</Label>
+              <Label>Arquivo (máx. 200MB) — PDF, JPG, PNG</Label>
               <Input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1" />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => setMostrarForm(false)}>Cancelar</Button>
-              <Button onClick={handleUpload} disabled={salvando || !tipo || !dataEmissao} className="gap-2 rounded-xl">
+              <Button onClick={handleUpload} disabled={salvando || !tipo || !dataEmissao || (tipo === 'outro' && !nomeDoTipoOk)} className="gap-2 rounded-xl">
                 {salvando ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 {salvando ? 'Enviando...' : 'Enviar'}
               </Button>
@@ -191,67 +246,74 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
       ) : (
         Object.entries(agrupados).map(([tipoKey, items]) => (
           <div key={tipoKey} className="space-y-3">
-            <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">{TIPO_LABELS[tipoKey] ?? tipoKey}</h3>
-            {items.map((doc: any) => {
-              const vencido = new Date(doc.dataValidade) < new Date();
-              return (
-                <Card key={doc.id} className="border-border/40 shadow-sm transition-shadow hover:shadow-md">
-                  <CardContent className="flex items-center justify-between gap-4 p-4">
-                    {/* Info do arquivo */}
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C08E3A]/10">
+            <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">{rotuloDaChave(tipoKey)}</h3>
+            <DataList>
+              {items.map((doc: any) => {
+                const vencido = new Date(doc.dataValidade) < new Date();
+                return (
+                  <DataRow
+                    key={doc.id}
+                    icon={
+                      <div className="flex h-full w-full items-center justify-center rounded-full bg-[#C08E3A]/10">
                         <FileCheck size={18} className="text-[#C08E3A]" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{doc.nomeArquivo}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
-                          {' · '}
-                          Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
+                    }
+                    title={doc.nomeArquivo}
+                    subtitle={
+                      <>
+                        Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {' · '}
+                        Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </>
+                    }
+                    trailing={
+                      <>
+                        <Badge variant={vencido ? 'destructive' : 'outline'}>
+                          {vencido ? 'Vencido' : 'Válido'}
+                        </Badge>
 
-                    {/* Ações */}
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge variant={vencido ? 'destructive' : 'outline'}>
-                        {vencido ? 'Vencido' : 'Válido'}
-                      </Badge>
+                        {/*
+                          🔴 Ver abre num MODAL — 14/09/2026. Para o médico o ganho é maior que
+                          para o paciente: conferir o documento sem sair da ficha é o que
+                          permite dizer "isto não é um RG" antes de a procuração seguir.
 
-                      {/* Visualizar */}
-                      <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                          <ExternalLink size={13} />
-                          Ver
+                          A rota é a mesma de antes, e o escopo de objeto continua sendo
+                          decidido nela: `garantirLeitorDoDocumento` exige o vínculo
+                          médico-paciente, não basta ser médico.
+                        */}
+                        <VisualizadorDeDocumento
+                          documentoId={doc.id}
+                          rotulo={rotuloDaChave(tipoKey)}
+                          nomeArquivo={doc.nomeArquivo}
+                        />
+
+                        {/* Baixar */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
+                        >
+                          <Download size={13} />
+                          Baixar
                         </Button>
-                      </a>
 
-                      {/* Baixar */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
-                      >
-                        <Download size={13} />
-                        Baixar
-                      </Button>
-
-                      {/* Excluir */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
-                        onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
-                      >
-                        <Trash2 size={13} />
-                        Excluir
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        {/* Excluir */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+                          onClick={() => setDocParaExcluir({ id: doc.id, nome: doc.nomeArquivo ?? 'documento' })}
+                        >
+                          <Trash2 size={13} />
+                          Excluir
+                        </Button>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </DataList>
           </div>
         ))
       )}

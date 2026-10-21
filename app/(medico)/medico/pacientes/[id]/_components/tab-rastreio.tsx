@@ -15,6 +15,7 @@ import {
   listarDosagens,
   listarMedicamentos,
 } from '@/app/_actions/dosagens';
+import { DataList, DataRow } from '@/components/shared/data-list';
 
 export function TabRastreio({ pacienteId }: { pacienteId: string }) {
   const [rastreios, setRastreios] = useState<any[]>([]);
@@ -176,24 +177,18 @@ export function TabRastreio({ pacienteId }: { pacienteId: string }) {
 
       {/* Histórico */}
       {historico.length > 0 && (
-        <div className="space-y-3 pt-4">
+        <div className="space-y-3 pt-4 opacity-70 grayscale">
           <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Histórico de Frascos</h3>
-          {historico.map(r => (
-            <Card key={r.id} className="border-border/40 shadow-sm opacity-70 grayscale">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{r.medicamentoNome}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.mlFrasco} mL · {r.gotasPorDia} gotas/dia
-                  </p>
-                  <p className="text-xs mt-1">
-                    Fim Previsto: {new Date(r.dataFimPrevista + 'T12:00:00').toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <Badge variant="secondary">Encerrado</Badge>
-              </CardContent>
-            </Card>
-          ))}
+          <DataList>
+            {historico.map(r => (
+              <DataRow
+                key={r.id}
+                title={r.medicamentoNome}
+                subtitle={`${r.mlFrasco} mL · ${r.gotasPorDia} gotas/dia · Fim Previsto: ${new Date(r.dataFimPrevista + 'T12:00:00').toLocaleDateString('pt-BR')}`}
+                trailing={<Badge variant="secondary">Encerrado</Badge>}
+              />
+            ))}
+          </DataList>
         </div>
       )}
 

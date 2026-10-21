@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import {
   listarMedicosDisponiveis,
   listarHorariosLivres,
-  agendarConsulta,
+  reservarConsulta,
+  iniciarAguardoPagamento,
+  type ReservaAtivaAgendamento,
+  type HistoricoAgendamentoItem,
 } from '@/app/(public)/_actions/agendamento';
-import { useAuth } from '@clerk/nextjs';
-import Link from 'next/link';
+import { AgendamentoPagamentoStep } from '@/components/shared/agendamento-pagamento-step';
+import { AgendamentoHistorico } from '@/components/shared/agendamento-historico';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,20 +25,34 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CloudSun,
+  CreditCard,
+  Info,
   Loader2,
+  Moon,
+  ShieldCheck,
   Stethoscope,
-  UserCheck,
+  Sunrise,
   Video,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
- * Wizard multi-step para agendamento de consultas.
+ * Wizard multi-step para agendamento de consultas — vive dentro da área logada
+ * (`/paciente/agendamento`), já protegida pelo layout de `(paciente)`.
  *
  * Steps:
- * 1. Seleção de médico
- * 2. Seleção de data e horário
- * 3. Confirmação (login required)
- * 4. Sucesso
+ * 0. Seleção de médico
+ * 1. Seleção de data e horário — ao continuar, reserva o horário por um prazo curto
+ *    (`reservarConsulta`); ninguém mais consegue reservar o mesmo horário enquanto
+ *    a reserva estiver ativa
+ * 2. Confirmação da reserva — dentro do prazo, avança para pagamento (`iniciarAguardoPagamento`).
+ *    A consulta continua 'reservada' (aguardando pagamento) até uma confirmação real existir.
+ * 3. Pagamento — Payment Brick do Mercado Pago (cartão de crédito e PIX), confirmado pelo webhook.
+ *
+ * A etapa inicial NÃO nasce sempre em 0: `reservaAtivaInicial` vem do servidor
+ * (`obterEstadoAgendamentoPaciente`, chamada pela Server Component da página) e reflete a
+ * reserva real no banco — reload ou saída da tela não faz o paciente perder o lugar.
  */
 
 interface Medico {
@@ -44,57 +60,129 @@ interface Medico {
   nome: string;
   especialidade: string;
   bio: string | null;
+  crm: string | null;
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
+  /** `podeAgendarCom` — `false` só com o bloqueio do Mercado Pago ligado e o médico sem conta. */
+  agendavel: boolean;
+}
+
+interface AgendamentoWizardProps {
+  reservaAtivaInicial: ReservaAtivaAgendamento | null;
+  /** Public key do Payment Brick, lida no servidor pela página. `null` = pagamento indisponível. */
+  publicKeyMercadoPago: string | null;
+  historicoInicial: HistoricoAgendamentoItem[];
 }
 
 function formatarValor(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function iniciaisDoNome(nome: string): string {
+  return nome
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .slice(0, 2)
+    .join('');
+}
+
+interface GrupoHorarios {
+  label: string;
+  icon: LucideIcon;
+  horarios: string[];
+}
+
+/** Agrupa horários "HH:mm" por período do dia — deixa a lista organizada mesmo quando
+ *  há poucos horários, em vez de uma grade solta sem contexto. */
+function agruparHorariosPorPeriodo(horarios: string[]): GrupoHorarios[] {
+  const periodos: GrupoHorarios[] = [
+    { label: 'Manhã', icon: Sunrise, horarios: [] },
+    { label: 'Tarde', icon: CloudSun, horarios: [] },
+    { label: 'Noite', icon: Moon, horarios: [] },
+  ];
+
+  for (const h of horarios) {
+    const hora = parseInt(h.split(':')[0], 10);
+    if (hora < 12) periodos[0].horarios.push(h);
+    else if (hora < 18) periodos[1].horarios.push(h);
+    else periodos[2].horarios.push(h);
+  }
+
+  return periodos.filter((p) => p.horarios.length > 0);
+}
+
 const STEPS = [
   { label: 'Médico', icon: Stethoscope },
   { label: 'Data/Hora', icon: CalendarDays },
   { label: 'Confirmação', icon: CheckCircle2 },
+  { label: 'Pagamento', icon: CreditCard },
 ];
 
-const INFO_CARDS = [
-  {
-    icon: Video,
-    titulo: '100% Online',
-    descricao: 'Consulta por videoconferência via Google Meet',
-  },
-  {
-    icon: Clock,
-    titulo: 'Duração: ~60 min',
-    descricao: 'Avaliação completa e orientação personalizada',
-  },
-  {
-    icon: UserCheck,
-    titulo: 'Confirmação Imediata',
-    descricao: 'Receba o link do Meet por e-mail na hora',
-  },
-];
+export function AgendamentoWizard({
+  reservaAtivaInicial,
+  historicoInicial,
+  publicKeyMercadoPago,
+}: AgendamentoWizardProps) {
+  const router = useRouter();
 
-export function AgendamentoWizard() {
-  const { isSignedIn } = useAuth();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => {
+    if (!reservaAtivaInicial) return 0;
+    return reservaAtivaInicial.aguardandoPagamento ? 3 : 2;
+  });
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(null);
-  const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>();
+  const [medicoSelecionado, setMedicoSelecionado] = useState<Medico | null>(() =>
+    reservaAtivaInicial
+      ? {
+          id: reservaAtivaInicial.medicoId,
+          nome: reservaAtivaInicial.medicoNome,
+          especialidade: reservaAtivaInicial.medicoEspecialidade,
+          bio: null,
+          crm: null,
+          avatarUrl: reservaAtivaInicial.medicoAvatarUrl,
+          valorConsulta: reservaAtivaInicial.valor,
+          googleConectado: false,
+          // Retomando uma reserva: ela já passou pela checagem de `reservarConsulta`.
+          agendavel: true,
+        }
+      : null,
+  );
+  const [dataSelecionada, setDataSelecionada] = useState<Date | undefined>(() =>
+    reservaAtivaInicial ? new Date(reservaAtivaInicial.dataHora) : undefined,
+  );
   const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
-  const [horarioSelecionado, setHorarioSelecionado] = useState<string | null>(null);
-  const [observacoes, setObservacoes] = useState('');
-  const [carregando, setCarregando] = useState(true);
+  const [horarioSelecionado, setHorarioSelecionado] = useState<string | null>(() =>
+    reservaAtivaInicial ? format(new Date(reservaAtivaInicial.dataHora), 'HH:mm') : null,
+  );
+  const [observacoes, setObservacoes] = useState(() => reservaAtivaInicial?.observacoes ?? '');
+  const [carregando, setCarregando] = useState(() => !reservaAtivaInicial);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
-  const [agendando, setAgendando] = useState(false);
-  const [resultado, setResultado] = useState<{ meetLink: string; consultaId: string } | null>(null);
+  const [reservando, setReservando] = useState(false);
+  const [avancandoPagamento, setAvancandoPagamento] = useState(false);
+  const [historico, setHistorico] = useState<HistoricoAgendamentoItem[]>(historicoInicial);
+  const [reserva, setReserva] = useState<{
+    consultaId: string;
+    expiraEm: string;
+    valor: number | null;
+    moeda: string;
+  } | null>(() =>
+    reservaAtivaInicial
+      ? {
+          consultaId: reservaAtivaInicial.consultaId,
+          expiraEm: reservaAtivaInicial.expiraEm,
+          valor: reservaAtivaInicial.valor,
+          moeda: reservaAtivaInicial.moeda,
+        }
+      : null,
+  );
 
-  // Carregar médicos
   useEffect(() => {
-    if (!isSignedIn) return; // Não carrega se não logado
-    async function load() {
+    // Retomando direto na confirmação/pagamento: `carregando` já nasceu `false` (ver
+    // inicializador acima) — não precisa da lista de médicos nem de um fetch aqui.
+    if (reservaAtivaInicial) return;
+
+    async function carregarMedicos() {
       setCarregando(true);
       const res = await listarMedicosDisponiveis();
       if (res.sucesso && res.dados) {
@@ -102,10 +190,10 @@ export function AgendamentoWizard() {
       }
       setCarregando(false);
     }
-    load();
-  }, [isSignedIn]);
+    carregarMedicos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Carregar horários ao selecionar data
   const carregarHorarios = useCallback(async (data: Date) => {
     if (!medicoSelecionado) return;
     setCarregandoHorarios(true);
@@ -130,205 +218,231 @@ export function AgendamentoWizard() {
   }
 
   function handleSelecionarMedico(medico: Medico) {
+    if (!medico.agendavel) return;
     setMedicoSelecionado(medico);
     setStep(1);
     setDataSelecionada(undefined);
     setHorarioSelecionado(null);
   }
 
-  async function handleConfirmar() {
-    if (!medicoSelecionado || !dataSelecionada || !horarioSelecionado) return;
-
-    setAgendando(true);
-
+  function horarioSelecionadoParaData(): Date | null {
+    if (!dataSelecionada || !horarioSelecionado) return null;
     const [hora, minuto] = horarioSelecionado.split(':');
     const dataHora = new Date(dataSelecionada);
     dataHora.setHours(parseInt(hora), parseInt(minuto), 0, 0);
+    return dataHora;
+  }
 
-    // Para agendamento público, usamos um pacienteId placeholder
-    // Em produção, será o pacienteId do usuário autenticado
-    const res = await agendarConsulta({
+  // Data/Hora → Confirmação: reserva o horário (trava com prazo). Se falhar, não
+  // avança — outra pessoa pode ter acabado de reservar o mesmo horário, ou algo
+  // real está quebrado (auth, banco).
+  async function handleReservar() {
+    if (!medicoSelecionado) return;
+    const dataHora = horarioSelecionadoParaData();
+    if (!dataHora) return;
+
+    setReservando(true);
+    const res = await reservarConsulta({
       medicoId: medicoSelecionado.id,
-      pacienteId: 'auto', // A action deveria resolver pelo user autenticado
       dataHora: dataHora.toISOString(),
       observacoes: observacoes || undefined,
     });
+    setReservando(false);
 
     if (res.sucesso && res.dados) {
-      setResultado(res.dados);
-      setStep(3); // Sucesso
-      toast.success('Consulta agendada com sucesso!');
+      setReserva(res.dados);
+      setStep(2); // Confirmação
+
+      // Atualização otimista do histórico — evita esperar um reload para o paciente ver
+      // a reserva que acabou de criar na lista abaixo do wizard.
+      setHistorico((atual) => [
+        {
+          id: res.dados!.consultaId,
+          medicoId: medicoSelecionado.id,
+          medicoNome: medicoSelecionado.nome,
+          medicoEspecialidade: medicoSelecionado.especialidade,
+          medicoAvatarUrl: medicoSelecionado.avatarUrl,
+          dataHora: dataHora.toISOString(),
+          status: 'reservada',
+          valor: res.dados!.valor,
+          moeda: res.dados!.moeda,
+          expiraEm: res.dados!.expiraEm,
+          observacoes: observacoes || null,
+          remarcadaPeloPacienteEm: null,
+        },
+        ...atual,
+      ]);
     } else {
-      toast.error(res.erro ?? 'Erro ao agendar consulta');
+      toast.error(res.erro ?? 'Não foi possível reservar este horário. Tente novamente.');
     }
-
-    setAgendando(false);
   }
 
-  // ── Gate: exigir login ──────────────────────────────────────
-  if (!isSignedIn) {
-    return (
-      <Card className="border-0 shadow-xl">
-        <CardContent className="flex flex-col items-center py-16 text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#C08E3A]/10">
-            <CalendarDays size={40} className="text-[#C08E3A]" />
-          </div>
-          <h2 className="text-2xl font-bold">Pronto para agendar?</h2>
-          <p className="mt-3 max-w-md text-muted-foreground">
-            Crie sua conta ou faça login para confirmar o agendamento e garantir seu horário com um dos nossos especialistas.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/entrar?redirect_url=/agendamento">
-              <Button className="gap-2 bg-[#C08E3A] px-8 hover:bg-[#a8762f]">
-                Entrar para agendar
-              </Button>
-            </Link>
-            <Link href="/registrar-se?redirect_url=/agendamento">
-              <Button variant="outline" className="gap-2 px-8">
-                Criar conta grátis
-              </Button>
-            </Link>
-          </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Cadastro rápido · Atendimento humanizado
-          </p>
-        </CardContent>
-      </Card>
+  // Confirmação da reserva → Pagamento. NÃO confirma o agendamento de verdade (isso só
+  // acontece quando existir pagamento real) — só avisa o paciente e avança a tela.
+  async function handleContinuarParaPagamento() {
+    if (!reserva) return;
+
+    setAvancandoPagamento(true);
+    const res = await iniciarAguardoPagamento({ consultaId: reserva.consultaId });
+    setAvancandoPagamento(false);
+
+    if (res.sucesso) {
+      toast.success('Horário reservado! Finalize o pagamento para confirmar sua consulta.');
+      setStep(3); // Pagamento
+    } else {
+      toast.error(res.erro ?? 'Erro ao avançar para o pagamento');
+    }
+  }
+
+  // Prazo da reserva expirou enquanto o paciente estava na tela de pagamento — o backend
+  // já vai liberar o horário (cron ou próxima leitura de `obterEstadoAgendamentoPaciente`);
+  // aqui só refletimos isso na tela na hora, sem esperar reload.
+  function handleReservaExpirada() {
+    if (!reserva) return;
+    toast.error('O prazo para pagamento acabou. Escolha um novo horário.');
+    setHistorico((atual) =>
+      atual.map((item) =>
+        item.id === reserva.consultaId ? { ...item, status: 'cancelada' as const } : item,
+      ),
     );
+    setStep(0);
+    setMedicoSelecionado(null);
+    setDataSelecionada(undefined);
+    setHorarioSelecionado(null);
+    setObservacoes('');
+    setReserva(null);
+    router.refresh();
   }
 
-  // ── Info Cards ──────────────────────────────────────────────
-  if (step === 0 && medicos.length === 0 && !carregando) {
-    return (
-      <div className="space-y-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {INFO_CARDS.map((card) => {
-            const CardIcon = card.icon;
-            return (
-            <Card key={card.titulo} className="border-0 bg-card shadow-sm">
-              <CardContent className="p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <CardIcon size={24} className="text-foreground" />
-                </div>
-                <h3 className="font-display text-sm font-semibold">{card.titulo}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{card.descricao}</p>
-              </CardContent>
-            </Card>
-          ); })}
-        </div>
-
-        <Card className="border-0 shadow-xl">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <p className="text-lg font-medium">Nenhum médico disponível no momento</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Entre em contato conosco para mais informações
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+  /** O webhook confirmou: o histórico passa a mostrar a consulta agendada. */
+  function handlePagamentoConfirmado() {
+    if (!reserva) return;
+    toast.success('Pagamento confirmado — sua consulta está agendada.');
+    setHistorico((atual) =>
+      atual.map((item) =>
+        item.id === reserva.consultaId ? { ...item, status: 'agendada' as const } : item,
+      ),
     );
+    router.refresh();
   }
+
+  const dataHoraReserva = horarioSelecionadoParaData();
 
   return (
     <div className="space-y-8">
 
       {/* Step indicator */}
-      {step < 3 && (
-        <div className="flex items-center justify-center gap-2">
-          {STEPS.map((s, i) => (
-            <div key={s.label} className="flex items-center gap-2">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
-                  i <= step
-                    ? 'bg-[#C08E3A] text-white'
+      <div className="flex items-center justify-center gap-2">
+        {STEPS.map((s, i) => (
+          <div key={s.label} className="flex items-center gap-2">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all ${
+                i < step
+                  ? 'bg-primary text-primary-foreground'
+                  : i === step
+                    ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
                     : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {i + 1}
-              </div>
-              <span
-                className={`hidden text-sm font-medium sm:block ${
-                  i <= step ? 'text-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {s.label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className={`mx-2 h-px w-8 ${i < step ? 'bg-[#C08E3A]' : 'bg-border'}`} />
-              )}
+              }`}
+            >
+              {i < step ? <CheckCircle2 size={16} /> : i + 1}
             </div>
-          ))}
-        </div>
-      )}
+            <span
+              className={`hidden text-sm font-medium sm:block ${
+                i <= step ? 'text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              {s.label}
+            </span>
+            {i < STEPS.length - 1 && (
+              <div className={`mx-2 h-1 w-8 rounded-full transition-colors ${i < step ? 'bg-primary' : 'bg-border'}`} />
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Step 0 — Seleção de Médico */}
       {step === 0 && (
-        <Card className="border-0 shadow-xl">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Stethoscope size={20} className="text-[#C08E3A]" />
-              Escolha seu médico
-            </CardTitle>
+            <CardTitle>Escolha seu médico</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Todos os profissionais são especializados em medicina endocanabinóide.
+            </p>
           </CardHeader>
           <CardContent>
             {carregando ? (
               <div className="flex justify-center py-12">
-                <Loader2 size={32} className="animate-spin text-primary" />
+                <Loader2 size={28} className="animate-spin text-primary" />
+              </div>
+            ) : medicos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-sm font-medium">Nenhum médico disponível no momento</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Entre em contato conosco para mais informações
+                </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 {medicos.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => handleSelecionarMedico(m)}
-                    className="group flex w-full items-stretch gap-6 rounded-2xl border border-border/50 p-6 text-left transition-all duration-300 hover:border-[#C08E3A]/60 hover:shadow-xl hover:scale-[1.01]"
-                    style={{ transformOrigin: 'top center' }}
+                    disabled={!m.agendavel}
+                    aria-disabled={!m.agendavel}
+                    className={
+                      m.agendavel
+                        ? 'group flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03]'
+                        : 'flex min-w-0 cursor-not-allowed flex-col gap-3 rounded-xl border border-border/60 p-5 text-left opacity-60'
+                    }
                   >
-                    {/* Foto */}
-                    <div className="shrink-0">
+                    <div className="flex min-w-0 items-start gap-4">
                       {m.avatarUrl ? (
                         <img
                           src={m.avatarUrl}
                           alt={m.nome}
-                          className="h-28 w-28 rounded-xl object-cover transition-all duration-300 group-hover:h-32 group-hover:w-32"
+                          className="h-14 w-14 shrink-0 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:h-32 group-hover:w-32">
-                          <Stethoscope size={40} className="text-primary/60" />
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-semibold text-primary">
+                          {iniciaisDoNome(m.nome)}
                         </div>
                       )}
-                    </div>
 
-                    {/* Informações */}
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <h3 className="text-xl font-bold leading-tight">{m.nome}</h3>
-                      <p className="mt-1 text-sm font-semibold text-[#C08E3A]">{m.especialidade}</p>
-
-                      {m.bio && (
-                        <p className="mt-3 text-sm leading-relaxed text-justify text-muted-foreground transition-all duration-300 line-clamp-3 group-hover:line-clamp-none">
-                          {m.bio}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="truncate font-semibold leading-tight">{m.nome}</p>
+                          <ChevronRight
+                            size={16}
+                            className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs leading-snug font-medium text-primary/80">
+                          {m.especialidade}
                         </p>
-                      )}
-
-                      <div className="mt-auto pt-3 space-y-1">
-                        {m.valorConsulta !== null && (
-                          <p className="text-sm">
-                            <strong>Valor:</strong> {formatarValor(m.valorConsulta)}
-                          </p>
-                        )}
-                        <p className="text-sm font-semibold text-emerald-600">
-                          Médico parceiro da associação
-                        </p>
-                        {m.googleConectado && (
-                          <Badge className="mt-2 gap-1 bg-emerald-500/10 text-emerald-600 text-xs">
-                            <Video size={10} />
-                            Google Meet
-                          </Badge>
+                        {m.crm && (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{m.crm}</p>
                         )}
                       </div>
                     </div>
 
-                    <ChevronRight size={18} className="shrink-0 self-center text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-[#C08E3A]" />
+                    {m.bio && (
+                      <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                        {m.bio}
+                      </p>
+                    )}
+
+                    {m.valorConsulta !== null && (
+                      <p className="text-sm font-semibold text-primary">
+                        R$ {formatarValor(m.valorConsulta)} <span className="font-normal text-muted-foreground">/ consulta</span>
+                      </p>
+                    )}
+
+                    {!m.agendavel && (
+                      <p className="text-xs text-muted-foreground">
+                        Agendamento pelo site ainda indisponível para este médico. Escolha outro
+                        profissional ou fale com a clínica.
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -339,24 +453,49 @@ export function AgendamentoWizard() {
 
       {/* Step 1 — Data e Horário */}
       {step === 1 && medicoSelecionado && (
-        <Card className="border-0 shadow-xl">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays size={20} className="text-[#C08E3A]" />
-                Escolha data e horário
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1">
+              <CardTitle>Escolha data e horário</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1 text-xs">
                 <ChevronLeft size={14} />
                 Trocar médico
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Consulta com <strong>{medicoSelecionado.nome}</strong>, {medicoSelecionado.especialidade}
-            </p>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-8 md:grid-cols-2">
+            {/*
+              Uma única grade com as 3 partes lado a lado (médico | calendário | horários),
+              em vez de grades aninhadas com colunas de largura igual — isso deixava um vão
+              morto entre o calendário (mais estreito que sua coluna) e a coluna de horários.
+              `auto` faz o calendário ocupar só a largura que precisa; `1fr` faz os horários
+              começarem logo em seguida e usarem o resto do espaço.
+            */}
+            <div className="grid gap-8 md:grid-cols-[220px_auto_1fr] md:items-start">
+              {/* Resumo do médico selecionado */}
+              <div className="flex md:flex-col items-center gap-3 rounded-xl border border-border/60 p-4 md:items-start">
+                {medicoSelecionado.avatarUrl ? (
+                  <img
+                    src={medicoSelecionado.avatarUrl}
+                    alt={medicoSelecionado.nome}
+                    className="h-14 w-14 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-semibold text-primary">
+                    {iniciaisDoNome(medicoSelecionado.nome)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold leading-tight">{medicoSelecionado.nome}</p>
+                  <p className="text-xs text-muted-foreground">{medicoSelecionado.especialidade}</p>
+                  {medicoSelecionado.valorConsulta !== null && (
+                    <p className="mt-1 text-sm font-semibold text-primary">
+                      R$ {formatarValor(medicoSelecionado.valorConsulta)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Calendário */}
               <div>
                 <Calendar
@@ -371,93 +510,138 @@ export function AgendamentoWizard() {
                   }}
                   className="rounded-xl border"
                 />
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Info size={12} />
+                  Horários exibidos no fuso de Brasília
+                </p>
               </div>
 
               {/* Horários */}
-              <div>
+              <div className="md:min-w-[240px]">
                 {!dataSelecionada ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Clock size={32} className="mb-2 text-muted-foreground" />
+                    <Clock size={28} className="mb-2 text-muted-foreground/50" />
                     <p className="text-sm text-muted-foreground">
                       Selecione uma data para ver os horários disponíveis
                     </p>
                   </div>
                 ) : carregandoHorarios ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 size={24} className="animate-spin text-primary" />
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 size={22} className="animate-spin text-primary" />
                   </div>
                 ) : horariosLivres.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum horário disponível nesta data
+                    <CalendarDays size={28} className="mb-2 text-muted-foreground/40" />
+                    <p className="text-sm font-medium">Nenhum horário disponível nesta data</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Tente escolher outro dia no calendário
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="mb-3 text-sm font-medium">
+                    <p className="mb-4 text-sm font-medium">
                       {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
+                      <span className="ml-1.5 font-normal text-muted-foreground">
+                        — {horariosLivres.length}{' '}
+                        {horariosLivres.length === 1
+                          ? 'horário disponível'
+                          : 'horários disponíveis'}
+                      </span>
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {horariosLivres.map((h) => (
-                        <button
-                          key={h}
-                          onClick={() => setHorarioSelecionado(h)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
-                            horarioSelecionado === h
-                              ? 'border-[#C08E3A] bg-[#C08E3A] text-white'
-                              : 'border-border hover:border-[#C08E3A]/50'
-                          }`}
-                        >
-                          {h}
-                        </button>
-                      ))}
-                    </div>
+
+                    {agruparHorariosPorPeriodo(horariosLivres).map((grupo) => (
+                      <div key={grupo.label} className="mb-5">
+                        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <grupo.icon size={13} />
+                          {grupo.label}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {grupo.horarios.map((h) => (
+                            <button
+                              key={h}
+                              onClick={() => setHorarioSelecionado(h)}
+                              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                horarioSelecionado === h
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border hover:border-primary/40'
+                              }`}
+                            >
+                              {h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
 
                     {horarioSelecionado && (
-                      <div className="mt-6">
+                      <div className="mb-5">
                         <Textarea
                           value={observacoes}
                           onChange={(e) => setObservacoes(e.target.value)}
                           placeholder="Observações para o médico (opcional)"
-                          className="min-h-[80px]"
+                          className="min-h-[72px]"
                         />
                         <Button
-                          onClick={() => setStep(2)}
-                          className="mt-4 w-full gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+                          onClick={handleReservar}
+                          disabled={reservando}
+                          className="mt-4 w-full gap-2"
                         >
+                          {reservando ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
                           Continuar
-                          <ChevronRight size={14} />
                         </Button>
                       </div>
                     )}
                   </div>
                 )}
+
+                <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-muted/40 p-3.5">
+                  <Video size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Consulta por videochamada, com duração aproximada de 1 hora. Você pode
+                    trocar de médico ou data a qualquer momento antes de reservar o horário.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 2 — Confirmação */}
-      {step === 2 && medicoSelecionado && dataSelecionada && horarioSelecionado && (
-        <Card className="border-0 shadow-xl">
+      {/* Step 2 — Confirmação da reserva (dentro do prazo) */}
+      {step === 2 && medicoSelecionado && dataSelecionada && horarioSelecionado && reserva && (
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle2 size={20} className="text-[#C08E3A]" />
-              Confirme sua consulta
-            </CardTitle>
+            <CardTitle>Confirme sua reserva</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Revise os dados abaixo antes de continuar para o pagamento.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Resumo */}
-            <div className="rounded-xl border border-border/50 p-6 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Médico</span>
-                <span className="font-medium">{medicoSelecionado.nome}</span>
+          <CardContent className="space-y-5">
+            <div className="rounded-xl border border-border/60 p-5 space-y-3">
+              <div className="flex items-center gap-3 border-b border-border/60 pb-3">
+                {medicoSelecionado.avatarUrl ? (
+                  <img
+                    src={medicoSelecionado.avatarUrl}
+                    alt={medicoSelecionado.nome}
+                    className="h-11 w-11 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    {iniciaisDoNome(medicoSelecionado.nome)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{medicoSelecionado.nome}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {medicoSelecionado.especialidade}
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Especialidade</span>
-                <span className="font-medium">{medicoSelecionado.especialidade}</span>
-              </div>
+
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Data</span>
                 <span className="font-medium">
@@ -468,65 +652,80 @@ export function AgendamentoWizard() {
                 <span className="text-muted-foreground">Horário</span>
                 <span className="font-medium">{horarioSelecionado}</span>
               </div>
+              {reserva.valor !== null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Valor</span>
+                  <span className="font-medium">
+                    {reserva.moeda} {formatarValor(reserva.valor)}
+                  </span>
+                </div>
+              )}
               {observacoes && (
-                <div className="border-t pt-3">
+                <div className="border-t border-border/60 pt-2.5">
                   <span className="text-sm text-muted-foreground">Observações</span>
                   <p className="mt-1 text-sm">{observacoes}</p>
                 </div>
               )}
             </div>
 
-            {/* Ação */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-400">
+                <Clock size={14} />
+                Horário reservado até{' '}
+                {new Date(reserva.expiraEm).toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+              <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-400/70">
+                Ninguém mais pode reservar este horário enquanto o prazo não expira. Se o prazo
+                passar sem pagamento, o horário é liberado automaticamente.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+              <p>
+                Cancelamentos podem ser feitos a qualquer momento antes da consulta pela área de
+                agendamento. O pagamento só é confirmado após a conclusão da etapa seguinte.
+              </p>
+            </div>
+
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep(1)} className="gap-1">
                 <ChevronLeft size={14} />
                 Voltar
               </Button>
               <Button
-                onClick={handleConfirmar}
-                disabled={agendando}
-                className="flex-1 gap-2 bg-[#C08E3A] hover:bg-[#a8762f]"
+                onClick={handleContinuarParaPagamento}
+                disabled={avancandoPagamento}
+                className="flex-1 gap-2"
               >
-                {agendando ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={16} />
-                )}
-                {agendando ? 'Agendando...' : 'Confirmar Agendamento'}
+                {avancandoPagamento && <Loader2 size={16} className="animate-spin" />}
+                {avancandoPagamento ? 'Avançando...' : 'Continuar para pagamento'}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 3 — Sucesso */}
-      {step === 3 && resultado && (
-        <Card className="border-0 shadow-xl">
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
-              <CheckCircle2 size={40} className="text-emerald-600" />
-            </div>
-            <h2 className="text-2xl font-bold">Consulta agendada!</h2>
-            <p className="mt-3 max-w-md text-muted-foreground">
-              Sua consulta foi agendada com sucesso. Você receberá um e-mail de confirmação
-              com os detalhes e o link do Google Meet.
-            </p>
-            {resultado.meetLink && (
-              <a
-                href={resultado.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6"
-              >
-                <Button className="gap-2 bg-[#C08E3A] hover:bg-[#a8762f]">
-                  <Video size={16} />
-                  Acessar Google Meet
-                </Button>
-              </a>
-            )}
-          </CardContent>
-        </Card>
+      {/* Step 3 — Pagamento: Payment Brick do Mercado Pago (Parte 2, Fase 5) */}
+      {step === 3 && reserva && medicoSelecionado && dataHoraReserva && (
+        <AgendamentoPagamentoStep
+          consultaId={reserva.consultaId}
+          publicKey={publicKeyMercadoPago}
+          onConfirmado={handlePagamentoConfirmado}
+          medicoNome={medicoSelecionado.nome}
+          dataHora={dataHoraReserva}
+          valor={reserva.valor}
+          moeda={reserva.moeda}
+          expiraEm={reserva.expiraEm}
+          onExpirar={handleReservaExpirada}
+        />
       )}
+
+      {/* Histórico/resumo — sempre visível, independente da etapa atual */}
+      <AgendamentoHistorico items={historico} />
     </div>
   );
 }

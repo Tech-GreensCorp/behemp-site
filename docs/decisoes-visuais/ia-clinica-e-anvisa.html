@@ -1,0 +1,831 @@
+<title>IA Clínica e ANVISA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+  /* ─────────────────────────────────────────────────────────────────────
+     Paleta: papel de laudo. Ground levemente esverdeado, tinta quase-preta
+     com viés verde, acento em verde-petróleo — autoridade clínica sem o
+     verde-folha óbvio de cannabis. Semânticos separados do acento.
+     ───────────────────────────────────────────────────────────────────── */
+  :root {
+    --ground: #f7f8f6;
+    --surface: #ffffff;
+    --surface-sunk: #eef1ed;
+    --ink: #16211c;
+    --ink-soft: #46534d;
+    --ink-mute: #6b7873;
+    --rule: #d7ddd8;
+    --rule-strong: #b9c2bc;
+
+    --accent: #1f4d3f;
+    --accent-soft: #e4ede8;
+    --accent-line: #9cbfb0;
+
+    --risk: #8e2c2c;
+    --risk-soft: #f7e7e5;
+    --warn: #8a5314;
+    --warn-soft: #f9eddd;
+    --done: #2f6b4f;
+    --done-soft: #e6f0e8;
+
+    --shadow: 0 1px 2px rgba(22, 33, 28, 0.04), 0 8px 24px -16px rgba(22, 33, 28, 0.18);
+  }
+
+  /* Dark por preferência do sistema. Guardado com :not([data-theme='light']) para que uma
+     escolha explícita de tema claro vença um SO escuro. @media externa (não aninhada) para
+     não depender de CSS nesting. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ground: #0f1513;
+      --surface: #161e1a;
+      --surface-sunk: #1c2621;
+      --ink: #e7ede9;
+      --ink-soft: #b3c0b9;
+      --ink-mute: #879690;
+      --rule: #2a352f;
+      --rule-strong: #3c4a43;
+
+      --accent: #6fb595;
+      --accent-soft: #1a2b24;
+      --accent-line: #34564a;
+
+      --risk: #e08a80;
+      --risk-soft: #2c1a19;
+      --warn: #d9a05a;
+      --warn-soft: #2a2016;
+      --done: #7dbb99;
+      --done-soft: #17251d;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --ground: #0f1513;
+    --surface: #161e1a;
+    --surface-sunk: #1c2621;
+    --ink: #e7ede9;
+    --ink-soft: #b3c0b9;
+    --ink-mute: #879690;
+    --rule: #2a352f;
+    --rule-strong: #3c4a43;
+
+    --accent: #6fb595;
+    --accent-soft: #1a2b24;
+    --accent-line: #34564a;
+
+    --risk: #e08a80;
+    --risk-soft: #2c1a19;
+    --warn: #d9a05a;
+    --warn-soft: #2a2016;
+    --done: #7dbb99;
+    --done-soft: #17251d;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'Public Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2.5rem) 6rem;
+  }
+
+  /* Coluna de leitura estreita; figuras e fichas podem exceder. */
+  .prose { max-width: 40rem; }
+
+  h1, h2, h3 {
+    font-family: 'Newsreader', ui-serif, Georgia, serif;
+    font-weight: 500;
+    text-wrap: balance;
+    letter-spacing: -0.011em;
+    margin: 0;
+  }
+
+  h1 { font-size: clamp(2.1rem, 5.2vw, 3.1rem); line-height: 1.1; }
+  h2 { font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; }
+  h3 { font-size: 1.16rem; line-height: 1.3; font-weight: 600; }
+
+  p { margin: 0 0 1.05em; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  code, .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--surface-sunk);
+    padding: 0.12em 0.36em;
+    border-radius: 3px;
+  }
+
+  /* ── Cabeçalho ─────────────────────────────────────────────────────── */
+  header.doc {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 2.4rem;
+    margin-bottom: 3rem;
+  }
+  header.doc h1 { margin: 0.7rem 0 1.2rem; }
+  .lede {
+    font-family: 'Newsreader', ui-serif, Georgia, serif;
+    font-size: clamp(1.14rem, 2.3vw, 1.32rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 36rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.6rem;
+    margin-top: 1.8rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.74rem;
+    color: var(--ink-mute);
+  }
+
+  section { margin-top: 3.6rem; }
+  section > h2 { margin-bottom: 0.5rem; }
+  .section-sub { color: var(--ink-mute); margin-bottom: 2rem; max-width: 40rem; }
+
+  /* ── Ficha de decisão ──────────────────────────────────────────────── */
+  .fichas { display: flex; flex-direction: column; gap: 1.6rem; }
+
+  .ficha {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  /* A faixa esquerda codifica a gravidade — não é ornamento. */
+  .ficha { border-left: 3px solid var(--rule-strong); }
+  .ficha[data-grau='alto'] { border-left-color: var(--risk); }
+  .ficha[data-grau='medio'] { border-left-color: var(--warn); }
+  .ficha[data-grau='baixo'] { border-left-color: var(--accent); }
+
+  .ficha-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+    padding: 1.3rem 1.5rem 0;
+  }
+  .ficha-num {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-mute);
+  }
+  .ficha h3 { flex: 1 1 18rem; }
+
+  .selo {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.24rem 0.5rem;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .selo[data-t='risco'] { background: var(--risk-soft); color: var(--risk); }
+  .selo[data-t='pendente'] { background: var(--warn-soft); color: var(--warn); }
+  .selo[data-t='feito'] { background: var(--done-soft); color: var(--done); }
+
+  .ficha-corpo { padding: 1rem 1.5rem 1.5rem; }
+  .ficha-corpo > p:last-child { margin-bottom: 0; }
+  .ficha-corpo p { max-width: 44rem; }
+
+  .quem {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.86rem;
+    color: var(--ink-mute);
+  }
+  .quem b { color: var(--ink); font-weight: 600; }
+
+  /* ── Caminhos (se sim / se não) ────────────────────────────────────── */
+  .caminhos {
+    display: grid;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin: 1.2rem 0 0;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 40rem) { .caminhos { grid-template-columns: 1fr 1fr; } }
+  .caminho { background: var(--surface); padding: 1rem 1.15rem; }
+  .caminho .rot {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.45rem;
+  }
+  .caminho[data-v='a'] .rot { color: var(--accent); }
+  .caminho[data-v='b'] .rot { color: var(--risk); }
+  .caminho p { margin: 0; font-size: 0.94rem; color: var(--ink-soft); }
+
+  /* ── Figuras ───────────────────────────────────────────────────────── */
+  figure {
+    margin: 2.4rem 0;
+    padding: 0;
+  }
+  .fig-canvas {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.4rem 1rem;
+    overflow-x: auto;
+  }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; color: var(--ink-soft); }
+  figcaption {
+    margin-top: 0.85rem;
+    font-size: 0.88rem;
+    color: var(--ink-mute);
+    max-width: 44rem;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ── Destaque de tese ──────────────────────────────────────────────── */
+  .tese {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 4px;
+    padding: 1.5rem 1.6rem;
+    margin: 2.2rem 0;
+  }
+  .tese p { margin: 0; max-width: 42rem; }
+  .tese p + p { margin-top: 0.9rem; }
+  .tese .eyebrow { color: var(--accent); margin-bottom: 0.6rem; display: block; }
+
+  /* ── Citação de norma ──────────────────────────────────────────────── */
+  blockquote.norma {
+    margin: 1.4rem 0;
+    padding: 0 0 0 1.1rem;
+    border-left: 2px solid var(--accent-line);
+    font-family: 'Newsreader', ui-serif, Georgia, serif;
+    font-size: 1.04rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 40rem;
+  }
+  blockquote.norma cite {
+    display: block;
+    margin-top: 0.5rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.74rem;
+    font-style: normal;
+    color: var(--ink-mute);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Tabela ────────────────────────────────────────────────────────── */
+  .tabela-wrap { overflow-x: auto; margin: 1.6rem 0; }
+  table {
+    width: 100%;
+    min-width: 34rem;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.68rem 0.9rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    border-bottom-color: var(--rule-strong);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── Lista de tela ─────────────────────────────────────────────────── */
+  .regras { list-style: none; padding: 0; margin: 1.4rem 0 0; display: flex; flex-direction: column; gap: 0.9rem; }
+  .regras li {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.7rem;
+    align-items: start;
+    font-size: 0.96rem;
+  }
+  .regras .marca {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    font-weight: 700;
+  }
+  .regras li[data-ok='sim'] .marca { color: var(--done); }
+  .regras li[data-ok='nao'] .marca { color: var(--risk); }
+  .regras b { font-weight: 600; }
+
+  footer.doc {
+    margin-top: 4.5rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.88rem;
+    color: var(--ink-mute);
+    max-width: 44rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="doc">
+    <span class="eyebrow">Decisão de produto · Be4Hope / BeHemp</span>
+    <h1>IA Clínica e ANVISA</h1>
+    <p class="lede">
+      Três decisões que precisam de resposta antes de ligar o motor de IA — e uma delas muda o
+      desenho das telas que estamos construindo agora.
+    </p>
+    <div class="meta">
+      <span>20 · 08 · 2026</span>
+      <span>Metade 1 · telas sem motor</span>
+      <span>Fontes lidas: CFM 2.314/2022 · ANVISA RDC 657/2022</span>
+    </div>
+  </header>
+
+  <div class="prose">
+    <p>
+      Enquanto construíamos a anamnese, fui buscar as normas que ainda não tinham sido lidas. Duas
+      coisas apareceram, e as duas mudam decisões que já tomamos. Este documento existe para você
+      decidir sobre elas — e, onde a decisão for de outra pessoa, para você poder levar o problema
+      pronto.
+    </p>
+    <p>
+      A parte mais importante não é regulatória, é de desenho: <strong>a tela é o que prova que a
+      decisão foi humana.</strong> Isso liga o que você me pediu sobre a IA — três hipóteses,
+      confirmação humana em toda ação — diretamente ao risco regulatório do produto. Explico na
+      segunda metade.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>O que você precisa decidir</h2>
+    <p class="section-sub">
+      Em ordem de gravidade. A primeira decide se a Metade 2 existe como planejada; a segunda é
+      requisito de norma para algo que já está no ar; a terceira é operacional.
+    </p>
+
+    <div class="fichas">
+
+      <!-- ── 1 ── -->
+      <article class="ficha" data-grau="alto">
+        <div class="ficha-topo">
+          <span class="ficha-num">01</span>
+          <h3>O módulo de IA clínica é um dispositivo médico?</h3>
+          <span class="selo" data-t="risco">decide a Metade 2</span>
+        </div>
+        <div class="ficha-corpo">
+          <p>
+            A ANVISA regula software como dispositivo médico. O que você descreveu — dar o
+            diagnóstico direcionado ao canabidiol, recomendar o medicamento, ranquear três hipóteses
+            — tem finalidade clínica diagnóstica <em>e</em> terapêutica. Nenhuma das exclusões da
+            norma cobre isso.
+          </p>
+
+          <blockquote class="norma">
+            Não são abrangidos os softwares “para bem-estar”, os de “gerenciamento administrativo e
+            financeiro”, e os que processam dados “sem qualquer finalidade clínica diagnóstica ou
+            terapêutica”.
+            <cite>RDC 657/2022, Art. 1º § 2º — as três exclusões que não nos servem</cite>
+          </blockquote>
+
+          <p>
+            Se for dispositivo médico, precisa de <strong>regularização antes do uso clínico</strong>
+            — notificação ou registro, conforme a classe de risco. Isso tem prazo, e prazo entra no
+            cronograma.
+          </p>
+
+          <div class="caminhos">
+            <div class="caminho" data-v="a">
+              <span class="rot">O que joga a favor</span>
+              <p>
+                Hoje não há risco em operação: o motor não está ligado, e tela sem motor não tem
+                finalidade diagnóstica ativa. A ordem que escolhemos — telas primeiro — deu essa
+                folga sem querer.
+              </p>
+            </div>
+            <div class="caminho" data-v="b">
+              <span class="rot">O que não pode acontecer</span>
+              <p>
+                Ligar o motor e atender paciente antes dessa resposta. Aí o produto estaria operando
+                como dispositivo médico não regularizado, com o atendimento já acontecendo.
+              </p>
+            </div>
+          </div>
+
+          <div class="quem">
+            <span><b>Quem decide:</b> Assuntos Regulatórios</span>
+            <span><b>Quando:</b> antes da Metade 2</span>
+            <span><b>Falta ler:</b> RDC 185/2001, que define as classes</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ── 2 ── -->
+      <article class="ficha" data-grau="medio">
+        <div class="ficha-topo">
+          <span class="ficha-num">02</span>
+          <h3>O consentimento de teleconsulta, que a CFM exige e nós não temos</h3>
+          <span class="selo" data-t="pendente">requisito de norma</span>
+        </div>
+        <div class="ficha-corpo">
+          <p>
+            Aqui eu errei, e a correção é sua a favor. Quando argumentei que a consulta não devia ser
+            bloqueada pelo consentimento, olhei <strong>só a LGPD</strong>. A norma do CFM diz o
+            contrário:
+          </p>
+
+          <blockquote class="norma">
+            O paciente ou seu representante legal <strong>deverá autorizar</strong> o atendimento por
+            telemedicina e a transmissão das suas imagens e dados por meio de consentimento livre e
+            esclarecido, devendo fazer parte do prontuário do paciente.
+            <cite>CFM 2.314/2022, Art. 15</cite>
+          </blockquote>
+
+          <p>
+            Base legal dispensa consentimento como fundamento para <em>tratar o dado</em>. Não
+            dispensa norma ética que exige autorização para o <em>ato</em>. As duas valem — e sua
+            intuição de bloquear estava certa, só era sobre outro consentimento.
+          </p>
+
+          <div class="caminhos">
+            <div class="caminho" data-v="a">
+              <span class="rot">Consentimento 1 — falta</span>
+              <p>
+                <b>Atendimento por telemedicina.</b> Exigido pela CFM. Bloqueia a entrada na sala, e
+                o aceite precisa ir ao prontuário.
+              </p>
+            </div>
+            <div class="caminho" data-v="b">
+              <span class="rot">Consentimento 2 — feito hoje</span>
+              <p>
+                <b>Transcrição e IA.</b> Exigido pela LGPD, porque o áudio sai para o Google e o
+                texto para o Gemini. Bloqueia só a IA.
+              </p>
+            </div>
+          </div>
+
+          <div class="quem">
+            <span><b>Quem decide:</b> você, com o texto do Jurídico</span>
+            <span><b>Quanto custa:</b> uma tela — reuso o que já fiz</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ── 3 ── -->
+      <article class="ficha" data-grau="baixo">
+        <div class="ficha-topo">
+          <span class="ficha-num">03</span>
+          <h3>Quando aplicar as duas migrations que estão prontas</h3>
+          <span class="selo" data-t="pendente">operacional</span>
+        </div>
+        <div class="ficha-corpo">
+          <p>
+            Geradas e não aplicadas, como você pediu. Sem elas o código novo compila e
+            <strong>não grava</strong>: as colunas do consentimento e as tabelas da anamnese não
+            existem no banco. As duas são aditivas — só criam coisa nova, nada é alterado nem
+            removido.
+          </p>
+          <div class="quem">
+            <span><b>Quem decide:</b> você</span>
+            <span><b>Risco:</b> baixo, mas <code>db:migrate</code> não tem rollback</span>
+            <span><b>Antes:</b> ensaiar em cópia do banco</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Por que isso chega até a tela</h2>
+    <p class="section-sub">
+      Esta é a parte que liga a decisão regulatória ao que estamos desenhando agora.
+    </p>
+
+    <div class="tese">
+      <span class="eyebrow">A tese deste documento</span>
+      <p>
+        No enquadramento de risco de software médico, o que pesa não é só <em>o que o sistema
+        calcula</em> — é <strong>o que ele faz com o resultado</strong>. Software que
+        <strong>informa</strong> um profissional, que então decide, é tratado de forma diferente de
+        software que <strong>dirige</strong> a conduta.
+      </p>
+      <p>
+        Isso significa que a confirmação humana que você exigiu não é só ética e não é só boa
+        interface. <strong>É o argumento regulatório</strong> — e a tela é onde ele fica visível ou
+        desaparece.
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-canvas">
+        <svg viewBox="0 0 760 300" role="img" aria-label="Duas versões da mesma tela: à esquerda, a IA apresenta um medicamento recomendado com botão de prescrever, e a decisão do sistema chega direto ao prontuário. À direita, a IA apresenta três hipóteses com evidência, o médico escolhe e registra, e só então o prontuário recebe o registro assinado por ele.">
+          <defs>
+            <marker id="pt-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f4d3f"/>
+            </marker>
+            <marker id="pt-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8e2c2c"/>
+            </marker>
+          </defs>
+
+          <!-- ─── coluna esquerda: DIRIGE ─── -->
+          <text x="14" y="20" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#8e2c2c" letter-spacing="1">A TELA QUE DIRIGE</text>
+
+          <rect x="14" y="34" width="300" height="88" rx="3" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="28" y="56" font-family="Public Sans, sans-serif" font-size="12" font-weight="600" fill="currentColor">Medicamento recomendado</text>
+          <text x="28" y="76" font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">CBD 200 mg/mL · 8 gotas/dia</text>
+          <rect x="28" y="88" width="104" height="22" rx="3" fill="#8e2c2c"/>
+          <text x="80" y="103" font-family="Public Sans, sans-serif" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">Prescrever</text>
+          <text x="146" y="103" font-family="Public Sans, sans-serif" font-size="10.5" fill="currentColor" opacity="0.75">um clique, sem registro</text>
+
+          <line x1="164" y1="122" x2="164" y2="196" stroke="#8e2c2c" stroke-width="1.5" marker-end="url(#pt-r)"/>
+          <text x="174" y="163" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#8e2c2c">a decisão é do sistema</text>
+
+          <rect x="14" y="200" width="300" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="164" y="226" font-family="Public Sans, sans-serif" font-size="12" fill="currentColor" text-anchor="middle">Prontuário</text>
+
+          <text x="14" y="268" font-family="Public Sans, sans-serif" font-size="11" font-weight="600" fill="#8e2c2c">Dirige a conduta.</text>
+          <text x="14" y="284" font-family="Public Sans, sans-serif" font-size="11" fill="currentColor" opacity="0.8">Nada na tela prova que houve juízo humano.</text>
+
+          <!-- divisor -->
+          <line x1="380" y1="14" x2="380" y2="290" stroke="currentColor" stroke-width="1" opacity="0.25"/>
+
+          <!-- ─── coluna direita: INFORMA ─── -->
+          <text x="404" y="20" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#1f4d3f" letter-spacing="1">A TELA QUE INFORMA</text>
+
+          <rect x="404" y="34" width="342" height="88" rx="3" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="418" y="52" font-family="Public Sans, sans-serif" font-size="11" font-weight="600" fill="currentColor">Três hipóteses, com a evidência de cada</text>
+
+          <circle cx="424" cy="68" r="3" fill="#1f4d3f"/>
+          <text x="434" y="72" font-family="Public Sans, sans-serif" font-size="11" fill="currentColor">1 · evidência alta · 4 achados a favor</text>
+          <circle cx="424" cy="86" r="3" fill="currentColor" opacity="0.5"/>
+          <text x="434" y="90" font-family="Public Sans, sans-serif" font-size="11" fill="currentColor">2 · evidência média · 2 a favor, 1 contra</text>
+          <circle cx="424" cy="104" r="3" fill="currentColor" opacity="0.3"/>
+          <text x="434" y="108" font-family="Public Sans, sans-serif" font-size="11" fill="currentColor">3 · evidência baixa · sinalizar incerteza</text>
+
+          <line x1="575" y1="122" x2="575" y2="150" stroke="#1f4d3f" stroke-width="1.5" marker-end="url(#pt-a)"/>
+
+          <rect x="404" y="152" width="342" height="44" rx="3" fill="#e4ede8" stroke="#1f4d3f" stroke-width="1.5"/>
+          <text x="575" y="170" font-family="Public Sans, sans-serif" font-size="12" font-weight="700" fill="#1f4d3f" text-anchor="middle">O médico escolhe, ou discorda</text>
+          <text x="575" y="186" font-family="Public Sans, sans-serif" font-size="10.5" fill="#1f4d3f" text-anchor="middle" opacity="0.85">e o que ele decidiu fica registrado com o nome dele</text>
+
+          <line x1="575" y1="196" x2="575" y2="222" stroke="#1f4d3f" stroke-width="1.5" marker-end="url(#pt-a)"/>
+
+          <rect x="404" y="226" width="342" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="575" y="252" font-family="Public Sans, sans-serif" font-size="12" fill="currentColor" text-anchor="middle">Prontuário — assinado por quem decidiu</text>
+
+          <text x="404" y="288" font-family="Public Sans, sans-serif" font-size="11" font-weight="600" fill="#1f4d3f">Informa a decisão. O juízo humano fica no registro.</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>A mesma IA, dois desenhos de tela, consequências diferentes.</b> À esquerda, o sistema
+        entrega uma conclusão e um botão — a tela não registra que alguém pensou. À direita, entrega
+        três hipóteses com a evidência de cada, e o passo do meio é obrigatório: o médico escolhe ou
+        discorda, e a escolha vai ao prontuário com o nome dele. O cálculo é o mesmo nas duas; o que
+        muda é onde a decisão acontece — e é isso que o enquadramento de risco observa.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>O fluxo que você descreveu, desenhado</h2>
+    <p class="section-sub">
+      Cada seta é um passo real. As duas em destaque são as que não podem ser puladas, e é onde a
+      norma incide.
+    </p>
+
+    <figure>
+      <div class="fig-canvas">
+        <svg viewBox="0 0 760 340" role="img" aria-label="Fluxo em cinco etapas: anamnese com rastreio do uso de cannabis alimenta o motor, que devolve três hipóteses e uma recomendação de medicamento; o médico confirma ou discorda, e só depois disso o resultado entra no prontuário e vira prescrição. Duas travas obrigatórias: consentimento antes de qualquer captura, e confirmação humana antes de qualquer registro.">
+          <defs>
+            <marker id="f1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="f2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f4d3f"/>
+            </marker>
+          </defs>
+
+          <!-- trava 1: consentimento -->
+          <rect x="16" y="16" width="180" height="52" rx="3" fill="#e4ede8" stroke="#1f4d3f" stroke-width="1.5"/>
+          <text x="106" y="37" font-family="Public Sans, sans-serif" font-size="11.5" font-weight="700" fill="#1f4d3f" text-anchor="middle">TRAVA 1 · consentimento</text>
+          <text x="106" y="54" font-family="Public Sans, sans-serif" font-size="10" fill="#1f4d3f" text-anchor="middle">CFM Art. 15 · antes de capturar nada</text>
+
+          <line x1="196" y1="42" x2="238" y2="42" stroke="#1f4d3f" stroke-width="1.5" marker-end="url(#f2)"/>
+
+          <!-- 1 anamnese -->
+          <rect x="242" y="16" width="196" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="340" y="37" font-family="Public Sans, sans-serif" font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">Anamnese</text>
+          <text x="340" y="54" font-family="Public Sans, sans-serif" font-size="10" fill="currentColor" text-anchor="middle" opacity="0.8">medidas + rastreio do uso</text>
+
+          <line x1="340" y1="68" x2="340" y2="96" stroke="currentColor" stroke-width="1.2" marker-end="url(#f1)"/>
+          <text x="350" y="86" font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.8">envia o que foi preenchido</text>
+
+          <!-- 2 motor -->
+          <rect x="242" y="100" width="196" height="64" rx="3" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+          <text x="340" y="122" font-family="Public Sans, sans-serif" font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">Motor de IA</text>
+          <text x="340" y="139" font-family="Public Sans, sans-serif" font-size="10" fill="currentColor" text-anchor="middle" opacity="0.8">3 hipóteses + medicamento sugerido</text>
+          <text x="340" y="154" font-family="JetBrains Mono, monospace" font-size="9.5" fill="currentColor" text-anchor="middle" opacity="0.6">ainda não ligado · Metade 2</text>
+
+          <!-- lateral: o que a norma chama isso -->
+          <line x1="438" y1="132" x2="492" y2="132" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+          <text x="500" y="128" font-family="Public Sans, sans-serif" font-size="10.5" fill="currentColor" opacity="0.85">finalidade clínica</text>
+          <text x="500" y="143" font-family="Public Sans, sans-serif" font-size="10.5" fill="currentColor" opacity="0.85">diagnóstica — é o que</text>
+          <text x="500" y="158" font-family="Public Sans, sans-serif" font-size="10.5" fill="currentColor" opacity="0.85">a RDC 657 alcança</text>
+
+          <line x1="340" y1="164" x2="340" y2="194" stroke="currentColor" stroke-width="1.2" marker-end="url(#f1)"/>
+
+          <!-- trava 2: HITL -->
+          <rect x="196" y="198" width="288" height="60" rx="3" fill="#e4ede8" stroke="#1f4d3f" stroke-width="2"/>
+          <text x="340" y="220" font-family="Public Sans, sans-serif" font-size="12" font-weight="700" fill="#1f4d3f" text-anchor="middle">TRAVA 2 · confirmação humana</text>
+          <text x="340" y="237" font-family="Public Sans, sans-serif" font-size="10" fill="#1f4d3f" text-anchor="middle">o médico valida, ajusta ou discorda</text>
+          <text x="340" y="251" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#1f4d3f" text-anchor="middle" opacity="0.8">CFM Art. 4º §2º · quem responde é quem decide</text>
+
+          <!-- discordância volta como dado -->
+          <path d="M 196 228 L 130 228 L 130 300 L 300 300" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#f1)"/>
+          <text x="120" y="278" font-family="Public Sans, sans-serif" font-size="10" fill="currentColor" text-anchor="start" opacity="0.85">discordância também</text>
+          <text x="120" y="292" font-family="Public Sans, sans-serif" font-size="10" fill="currentColor" text-anchor="start" opacity="0.85">é registrada</text>
+
+          <line x1="484" y1="228" x2="524" y2="228" stroke="#1f4d3f" stroke-width="1.5" marker-end="url(#f2)"/>
+
+          <!-- 3 prontuário -->
+          <rect x="528" y="198" width="216" height="60" rx="3" fill="none" stroke="currentColor" stroke-width="1"/>
+          <text x="636" y="220" font-family="Public Sans, sans-serif" font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">Prontuário e prescrição</text>
+          <text x="636" y="237" font-family="Public Sans, sans-serif" font-size="10" fill="currentColor" text-anchor="middle" opacity="0.8">com CRM, data, hora e assinatura</text>
+          <text x="636" y="251" font-family="JetBrains Mono, monospace" font-size="9.5" fill="currentColor" text-anchor="middle" opacity="0.6">CFM Art. 13 · e “por telemedicina”</text>
+
+          <text x="304" y="304" font-family="Public Sans, sans-serif" font-size="10.5" fill="currentColor" opacity="0.9">alimenta a próxima análise — divergência é dado, não erro</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>Nada chega ao prontuário sem passar pela Trava 2.</b> É o desenho que você descreveu — a
+        IA ajuda, nunca substitui — e é também o que a CFM exige, no artigo que liga autonomia a
+        responsabilidade: quem responde pelo ato é quem decide. A seta pontilhada de volta é a parte
+        que quase todo sistema esquece: quando o médico <em>discorda</em>, isso é informação sobre a
+        qualidade do modelo, e vale mais que uma concordância.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>O que muda nas telas que estou construindo</h2>
+    <p class="section-sub">
+      Consequência prática, tela por tela. Nada disso depende do motor — é desenho, e dá para fazer
+      agora.
+    </p>
+
+    <h3 style="margin-top:2rem">Anamnese</h3>
+    <ul class="regras">
+      <li data-ok="sim"><span class="marca">✓</span><span><b>Já está assim:</b> o rastreio do uso de cannabis é o ponto de partida da titulação — produto, dose, tempo de uso, resposta e adesão. E o primeiro uso é caminho próprio, não o “não” de uma pergunta.</span></li>
+      <li data-ok="sim"><span class="marca">✓</span><span><b>Já está assim:</b> o lugar da IA existe na tela, com estado vazio explicando o que virá — e <em>sem botão que não faz nada</em>, porque botão inerte ensina o médico a não confiar na interface.</span></li>
+      <li data-ok="nao"><span class="marca">→</span><span><b>Vai precisar:</b> quando o motor ligar, a área da IA mostra as três hipóteses com a evidência de cada, e cada achado diz de onde saiu — relato do paciente, registro anterior, ou inferência do modelo. Sem essa distinção, sugestão e fato aparecem iguais.</span></li>
+      <li data-ok="nao"><span class="marca">→</span><span><b>Vai precisar:</b> o campo onde o médico registra o que decidiu, e o que ele decidiu <em>diferente</em>. É a Trava 2 na anamnese.</span></li>
+    </ul>
+
+    <h3 style="margin-top:2.4rem">Teleconsulta</h3>
+    <ul class="regras">
+      <li data-ok="sim"><span class="marca">✓</span><span><b>Já está assim:</b> o consentimento da IA, nas duas pontas, com botão grande e o efeito da recusa dito antes da escolha.</span></li>
+      <li data-ok="nao"><span class="marca">→</span><span><b>Falta:</b> o consentimento de <em>teleconsulta</em> — decisão 02 acima. Tela própria, antes de entrar na sala, e o aceite vai ao prontuário.</span></li>
+      <li data-ok="nao"><span class="marca">→</span><span><b>Vai precisar:</b> quando a IA sugerir conduta durante a consulta, a sugestão aparece como sugestão — rotulada, com a evidência ao lado, e sem caminho de um clique até a prescrição.</span></li>
+      <li data-ok="nao"><span class="marca">→</span><span><b>Vai precisar:</b> a prescrição gerada na teleconsulta registra o que a CFM lista: CRM e endereço do médico, dados e local do paciente, data e hora, assinatura ICP-Brasil, <em>e que foi emitida em modalidade de telemedicina</em>. O último é o que se esquece.</span></li>
+    </ul>
+
+    <div class="tese" style="margin-top:2.6rem">
+      <span class="eyebrow">A regra de desenho que sai de tudo isso</span>
+      <p>
+        <strong>Nenhuma saída do modelo chega ao prontuário sem um ato humano registrado.</strong>
+        Não é uma preferência de interface — é o que sustenta o argumento de que o sistema informa em
+        vez de dirigir. Toda tela nova de IA clínica passa por esse teste antes de existir.
+      </p>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Onde cada norma incide</h2>
+    <p class="section-sub">
+      Só o que foi <strong>lido em fonte primária</strong>. O que ainda não foi lido está marcado
+      como tal — norma citada de memória é pior que norma ausente.
+    </p>
+
+    <div class="tabela-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Norma</th>
+            <th>O que ela governa aqui</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">CFM&nbsp;2.314/2022</td>
+            <td>Telemedicina: consentimento, autonomia, prontuário, o que uma prescrição a distância precisa ter</td>
+            <td><span class="selo" data-t="feito">lida</span></td>
+          </tr>
+          <tr>
+            <td class="mono">ANVISA&nbsp;RDC&nbsp;657/2022</td>
+            <td>Se o software é dispositivo médico, e o que está fora do escopo</td>
+            <td><span class="selo" data-t="feito">lida</span></td>
+          </tr>
+          <tr>
+            <td class="mono">LGPD&nbsp;art.&nbsp;11</td>
+            <td>Base legal para tratar dado de saúde; consentimento para o que sai à IA</td>
+            <td><span class="selo" data-t="feito">lida</span></td>
+          </tr>
+          <tr>
+            <td class="mono">ANVISA&nbsp;RDC&nbsp;185/2001</td>
+            <td>As classes de risco — decide se é notificação ou registro</td>
+            <td><span class="selo" data-t="pendente">não lida</span></td>
+          </tr>
+          <tr>
+            <td class="mono">CFM&nbsp;2.299/2021</td>
+            <td>Documento médico eletrônico e assinatura digital — vale para o receituário</td>
+            <td><span class="selo" data-t="pendente">só a ementa</span></td>
+          </tr>
+          <tr>
+            <td class="mono">RDC&nbsp;327 · 660 · 1.000</td>
+            <td>Produtos de cannabis, importação e receituário</td>
+            <td><span class="selo" data-t="pendente">não lidas</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p>
+        Uma observação sobre método, porque foi ela que produziu o achado 01. O plano citava a CFM
+        <strong>2.299/2021</strong> como a norma da teleconsulta. O objeto real dessa resolução é
+        <em>“emissão de documentos médicos eletrônicos”</em> — a telemedicina é a
+        <strong>2.314/2022</strong>, publicada depois. Conferir a ementa de uma norma antes de citá-la
+        como fundamento leva trinta segundos, e é a diferença entre fundamentar e supor.
+      </p>
+    </div>
+  </section>
+
+  <footer class="doc">
+    <p style="margin:0">
+      Documento de trabalho, escrito em 20 · 08 · 2026, ao fim da Sprint 3. As citações de norma vêm
+      do texto oficial — CFM em <span class="mono">sistemas.cfm.org.br</span>, ANVISA em
+      <span class="mono">anvisalegis.datalegis.net</span>. O enquadramento como dispositivo médico é
+      determinação de Assuntos Regulatórios: o que está aqui é a leitura do escopo e das exclusões,
+      não um parecer.
+    </p>
+  </footer>
+
+</div>

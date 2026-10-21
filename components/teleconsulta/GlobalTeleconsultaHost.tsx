@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getPusherClient } from "@/lib/integrations/pusher/client";
-import { registrarConsentimentoLgpd, encerrarTeleconsulta } from "@/app/(medico)/_actions/teleconsulta";
+import { encerrarTeleconsulta } from "@/app/(medico)/_actions/teleconsulta";
 import {
     Video, VideoOff, Mic, MicOff, PhoneOff,
-    Monitor, MonitorOff, RefreshCw, Brain, Minimize2,
+    Monitor, MonitorOff, Brain, Minimize2,
     FileText, User, Pill, VideoIcon
 } from "lucide-react";
 import { TeleconsultaPip } from '@/components/teleconsulta/TeleconsultaPip';
@@ -16,6 +16,9 @@ import { buscarDadosPainelTeleconsulta, type DadosPainelTeleconsulta } from '@/a
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useTeleconsulta } from "./TeleconsultaContext";
+import { buscarIceServers } from "@/lib/webrtc/ice-servers";
+import { Consentimento } from "@/components/teleconsulta/Consentimento";
+import { EsperaDaTeleconsulta } from "@/components/teleconsulta/EsperaDaTeleconsulta";
 
 const horaFmt = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -43,6 +46,8 @@ export function GlobalTeleconsultaHost() {
     const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
     const [micOn, setMicOn] = useState(true);
+    // A faixa do microfone em estado: a espera mede o nível dela, só neste aparelho (ADR-0029 D-30).
+    const [faixaDoMicrofone, setFaixaDoMicrofone] = useState<MediaStreamTrack | null>(null);
     const [camOn, setCamOn] = useState(true);
     const [screenSharing, setScreenSharing] = useState(false);
 
@@ -76,7 +81,11 @@ export function GlobalTeleconsultaHost() {
     const [showCopilot, setShowCopilot] = useState(false);
     const [transcricaoPronta, setTranscricaoPronta] = useState(false);
 
-    const [consentimentoTranscricao] = useState(true);
+    // 20/08/2026 — aqui havia `const [consentimentoTranscricao] = useState(true)`: flag fixa,
+    // sem setter e sem tela, que fazia a plataforma agir como se todos tivessem consentido.
+    // Item 11 de docs/04-LISTA-DE-AFAZERES.md, e o motivo da ADR-0007.
+    // Só grava áudio com os DOIS aceites registrados no banco, na versão atual do texto.
+    const consentimentoIaLiberadoRef = useRef(false);
     const audioChunksRef = useRef<Blob[]>([]);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
@@ -84,6 +93,7 @@ export function GlobalTeleconsultaHost() {
     // Callback estável: atribui stream ao <video> SEM disparar re-render desnecessário.
     const assignLocalStream = useCallback((stream: MediaStream) => {
         localStreamRef.current = stream;
+        setFaixaDoMicrofone(stream.getAudioTracks()[0] ?? null);
         if (localVideoRef.current && localVideoRef.current.srcObject !== stream) {
             localVideoRef.current.srcObject = stream;
             localVideoRef.current.play().catch(console.warn);
@@ -168,18 +178,21 @@ export function GlobalTeleconsultaHost() {
             return;
         }
 
+        // Sem sala não há canal nem credencial de retransmissão a pedir.
+        if (!roomId) {
+            toast.error('Sala não identificada.');
+            return;
+        }
+
         let stream = localStreamRef.current;
         if (!stream) {
             stream = await iniciarMidia();
         }
 
-        if (salaId && consentimentoTranscricao) {
-            try {
-                await registrarConsentimentoLgpd(salaId, consentimentoTranscricao);
-            } catch (err) {
-                console.error('[WebRTC][medico] Erro LGPD:', err);
-            }
-        }
+        // 20/08/2026 — o registro do consentimento saiu daqui (ADR-0007). Antes, esta função
+        // gravava `consentimentoLgpd: true` a partir de um `useState(true)`: a tela do MÉDICO
+        // "consentia" pelo paciente, e a falha era engolida enquanto o áudio seguia sendo gravado.
+        // Agora quem registra é o <Consentimento>, cada lado pelo seu papel.
 
         setPhase('connecting');
 
@@ -187,15 +200,14 @@ export function GlobalTeleconsultaHost() {
             const pusher = getPusherClient();
             const channel = pusher.subscribe(`presence-sala-${roomId}`);
 
-            const pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-                    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-                ],
-            });
+            // CORRIGIDO 20/08/2026 — Item 8 do 04. Havia relay gratuito de terceiro com
+            // credencial pública, e o MESMO array estava duplicado na página do paciente — foi
+            // por isso que o diagnóstico contou 1 ocorrência quando havia 2.
+            const config = await buscarIceServers(roomId);
+            if (!config.turnDisponivel) {
+                toast.warning('Sem servidor de retransmissão — se a conexão direta falhar, a chamada não completa.');
+            }
+            const pc = new RTCPeerConnection({ iceServers: config.iceServers });
             pcRef.current = pc;
 
             if (stream) {
@@ -207,7 +219,7 @@ export function GlobalTeleconsultaHost() {
                     setRemoteStream(event.streams[0]);
                     setRemoteConnected(true);
 
-                    if (consentimentoTranscricao && localStreamRef.current) {
+                    if (consentimentoIaLiberadoRef.current && localStreamRef.current) {
                         try {
                             const audioCtx = new window.AudioContext();
                             audioCtxRef.current = audioCtx;
@@ -309,7 +321,7 @@ export function GlobalTeleconsultaHost() {
             console.error('[Teleconsulta][medico] Erro ao iniciar sala:', err);
             toast.error('Erro ao iniciar a sala.');
         }
-    }, [roomId, salaId, consentimentoTranscricao, iniciarMidia, sinalizarWebRTC]);
+    }, [roomId, iniciarMidia, sinalizarWebRTC]);
 
     // 2.3 BEFOREUNLOAD GUARD (padrão VidAI)
     useEffect(() => {
@@ -363,7 +375,7 @@ export function GlobalTeleconsultaHost() {
 
     const encerrar = async () => {
         const mr = audioRecorderRef.current;
-        if (mr && mr.state !== "inactive" && consentimentoTranscricao && salaId) {
+        if (mr && mr.state !== "inactive" && consentimentoIaLiberadoRef.current && salaId) {
             mr.onstop = () => {
                 if (audioChunksRef.current.length === 0) return;
                 const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
@@ -525,29 +537,63 @@ export function GlobalTeleconsultaHost() {
 
                     {/* Estado de aguardando / Lobby — sobrepõe quando paciente não conectado */}
                     {!remoteConnected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-30">
+                        /* 🔴 O z-index É CONDICIONAL, E ISSO NÃO É DETALHE DE ESTILO.
+                         *
+                         * Em `lobby` este overlay É a tela: traz o card "Pronto para iniciar?",
+                         * o consentimento da ADR-0007 e o botão de iniciar. Ele precisa cobrir.
+                         *
+                         * Depois de iniciar, com o paciente ainda fora, ele vira FUNDO — e um
+                         * fundo não pode cobrir o que está na frente. Com `z-30` fixo ele
+                         * escondia o PiP da própria câmera do médico (`z-10`) e os botões de
+                         * Paciente / Prontuário / Prescrição / Copilot (`z-20`), que ficavam
+                         * renderizados e invisíveis atrás de um `bg-slate-900` opaco.
+                         *
+                         * Relatado pelo dono em 10/09/2026 como "a câmera não aparece, o sidebar
+                         * da esquerda também não" — os dois somem juntos porque a causa é uma só.
+                         */
+                        <div
+                            className={`absolute inset-0 flex items-center justify-center bg-slate-900 ${
+                                phase === 'lobby' ? 'z-30' : 'z-0'
+                            }`}
+                        >
                             {phase === "lobby" ? (
-                                <div className="flex flex-col items-center gap-6 text-center max-w-md p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
+                                <div className="flex flex-col items-center gap-6 text-center max-w-md max-h-[90vh] overflow-y-auto p-8 bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700 shadow-xl">
                                     <VideoIcon className="h-16 w-16 text-primary animate-pulse" />
                                     <div>
                                         <h2 className="text-xl font-bold text-white mb-2">Pronto para iniciar?</h2>
                                         <p className="text-slate-400 text-sm">A câmera e o microfone estão prontos. Ao iniciar, a sala será aberta para o paciente.</p>
                                     </div>
+                                    {/* ACRESCENTADO 20/08/2026 — ADR-0007. O médico também
+                                        consente: o áudio capta a voz dele, então ele é titular de
+                                        dado, não só operador. Sem os DOIS aceites não há
+                                        transcrição — mas a consulta acontece, e o botão abaixo
+                                        segue habilitado. */}
+                                    {salaId && (
+                                        <Consentimento
+                                            tipo="ia"
+                                            salaId={salaId}
+                                            papel="medico"
+                                            tom="escuro"
+                                            onMudanca={(liberado) => { consentimentoIaLiberadoRef.current = liberado; }}
+                                            className="w-full text-left"
+                                        />
+                                    )}
+
                                     <Button onClick={iniciarConsulta} size="lg" className="w-full text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
                                         Iniciar Teleconsulta
                                     </Button>
                                 </div>
-                            ) : phase === "connecting" ? (
-                                <div className="flex flex-col items-center gap-4 text-center">
-                                    <RefreshCw className="h-8 w-8 text-white/50 animate-spin" />
-                                    <p className="text-slate-400 text-sm">Conectando à sala...</p>
-                                </div>
                             ) : (
-                                <div className="flex flex-col items-center gap-4 text-center">
-                                    <VideoIcon className="h-10 w-10 text-slate-600" />
-                                    <p className="text-slate-400 text-sm">Aguardando paciente entrar na sala...</p>
-                                    <p className="text-slate-500 text-xs">O paciente foi notificado. Aguarde a conexão.</p>
-                                </div>
+                                /* ADR-0029 D-30 (01/10/2026): a espera do atendimento, no escuro.
+                                   Antes, "Conectando à sala..." com um ícone girando, e
+                                   "Aguardando paciente entrar na sala..." parado. */
+                                <EsperaDaTeleconsulta
+                                    quem="medico"
+                                    fase={phase === "connecting" ? "abrindo" : "aguardando"}
+                                    nomeDoOutro={dadosPainel?.paciente.nome}
+                                    microfone={faixaDoMicrofone}
+                                    mudo={!micOn}
+                                />
                             )}
                         </div>
                     )}

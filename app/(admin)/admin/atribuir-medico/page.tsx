@@ -22,8 +22,6 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowDownAZ,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   UserPlus,
   UserCheck,
@@ -40,6 +38,8 @@ import {
   reatribuirTodosPacientes,
 } from '@/app/_actions/admin-atribuicao';
 import { toast } from 'sonner';
+import { PaginationBar } from '@/components/shared/pagination-bar';
+import { PageHeader } from '@/components/shared/page-header';
 
 interface Paciente {
   pacienteId: string;
@@ -179,118 +179,115 @@ export default function AtribuirMedicoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold tracking-tight">Atribuir Médico</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Vincule pacientes sem médico responsável a um profissional
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
-            <AlertCircle className="h-3 w-3 text-amber-500" />
-            {statsSemMedico} sem médico
-          </Badge>
-          <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
-            <UserCheck className="h-3 w-3 text-emerald-500" />
-            {statsComMedico} atribuídos
-          </Badge>
+      <PageHeader
+        title="Atribuir Médico"
+        description="Vincule pacientes sem médico responsável a um profissional"
+        actions={
+          <>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
+              <AlertCircle className="h-3 w-3 text-amber-500" />
+              {statsSemMedico} sem médico
+            </Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-xs">
+              <UserCheck className="h-3 w-3 text-emerald-500" />
+              {statsComMedico} atribuídos
+            </Badge>
 
-          {/* Botão Reatribuir Todos com Dialog */}
-          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-            <DialogTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
-                />
-              }
-            >
-              <Users className="h-3.5 w-3.5" />
-              Reatribuir todos
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Reatribuir todos os pacientes</DialogTitle>
-                <DialogDescription>
-                  Todos os <strong>{statsSemMedico + statsComMedico}</strong> pacientes serão
-                  reatribuídos para o médico selecionado abaixo. Essa ação
-                  substitui qualquer atribuição anterior.
-                </DialogDescription>
-              </DialogHeader>
+            {/* Botão Reatribuir Todos com Dialog */}
+            <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+              <DialogTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-primary/30 text-primary hover:border-primary hover:bg-primary/5"
+                  />
+                }
+              >
+                <Users className="h-3.5 w-3.5" />
+                Reatribuir todos
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Reatribuir todos os pacientes</DialogTitle>
+                  <DialogDescription>
+                    Todos os <strong>{statsSemMedico + statsComMedico}</strong> pacientes serão
+                    reatribuídos para o médico selecionado abaixo. Essa ação
+                    substitui qualquer atribuição anterior.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Médico de destino</label>
-                  <Select
-                    onValueChange={(val: string | null) => setMedicoDestinoLote(val ?? '')}
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Médico de destino</label>
+                    <Select
+                      onValueChange={(val: string | null) => setMedicoDestinoLote(val ?? '')}
+                      disabled={salvandoLote}
+                    >
+                      <SelectTrigger className="w-full">
+                        {medicoDestinoLote ? (
+                          <span className="flex items-center gap-2">
+                            <Stethoscope className="h-3 w-3 text-muted-foreground" />
+                            {medicos.find((m) => m.medicoId === medicoDestinoLote)?.nome}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Selecionar médico</span>
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {medicos.map((m) => (
+                          <SelectItem key={m.medicoId} value={m.medicoId}>
+                            <div className="flex items-center gap-2">
+                              <Stethoscope className="h-3 w-3 text-muted-foreground" />
+                              {m.nome}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs text-amber-800">
+                      <strong>Atenção:</strong> essa ação afetará{' '}
+                      <strong>{statsSemMedico + statsComMedico}</strong> paciente(s) e não pode
+                      ser desfeita em lote. Verifique se o médico selecionado
+                      está correto.
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDialogAberto(false)}
                     disabled={salvandoLote}
                   >
-                    <SelectTrigger className="w-full">
-                      {medicoDestinoLote ? (
-                        <span className="flex items-center gap-2">
-                          <Stethoscope className="h-3 w-3 text-muted-foreground" />
-                          {medicos.find((m) => m.medicoId === medicoDestinoLote)?.nome}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">Selecionar médico</span>
-                      )}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {medicos.map((m) => (
-                        <SelectItem key={m.medicoId} value={m.medicoId}>
-                          <div className="flex items-center gap-2">
-                            <Stethoscope className="h-3 w-3 text-muted-foreground" />
-                            {m.nome}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-xs text-amber-800">
-                    <strong>Atenção:</strong> essa ação afetará{' '}
-                    <strong>{statsSemMedico + statsComMedico}</strong> paciente(s) e não pode
-                    ser desfeita em lote. Verifique se o médico selecionado
-                    está correto.
-                  </p>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogAberto(false)}
-                  disabled={salvandoLote}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleReatribuirTodos}
-                  disabled={!medicoDestinoLote || salvandoLote}
-                  className="gap-1.5"
-                >
-                  {salvandoLote ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Reatribuindo...
-                    </>
-                  ) : (
-                    <>
-                      <Users className="h-4 w-4" />
-                      Confirmar reatribuição
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleReatribuirTodos}
+                    disabled={!medicoDestinoLote || salvandoLote}
+                    className="gap-1.5"
+                  >
+                    {salvandoLote ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Reatribuindo...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="h-4 w-4" />
+                        Confirmar reatribuição
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
 
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -423,61 +420,16 @@ export default function AtribuirMedicoPage() {
 
       {/* Paginação */}
       {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-          {/* Info + itens por página */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              {total} paciente{total !== 1 ? 's' : ''}
-            </span>
-            <span className="text-border">·</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs">Exibir</span>
-              <Select
-                value={String(porPagina)}
-                onValueChange={(val) => { if (val) setPorPagina(Number(val)); }}
-              >
-                <SelectTrigger size="sm" className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {POR_PAGINA_OPCOES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs">por página</span>
-            </div>
-          </div>
-
-          {/* Controles de página */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina <= 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              className="gap-1"
-            >
-              <ChevronLeft size={14} />
-              Anterior
-            </Button>
-            <span className="min-w-[6rem] text-center text-sm tabular-nums text-muted-foreground">
-              Página {pagina} de {totalPaginas}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagina >= totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              className="gap-1"
-            >
-              Próximo
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        </div>
+        <PaginationBar
+          page={pagina}
+          totalPages={totalPaginas}
+          onPageChange={setPagina}
+          totalItems={total}
+          itemLabel="paciente"
+          pageSize={porPagina}
+          onPageSizeChange={setPorPagina}
+          pageSizeOptions={POR_PAGINA_OPCOES}
+        />
       )}
     </div>
   );

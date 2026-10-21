@@ -6,6 +6,12 @@ import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  semCamposVazios,
+  statusDaEdicaoSchema,
+  tratamentoDaEdicaoSchema,
+  valoresParaGravar,
+} from '@/lib/pacientes/edicao';
 
 /**
  * Server Actions de pacientes.
@@ -60,7 +66,9 @@ const criarPacienteSchema = z.object({
 
 const atualizarPacienteSchema = criarPacienteSchema.partial().extend({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
-  status: z.enum(['aguardando_consulta', 'em_tratamento', 'concluido', 'arquivado']).optional(),
+  // Na edição o formulário manda `''` para campo sem valor: ver lib/pacientes/edicao.ts.
+  tratamentoTipo: tratamentoDaEdicaoSchema.optional(),
+  status: statusDaEdicaoSchema.optional(),
 });
 
 // ── Types ─────────────────────────────────────────────────────
@@ -91,11 +99,14 @@ export async function criarPaciente(
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
+    // `''` = campo em branco no formulário: some do INSERT e a coluna fica NULL (lib/pacientes/edicao.ts).
+    const d = semCamposVazios(parsed.data);
+
     // Verificar se já existe user com esse e-mail
     const [userExistente] = await db
       .select()
       .from(users)
-      .where(eq(users.email, parsed.data.email))
+      .where(eq(users.email, d.email))
       .limit(1);
 
     let userId: string;
@@ -107,10 +118,10 @@ export async function criarPaciente(
       const [novoUser] = await db
         .insert(users)
         .values({
-          email: parsed.data.email,
-          nome: parsed.data.nome,
+          email: d.email,
+          nome: d.nome,
           role: 'paciente',
-          telefone: parsed.data.telefone,
+          telefone: d.telefone,
         })
         .returning({ id: users.id });
       userId = novoUser.id;
@@ -125,38 +136,38 @@ export async function criarPaciente(
       .values({
         userId,
         medicoId,
-        dataNascimento: parsed.data.dataNascimento,
-        cpf: parsed.data.cpf,
-        rg: parsed.data.rg,
-        genero: parsed.data.genero,
-        cep: parsed.data.cep,
-        endereco: parsed.data.endereco,
-        cidade: parsed.data.cidade,
-        uf: parsed.data.uf,
-        peso: parsed.data.peso,
-        altura: parsed.data.altura,
-        historicoMedico: parsed.data.historicoMedico,
-        patologia: parsed.data.patologia,
-        atendimento: parsed.data.atendimento,
-        temAdvogado: parsed.data.temAdvogado,
-        nomeAdvogado: parsed.data.nomeAdvogado,
-        cid: parsed.data.cid,
-        categorizacao: parsed.data.categorizacao,
-        comoConheceu: parsed.data.comoConheceu,
-        dataAssociacao: parsed.data.dataAssociacao,
-        entradaPaciente: parsed.data.entradaPaciente,
-        etapa: parsed.data.etapa,
-        hospitalProximo: parsed.data.hospitalProximo,
-        homeCare: parsed.data.homeCare,
-        planoSaude: parsed.data.planoSaude,
-        possuiPlanoSaude: parsed.data.possuiPlanoSaude,
-        rendaFamilia: parsed.data.rendaFamilia,
-        termoAssociado: parsed.data.termoAssociado,
-        valorContribuicao: parsed.data.valorContribuicao,
-        processoJudicializacao: parsed.data.processoJudicializacao,
-        responsavelNome: parsed.data.responsavelNome,
-        responsavelCpf: parsed.data.responsavelCpf,
-        tratamentoTipo: parsed.data.tratamentoTipo,
+        dataNascimento: d.dataNascimento,
+        cpf: d.cpf,
+        rg: d.rg,
+        genero: d.genero,
+        cep: d.cep,
+        endereco: d.endereco,
+        cidade: d.cidade,
+        uf: d.uf,
+        peso: d.peso,
+        altura: d.altura,
+        historicoMedico: d.historicoMedico,
+        patologia: d.patologia,
+        atendimento: d.atendimento,
+        temAdvogado: d.temAdvogado,
+        nomeAdvogado: d.nomeAdvogado,
+        cid: d.cid,
+        categorizacao: d.categorizacao,
+        comoConheceu: d.comoConheceu,
+        dataAssociacao: d.dataAssociacao,
+        entradaPaciente: d.entradaPaciente,
+        etapa: d.etapa,
+        hospitalProximo: d.hospitalProximo,
+        homeCare: d.homeCare,
+        planoSaude: d.planoSaude,
+        possuiPlanoSaude: d.possuiPlanoSaude,
+        rendaFamilia: d.rendaFamilia,
+        termoAssociado: d.termoAssociado,
+        valorContribuicao: d.valorContribuicao,
+        processoJudicializacao: d.processoJudicializacao,
+        responsavelNome: d.responsavelNome,
+        responsavelCpf: d.responsavelCpf,
+        tratamentoTipo: d.tratamentoTipo,
         status: 'aguardando_consulta',
       })
       .returning({ id: pacientes.id });
@@ -169,7 +180,7 @@ export async function criarPaciente(
         acao: 'criar',
         entidade: 'pacientes',
         entidadeId: novoPaciente.id,
-        dadosDepois: { nome: parsed.data.nome, email: parsed.data.email },
+        dadosDepois: { nome: d.nome, email: d.email },
       });
     }
 
@@ -214,11 +225,8 @@ export async function atualizarPaciente(
       'tratamentoTipo', 'status',
     ] as const;
 
-    const updatePaciente: Record<string, unknown> = {};
-    for (const campo of CAMPOS_PACIENTE) {
-      const valor = (dadosPaciente as Record<string, unknown>)[campo];
-      if (valor !== undefined) updatePaciente[campo] = valor;
-    }
+    // `''` esvazia o campo (NULL); `status` vazio é ignorado. Ver lib/pacientes/edicao.ts.
+    const updatePaciente = valoresParaGravar(dadosPaciente as Record<string, unknown>, CAMPOS_PACIENTE);
 
     if (Object.keys(updatePaciente).length > 0) {
       await db

@@ -19,19 +19,89 @@ const isPublicRoute = createRouteMatcher([
   '/registrar-se(.*)',
   '/historias',
   '/ebooks(.*)',
-  '/agendamento',
   '/parceiros',
   '/programa-acesso-solidario',
   '/contato',
   '/triagem',
+  '/simulador',
   '/politica-de-privacidade',
   '/termos-de-uso',
   '/redirect',
+  /**
+   * P4 — a tela que pergunta se o paciente já tem conta (fluxo Greens 3, recompra).
+   *
+   * Pública por natureza: quem chega ainda não provou quem é, e ela não revela nada — só
+   * oferece dois caminhos que já são públicos. Protegê-la mandaria para o login justamente
+   * quem não sabe se tem login.
+   */
+  '/acesso',
+  // Previsualização de layout — SÓ existe fora de produção.
+  // A própria rota faz `notFound()` quando NODE_ENV=production, então liberá-la aqui não abre
+  // nada em produção: lá ela não existe. Sem esta linha, o middleware manda para o Clerk antes
+  // de a rota poder responder — foi o que aconteceu em 20/08/2026.
+  ...(process.env.NODE_ENV === 'production' ? [] : ['/preview(.*)']),
   // Arquivos de SEO — NUNCA devem ser interceptados pelo auth
   '/robots.txt',
   '/sitemap.xml',
   '/sitemap(.*).xml',
   '/favicon.ico',
+  /**
+   * 🔴 O CADASTRO QUE VEM DO WHATSAPP.
+   *
+   * Quem abre este link AINDA NÃO TEM CONTA — criar a conta é justamente o que a tela
+   * faz. Sem esta linha o middleware manda o paciente para o login antes de a página
+   * existir, e ele fica preso num laço: para se cadastrar, precisaria já estar cadastrado.
+   *
+   * A rota não fica desprotegida por isso: o token de 64 hex no caminho é a credencial,
+   * é de uso único, expira, e é conferido no servidor antes de qualquer campo ser pintado.
+   */
+  '/cadastro(.*)',
+  /**
+   * 🔴 AS ROTAS DO CHATPRO NÃO USAM CLERK — E NÃO PODEM USAR.
+   *
+   * Quem as chama é o servidor do ChatPro e o cron, não um navegador com sessão. Elas
+   * têm autenticação própria: `x-chatpro-intake-secret` comparado em tempo constante no
+   * bot-link e no intake, token no caminho da URL no webhook, e `CRON_SECRET` no
+   * processador.
+   *
+   * ⚠️ ISTO NÃO APARECEU NOS TESTES LOCAIS porque o `.env` de desenvolvimento está sem
+   * as chaves do Clerk — sem elas o middleware não bloqueia nada, e tudo respondeu 200.
+   * Em produção, com o Clerk configurado, toda chamada do ChatPro receberia um redirect
+   * para a tela de login: o bot registraria falha, o paciente cairia na triagem humana, e
+   * o log da aplicação não mostraria nada — porque a requisição nunca chegaria à rota.
+   */
+  '/api/chatpro(.*)',
+  /**
+   * 🔴 Rota de diagnóstico da sentinela (ADR-0022 D-16). Pública **no middleware**, nunca sem
+   * credencial: ela exige o mesmo segredo do `bot-link`, no cabeçalho.
+   *
+   * ⚠️ Precisa estar aqui pelo mesmo motivo das rotas do ChatPro: o middleware do Clerk
+   * responde **redirect** a quem não tem sessão, e um chamador de máquina receberia um 307 em
+   * vez do 401 — que é diagnóstico errado sobre o próprio diagnóstico.
+   */
+  '/api/fluxo(.*)',
+  /**
+   * 🔴 O HANDOFF DOS PARCEIROS TAMBÉM NÃO USA CLERK.
+   * Quem chama é o servidor da Greens, não um navegador com sessão. A autenticação é
+   * HMAC-SHA256 sobre id + timestamp + corpo, com janela de 300 s — mais forte que uma
+   * sessão de navegador, porque prova também a INTEGRIDADE do corpo.
+   * Sem esta linha, a chamada receberia um redirect para a tela de login e o log da
+   * aplicação não mostraria nada: foi exatamente o que aconteceu com o ChatPro (Item 21).
+   */
+  '/api/parceiros(.*)',
+  /**
+   * 🔴 O PROCESSADOR DO MERCADO PAGO — pelo caminho EXATO, nunca o prefixo.
+   * Quem chama é o cron do `filas.yml`, sem sessão; a autenticação é o `CRON_SECRET` (503 sem
+   * ele, 401 com o errado). Sem esta linha o cron recebia 307 para o login — medido em
+   * produção em 23/09/2026, depois do PR #122. `'/api/mercadopago(.*)'` tiraria o login de
+   * toda rota futura com esse prefixo: guarda `o-cron-chama-rota-que-o-middleware-deixa-passar`.
+   */
+  '/api/mercadopago/processar',
+  /**
+   * 🔴 O EXPIRADOR DE RESERVAS (Fase 4) — pelo caminho EXATO, mesmo motivo do de cima. Quem
+   * chama é o worker das filas e o `filas.yml`, sem sessão; a autenticação é o `CRON_SECRET`.
+   */
+  '/api/agendamento/expirar',
   // Rotas de sistema e integrações
   '/api/webhooks(.*)',
   '/api/cron(.*)',

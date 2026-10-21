@@ -1,4 +1,4 @@
-import { pgTable, text, date, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, date, jsonb, timestamp, index, AnyPgColumn } from 'drizzle-orm/pg-core';
 import { baseColumns, softDeleteColumn } from './_helpers';
 import { pacientes } from './pacientes';
 import { medicos } from './medicos';
@@ -18,6 +18,7 @@ export const autorizacoesAnvisa = pgTable(
     pacienteId: text('paciente_id').notNull().references(() => pacientes.id),
     medicoId: text('medico_id').references(() => medicos.id),
     prescricaoId: text('prescricao_id').references(() => prescricoes.id),
+    autorizacaoAnteriorId: text('autorizacao_anterior_id').references((): AnyPgColumn => autorizacoesAnvisa.id),
     modalidade: anvisaModalidadeEnum('modalidade').notNull().default('guiada'),
     status: anvisaStatusEnum('status').notNull().default('pendente'),
     numeroProcesso: text('numero_processo'),
@@ -34,5 +35,6 @@ export const autorizacoesAnvisa = pgTable(
     index('autorizacoes_paciente_idx').on(t.pacienteId),
     index('autorizacoes_status_idx').on(t.status),
     index('autorizacoes_prescricao_idx').on(t.prescricaoId),
+    index('autorizacoes_anterior_idx').on(t.autorizacaoAnteriorId),
   ],
 );

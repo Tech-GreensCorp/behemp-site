@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { listarPrescricoesPaciente, criarPrescricao } from '@/app/(medico)/_actions/prescricoes';
+import { listarAjustesParaPrescricoes } from '@/app/(medico)/_actions/conduta';
+import { CurvaDeTitulacao, type PassoDaCurva } from '@/components/conduta/CurvaDeTitulacao';
 import { listarTemplatesMedico } from '@/app/(medico)/_actions/receituario-templates';
 
 interface MedicamentoForm {
@@ -24,6 +26,10 @@ interface MedicamentoForm {
 
 export function TabPrescricoes({ pacienteId }: { pacienteId: string }) {
   const [prescricoes, setPrescricoes] = useState<any[]>([]);
+  // 🔴 A SEGUNDA superfície do `DO-44` (b): *"a dosagem ou medicamento anterior tem que ficar
+  // no historico tanto do paciente quanto no historico de prescrições dentro do nome do
+  // paciente"*. Mesma origem da curva da aba de dosagem — nenhuma cópia de dado.
+  const [ajustes, setAjustes] = useState<PassoDaCurva[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   
@@ -43,13 +49,15 @@ export function TabPrescricoes({ pacienteId }: { pacienteId: string }) {
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
-    const [resPresc, resTemp] = await Promise.all([
+    const [resPresc, resTemp, resAjustes] = await Promise.all([
       listarPrescricoesPaciente(pacienteId),
-      listarTemplatesMedico()
+      listarTemplatesMedico(),
+      listarAjustesParaPrescricoes(pacienteId)
     ]);
     
     if (resPresc.sucesso) setPrescricoes(resPresc.dados ?? []);
     if (resTemp.sucesso) setTemplates(resTemp.dados ?? []);
+    if (resAjustes.sucesso) setAjustes(resAjustes.dados);
     setCarregando(false);
   }, [pacienteId]);
 
@@ -288,6 +296,23 @@ export function TabPrescricoes({ pacienteId }: { pacienteId: string }) {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* ── O histórico de ajuste de dose, sob o nome do paciente (`DO-44` b) ──────
+          Não é cópia: lê a mesma origem que a curva da aba de Dosagem. Está aqui porque um
+          ajuste de dose muda o que o paciente toma, e quem abre o histórico de prescrições
+          precisa ver isso sem trocar de aba. Somente leitura — ajustar acontece na conduta. */}
+      {ajustes.length > 0 && (
+        <section className="space-y-3 border-t pt-6">
+          <div className="space-y-1">
+            <h3 className="font-heading text-base font-semibold">Ajustes de dose do paciente</h3>
+            <p className="text-muted-foreground text-xs">
+              Cada ajuste com o motivo e a data da próxima revisão. Para ajustar, use a aba
+              Dosagem.
+            </p>
+          </div>
+          <CurvaDeTitulacao passos={ajustes} />
+        </section>
       )}
     </div>
   );

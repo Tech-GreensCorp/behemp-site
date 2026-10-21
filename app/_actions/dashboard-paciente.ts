@@ -1,6 +1,8 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { cadastroPendenteDoEmail } from '@/lib/parceiros/cadastro-pendente';
+import { situacaoDoFluxo } from '@/lib/fluxo/sentinela';
 import { sql } from 'drizzle-orm';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { contarMensagensNaoLidas } from '@/app/_actions/chat';
@@ -48,7 +50,44 @@ export interface DadosDashboard {
     medicoNome: string;
     temPrescricao: boolean;
   } | null;
+  autorizacaoAnvisa: {
+    id: string;
+    numeroProcesso: string | null;
+    dataValidade: string | null;
+    status: string;
+    temRenovacaoEmAndamento: boolean;
+  } | null;
   userId: string | null;
+  /**
+   * 🔴 SAI DO ESTADO REAL, não da declaração do cadastro.
+   *
+   * O paciente precisa da procuração quando não tem autorização da ANVISA válida. A
+   * declaração "não tenho" que ele dá no cadastro **não é persistida em coluna** (Item 33) —
+   * e mesmo que fosse, o que existe vale mais que o que ele lembrou de responder.
+   */
+  precisaDaProcuracao: boolean;
+  /**
+   * 🔴 HÁ UM CADASTRO ESPERANDO ESTA PESSOA (ADR-0022, D-02).
+   *
+   * `null` quando não há. Quando há, o paciente entrou com uma solicitação aberta — e sem
+   * isto ele via um painel vazio sem nenhuma explicação, com os documentos que já tinha
+   * enviado invisíveis. Medido com o dono em 12/09/2026.
+   */
+  cadastroPendente: { protocolo: string; parceiro: string | null; expiraEm: Date } | null;
+  /**
+   * 🔴 O PONTO DO FLUXO, vindo da sentinela — ADR-0022 D-05.
+   *
+   * É o que permite à tela distinguir "você não enviou" de "veio e não chegou" (R6) sem
+   * decidir por conta própria. Antes, cada tela decidia sozinha — e foi assim que a ficha
+   * casca do `/redirect` passou a mentir para todas.
+   */
+  situacao: { ponto: string; porque: string; destino: string | null; origem: string | null };
+  /**
+   * `true` quando o paciente ainda não tem CEP salvo em `pacientes.cep` (inclusive quando
+   * a linha em `pacientes` nem existe ainda). É o que decide o aviso de endereço no painel —
+   * some sozinho assim que o CEP é gravado, sem precisar de flag de "já perguntei".
+   */
+  enderecoPendente: boolean;
 }
 
 export async function obterDadosDashboard(): Promise<{
@@ -63,7 +102,20 @@ export async function obterDadosDashboard(): Promise<{
     }
 
     // Executa todas as queries em paralelo
-    const [medicoRes, medicamentoRes, jornadaRes, consultaRes, documentosRes, mensagensRes, teleconsultaRes, consultaRecenteRes, userIdRes] = await Promise.all([
+    const [
+      medicoRes,
+      medicamentoRes,
+      jornadaRes,
+      consultaRes,
+      documentosRes,
+      mensagensRes,
+      teleconsultaRes,
+      consultaRecenteRes,
+      userIdRes,
+      temAnvisaRes,
+      cepRes,
+      anvisaAtualRes,
+    ] = await Promise.all([
       // 1. Médico vinculado ao paciente
       db.execute(sql`
         SELECT um.nome AS "medicoNome"
@@ -143,7 +195,10 @@ export async function obterDadosDashboard(): Promise<{
       // 6. Mensagens não lidas
       contarMensagensNaoLidas(),
 
-      // 7. Teleconsulta ativa
+      // 7. Teleconsulta ativa — só conta como "ao vivo" se começou há pouco tempo.
+      // Sem esse filtro, uma sala 'aguardando'/'em_andamento' nunca encerrada (médico
+      // fechou a aba sem finalizar, por exemplo) fica aparecendo como "entrar agora"
+      // pro paciente pra sempre — não existe hoje nenhum job que feche sala parada.
       db.execute(sql`
         SELECT
           t.room_id     AS "roomId",
@@ -158,6 +213,7 @@ export async function obterDadosDashboard(): Promise<{
           AND p.deleted_at IS NULL
           AND t.deleted_at IS NULL
           AND t.status IN ('aguardando', 'em_andamento')
+          AND t.iniciada_em >= NOW() - INTERVAL '4 hours'
         ORDER BY t.iniciada_em DESC
         LIMIT 1
       `),
@@ -194,12 +250,64 @@ export async function obterDadosDashboard(): Promise<{
         WHERE u.clerk_id = ${auth.clerkId}
         LIMIT 1
       `),
+      /**
+       * 10. Tem autorização da ANVISA valendo?
+       *
+       * ⚠️ `data_validade IS NULL` conta como válida: autorização aprovada sem validade
+       * registrada é lacuna de dado nosso, e tratá-la como vencida faria o sistema cobrar
+       * procuração de quem já tem autorização.
+       */
+      db.execute(sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM autorizacoes_anvisa a
+          JOIN pacientes p ON p.id = a.paciente_id
+          JOIN users u ON u.id = p.user_id
+          WHERE u.clerk_id = ${auth.clerkId}
+            AND a.status = 'aprovado'
+            AND a.deleted_at IS NULL
+            AND (a.data_validade IS NULL OR a.data_validade >= CURRENT_DATE)
+        ) AS "temAnvisa"
+      `),
+      /**
+       * 11. CEP já cadastrado?
+       *
+       * `LEFT JOIN` de propósito: paciente sem linha em `pacientes` (reconciliação
+       * automática que ainda não gravou ficha, por exemplo) também conta como pendente.
+       */
+      db.execute(sql`
+        SELECT p.cep
+        FROM users u
+        LEFT JOIN pacientes p ON p.user_id = u.id AND p.deleted_at IS NULL
+        WHERE u.clerk_id = ${auth.clerkId}
+        LIMIT 1
+      `),
+      // 12. Autorização ANVISA mais recente — alimenta o AnvisaCard
+      db.execute(sql`
+        SELECT
+          a.id,
+          a.numero_processo AS "numeroProcesso",
+          a.data_validade   AS "dataValidade",
+          a.status,
+          EXISTS(
+            SELECT 1 FROM autorizacoes_anvisa ar
+            WHERE ar.autorizacao_anterior_id = a.id
+              AND ar.deleted_at IS NULL
+              AND ar.status NOT IN ('aprovado', 'rejeitado')
+          ) AS "temRenovacaoEmAndamento"
+        FROM autorizacoes_anvisa a
+        INNER JOIN pacientes p ON p.id = a.paciente_id
+        INNER JOIN users u     ON u.id = p.user_id
+        WHERE u.clerk_id = ${auth.clerkId}
+          AND a.deleted_at IS NULL
+        ORDER BY a.created_at DESC
+        LIMIT 1
+      `),
     ]);
 
     // Processar médico
-    const medicoNome = medicoRes.rows.length > 0
-      ? (medicoRes.rows[0] as any).medicoNome as string
-      : null;
+    const medicoNome =
+      medicoRes.rows.length > 0 ? ((medicoRes.rows[0] as any).medicoNome as string) : null;
 
     // Processar medicamento
     let medicamentoAtivo: DadosDashboard['medicamentoAtivo'] = null;
@@ -243,20 +351,62 @@ export async function obterDadosDashboard(): Promise<{
     const mensagensNaoLidas = mensagensRes.sucesso ? (mensagensRes.dados ?? 0) : 0;
 
     const teleconsultaAtivaRow = teleconsultaRes.rows[0] as any;
-    const teleconsultaAtiva = teleconsultaAtivaRow ? {
-      roomId: String(teleconsultaAtivaRow.roomId),
-      medicoNome: String(teleconsultaAtivaRow.medicoNome),
-      iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
-    } : null;
+    const teleconsultaAtiva = teleconsultaAtivaRow
+      ? {
+          roomId: String(teleconsultaAtivaRow.roomId),
+          medicoNome: String(teleconsultaAtivaRow.medicoNome),
+          iniciadaEm: String(teleconsultaAtivaRow.iniciadaEm),
+        }
+      : null;
 
     const consultaRecenteRow = consultaRecenteRes.rows[0] as any;
-    const consultaRecenteRealizada = consultaRecenteRow ? {
-      dataHora: consultaRecenteRow.dataHora instanceof Date ? consultaRecenteRow.dataHora.toISOString() : String(consultaRecenteRow.dataHora),
-      medicoNome: String(consultaRecenteRow.medicoNome),
-      temPrescricao: Boolean(consultaRecenteRow.temPrescricao),
-    } : null;
+    const consultaRecenteRealizada = consultaRecenteRow
+      ? {
+          dataHora:
+            consultaRecenteRow.dataHora instanceof Date
+              ? consultaRecenteRow.dataHora.toISOString()
+              : String(consultaRecenteRow.dataHora),
+          medicoNome: String(consultaRecenteRow.medicoNome),
+          temPrescricao: Boolean(consultaRecenteRow.temPrescricao),
+        }
+      : null;
 
     const userId = userIdRes.rows[0] ? String((userIdRes.rows[0] as any).userId) : null;
+
+    const precisaDaProcuracao = !temAnvisaRes.rows[0]?.temAnvisa;
+    const enderecoPendente = !(cepRes.rows[0] as { cep?: string | null } | undefined)?.cep;
+
+    /**
+     * O cadastro que ficou pela metade, se houver. Casa pelo e-mail porque a solicitação
+     * nasce ANTES da conta: quando a Greens a cria, não existe `clerkId` nem `pacienteId`
+     * para amarrar. Ver ADR-0022 §1.5 — até hoje ninguém fazia esta pergunta.
+     */
+    const [emailRes] = (
+      await db.execute(sql`
+        SELECT u.email FROM users u WHERE u.clerk_id = ${auth.clerkId} LIMIT 1
+      `)
+    ).rows as { email?: string }[];
+    const cadastroPendente = await cadastroPendenteDoEmail(emailRes?.email);
+
+    /** A sentinela: um lugar só decide em que ponto esta pessoa está (D-05). */
+    const situacao = await situacaoDoFluxo(auth.clerkId);
+
+    /**
+     * O shape sai da própria interface: a query 12 seleciona exatamente estes campos, e
+     * declarar o tipo aqui faria a mesma lista existir em dois lugares que podem divergir.
+     */
+    const anvisaRow = anvisaAtualRes.rows[0] as
+      | NonNullable<DadosDashboard['autorizacaoAnvisa']>
+      | undefined;
+    const autorizacaoAnvisa = anvisaRow
+      ? {
+          id: String(anvisaRow.id),
+          numeroProcesso: anvisaRow.numeroProcesso ? String(anvisaRow.numeroProcesso) : null,
+          dataValidade: anvisaRow.dataValidade ? String(anvisaRow.dataValidade) : null,
+          status: String(anvisaRow.status),
+          temRenovacaoEmAndamento: Boolean(anvisaRow.temRenovacaoEmAndamento),
+        }
+      : null;
 
     return {
       sucesso: true,
@@ -269,7 +419,12 @@ export async function obterDadosDashboard(): Promise<{
         mensagensNaoLidas,
         teleconsultaAtiva,
         consultaRecenteRealizada,
+        autorizacaoAnvisa,
         userId,
+        precisaDaProcuracao,
+        cadastroPendente,
+        situacao,
+        enderecoPendente,
       },
     };
   } catch (error) {

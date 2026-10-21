@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
@@ -26,11 +26,91 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --no-frozen-lockfile
 
+      # ── PORTÃO (enxertado na Sprint 0, 20/08/2026 — autorizado em .claude/autorizacoes.txt)
+      # Fica ANTES do build e, principalmente, antes do rsync e do `pnpm db:migrate`.
+      # Se falhar aqui, nada chega ao servidor e nenhuma migration é aplicada em produção.
+      # Push direto em main não passa por PR, então o portão do ci.yml não o cobre — é por
+      # isso que os mesmos três checks aparecem nos dois workflows.
+      - name: Type-check (portão absoluto — zero erro)
+        run: pnpm typecheck
+
+      - name: Guardas
+        run: pnpm test
+
+      - name: Baseline não piorou
+        run: node scripts/conferir-baseline.mjs
+
       - name: Build do projeto (Next.js)
-        # Passar variáveis públicas necessárias para o build
+        # 🔴 TODA `NEXT_PUBLIC_*` PRECISA EXISTIR AQUI, E NÃO NO SERVIDOR.
+        #
+        # Elas são substituídas pelo VALOR durante o `next build` e viajam dentro do
+        # JavaScript que o navegador baixa. Quem não existe no build não vira valor: vira
+        # acesso a uma propriedade que, no navegador, é `undefined`.
+        #
+        # O que isso custou, em 10/09/2026: o build que rodava em produção tinha sido feito
+        # À MÃO NO SERVIDOR, onde o `.env` completo existia — então as chaves do Pusher
+        # estavam congeladas dentro dele e a teleconsulta funcionava. Quando o deploy passou
+        # a entregar o build do CI, que não recebia essas variáveis, o bundle saiu com
+        #
+        #     let t = env.NEXT_PUBLIC_PUSHER_KEY, s = env.NEXT_PUBLIC_PUSHER_CLUSTER;
+        #     if (!t || !s) throw Error("[Pusher Client] … devem estar …")
+        #
+        # e a teleconsulta passou a morrer em "Erro ao iniciar a sala" — sem erro no
+        # servidor, porque a falha acontece no navegador.
+        #
+        # ⚠️ Isto NÃO se resolve escrevendo a variável no `.env` do servidor. O `.env` do
+        # servidor alimenta o código que roda no servidor; o navegador só recebe o que foi
+        # embutido no build. É a diferença que o nome `NEXT_PUBLIC_` anuncia e que é fácil
+        # ler como "pública, então qualquer lugar serve".
+        #
+        # Valor de `NEXT_PUBLIC_*` NÃO é segredo — ele é servido a qualquer visitante dentro
+        # do bundle. Está em `secrets` por conveniência de gestão, não por sigilo.
         env:
-          NEXT_PUBLIC_APP_URL: "https://be4hope.org"
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+          # 🔴 O ID DESTE DEPLOY — sem ele, uma aba aberta durante o deploy QUEBRA.
+          #
+          # Os ids de Server Action são hashes gerados no build. Quando o build troca, a aba
+          # que o paciente deixou aberta continua chamando o hash antigo, e o servidor
+          # responde `Failed to find Server Action "…"`. Medido em produção em 11/09/2026:
+          # o dono perdeu um cadastro no meio, com uploads já feitos, e a mensagem na tela
+          # mandava "tentar novamente" — que não resolve, porque a aba continua velha.
+          #
+          # Com o `deploymentId`, o Next compara o id do cliente com o do servidor e, na
+          # divergência, força RECARGA COMPLETA em vez de navegação — doc oficial:
+          # "triggers a hard navigation (full page reload) instead of a client-side
+          # navigation". O `github.sha` é único por deploy e igual em todas as instâncias.
+          NEXT_DEPLOYMENT_ID: ${{ github.sha }}
+          NEXT_PUBLIC_APP_URL: 'https://be4hope.org'
+          DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
+          NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_WHATSAPP_BEHEMP: ${{ secrets.NEXT_PUBLIC_WHATSAPP_BEHEMP }}
+          NEXT_PUBLIC_SHEETS_SPREADSHEET_ID: ${{ secrets.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID }}
+          NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED: ${{ secrets.NEXT_PUBLIC_GOOGLE_API_KEY_CONFIGURED }}
+          # ── Mercado Pago — só o SELETOR entra no bundle (22/09/2026) ──────────────
+          #
+          # 🔴 AS PUBLIC KEYS NÃO ESTÃO AQUI, E ISSO É A DECISÃO, NÃO UM ESQUECIMENTO.
+          #
+          # Elas seguem o desenho do Clerk: o servidor as lê do `.env` em runtime e entrega
+          # a escolhida ao componente do Brick POR PROP. O que se ganha é que trocar de
+          # conta deixa de exigir rebuild — `NEXT_PUBLIC_*` é substituída no `next build` e
+          # congela dentro do bundle, uma variável de servidor não.
+          #
+          # O precedente está medido em `next-public-existe-no-build.test.ts:31-41`: a
+          # `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` é exceção do guarda justamente porque o
+          # ClerkProvider é Server Component e a entrega ao client por prop.
+          #
+          # ⚠️ Quem acrescentar `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_*` aqui está desfazendo
+          # esta decisão — leia o comentário da lista `gravar` antes.
+          #
+          # O QUE FICA: só o seletor, que o navegador precisa conhecer para saber que
+          # comportamento adotar. Ele não carrega segredo nenhum — é a palavra `teste` ou
+          # `producao` — e vem do MESMO secret que o servidor recebe abaixo, pelo motivo do
+          # NEXT_DEPLOYMENT_ID: em um lado só, as duas pontas discordariam de qual conta
+          # está ativa, e nenhum type-check acusa isso.
+          #
+          # Vazio = `teste`. O padrão seguro é o que não cobra.
+          NEXT_PUBLIC_MERCADOPAGO_AMBIENTE: ${{ secrets.MERCADOPAGO_AMBIENTE }}
         run: pnpm build
 
       - name: Limpar .next antigo no servidor antes do deploy
@@ -47,13 +127,13 @@ jobs:
         uses: easingthemes/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ARGS: "-rltgoDzvO --delete"
-          SOURCE: "./"
+          ARGS: '-rltgoDzvO --delete'
+          SOURCE: './'
           REMOTE_HOST: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: ${{ secrets.TARGET_DIR }}
           # Excluir arquivos que não precisam ser enviados
-          EXCLUDE: "/node_modules/, /.git/, /.github/, /.env, /pnpm-lock.yaml"
+          EXCLUDE: '/node_modules/, /.git/, /.github/, /.env, /pnpm-lock.yaml'
 
       - name: Reiniciar Servidor (PM2)
         uses: appleboy/ssh-action@v1.0.3
@@ -62,24 +142,401 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # 🔴 `set -e` — A CORREÇÃO MAIS IMPORTANTE DESTE ARQUIVO (10/09/2026).
+            #
+            # Sem ele, o script seguia depois de qualquer falha. No deploy do PR #36 duas
+            # coisas falharam — `cp: cannot stat '.env'` e `drizzle-kit: not found` — o PM2
+            # reiniciou assim mesmo, e o passo foi marcado ✓.
+            #
+            # O resultado foi o pior possível: DEPLOY VERDE COM BANCO DESATUALIZADO. O
+            # código novo subiu esperando tabelas que a migration não criou.
+            set -e
+
             cd ${{ secrets.TARGET_DIR }}
-            
+
             # Instala apenas as dependências necessárias para rodar (economiza RAM na AWS)
             pnpm install --prod
-            
-            # Copia o .env para dentro do standalone (Opção A)
-            cp .env .next/standalone/.env
-            
-            # Aplica eventuais migrações do banco
-            pnpm db:migrate
-            
+
+            # ── As variáveis da integração, vindas dos GitHub Secrets ──────────────
+            #
+            # 🔴 POR QUE ASSIM, E NÃO `cp .env`
+            #
+            # A versão anterior copiava de `./.env` — arquivo que o rsync GARANTE não
+            # existir (ele está no EXCLUDE, de propósito, para deploy nunca sobrescrever
+            # segredo). Falhava em todo deploy, em silêncio, desde sempre.
+            #
+            # E quando a checagem passou a existir, ela revelou o que ninguém sabia: **não
+            # há `.env` nem na raiz nem no standalone**. O app funciona porque o PM2 guarda
+            # o ambiente no `dump.pm2` desde o primeiro `pm2 start` — configuração viva só
+            # na memória de um processo, que ninguém consegue ler, versionar ou conferir.
+            #
+            # Aqui as variáveis passam a vir dos **GitHub Secrets**, como no repositório da
+            # Greens. O que se ganha: o valor entra por um caminho auditável, a rotação é um
+            # comando, e ninguém precisa de acesso SSH para trocar um segredo.
+            #
+            # ⚠️ ESCREVE SÓ AS DA INTEGRAÇÃO, e ACRESCENTA em vez de substituir. Gerar o
+            # `.env` inteiro exigiria que todos os ~40 secrets estivessem cadastrados, e um
+            # que faltasse derrubaria o app inteiro numa variável vazia.
+            ENVFILE=.next/standalone/.env
+            touch "$ENVFILE"
+
+            gravar() {
+              # $1 = nome, $2 = valor. Vazio não sobrescreve o que já existe.
+              [ -z "$2" ] && return 0
+              # Remove a linha antiga (se houver) e acrescenta a nova. `grep -v` com `||
+              # true` porque grep sai 1 quando não casa nada, e `set -e` mataria o deploy.
+              grep -v "^$1=" "$ENVFILE" > "$ENVFILE.tmp" 2>/dev/null || true
+              mv "$ENVFILE.tmp" "$ENVFILE"
+              # 🔴 ASPAS SIMPLES, e isto não é estilo — é o bug do deploy #39.
+              #
+              # A URL do Neon é `postgresql://…/db?sslmode=require&channel_binding=require`.
+              # Escrita SEM aspas, o `.` (source) INTERPRETA a linha: o `&` manda para
+              # background e corta o resto. Medido: a variável vira VAZIA — e o source não
+              # falha, então o `set -e` não pega. Falha silenciosa, da mesma família das
+              # outras três deste arquivo.
+              #
+              # O `'\''` fecha a aspa, escapa uma literal e reabre — cobre valor que
+              # contenha aspa simples.
+              printf "%s='\''%s'\''\n" "$1" "$(printf '%s' "$2" | sed "s/'/'\\\\''/g")" >> "$ENVFILE"
+            }
+
+            gravar PARCEIRO_GREENS_SEGREDO_ENTRADA "${{ secrets.PARCEIRO_GREENS_SEGREDO_ENTRADA }}"
+            gravar PARCEIRO_GREENS_SEGREDO_SAIDA   "${{ secrets.PARCEIRO_GREENS_SEGREDO_SAIDA }}"
+            # 🔴 O SEGREDO DO S2 — par PRÓPRIO, não o do aviso (§1 do contrato com a Greens).
+            # Quem tem o do aviso mente que uma receita ficou pronta; quem tem o do cadastro
+            # cria solicitações lá e faz a Greens buscar URLs que escolher.
+            gravar PARCEIRO_GREENS_SEGREDO_CADASTRO "${{ secrets.PARCEIRO_GREENS_SEGREDO_CADASTRO }}"
+            gravar PARCEIRO_GREENS_CAMINHO_CADASTRO "${{ secrets.PARCEIRO_GREENS_CAMINHO_CADASTRO }}"
+            gravar PARCEIRO_GREENS_CAMINHO_RETORNO  "${{ secrets.PARCEIRO_GREENS_CAMINHO_RETORNO }}"
+            # ⚠️ Estas três TÊM valor de reserva no código e funcionam sem o secret. Ficam aqui
+            # para serem CONFIGURÁVEIS sem deploy — `gravar` com valor vazio não sobrescreve,
+            # então listá-las não muda nada enquanto o secret não existir.
+            gravar CHATPRO_CADASTRO_PATH           "${{ secrets.CHATPRO_CADASTRO_PATH }}"
+            gravar CHATPRO_LINK_TTL_HORAS          "${{ secrets.CHATPRO_LINK_TTL_HORAS }}"
+            gravar CHATPRO_CONFIRMAR_NO_INTAKE     "${{ secrets.CHATPRO_CONFIRMAR_NO_INTAKE }}"
+            gravar CHATPRO_CHAT_API_URL            "${{ secrets.CHATPRO_CHAT_API_URL }}"
+            gravar CHATPRO_START_SEM_CONFIRMACAO   "${{ secrets.CHATPRO_START_SEM_CONFIRMACAO }}"
+            gravar PARCEIRO_GREENS_API_URL         "${{ secrets.PARCEIRO_GREENS_API_URL }}"
+            gravar PARCEIRO_ORIGENS_DE_RETORNO     "${{ secrets.PARCEIRO_ORIGENS_DE_RETORNO }}"
+            gravar PARCEIRO_ORIGENS_DE_DOCUMENTO  "${{ secrets.PARCEIRO_ORIGENS_DE_DOCUMENTO }}"
+            # 🔴 A CHAVE QUE LIGA A TRANSFERÊNCIA DE CADASTRO (P5, ADR-0021).
+            #
+            # Vazia = nada sai. Só `1` liga. Ligada por decisão do dono em 11/09/2026, para
+            # demonstrar o fluxo à direção antes de levar ao Jurídico — a plataforma ainda não
+            # tem paciente real, então o que trafega é fictício.
+            #
+            # ⚠️ DESLIGAR É UM COMANDO, e isso é de propósito: a trava fica no código, e o que
+            # muda é o valor. Se o Jurídico pedir para parar, some da lista de secrets e o
+            # próximo deploy já sai desligado — sem precisar reverter código.
+            gravar PARCEIRO_TRANSFERENCIA_ATIVA   "${{ secrets.PARCEIRO_TRANSFERENCIA_ATIVA }}"
+            gravar CHATPRO_INTAKE_SECRET           "${{ secrets.CHATPRO_INTAKE_SECRET }}"
+            gravar CHATPRO_INTAKE_SECRET_GREENS    "${{ secrets.CHATPRO_INTAKE_SECRET_GREENS }}"
+            gravar CHATPRO_WEBHOOK_PATH_TOKEN      "${{ secrets.CHATPRO_WEBHOOK_PATH_TOKEN }}"
+            gravar CHATPRO_INSTANCE_ID             "${{ secrets.CHATPRO_INSTANCE_ID }}"
+            gravar CHATPRO_INSTANCE_TOKEN          "${{ secrets.CHATPRO_INSTANCE_TOKEN }}"
+            # 🔴 A instância da conta da GREENS. Sem ela, o leadId de uma chamada deles
+            # é procurado na instância da BeHemp, não é encontrado, e o /bot-link responde
+            # 422 — o painel transfere o paciente para um atendente. Travou o Fluxo 2.
+            gravar CHATPRO_INSTANCE_ID_GREENS      "${{ secrets.CHATPRO_INSTANCE_ID_GREENS }}"
+            gravar CHATPRO_INSTANCE_TOKEN_GREENS   "${{ secrets.CHATPRO_INSTANCE_TOKEN_GREENS }}"
+            gravar CHATPRO_CHAT_API_URL_GREENS    "${{ secrets.CHATPRO_CHAT_API_URL_GREENS }}"
+            gravar CHATPRO_GREENS_URL_DE_RETORNO   "${{ secrets.CHATPRO_GREENS_URL_DE_RETORNO }}"
+            # 🔴 O store PRIVADO dos documentos de paciente. Sem ele no processo,
+            # `lib/documentos/store-privado.ts` lança e NENHUM documento é gravado — nem o
+            # anexo do formulário, nem o que a Greens envia. É falha fechada de propósito:
+            # dado de saúde não cai para store público quando a configuração falta.
+            gravar BLOB_TOKEN_PRIVADO              "${{ secrets.BLOB_TOKEN_PRIVADO }}"
+            gravar CRON_SECRET                     "${{ secrets.CRON_SECRET }}"
+            gravar DATABASE_URL                    "${{ secrets.DATABASE_URL }}"
+            # ── Mercado Pago (22/09/2026) — o pipeline nasce antes da integração ───
+            #
+            # 🔴 POR QUE ANTES: cadastrar o secret no GitHub NÃO o faz chegar ao processo.
+            # Esta lista é fixa, e o que fica de fora nunca vira ambiente. Já aconteceu três
+            # vezes — PARCEIRO_ORIGENS_DE_DOCUMENTO, PARCEIRO_TRANSFERENCIA_ATIVA e
+            # PARCEIRO_GREENS_SEGREDO_CADASTRO —, sempre com o mesmo sintoma: o
+            # comportamento não acontece, e quem investiga vê a variável cadastrada.
+            #
+            # `gravar` com valor vazio não sobrescreve, então listar aqui não muda nada
+            # enquanto o código não ler. O que muda é que a integração nasce configurável.
+            #
+            # ⚠️ QUAL PAR COBRA É `MERCADOPAGO_AMBIENTE`, E NÃO `NODE_ENV`.
+            #
+            # Produção roda `NODE_ENV=production` e deve usar, HOJE, o par de TESTE — ainda
+            # não se processa pagamento real. Derivar do `NODE_ENV` entregaria a credencial
+            # de produção exatamente onde não se quer, sem ninguém ter pedido. É a mesma
+            # confusão que `lib/auth/instancia-do-clerk.ts` existe para DENUNCIAR: lá o
+            # `NODE_ENV` serve para avisar que o ambiente e a credencial divergiram, nunca
+            # para escolher a credencial.
+            #
+            # Vazia = `teste`. Passar a cobrar de verdade é mudar um secret e redeployar,
+            # não reverter código — o mesmo desenho de PARCEIRO_TRANSFERENCIA_ATIVA.
+            gravar MERCADOPAGO_AMBIENTE               "${{ secrets.MERCADOPAGO_AMBIENTE }}"
+            gravar MERCADOPAGO_ACCESS_TOKEN_TESTE     "${{ secrets.MERCADOPAGO_ACCESS_TOKEN_TESTE }}"
+            gravar MERCADOPAGO_ACCESS_TOKEN_PRODUCAO  "${{ secrets.MERCADOPAGO_ACCESS_TOKEN_PRODUCAO }}"
+            gravar MERCADOPAGO_CLIENT_ID              "${{ secrets.MERCADOPAGO_CLIENT_ID }}"
+            gravar MERCADOPAGO_CLIENT_SECRET          "${{ secrets.MERCADOPAGO_CLIENT_SECRET }}"
+            # 🔴 AS PUBLIC KEYS SÃO VARIÁVEIS DE SERVIDOR — sem `NEXT_PUBLIC_`, de propósito.
+            #
+            # Elas são públicas por natureza (viajam ao navegador em toda página de checkout
+            # e identificam a conta; quem autoriza cobrança é o access token acima). Estarem
+            # aqui não é sigilo: é para que a chave chegue ao navegador POR PROP, do servidor,
+            # em vez de congelada no bundle pelo `next build`.
+            #
+            # É o desenho do ClerkProvider, e o efeito prático é que virar a conta do
+            # Mercado Pago passa a ser trocar um secret — não reconstruir o bundle.
+            gravar MERCADOPAGO_PUBLIC_KEY_TESTE       "${{ secrets.MERCADOPAGO_PUBLIC_KEY_TESTE }}"
+            gravar MERCADOPAGO_PUBLIC_KEY_PRODUCAO    "${{ secrets.MERCADOPAGO_PUBLIC_KEY_PRODUCAO }}"
+            # 🔴 A CHAVE QUE CIFRA OS TOKENS DE CONTA DO MÉDICO — e perdê-la é perder os dados.
+            #
+            # `lib/seguranca/cifra.ts` (AES-256-GCM, a primeira cifra em repouso deste
+            # repositório) LANÇA sem ela: nenhum médico consegue conectar a conta do Mercado
+            # Pago, e nada é gravado em claro. Falha fechada, como o BLOB_TOKEN_PRIVADO.
+            #
+            # ⚠️ NÃO EXISTE RECUPERAÇÃO. Trocar esta chave sem recifrar torna ilegível todo
+            # `access_token_cifrado` e `refresh_token_cifrado` já gravado, e cada médico
+            # precisaria reconectar. Rotação é decifrar com a antiga e recifrar com a nova —
+            # é por isso que o formato carrega `v1.` desde o primeiro dia.
+            #
+            # 64 hex = 32 bytes. Gerada com `openssl rand -hex 32`; o `tr -d '\n'` ao cadastrar
+            # não é detalhe — uma quebra de linha a mais e a chave deixa de ter 32 bytes.
+            gravar MERCADOPAGO_TOKEN_ENCRYPTION_KEY   "${{ secrets.MERCADOPAGO_TOKEN_ENCRYPTION_KEY }}"
+            # 🔴 A ASSINATURA SECRETA DO WEBHOOK — sem ela, NENHUM pagamento se confirma sozinho.
+            #
+            # `lib/mercadopago/assinatura-webhook.ts` confere o `x-signature` de cada
+            # notificação com esta chave e recusa TUDO quando ela falta (falha fechada: um
+            # webhook que aceita sem conferir é um webhook aberto). O sintoma de esquecê-la é
+            # silencioso: o MP recebe 200, e a consulta paga só se confirma pela conciliação
+            # do `filas.yml`.
+            #
+            # ⚠️ NÃO é o MERCADOPAGO_CLIENT_SECRET. É gerada em Suas integrações → Webhooks →
+            # Configurar notificação, e é uma por aplicação.
+            gravar MERCADOPAGO_WEBHOOK_SECRET         "${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}"
+            # 🔴 O INTERRUPTOR DO ROLLOUT — e LIGAR ELE QUEBRA AGENDAMENTO SE FOR CEDO.
+            #
+            # `reservarConsulta` recusa quando o médico não tem conta do Mercado Pago
+            # conectada. É a regra final, e é também mudança visível ao paciente: com a
+            # tabela `medicos_mercadopago_conta` vazia, ligar isto bloqueia TODOS os
+            # agendamentos, com TODOS os médicos, no mesmo segundo.
+            #
+            # ⚠️ ANTES DE CADASTRAR O SECRET COM 'ativo', um passo manual que NENHUM código
+            # confere: verificar que todo médico ativo já conectou a conta. Quem não tiver
+            # conectado deixa de receber agendamento imediatamente, e o sintoma do lado do
+            # paciente é a agenda parecer quebrada. Procedimento em docs/04, Item 38.
+            #
+            # Vazio = `inativo`, que é o padrão que não quebra nada. O log de produção
+            # registra cada médico sem conta mesmo com a flag desligada — é por ali que se
+            # mede quantos faltam antes de ligar.
+            #
+            # Mesmo desenho de PARCEIRO_TRANSFERENCIA_ATIVA: a trava fica no código e o que
+            # muda é o valor. Desligar é um comando, não um revert.
+            gravar MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO "${{ secrets.MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO }}"
+            # 🔴 O MESMO id do passo de build. Se só o build tiver, o header do servidor
+            # nunca bate com o do cliente e TODA navegação vira recarga completa.
+            gravar NEXT_DEPLOYMENT_ID              "${{ github.sha }}"
+
+            chmod 600 "$ENVFILE"
+
+            # ── O QUE O PM2 ESTÁ RODANDO HOJE, ANTES DE MUDAR QUALQUER COISA ────────
+            #
+            # Não muda nada: só imprime. Existe porque em 10/09/2026 descobrimos que o
+            # processo em produção não servia o build entregue — e ninguém tinha como
+            # saber, porque o caminho que o PM2 usa nunca aparecia em lugar nenhum.
+            echo "[diag] diretório do deploy:  $(pwd)"
+            echo "[diag] server.js entregue:   $(ls -l --time-style=+%F_%T .next/standalone/server.js 2>/dev/null || echo AUSENTE)"
+            pm2 describe behemp-site 2>/dev/null | grep -E "script path|exec cwd|status|uptime" \
+              || echo "[diag] nenhum processo behemp-site no PM2"
+
+            # ── PRESERVA O AMBIENTE QUE SÓ EXISTE DENTRO DO PROCESSO ───────────────
+            #
+            # 🔴 SEM ISTO, RECRIAR O PROCESSO DERRUBA O SITE INTEIRO.
+            #
+            # O deploy escreve 12 variáveis no `.env`; o `lib/env.ts` declara 61. As
+            # outras — CLERK_SECRET_KEY, BREVO_API_KEY, PUSHER_SECRET, DOCUSIGN_* —
+            # nunca foram escritas em arquivo nenhum: vivem só na memória do processo,
+            # herdadas do primeiro `pm2 start` manual. Foi o que o deploy #37 revelou.
+            #
+            # Reproduzido em 10/09/2026: sem CLERK_SECRET_KEY, TODA rota responde 500,
+            # inclusive as públicas. O script copia para o `.env` apenas as chaves que o
+            # app declara em `lib/env.ts`, e imprime somente NOMES.
+            node scripts/preservar-ambiente-do-pm2.mjs
+
+            # 🔴 CARREGA O `.env` NO AMBIENTE DESTE SHELL.
+            #
+            # Sem isto, `pnpm db:migrate:prod` falha com "DATABASE_URL ausente" — e falhou,
+            # no deploy do PR #38. O migrador lê `process.env`, e o `.env` que acabamos de
+            # escrever é um ARQUIVO: ninguém o carrega sozinho.
+            #
+            # O `drizzle-kit` antigo não tinha esse problema porque o `drizzle.config.ts`
+            # usa dotenv — a diferença passou despercebida ao trocar o CLI pelo migrador.
+            #
+            # `set -a` exporta tudo que for definido até o `set +a`. É o jeito canônico de
+            # transformar um arquivo de env em ambiente de shell, e é preciso porque o
+            # `pnpm` roda o script num processo filho, que herda o ambiente — não o arquivo.
+            set -a
+            . "$ENVFILE"
+            set +a
+
+            # Aplica as migrations pendentes.
+            #
+            # 🔴 `db:migrate:prod`, e NÃO `db:migrate`. O segundo chama o CLI `drizzle-kit`,
+            # que é devDependency — e o passo acima roda `--prod`, que pula devDependencies
+            # (o log dizia "devDependencies: skipped"). O CLI nunca esteve aqui.
+            #
+            # `db:migrate:prod` usa o migrator do próprio `drizzle-orm`, que é dependência
+            # de produção e precisa só dos .sql e da conexão — o caminho que a documentação
+            # do Drizzle recomenda quando devDependencies são podadas.
+            # 🔴 A VARIÁVEL VAI DIRETO NO COMANDO, sem depender do `source`.
+            #
+            # O `set -a; . $ENVFILE` acima serve ao APP; para a migration, passar o valor
+            # aqui elimina a classe inteira de problema: nenhum metacaractere de shell tem
+            # chance de interferir, porque o valor nunca é interpretado — vai do GitHub
+            # para o ambiente deste comando e pronto.
+            #
+            # É defesa em profundidade: as aspas no `.env` já resolvem, e esta linha
+            # continua funcionando mesmo que alguém quebre aquelas.
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" pnpm db:migrate:prod
+
             # Copia arquivos estáticos vitais para o standalone (CSS/Imagens)
             cp -r public .next/standalone/
             cp -r .next/static .next/standalone/.next/
-            
-            # Reinicia o processo com cwd no standalone
+
+            # ── O PROCESSO PRECISA APONTAR PARA O server.js DESTE DEPLOY ───────────
+            #
+            # 🔴 `pm2 restart` NÃO RELÊ O CAMINHO DO SCRIPT. Ele reusa o que foi gravado
+            # no `pm2 start` original — comportamento conhecido (Unitech/pm2#3054, onde
+            # o usuário trocou `index.js` por `dist/app.js` e o PM2 seguiu executando o
+            # antigo). Nem `--update-env`, nem `reload`, nem `startOrReload` corrigem.
+            #
+            # Era a causa da falha de 10/09/2026: o rsync entregava o build novo, o
+            # `pm2 restart` reiniciava OUTRO server.js, e o site servia um build de dias
+            # antes. Todo deploy passava verde. Nenhuma rota nova aparecia.
+            CAMINHO_ATUAL="$(node scripts/pm2-do-app.mjs --caminho || true)"
+
+            # A raiz do checkout, antes do `cd`: o worker das filas mora em `scripts/`, fora
+            # do standalone, e sobe por caminho absoluto lá embaixo.
+            RAIZ_DO_DEPLOY="$(pwd)"
+
             cd .next/standalone
-            pm2 restart behemp-site --update-env || pm2 start server.js --name "behemp-site"
-            pm2 save
+
+            # 1) Nada destrutivo antes de o arquivo novo existir de fato.
+            if [ ! -f server.js ]; then
+              echo "[pm2] ✗ server.js não está aqui — o build não chegou."
+              echo "[pm2]   Abortando SEM tocar no processo: o site continua no ar como está."
+              exit 1
+            fi
+
+            CAMINHO_ESPERADO="$(pwd)/server.js"
+            echo "[pm2] o processo roda:  ${CAMINHO_ATUAL:-<nenhum processo>}"
+            echo "[pm2] o deploy entrega: $CAMINHO_ESPERADO"
+
+            if [ "$CAMINHO_ATUAL" = "$CAMINHO_ESPERADO" ]; then
+              # Caminho certo: restart preserva o processo e não tem janela de queda.
+              echo "[pm2] mesmo caminho — restart basta."
+              pm2 restart behemp-site --update-env
+            else
+              # Caminho diferente (ou processo inexistente): só recriar resolve.
+              #
+              # `pm2 delete` NÃO apaga arquivo, log nem código — remove o registro do
+              # processo e o mata. O que ele descarta é o ambiente vivo, e é por isso
+              # que o passo de preservação acima roda ANTES, nunca depois.
+              echo "[pm2] caminho diferente — restart reusaria o antigo. Recriando."
+              pm2 delete behemp-site 2>/dev/null || true
+              pm2 start server.js --name "behemp-site" --update-env
+            fi
+
+            # ── O WORKER DAS FILAS, `behemp-filas` (ADR-0027 D-04) ─────────────────
+            #
+            # Chama as três rotas do `filas.yml` a cada 60 s em `127.0.0.1:3000`. O cron do
+            # GitHub continua como rede de segurança (D-06).
+            #
+            # SEMPRE `delete` + `start`, pelo mesmo motivo do behemp-site acima: `restart`
+            # reusaria o caminho gravado no primeiro start (Unitech/pm2#3054). O worker é só
+            # um temporizador — recriá-lo custa nada.
+            #
+            # 🔴 O AMBIENTE É MÍNIMO, com `env -i`: só PATH (achar `pm2` e `node`), HOME (o
+            # `pm2` acha o daemon em `~/.pm2`), PORT e CRON_SECRET. Este shell carregou o
+            # `.env` inteiro com `set -a`, e o PM2 dá ao processo o ambiente de QUEM CHAMOU o
+            # `pm2 start` — e grava esse ambiente no `dump.pm2`. Sem o `env -i`, o worker
+            # levaria todos os segredos do site e duplicaria no dump a exposição do Item 43.
+            # Medido em 24/09/2026 com PM2 7.0.4: herdando, o processo recebeu o segredo falso
+            # do shell; com `env -i`, só as quatro. O daemon não mistura o dele. O
+            # `--update-env` aqui só confirma que o ambiente é o desta chamada (o mínimo).
+            # `PM2_HOME` passa só se estiver definido, para nunca falar com outro daemon.
+            #
+            # 🔴 A falha do worker NÃO pula o `pm2 save`. Com `set -e`, um start que falhasse
+            # abortaria aqui, e o dump ficaria com o caminho ANTIGO do behemp-site: o próximo
+            # reboot o ressuscitaria no build velho. Então: marca, salva, e só depois denuncia.
+            WORKER_FALHOU=""
+            pm2 delete behemp-filas 2>/dev/null || true
+            env -i PATH="$PATH" HOME="$HOME" ${PM2_HOME:+PM2_HOME="$PM2_HOME"} PORT="${PORT:-3000}" CRON_SECRET="${CRON_SECRET:-}" pm2 start "$RAIZ_DO_DEPLOY/scripts/worker-filas.mjs" --name "behemp-filas" --cwd "$RAIZ_DO_DEPLOY" --update-env || WORKER_FALHOU=1
+
             pm2 save
 
+            if [ -n "$WORKER_FALHOU" ]; then
+              echo "[pm2] ✗ o behemp-filas não subiu. O site está no ar e foi salvo no dump;"
+              echo "[pm2]   as filas seguem só pelo filas.yml, na cadência de horas."
+              exit 1
+            fi
+            pm2 describe behemp-filas 2>/dev/null | grep -E "script path|exec cwd|status" \
+              || echo "[diag] behemp-filas não aparece no PM2"
+
+      # ── ⛔ O PORTÃO QUE IMPEDE "DEPLOY VERDE COM PRODUÇÃO PARADA" ──────────────
+      #
+      # Todo passo acima pode ter sucesso e ainda assim o site continuar servindo um
+      # build antigo — foi exatamente o que aconteceu entre 14/08 e 10/09/2026, e o
+      # que o diagnóstico da Dryelle mediu no servidor (`server.js` com mtime de
+      # 14 de agosto enquanto o Actions reportava sucesso em ~15s).
+      #
+      # COMO ELE PROVA: cada build gera chunks com hash NOVO em `.next/static/chunks`.
+      # Quem serve esses arquivos é o próprio processo Node, a partir do build que ele
+      # carregou. Se o processo for outro, o arquivo não existe lá e a resposta é 404 —
+      # medido em produção em 10/09/2026, com um chunk do build da vez.
+      #
+      # Portanto: 200 aqui significa que o processo em produção É este build. É a única
+      # afirmação deste workflow que não depende de nenhum passo ter "dado certo".
+      - name: Produção está servindo ESTE build?
+        run: |
+          set -e
+          ALVO=$(ls -S .next/static/chunks/*.js 2>/dev/null | head -1 || true)
+          if [ -z "$ALVO" ]; then
+            echo "✗ nenhum chunk em .next/static/chunks — o build não produziu o que deveria."
+            exit 1
+          fi
+          URL="https://be4hope.org/_next/static/chunks/$(basename "$ALVO")"
+          echo "conferindo: $URL"
+
+          for i in $(seq 1 20); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo 000)
+            if [ "$CODIGO" = "200" ]; then
+              echo "  o build deste deploy está sendo servido."
+
+              # 🔴 E O SITE PRECISA RESPONDER, NÃO SÓ EXISTIR.
+              #
+              # Em 10/09/2026 este portão passou VERDE com a produção inteira em HTTP 500:
+              # o chunk estático é servido mesmo quando o app falha em toda rota, porque o
+              # erro estava na autenticação, não no empacotamento.
+              #
+              # Servir arquivo não é estar de pé. A home tem que responder.
+              HOME_CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://be4hope.org/" || echo 000)
+              if [ "$HOME_CODIGO" = "200" ]; then
+                echo "✓ produção está servindo ESTE build, e a home responde 200."
+                exit 0
+              fi
+              echo "  ✗ o build é este, mas a home responde HTTP $HOME_CODIGO."
+              echo "    O processo subiu com o build certo e está falhando em runtime —"
+              echo "    tipicamente variável de ambiente ausente. Ver o passo do PM2 acima:"
+              echo "    a linha [ambiente] diz quantas chaves foram recuperadas e de onde."
+              exit 1
+            fi
+            echo "  tentativa $i/20: HTTP $CODIGO (o processo pode estar subindo)"
+            sleep 5
+          done
+
+          echo ""
+          echo "✗ DEPOIS DE 100s, PRODUÇÃO NÃO SERVE UM ARQUIVO DESTE BUILD."
+          echo ""
+          echo "  Os arquivos foram entregues e o PM2 reiniciou — e mesmo assim o site"
+          echo "  responde a partir de outro build. O passo 'Reiniciar Servidor (PM2)'"
+          echo "  acima imprime o caminho que o processo usa e o que o deploy entrega:"
+          echo "  comparar os dois diz se o rsync e o PM2 estão em diretórios diferentes."
+          exit 1

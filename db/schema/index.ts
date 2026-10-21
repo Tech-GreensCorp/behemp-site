@@ -36,7 +36,30 @@ export * from './teleconsultas';
 export * from './autorizacoes-anvisa';
 export * from './alertas-config';
 export * from './alertas-enviados';
+export * from './pagamentos';
+export * from './medicos-pagamento-config';
+export * from './medicos-mercadopago-conta';
+export * from './mercadopago-eventos-webhook';
 
 // Relations
 export * from './relations';
 export * from './procuracoes-especificas';
+
+// ── Anamnese como baseline — Sprint 3 (20/08/2026), ADR-0004 ──
+export * from './medidas-desfecho';
+export * from './rastreio-uso-cannabis';
+export * from './revisoes-ia';
+export * from './rascunhos-revisao-ia';
+export * from './solicitacoes-cadastro';
+export * from './chatpro-eventos';
+export * from './chatpro-diretorio';
+export * from './chatpro-sessoes';
+export * from './parceiro-eventos-saida';
+export * from './consentimentos';
+
+// ── Pedido de atendimento assistido da ANVISA — ADR-0029 ──
+export * from './pedidos-atendimento-assistido';
+export * from './chamadas-de-atendimento';
+
+// ── Comunicados para assinatura via DocuSign (Atualização do Programa de Doação) ──
+export * from './comunicados-assinatura';

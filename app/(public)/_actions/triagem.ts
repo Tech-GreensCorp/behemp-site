@@ -1,8 +1,9 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { triagens } from '@/db/schema';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { triagens, users, pacientes } from '@/db/schema';
+import { eq, desc, inArray, and, isNull, sql } from 'drizzle-orm';
+import { marcarPacientes, normalizarEmail } from '@/lib/triagens/e-paciente';
 import { z } from 'zod';
 
 /**
@@ -190,7 +191,7 @@ export async function criarTriagem(
  * Lista todas as triagens (admin only).
  */
 export async function listarTriagens(): Promise<
-  ActionResult<typeof triagens.$inferSelect[]>
+  ActionResult<Array<typeof triagens.$inferSelect & { ehPaciente: boolean }>>
 > {
   try {
     const { verificarAdmin } = await import('@/lib/auth');
@@ -204,7 +205,27 @@ export async function listarTriagens(): Promise<
       .from(triagens)
       .orderBy(desc(triagens.createdAt));
 
-    return { sucesso: true, dados: resultado };
+    // "É paciente" = e-mail da triagem bate com usuário que tem ficha ativa (lib/triagens/e-paciente.ts).
+    // Uma query só, limitada aos e-mails desta listagem — sem N+1 e sem trazer PII de quem não está nela.
+    const emails = [
+      ...new Set(resultado.map((t) => normalizarEmail(t.emailContato)).filter((e): e is string => e !== null)),
+    ];
+    const emailsDePacientes = new Set<string>();
+    if (emails.length > 0) {
+      const fichas = await db
+        .select({ email: sql<string>`lower(${users.email})` })
+        .from(pacientes)
+        .innerJoin(users, eq(pacientes.userId, users.id))
+        .where(
+          and(
+            isNull(pacientes.deletedAt),
+            sql`lower(${users.email}) IN (${sql.join(emails.map((e) => sql`${e}`), sql`, `)})`,
+          ),
+        );
+      for (const f of fichas) emailsDePacientes.add(f.email);
+    }
+
+    return { sucesso: true, dados: marcarPacientes(resultado, emailsDePacientes) };
   } catch (error) {
     console.error('[Action] Erro ao listar triagens:', error);
     return { sucesso: false, erro: 'Erro ao listar triagens' };

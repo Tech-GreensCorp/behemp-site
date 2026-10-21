@@ -5,6 +5,7 @@ import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
 import { coletarAlertasMedicacao, coletarAlertasLicencas, coletarAlertasMensalidades } from '@/lib/alertas/coletor';
 import { gerarHtmlDigestAdmin, gerarHtmlAlertaPaciente } from '@/lib/email/alertas';
 import { enviarEmailGenerico } from '@/lib/email/brevo';
+import { liberarReservasExpiradas as liberarReservasVencidas } from '@/lib/agendamento/liberar-reservas-expiradas';
 
 /**
  * Job: Verificar documentos próximos do vencimento.
@@ -205,9 +206,12 @@ export const digestDiarioAdmin = inngest.createFunction(
       }
     });
 
-    // 4. Notificar Paciente (Apenas Medicação)
+    // 4. Notificar Paciente (Medicação e ANVISA)
     if (notificarPaciente) {
       await step.run('enviar-alertas-paciente', async () => {
+        const { gerarHtmlAlertaAnvisaPaciente } = await import('@/lib/email/alertas');
+        
+        // 4.1 Medicação
         const meds = alertasNovos.filter(a => a.tipo === 'medicacao');
         for (const m of meds) {
           // Verifica se paciente já foi notificado neste marco
@@ -254,6 +258,59 @@ export const digestDiarioAdmin = inngest.createFunction(
               marcoDias: m.marcoDisparado,
               destinatario: 'paciente',
             }).onConflictDoNothing();
+          }
+        }
+
+        // 4.2 Licença ANVISA
+        const licencas = alertasNovos.filter(a => a.tipo === 'licenca_anvisa');
+        for (const l of licencas) {
+          const jaEnviado = await db.query.alertasEnviados.findFirst({
+            where: and(
+              eq(alertasEnviados.tipo, l.tipo),
+              eq(alertasEnviados.referenciaId, l.referenciaId),
+              eq(alertasEnviados.marcoDias, l.marcoDisparado),
+              eq(alertasEnviados.destinatario, 'paciente')
+            )
+          });
+
+          if (!jaEnviado) {
+            const lTyped = l as typeof alertasLicenca[number];
+            
+            // Só enviar alerta de ANVISA para paciente se os diasRestantes forem >= 0, ou seja, evitar alertar paciente sobre expirados que o admin já deve estar ciente
+            if (lTyped.diasRestantes >= 0 || lTyped.marcoDisparado < 0) {
+              const html = gerarHtmlAlertaAnvisaPaciente({
+                nome: lTyped.pacienteNome,
+                dataValidade: lTyped.dataValidade,
+                diasRestantes: lTyped.diasRestantes,
+                renovacaoUrl: 'https://be4hope.org/paciente/anvisa',
+              });
+
+              await enviarEmailGenerico(
+                [{ email: l.pacienteEmail, name: l.pacienteNome }],
+                lTyped.diasRestantes < 0 ? 'Autorização ANVISA Expirada - Be4Hope' : 'Aviso de Renovação ANVISA - Be4Hope',
+                html
+              );
+
+              const pUser = await db.query.users.findFirst({ where: eq(users.email, l.pacienteEmail) });
+              if (pUser) {
+                await db.insert(notificacoes).values({
+                  userId: pUser.id,
+                  titulo: lTyped.diasRestantes < 0 ? 'Autorização ANVISA Expirada' : 'Aviso de Renovação ANVISA',
+                  mensagem: lTyped.diasRestantes < 0 
+                    ? 'Sua autorização ANVISA expirou. Renove imediatamente.'
+                    : `Sua autorização ANVISA vence em ${lTyped.diasRestantes} dias.`,
+                  tipo: 'renovacao_documento',
+                  linkAcao: '/paciente/anvisa',
+                });
+              }
+
+              await db.insert(alertasEnviados).values({
+                tipo: l.tipo,
+                referenciaId: l.referenciaId,
+                marcoDias: l.marcoDisparado,
+                destinatario: 'paciente',
+              }).onConflictDoNothing();
+            }
           }
         }
       });
@@ -370,3 +427,30 @@ export const enviarEmailRecompraAgendado = inngest.createFunction(
   },
 );
 
+/**
+ * Job: Liberar reservas de agendamento expiradas.
+ *
+ * ⚠️ NÃO RODA EM PRODUÇÃO (Item 40): quem libera as reservas é o worker das filas, por
+ * `GET /api/agendamento/expirar` (ADR-0027). Mantido registrado, mas delegando à MESMA função,
+ * para que religar o Inngest não traga de volta uma cópia sem a trava da Fase 4 (PIX ainda
+ * pagável, pagamento em processamento). O retorno do step leva só os contadores — nada de
+ * nome ou e-mail do paciente na nuvem do Inngest.
+ */
+export const liberarReservasExpiradas = inngest.createFunction(
+  {
+    id: 'liberar-reservas-expiradas',
+    name: 'Liberar Reservas de Agendamento Expiradas',
+    triggers: [{ cron: '*/5 * * * *' }],
+  },
+  async ({ step }) => {
+    const resultado = await step.run('liberar-reservas-expiradas', () =>
+      liberarReservasVencidas(),
+    );
+
+    return {
+      reservasLiberadas: resultado.liberadas,
+      reservasProtegidas: resultado.protegidas,
+      timestamp: new Date().toISOString(),
+    };
+  },
+);

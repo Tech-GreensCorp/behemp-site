@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { solicitarRecompraManual, listarMinhasRecompras, listarPacientesParaRecompra } from '@/app/_actions/recompras';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   Calendar,
   Loader2,
@@ -181,12 +182,10 @@ export default function RecompraMedicoPage() {
   if (sucesso) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Solicite a recompra para seus pacientes
-          </p>
-        </div>
+        <PageHeader
+          title="Recompra de Medicamento"
+          description="Solicite a recompra para seus pacientes"
+        />
 
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -228,13 +227,10 @@ export default function RecompraMedicoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Solicite a recompra de medicamento para seus pacientes
-        </p>
-      </div>
+      <PageHeader
+        title="Recompra de Medicamento"
+        description="Solicite a recompra de medicamento para seus pacientes"
+      />
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Formulário */}

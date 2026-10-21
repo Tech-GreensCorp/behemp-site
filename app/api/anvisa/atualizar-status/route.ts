@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { notificarParceiro } from '@/lib/parceiros/notificar';
+import { avisarAnvisaAprovada } from '@/lib/anvisa/avisar-aprovacao';
+import { encerrarPedidoDaAutorizacao } from '@/lib/anvisa/encerrar-pedido-de-atendimento';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, users, logsAuditoria } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPusherServer } from '@/lib/integrations/pusher/server';
+import { addYears, format } from 'date-fns';
 
 const schema = z
   .object({
@@ -12,6 +16,7 @@ const schema = z
     status: z.enum(['em_analise', 'aprovado', 'pendencia_documental', 'rejeitado']),
     numeroProcesso: z.string().optional(),
     observacoes: z.string().optional(),
+    dataValidade: z.string().optional(), // YYYY-MM-DD
   })
   .strict();
 
@@ -33,18 +38,82 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 });
 
-  const { autorizacaoId, status, numeroProcesso, observacoes } = parsed.data;
+  const {
+    autorizacaoId,
+    status,
+    numeroProcesso,
+    observacoes,
+    dataValidade: manualDataValidade,
+  } = parsed.data;
 
   const dadosUpdate: Record<string, unknown> = { status };
   if (numeroProcesso) dadosUpdate.numeroProcesso = numeroProcesso;
   if (observacoes) dadosUpdate.observacoesAnvisa = observacoes;
-  if (status === 'aprovado') dadosUpdate.dataAprovacao = new Date();
+
+  if (status === 'aprovado') {
+    const dataAprovacao = new Date();
+    dadosUpdate.dataAprovacao = dataAprovacao;
+    if (manualDataValidade) {
+      dadosUpdate.dataValidade = manualDataValidade;
+    } else {
+      // Cálculo automático: +2 anos
+      dadosUpdate.dataValidade = format(addYears(dataAprovacao, 2), 'yyyy-MM-dd');
+    }
+  }
 
   const [atualizado] = await db
     .update(autorizacoesAnvisa)
     .set(dadosUpdate)
-    .where(eq(autorizacoesAnvisa.id, autorizacaoId))
+    .where(and(eq(autorizacoesAnvisa.id, autorizacaoId), isNull(autorizacoesAnvisa.deletedAt)))
     .returning({ pacienteId: autorizacoesAnvisa.pacienteId });
+
+  // Autorização apagada (ou inexistente) não muda de status: uma aba antiga poderia
+  // "aprovar" o que foi apagado, e o motor de alertas não filtra `deletedAt`.
+  if (!atualizado) {
+    return NextResponse.json(
+      { sucesso: false, erro: 'Autorização não encontrada ou apagada' },
+      { status: 404 },
+    );
+  }
+
+  /**
+   * 🔴 AVISA O PARCEIRO QUE A AUTORIZAÇÃO SAIU (ADR-0016 D-09).
+   *
+   * Só quando o status é `aprovado`: os demais são etapas do processo, e avisar a cada
+   * mudança encheria o funil do parceiro de ruído — ele quer saber que TERMINOU.
+   *
+   * `notificarParceiro` nunca lança, e só enfileira. A atualização de status não pode
+   * falhar porque um parceiro está fora do ar.
+   */
+  if (status === 'aprovado' && atualizado?.pacienteId) {
+    await notificarParceiro({ pacienteId: atualizado.pacienteId, tipo: 'anvisa_aprovada' });
+
+    /**
+     * 🔴 E O PACIENTE TAMBÉM É AVISADO (Item 29) — até 11/09/2026 havia só o Pusher, que é
+     * tempo real: quem não estava com a aba aberta nunca soube que a autorização saiu.
+     *
+     * Nunca lança, pelo mesmo motivo do aviso ao parceiro: a aprovação já foi gravada, e um
+     * provedor de e-mail fora do ar não pode desfazer isso.
+     */
+    await avisarAnvisaAprovada({
+      pacienteId: atualizado.pacienteId,
+      numeroProcesso: numeroProcesso ?? null,
+    });
+
+    /**
+     * E o pedido de atendimento assistido, se houver, sai dos pendentes do admin (ADR-0029 D-03,
+     * `DO-72`). Nunca lança: a aprovação já foi gravada.
+     */
+    await encerrarPedidoDaAutorizacao(autorizacaoId, 'concluido');
+  }
+
+  /**
+   * A ANVISA rejeitou: o pedido de atendimento fica como `rejeitado_anvisa` (Davi, 30/09/2026,
+   * `DO-76`) e sai dos pendentes. Nunca lança.
+   */
+  if (status === 'rejeitado') {
+    await encerrarPedidoDaAutorizacao(autorizacaoId, 'rejeitado_anvisa');
+  }
 
   // Notificar paciente via Pusher
   if (atualizado?.pacienteId) {

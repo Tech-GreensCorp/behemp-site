@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   Download,
-  ExternalLink,
   FileCheck,
   Loader2,
   Plus,
@@ -20,17 +19,37 @@ import {
 } from 'lucide-react';
 import { uploadDocumentoPaciente, listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
 import Link from 'next/link';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/page-header';
+import { ComunicadosParaAssinar } from '@/components/paciente/comunicados/ComunicadosParaAssinar';
+import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 
 const TIPO_LABELS: Record<string, string> = {
   rg: 'RG',
   receita_medica: 'Receita Médica',
   comprovante_residencia: 'Comprovante de Residência',
   autorizacao_anvisa: 'Autorização ANVISA',
+  // Entrou no enum em 23/09/2026 — ADR-0026.
+  laudo_medico: 'Laudo Médico',
   oficio_anvisa: 'Ofício da ANVISA',
   documento_pessoal: 'Documento Pessoal',
   procuracao_especifica: 'Procuração Específica',
+  contrato_termos: 'Contrato e termos',
+  laudo_relatorio: 'Laudo / relatório',
+  orcamento: 'Orçamento',
+  outro: 'Outro',
 };
+
+/** Documento do tipo "outro" agrupa pelo nome que o admin deu; os demais, pelo tipo. */
+function chaveDoTipo(d: { tipo?: string; tipoPersonalizado?: string | null }): string {
+  if (d.tipo === 'outro' && d.tipoPersonalizado) return `outro:${d.tipoPersonalizado}`;
+  return d.tipo || 'outro';
+}
+
+function rotuloDaChave(chave: string): string {
+  return chave.startsWith('outro:') ? chave.slice('outro:'.length) : (TIPO_LABELS[chave] ?? chave);
+}
 
 export default function DocumentosPacientePage() {
   const [docs, setDocs] = useState<any[]>([]);
@@ -100,7 +119,7 @@ export default function DocumentosPacientePage() {
   }
 
   const agrupados = docs.reduce((acc: Record<string, any[]>, d) => {
-    const key = d.tipo || 'outro';
+    const key = chaveDoTipo(d);
     if (!acc[key]) acc[key] = [];
     acc[key].push(d);
     return acc;
@@ -127,29 +146,26 @@ export default function DocumentosPacientePage() {
         </Link>
       </div>
 
-      {/* ── Header Editorial ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up">
-        <div>
-          <p className="text-primary mb-2 text-xs font-semibold tracking-[0.25em] uppercase">
-            Acolhimento
-          </p>
-          <h1 className="font-display text-4xl leading-[1.1] font-bold tracking-tight text-foreground">
-            Meus <span className="text-accent-italic">Documentos</span>
-          </h1>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
-            Envie e gerencie os documentos necessários para validação e conformidade legal do seu tratamento.
-          </p>
-        </div>
-        {!mostrarForm && (
-          <Button 
-            className="rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0 shrink-0 self-start sm:self-center" 
-            onClick={() => setMostrarForm(true)}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Enviar Documento
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow="Acolhimento"
+        title="Meus Documentos"
+        description="Envie e gerencie os documentos necessários para validação e conformidade legal do seu tratamento."
+        actions={
+          !mostrarForm && (
+            <Button
+              className="rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0 shrink-0"
+              onClick={() => setMostrarForm(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Enviar Documento
+            </Button>
+          )
+        }
+      />
+
+      {/* Comunicados enviados pela equipe para assinatura (só aparece se houver) */}
+      <ComunicadosParaAssinar />
 
       {/* Formulário inline */}
       {mostrarForm && (
@@ -199,7 +215,7 @@ export default function DocumentosPacientePage() {
 
             {/* Arquivo */}
             <div className="space-y-1.5">
-              <Label htmlFor="doc-file" className="text-xs text-muted-foreground font-semibold">Arquivo (máx. 100MB) — PDF, JPG, PNG <span className="text-destructive">*</span></Label>
+              <Label htmlFor="doc-file" className="text-xs text-muted-foreground font-semibold">Arquivo (máx. 200MB) — PDF, JPG, PNG <span className="text-destructive">*</span></Label>
               <Input id="doc-file" ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="rounded-xl border-border/40 file:rounded-lg file:border-border/40" />
             </div>
 
@@ -222,85 +238,73 @@ export default function DocumentosPacientePage() {
 
       {/* Lista de documentos */}
       {Object.keys(agrupados).length === 0 ? (
-        <Card className="border border-border/30 bg-white shadow-sm rounded-3xl overflow-hidden transition-all hover:shadow-md animate-fade-up max-w-lg mx-auto">
-          <CardContent className="flex flex-col items-center justify-center p-8 sm:p-12 text-center relative grain">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <FileText className="h-8 w-8" />
-            </div>
-            <h3 className="font-display text-2xl font-bold text-foreground">Nenhum documento enviado</h3>
-            <p className="mt-3 text-sm text-muted-foreground max-w-xs leading-relaxed">
-              Clique em <strong className="text-primary font-semibold">&quot;Enviar Documento&quot;</strong> para adicionar
-            </p>
-            {!mostrarForm && (
-              <Button 
-                className="mt-6 rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0" 
+        <DataEmpty
+          icon={<FileText size={24} />}
+          title="Nenhum documento enviado"
+          description={'Clique em "Enviar Documento" para adicionar'}
+          actions={
+            !mostrarForm && (
+              <Button
+                className="rounded-full bg-[#16a34a] hover:bg-[#148f43] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 px-6 py-2.5 text-sm cursor-pointer border-0"
                 onClick={() => setMostrarForm(true)}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Enviar Documento
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        />
       ) : (
         <div className="space-y-8 animate-fade-up">
           {Object.entries(agrupados).map(([tipoKey, items]) => (
             <div key={tipoKey} className="space-y-3">
               <h3 className="font-heading text-xs font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
-                {TIPO_LABELS[tipoKey] ?? tipoKey}
+                {rotuloDaChave(tipoKey)}
               </h3>
-              <div className="grid gap-3">
+              <DataList>
                 {items.map((doc: any) => {
                   const vencido = new Date(doc.dataValidade) < new Date();
                   return (
-                    <Card key={doc.id} className="border border-border/30 bg-white shadow-sm rounded-3xl overflow-hidden transition-all hover:shadow-md">
-                      <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5">
-                        
-                        {/* Info */}
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                            <FileCheck size={18} className="text-primary" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground leading-snug">{doc.nomeArquivo}</p>
-                            <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
-                              <span>Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                              <span>·</span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Validade: {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end sm:self-center">
+                    <DataRow
+                      key={doc.id}
+                      icon={<FileCheck size={18} className="text-primary" />}
+                      title={doc.nomeArquivo}
+                      subtitle={
+                        <>
+                          Emissão: {new Date(doc.dataEmissao + 'T00:00:00').toLocaleDateString('pt-BR')} ·{' '}
+                          <Clock className="mb-0.5 inline h-3 w-3" /> Validade:{' '}
+                          {new Date(doc.dataValidade + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </>
+                      }
+                      trailing={
+                        <>
                           <Badge className={cn(
-                            "border-0 font-bold text-[10px] py-0.5 px-2 rounded-full",
-                            vencido ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-700'
+                            'border-0 rounded-full px-2 py-0.5 text-[10px] font-bold',
+                            vencido ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-700',
                           )}>
                             {vencido ? 'Vencido' : 'Válido'}
                           </Badge>
-                          <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" size="sm" className="gap-1.5 rounded-full text-xs h-8 border-border/40 hover:bg-accent">
-                              <ExternalLink size={13} /> Ver
-                            </Button>
-                          </a>
+                          {/* Ver abre o documento num modal — 14/09/2026. Mesma rota de antes. */}
+                          <VisualizadorDeDocumento
+                            documentoId={doc.id}
+                            rotulo={rotuloDaChave(tipoKey)}
+                            nomeArquivo={doc.nomeArquivo}
+                            className="h-8 rounded-full text-xs"
+                          />
                           <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 rounded-full text-xs h-8 border-border/40 hover:bg-accent"
+                            className="h-8 gap-1.5 rounded-full text-xs"
                             onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
                           >
                             <Download size={13} /> Baixar
                           </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </>
+                      }
+                    />
                   );
                 })}
-              </div>
+              </DataList>
             </div>
           ))}
         </div>

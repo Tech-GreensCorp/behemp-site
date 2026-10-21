@@ -1,32 +1,59 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { consultas, medicos, pacientes, users } from '@/db/schema';
-import { eq, and, gte, lte, desc, isNull, asc } from 'drizzle-orm';
+import { estaConectado, podeAgendarCom } from '@/lib/mercadopago/conta';
+import { consultas, medicos, pacientes, pagamentos, users } from '@/db/schema';
+import { eq, and, gte, lte, isNull, asc, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { auth } from '@clerk/nextjs/server';
-import { criarConsultaGoogleCalendar, cancelarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
-import { enviarEmailConsultaAgendada, enviarEmailConsultaMedico } from '@/lib/email/consultas';
+import { verificarPaciente } from '@/lib/auth';
+import { registrarAuditoria } from '@/lib/utils/audit';
+import {
+  confirmarConsultaPaga,
+  marcarErroConfirmacao,
+} from '@/lib/agendamento/confirmar-consulta-paga';
+import { semPagamentoEmCurso } from '@/lib/agendamento/liberar-reservas-expiradas';
+import { revalidatePath } from 'next/cache';
+import { atualizarEventoGoogleCalendar } from '@/lib/integrations/google-calendar';
+import {
+  enviarEmailReservaAguardandoPagamento,
+  enviarEmailConsultaCancelada,
+  enviarEmailConsultaRemarcada,
+  enviarEmailConsultaRemarcadaPeloPacienteMedico,
+} from '@/lib/email/consultas';
 import { format } from 'date-fns';
 
 /**
  * Server Actions de agendamento de consultas.
  *
- * Regra (CLAUDE.md): Consulta só é confirmada APÓS criação bem-sucedida
- * do evento no Google Calendar. Em caso de falha, a transação é revertida.
+ * Fluxo em duas etapas:
+ * 1. `reservarConsulta` — trava o horário (`status: 'reservada'`) por um prazo curto
+ *    (`RESERVA_TTL_MINUTOS`). Ninguém mais consegue reservar o mesmo horário enquanto
+ *    a reserva estiver ativa (garantido pelo índice único de `consultas`).
+ * 2. `confirmarAgendamento` — dentro do prazo, confirma de fato: tenta o Google
+ *    Calendar (falha não bloqueia — token expirado/"invalid_grant" não deve travar
+ *    todos os agendamentos do médico), envia e-mails, e vincula o pagamento.
+ *
+ * Reservas que expiram sem confirmação são liberadas por um job (ver
+ * `liberarReservasExpiradas` em lib/agendamento/liberar-reservas-expiradas.ts, chamada pelo
+ * worker das filas por `GET /api/agendamento/expirar`).
  */
+
+/** Placeholder ajustável — quanto tempo o paciente tem para pagar após reservar. */
+const RESERVA_TTL_MINUTOS = 30;
 
 // ── Schemas de validação ──────────────────────────────────────
 
-const agendarConsultaSchema = z.object({
-  // 'auto' = resolver pelo usuario autenticado; ou UUID explícito (uso interno)
-  pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
+const reservarConsultaSchema = z.object({
   medicoId: z.string().min(1, 'ID do médico é obrigatório'),
   dataHora: z.string().datetime('Data/hora inválida'),
   observacoes: z.string().optional(),
 });
 
-const cancelarConsultaSchema = z.object({
+const confirmarAgendamentoSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+});
+
+const iniciarAguardoPagamentoSchema = z.object({
   consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
 });
 
@@ -38,71 +65,55 @@ interface ActionResult<T = unknown> {
   erro?: string;
 }
 
-// ── Actions ───────────────────────────────────────────────────
-
 /**
- * Agenda uma nova consulta.
- * 1. Valida dados
- * 2. Busca dados do médico e paciente
- * 3. Cria evento no Google Calendar com Meet
- * 4. Salva no banco
- * 5. Envia e-mail de confirmação
+ * Reserva um horário: cria a consulta com status 'reservada' e prazo de confirmação,
+ * e o registro de pagamento vinculado a ela. Autenticação obrigatória — pacienteId
+ * nunca vem do client, sempre resolvido a partir do usuário autenticado.
  */
-export async function agendarConsulta(
-  dados: z.infer<typeof agendarConsultaSchema>,
-): Promise<ActionResult<{ consultaId: string; meetLink: string }>> {
+export async function reservarConsulta(
+  dados: z.infer<typeof reservarConsultaSchema>,
+): Promise<ActionResult<{ consultaId: string; expiraEm: string; valor: number; moeda: string }>> {
   try {
-    // Validar entrada
-    const parsed = agendarConsultaSchema.safeParse(dados);
+    const parsed = reservarConsultaSchema.safeParse(dados);
     if (!parsed.success) {
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    let { pacienteId, medicoId, dataHora, observacoes } = parsed.data;
+    const { medicoId, dataHora, observacoes } = parsed.data;
 
-    // Resolver pacienteId automaticamente quando o wizard passa 'auto'
-    if (pacienteId === 'auto') {
-      const { userId: clerkId } = await auth();
-      if (!clerkId) {
-        return { sucesso: false, erro: 'Autenticação necessária para agendar' };
-      }
-
-      // Buscar user interno pelo clerkId
-      const [userInterno] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, clerkId))
-        .limit(1);
-
-      if (!userInterno) {
-        return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
-      }
-
-      // Buscar paciente vinculado a esse user
-      const [pacienteAuto] = await db
-        .select({ id: pacientes.id })
-        .from(pacientes)
-        .where(and(
-          eq(pacientes.userId, userInterno.id),
-          isNull(pacientes.deletedAt),
-        ))
-        .limit(1);
-
-      if (!pacienteAuto) {
-        return {
-          sucesso: false,
-          erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
-        };
-      }
-
-      pacienteId = pacienteAuto.id;
+    const auth = await verificarPaciente();
+    if (!auth.autorizado || !auth.clerkId) {
+      return { sucesso: false, erro: 'Autenticação necessária para agendar' };
     }
 
-    // Buscar dados do médico
+    const [userInterno] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId))
+      .limit(1);
+
+    if (!userInterno) {
+      return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+    }
+
+    const [pacienteAuto] = await db
+      .select({ id: pacientes.id })
+      .from(pacientes)
+      .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (!pacienteAuto) {
+      return {
+        sucesso: false,
+        erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+      };
+    }
+
+    const pacienteId = pacienteAuto.id;
+
     const [medico] = await db
-      .select()
+      .select({ valorConsulta: medicos.valorConsulta })
       .from(medicos)
-      .innerJoin(users, eq(medicos.userId, users.id))
       .where(eq(medicos.id, medicoId))
       .limit(1);
 
@@ -110,7 +121,276 @@ export async function agendarConsulta(
       return { sucesso: false, erro: 'Médico não encontrado' };
     }
 
-    // Buscar dados do paciente
+    if (medico.valorConsulta === null || medico.valorConsulta === undefined) {
+      return {
+        sucesso: false,
+        erro:
+          'Este médico ainda não tem o valor da consulta configurado. Peça para o administrador configurar em Médicos.',
+      };
+    }
+
+    // 🔴 SEM CONTA DO MERCADO PAGO CONECTADA, NÃO HÁ PARA ONDE O DINHEIRO IR.
+    //
+    // O split paga o médico direto na conta dele; sem o vínculo OAuth, a reserva nasceria
+    // com um pagamento que ninguém consegue cobrar — e o paciente só descobriria na etapa
+    // de pagamento, com o horário já bloqueado.
+    //
+    // ⚠️ `podeAgendarCom` NÃO DECIFRA NADA: só confere que existe linha sem
+    // `desconectadoEm`. Decifrar aqui seria expor a credencial num fluxo PÚBLICO, onde não
+    // há médico logado para auditar o acesso (ADR-0024 §5).
+    //
+    // ⚠️ MAS ISTO SÓ BLOQUEIA COM `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO='ativo'`, e o
+    // padrão é INATIVO. Hoje a tabela `medicos_mercadopago_conta` está vazia: bloquear no
+    // merge derrubaria o agendamento de TODOS os médicos ao mesmo tempo, sem que nenhum
+    // deles tivesse tido a chance de conectar. O interruptor existe para que a regra entre
+    // em vigor DEPOIS de os médicos conectarem, e não antes. Ver docs/04, Item 38.
+    const permissao = await podeAgendarCom(medicoId);
+
+    // O fato vai para o log MESMO quando não bloqueia — é assim que se mede quantos médicos
+    // ainda faltam antes de ligar a flag, em vez de descobrir pelo paciente. Só o id do
+    // médico, que é interno: nada do paciente entra aqui.
+    if (!permissao.conectado) {
+      console.warn(
+        `[mercadopago] médico sem conta conectada no agendamento (medicoId=${medicoId}, bloqueio=${permissao.bloqueioAtivo ? 'ativo' : 'inativo'})`,
+      );
+    }
+
+    if (!permissao.permitido) {
+      return {
+        sucesso: false,
+        erro:
+          'Este médico ainda não configurou o recebimento de pagamentos. Peça para o administrador entrar em contato com ele.',
+      };
+    }
+
+    const dataConsulta = new Date(dataHora);
+    const expiraEm = new Date(Date.now() + RESERVA_TTL_MINUTOS * 60 * 1000);
+
+    // O índice único parcial de `consultas` (medicoId+dataHora, status <> 'cancelada')
+    // garante a exclusividade — 'reservada' já conta como ativa.
+    let novaConsulta: { id: string };
+    try {
+      [novaConsulta] = await db
+        .insert(consultas)
+        .values({
+          pacienteId,
+          medicoId,
+          dataHora: dataConsulta,
+          status: 'reservada',
+          expiraEm,
+          observacoes,
+        })
+        .returning({ id: consultas.id });
+    } catch (dbError) {
+      const codigo = (dbError as { code?: string }).code;
+      if (codigo === '23505') {
+        return {
+          sucesso: false,
+          erro: 'Este horário acabou de ser reservado por outra pessoa. Escolha outro horário.',
+        };
+      }
+      throw dbError;
+    }
+
+    await registrarAuditoria({
+      userId: userInterno.id,
+      acao: 'criar',
+      entidade: 'consultas',
+      entidadeId: novaConsulta.id,
+      dadosDepois: { medicoId, dataHora: dataConsulta.toISOString(), status: 'reservada', expiraEm: expiraEm.toISOString() },
+    });
+
+    const moeda = 'BRL';
+    const valor = Number(medico.valorConsulta);
+
+    try {
+      await db.insert(pagamentos).values({
+        consultaId: novaConsulta.id,
+        pacienteId,
+        medicoId,
+        dataHora: dataConsulta,
+        valor: valor.toFixed(2),
+        moeda,
+      });
+    } catch (pagamentoError) {
+      // Não falha a reserva por causa do registro de pagamento — a consulta já existe.
+      console.error('[Action] Falha ao criar registro de pagamento da reserva:', pagamentoError);
+    }
+
+    revalidatePath('/admin/pagamentos');
+
+    return {
+      sucesso: true,
+      dados: { consultaId: novaConsulta.id, expiraEm: expiraEm.toISOString(), valor, moeda },
+    };
+  } catch (error) {
+    console.error('[Action] Erro ao reservar consulta:', error);
+    return { sucesso: false, erro: 'Erro interno ao reservar horário' };
+  }
+}
+
+/**
+ * Confirma uma reserva dentro do prazo — a CASCA AUTENTICADA.
+ *
+ * Confere a sessão do paciente e que a consulta é dele; a confirmação em si (prazo, Google
+ * Calendar, status final, pagamento pago, e-mails) é `confirmarConsultaPaga`, a mesma função
+ * que o webhook do Mercado Pago chama sem sessão (Parte 2, 23/09/2026).
+ */
+export async function confirmarAgendamento(
+  dados: z.infer<typeof confirmarAgendamentoSchema>,
+): Promise<ActionResult<{ consultaId: string; meetLink: string }>> {
+  try {
+    const parsed = confirmarAgendamentoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const { consultaId } = parsed.data;
+
+    const auth = await verificarPaciente();
+    if (!auth.autorizado || !auth.clerkId) {
+      return { sucesso: false, erro: 'Autenticação necessária para agendar' };
+    }
+
+    const [userInterno] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId))
+      .limit(1);
+
+    if (!userInterno) {
+      return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+    }
+
+    const [pacienteAuto] = await db
+      .select({ id: pacientes.id })
+      .from(pacientes)
+      .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (!pacienteAuto) {
+      return {
+        sucesso: false,
+        erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+      };
+    }
+
+    const pacienteId = pacienteAuto.id;
+
+    // A consulta precisa existir e pertencer a este paciente — nunca confiamos só no
+    // id vindo do client. Não distinguimos "não existe" de "não é sua" (evita enumeração).
+    const [reserva] = await db
+      .select()
+      .from(consultas)
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
+
+    if (!reserva) {
+      return { sucesso: false, erro: 'Reserva não encontrada.' };
+    }
+
+    // A partir daqui é a confirmação em si — a mesma que o webhook do Mercado Pago dispara.
+    // Esta action só respondeu "quem é você e a consulta é sua?"; o resto mora num módulo SEM
+    // `'use server'` de propósito (ver o cabeçalho de lib/agendamento/confirmar-consulta-paga.ts).
+    return await confirmarConsultaPaga(consultaId, { atorUserId: userInterno.id });
+  } catch (error) {
+    console.error('[Action] Erro ao confirmar agendamento:', error);
+    if (typeof dados?.consultaId === 'string' && dados.consultaId) {
+      await marcarErroConfirmacao(dados.consultaId, 'Erro interno ao confirmar agendamento');
+    }
+    return { sucesso: false, erro: 'Erro interno ao confirmar agendamento' };
+  }
+}
+
+/**
+ * Sai da etapa de confirmação para a etapa de pagamento (layout, sem gateway real).
+ *
+ * Ao contrário de `confirmarAgendamento`, esta action NÃO muda `consultas.status`
+ * (a reserva já nasceu 'reservada' em `reservarConsulta` e continua assim), NÃO toca
+ * Google Calendar e NÃO envia o e-mail de "consulta confirmada" — isso ficaria
+ * enganoso antes do pagamento existir de verdade. Só valida que a reserva ainda é
+ * do paciente e está dentro do prazo, e dispara o aviso de "aguardando pagamento".
+ *
+ * `confirmarAgendamento` continua intocada no código para ser chamada futuramente
+ * quando existir confirmação real de pagamento (ex.: webhook de gateway).
+ */
+export async function iniciarAguardoPagamento(
+  dados: z.infer<typeof iniciarAguardoPagamentoSchema>,
+): Promise<ActionResult<{ consultaId: string }>> {
+  try {
+    const parsed = iniciarAguardoPagamentoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
+    }
+
+    const { consultaId } = parsed.data;
+
+    const auth = await verificarPaciente();
+    if (!auth.autorizado || !auth.clerkId) {
+      return { sucesso: false, erro: 'Autenticação necessária para agendar' };
+    }
+
+    const [userInterno] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, auth.clerkId))
+      .limit(1);
+
+    if (!userInterno) {
+      return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+    }
+
+    const [pacienteAuto] = await db
+      .select({ id: pacientes.id })
+      .from(pacientes)
+      .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+      .limit(1);
+
+    if (!pacienteAuto) {
+      return {
+        sucesso: false,
+        erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+      };
+    }
+
+    const pacienteId = pacienteAuto.id;
+
+    const [reserva] = await db
+      .select()
+      .from(consultas)
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
+
+    if (!reserva) {
+      return { sucesso: false, erro: 'Reserva não encontrada.' };
+    }
+
+    if (reserva.status !== 'reservada') {
+      return {
+        sucesso: false,
+        erro: reserva.status === 'cancelada'
+          ? 'Sua reserva expirou ou foi cancelada. Escolha um novo horário.'
+          : 'Este agendamento já foi confirmado anteriormente.',
+      };
+    }
+
+    if (reserva.expiraEm && reserva.expiraEm.getTime() < Date.now()) {
+      await db
+        .update(consultas)
+        .set({ status: 'cancelada', expiraEm: null })
+        .where(eq(consultas.id, consultaId));
+      const mensagem = 'O prazo da reserva expirou.';
+      await marcarErroConfirmacao(consultaId, mensagem);
+      return { sucesso: false, erro: `${mensagem} Escolha um novo horário.` };
+    }
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, reserva.medicoId))
+      .limit(1);
+
     const [paciente] = await db
       .select()
       .from(pacientes)
@@ -118,177 +398,622 @@ export async function agendarConsulta(
       .where(eq(pacientes.id, pacienteId))
       .limit(1);
 
-    if (!paciente) {
-      return { sucesso: false, erro: 'Paciente não encontrado' };
+    if (!medico || !paciente) {
+      return { sucesso: false, erro: 'Erro ao carregar dados da reserva' };
     }
 
-    const dataConsulta = new Date(dataHora);
-    const dataFim = new Date(dataConsulta.getTime() + 60 * 60 * 1000); // +1 hora
+    const [pagamento] = await db
+      .select({ valor: pagamentos.valor, moeda: pagamentos.moeda })
+      .from(pagamentos)
+      .where(eq(pagamentos.consultaId, consultaId))
+      .limit(1);
 
-    // Tentar criar evento no Google Calendar
-    let googleEventId: string | null = null;
-    let meetLink: string | null = null;
-
-    if (medico.medicos.googleRefreshToken) {
-      const resultadoGoogle = await criarConsultaGoogleCalendar({
-        titulo: `Consulta Be4Hope — ${paciente.users.nome}`,
-        descricao: observacoes || 'Consulta de medicina endocanabinóide',
-        dataInicio: dataConsulta,
-        dataFim,
-        emailPaciente: paciente.users.email,
-        emailMedico: medico.users.email,
-        refreshToken: medico.medicos.googleRefreshToken,
-        calendarId: medico.medicos.googleCalendarId || undefined,
-      });
-
-      if (!resultadoGoogle.sucesso) {
-        return {
-          sucesso: false,
-          erro: `Falha ao criar evento no Google Calendar: ${resultadoGoogle.erro}`,
-        };
-      }
-
-      googleEventId = resultadoGoogle.dados?.eventId || null;
-      meetLink = resultadoGoogle.dados?.meetLink || null;
-    }
-
-    // Salvar consulta no banco
-    const [novaConsulta] = await db
-      .insert(consultas)
-      .values({
-        pacienteId,
-        medicoId,
-        dataHora: dataConsulta,
-        status: medico.medicos.googleRefreshToken ? 'confirmada' : 'agendada',
-        googleEventId,
-        googleMeetLink: meetLink,
-        observacoes,
-      })
-      .returning({ id: consultas.id });
-
-    // Enviar e-mail de confirmação ao paciente via Brevo
+    // Best-effort — a reserva já existe independente do envio do e-mail.
     try {
-      await enviarEmailConsultaAgendada({
+      await enviarEmailReservaAguardandoPagamento({
         pacienteNome: paciente.users.nome,
         pacienteEmail: paciente.users.email,
         medicoNome: medico.users.nome,
-        dataHora: dataConsulta,
-        meetLink,
+        dataHora: reserva.dataHora,
+        valor: pagamento ? Number(pagamento.valor) : null,
+        moeda: pagamento?.moeda ?? 'BRL',
+        expiraEm: reserva.expiraEm ?? new Date(),
       });
+      await db
+        .update(consultas)
+        .set({ emailReservaEnviadoEm: new Date() })
+        .where(eq(consultas.id, consultaId));
     } catch (emailError) {
-      console.error('[Action] Erro ao enviar e-mail de confirmação ao paciente:', emailError);
-      // Não falha a action — consulta já foi criada
+      console.error('[Action] Erro ao enviar e-mail de reserva aguardando pagamento:', emailError);
     }
 
-    // Enviar e-mail de notificação ao médico via Brevo
-    try {
-      await enviarEmailConsultaMedico({
-        medicoNome: medico.users.nome,
-        medicoEmail: medico.users.email,
-        pacienteNome: paciente.users.nome,
-        pacienteEmail: paciente.users.email,
-        dataHora: dataConsulta,
-        meetLink,
-      });
-    } catch (emailMedicoError) {
-      console.error('[Action] Erro ao enviar e-mail de notificação ao médico:', emailMedicoError);
-      // Não falha a action — consulta já foi criada
-    }
+    return { sucesso: true, dados: { consultaId } };
+  } catch (error) {
+    console.error('[Action] Erro ao iniciar aguardo de pagamento:', error);
+    return { sucesso: false, erro: 'Erro interno ao processar a reserva' };
+  }
+}
+
+/** Resolve o pacienteId do usuário autenticado — usado só pelas funções de estado abaixo. */
+async function resolverPacienteIdAutenticado(): Promise<
+  { sucesso: true; pacienteId: string; userId: string } | { sucesso: false; erro: string }
+> {
+  const auth = await verificarPaciente();
+  if (!auth.autorizado || !auth.clerkId) {
+    return { sucesso: false, erro: 'Autenticação necessária' };
+  }
+
+  const [userInterno] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, auth.clerkId))
+    .limit(1);
+
+  if (!userInterno) {
+    return { sucesso: false, erro: 'Usuário não encontrado no sistema' };
+  }
+
+  const [pacienteAuto] = await db
+    .select({ id: pacientes.id })
+    .from(pacientes)
+    .where(and(eq(pacientes.userId, userInterno.id), isNull(pacientes.deletedAt)))
+    .limit(1);
+
+  if (!pacienteAuto) {
+    return {
+      sucesso: false,
+      erro: 'Seu cadastro de paciente não foi encontrado. Entre em contato com a clínica.',
+    };
+  }
+
+  return { sucesso: true, pacienteId: pacienteAuto.id, userId: userInterno.id };
+}
+
+/**
+ * Libera (marca 'cancelada') qualquer reserva do paciente cujo prazo já passou — mesma
+ * lógica de `liberarReservasExpiradas` (Inngest, roda a cada 5 min), mas disparada na hora
+ * em que o paciente abre a tela de agendamento, para o status já vir correto sem esperar
+ * o próximo ciclo do cron.
+ *
+ * 🔴 Com a MESMA trava do job (Fase 4): reserva com PIX ainda pagável ou pagamento em
+ * processamento não é liberada — sem ela, o paciente que volta à tela para ver o QR code
+ * cancelaria a própria reserva.
+ */
+async function expirarReservasVencidasDoPaciente(pacienteId: string): Promise<void> {
+  const agora = new Date();
+  const expiradas = await db
+    .select({ id: consultas.id })
+    .from(consultas)
+    .where(
+      and(
+        eq(consultas.pacienteId, pacienteId),
+        eq(consultas.status, 'reservada'),
+        lte(consultas.expiraEm, agora),
+        semPagamentoEmCurso(agora),
+      ),
+    );
+
+  if (expiradas.length === 0) return;
+
+  await db
+    .update(consultas)
+    .set({ status: 'cancelada', expiraEm: null })
+    .where(
+      and(
+        eq(consultas.pacienteId, pacienteId),
+        eq(consultas.status, 'reservada'),
+        lte(consultas.expiraEm, agora),
+        semPagamentoEmCurso(agora),
+      ),
+    );
+
+  await Promise.all(
+    expiradas.map((e) => marcarErroConfirmacao(e.id, 'O prazo da reserva expirou.')),
+  );
+}
+
+export interface ReservaAtivaAgendamento {
+  consultaId: string;
+  medicoId: string;
+  medicoNome: string;
+  medicoEspecialidade: string;
+  medicoAvatarUrl: string | null;
+  dataHora: string;
+  observacoes: string | null;
+  expiraEm: string;
+  valor: number | null;
+  moeda: string;
+  /** true = já passou pela confirmação e está na etapa de pagamento; false = ainda está
+   *  na etapa de confirmação da reserva. */
+  aguardandoPagamento: boolean;
+}
+
+export interface HistoricoAgendamentoItem {
+  id: string;
+  medicoId: string;
+  medicoNome: string;
+  medicoEspecialidade: string;
+  medicoAvatarUrl: string | null;
+  dataHora: string;
+  status: 'reservada' | 'agendada' | 'confirmada' | 'realizada' | 'cancelada';
+  valor: number | null;
+  moeda: string;
+  expiraEm: string | null;
+  observacoes: string | null;
+  /** null = ainda pode remarcar de graça uma vez; preenchido = já usou a remarcação gratuita. */
+  remarcadaPeloPacienteEm: string | null;
+}
+
+/**
+ * Estado do agendamento do paciente para retomar a tela exatamente de onde parou:
+ * reserva ativa (se houver, dentro do prazo) + histórico recente. Chamada pela Server
+ * Component de `/paciente/agendamento` a cada carregamento — a etapa do wizard é sempre
+ * derivada daqui, nunca só do estado local do componente.
+ */
+const obterPagamentoDaReservaSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório').max(64),
+});
+
+export interface PagamentoDaReserva {
+  statusConsulta: string;
+  statusPagamento: string | null;
+  /** Meio do pagamento em trânsito — `em_processamento` com referência no gateway. */
+  emCurso: 'pix' | 'cartao' | null;
+  pixValidoAte: string | null;
+  /** O `users.id` do PRÓPRIO paciente: é o canal `private-user-{id}` que o aviso do pagamento usa. */
+  userId: string;
+  /**
+   * O médico tem conta do Mercado Pago conectada? Sem ela não há para onde a cobrança ir, e a
+   * tela não oferece o pagamento — com o interruptor de bloqueio desligado, o paciente ainda
+   * chega até aqui com um médico sem conta.
+   */
+  medicoConectado: boolean;
+}
+
+/**
+ * Onde está o pagamento desta reserva — o que a tela de pagamento relê ao abrir, ao voltar ao
+ * foco e ao receber o aviso do webhook (Parte 2, Fase 5).
+ *
+ * Só leitura, e só da consulta do PRÓPRIO paciente: "não existe" e "não é sua" respondem igual.
+ * Não devolve referência do gateway, QR code nem valor — só o estado, que é o que a tela usa.
+ */
+export async function obterPagamentoDaReserva(
+  dados: z.infer<typeof obterPagamentoDaReservaSchema>,
+): Promise<ActionResult<PagamentoDaReserva>> {
+  try {
+    const parsed = obterPagamentoDaReservaSchema.safeParse(dados);
+    if (!parsed.success) return { sucesso: false, erro: 'Dados inválidos' };
+
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+
+    const [linha] = await db
+      .select({
+        statusConsulta: consultas.status,
+        medicoId: consultas.medicoId,
+        pixValidoAte: consultas.pixValidoAte,
+        statusPagamento: pagamentos.status,
+        referencia: pagamentos.gatewayReferenciaId,
+        checkoutUrl: pagamentos.gatewayCheckoutUrl,
+      })
+      .from(consultas)
+      .leftJoin(pagamentos, eq(pagamentos.consultaId, consultas.id))
+      .where(
+        and(
+          eq(consultas.id, parsed.data.consultaId),
+          eq(consultas.pacienteId, resolvido.pacienteId),
+          isNull(consultas.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!linha) return { sucesso: false, erro: 'Reserva não encontrada.' };
+
+    // PIX grava `gatewayCheckoutUrl`; cartão não — a mesma distinção de `criarCobranca`.
+    const emTransito = linha.statusPagamento === 'em_processamento' && linha.referencia !== null;
+    const emCurso = !emTransito ? null : linha.checkoutUrl !== null ? 'pix' : 'cartao';
 
     return {
       sucesso: true,
       dados: {
-        consultaId: novaConsulta.id,
-        meetLink: meetLink || '',
+        statusConsulta: linha.statusConsulta,
+        statusPagamento: linha.statusPagamento,
+        emCurso,
+        pixValidoAte: linha.pixValidoAte?.toISOString() ?? null,
+        userId: resolvido.userId,
+        medicoConectado: await estaConectado(linha.medicoId),
       },
     };
   } catch (error) {
-    console.error('[Action] Erro ao agendar consulta:', error);
-    return { sucesso: false, erro: 'Erro interno ao agendar consulta' };
+    console.error('[Action] Erro ao ler o pagamento da reserva:', error);
+    return { sucesso: false, erro: 'Não foi possível ler o pagamento agora.' };
   }
 }
 
+export async function obterEstadoAgendamentoPaciente(): Promise<
+  ActionResult<{ reservaAtiva: ReservaAtivaAgendamento | null; historico: HistoricoAgendamentoItem[] }>
+> {
+  try {
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    // Corrige o status de qualquer reserva vencida ANTES de ler — sem isso, uma reserva
+    // expirada há 2 minutos ainda apareceria como "reservada" até o próximo ciclo do cron.
+    await expirarReservasVencidasDoPaciente(pacienteId);
+
+    const [reservaRow] = await db
+      .select({
+        id: consultas.id,
+        medicoId: consultas.medicoId,
+        medicoNome: users.nome,
+        medicoEspecialidade: medicos.especialidade,
+        medicoAvatarUrl: users.avatarUrl,
+        dataHora: consultas.dataHora,
+        observacoes: consultas.observacoes,
+        expiraEm: consultas.expiraEm,
+        emailReservaEnviadoEm: consultas.emailReservaEnviadoEm,
+      })
+      .from(consultas)
+      .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(
+        and(
+          eq(consultas.pacienteId, pacienteId),
+          eq(consultas.status, 'reservada'),
+          isNull(consultas.deletedAt),
+        ),
+      )
+      .orderBy(desc(consultas.createdAt))
+      .limit(1);
+
+    let reservaAtiva: ReservaAtivaAgendamento | null = null;
+    if (reservaRow && reservaRow.expiraEm) {
+      const [pagamentoRow] = await db
+        .select({ valor: pagamentos.valor, moeda: pagamentos.moeda })
+        .from(pagamentos)
+        .where(eq(pagamentos.consultaId, reservaRow.id))
+        .limit(1);
+
+      reservaAtiva = {
+        consultaId: reservaRow.id,
+        medicoId: reservaRow.medicoId,
+        medicoNome: reservaRow.medicoNome,
+        medicoEspecialidade: reservaRow.medicoEspecialidade,
+        medicoAvatarUrl: reservaRow.medicoAvatarUrl,
+        dataHora: reservaRow.dataHora.toISOString(),
+        observacoes: reservaRow.observacoes,
+        expiraEm: reservaRow.expiraEm.toISOString(),
+        valor: pagamentoRow ? Number(pagamentoRow.valor) : null,
+        moeda: pagamentoRow?.moeda ?? 'BRL',
+        aguardandoPagamento: reservaRow.emailReservaEnviadoEm !== null,
+      };
+    }
+
+    const historicoRows = await db
+      .select({
+        id: consultas.id,
+        medicoId: consultas.medicoId,
+        medicoNome: users.nome,
+        medicoEspecialidade: medicos.especialidade,
+        medicoAvatarUrl: users.avatarUrl,
+        dataHora: consultas.dataHora,
+        status: consultas.status,
+        expiraEm: consultas.expiraEm,
+        observacoes: consultas.observacoes,
+        remarcadaPeloPacienteEm: consultas.remarcadaPeloPacienteEm,
+        valor: pagamentos.valor,
+        moeda: pagamentos.moeda,
+      })
+      .from(consultas)
+      .innerJoin(medicos, eq(consultas.medicoId, medicos.id))
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .leftJoin(pagamentos, eq(pagamentos.consultaId, consultas.id))
+      .where(and(eq(consultas.pacienteId, pacienteId), isNull(consultas.deletedAt)))
+      .orderBy(desc(consultas.dataHora))
+      .limit(8);
+
+    const historico: HistoricoAgendamentoItem[] = historicoRows.map((r) => ({
+      id: r.id,
+      medicoId: r.medicoId,
+      medicoNome: r.medicoNome,
+      medicoEspecialidade: r.medicoEspecialidade,
+      medicoAvatarUrl: r.medicoAvatarUrl,
+      dataHora: r.dataHora.toISOString(),
+      status: r.status,
+      valor: r.valor !== null ? Number(r.valor) : null,
+      moeda: r.moeda ?? 'BRL',
+      expiraEm: r.expiraEm ? r.expiraEm.toISOString() : null,
+      observacoes: r.observacoes,
+      remarcadaPeloPacienteEm: r.remarcadaPeloPacienteEm ? r.remarcadaPeloPacienteEm.toISOString() : null,
+    }));
+
+    return { sucesso: true, dados: { reservaAtiva, historico } };
+  } catch (error) {
+    console.error('[Action] Erro ao obter estado do agendamento:', error);
+    return { sucesso: false, erro: 'Erro ao carregar estado do agendamento' };
+  }
+}
+
+const cancelarReservaPendenteSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+});
+
 /**
- * Cancela uma consulta existente.
+ * Cancela uma reserva PENDENTE (status 'reservada', ainda sem pagamento) a pedido do
+ * próprio paciente. Só existe para esse status: uma consulta 'agendada'/'confirmada' já
+ * tem pagamento associado, e cancelar isso passa por suporte, não por autoatendimento
+ * (ver `remarcarConsultaPaciente` abaixo para a alternativa de trocar a data).
  */
-export async function cancelarConsulta(
-  dados: z.infer<typeof cancelarConsultaSchema>,
+export async function cancelarReservaPendente(
+  dados: z.infer<typeof cancelarReservaPendenteSchema>,
 ): Promise<ActionResult> {
   try {
-    const parsed = cancelarConsultaSchema.safeParse(dados);
+    const parsed = cancelarReservaPendenteSchema.safeParse(dados);
     if (!parsed.success) {
       return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    // Buscar consulta
-    const [consulta] = await db
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    const { consultaId } = parsed.data;
+
+    const [reserva] = await db
       .select()
       .from(consultas)
-      .where(eq(consultas.id, parsed.data.consultaId))
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
       .limit(1);
 
-    if (!consulta) {
-      return { sucesso: false, erro: 'Consulta não encontrada' };
+    if (!reserva) {
+      return { sucesso: false, erro: 'Reserva não encontrada.' };
     }
 
-    // Cancelar no Google Calendar se existir
-    if (consulta.googleEventId) {
-      const [medico] = await db
-        .select()
-        .from(medicos)
-        .where(eq(medicos.id, consulta.medicoId))
-        .limit(1);
+    if (reserva.status !== 'reservada') {
+      return {
+        sucesso: false,
+        erro:
+          'Só é possível cancelar por aqui uma reserva ainda não paga. Para consultas já ' +
+          'confirmadas, entre em contato com o suporte.',
+      };
+    }
 
-      if (medico?.googleRefreshToken) {
-        await cancelarEventoGoogleCalendar({
-          eventId: consulta.googleEventId,
-          refreshToken: medico.googleRefreshToken,
-          calendarId: medico.googleCalendarId || undefined,
+    await db
+      .update(consultas)
+      .set({ status: 'cancelada', expiraEm: null })
+      .where(eq(consultas.id, consultaId));
+
+    // Sincroniza o pagamento vinculado — nasceu 'pendente' e nunca foi pago de verdade,
+    // então "cancelado" é o estado correto agora (recomendação: status do pagamento não
+    // pode ficar dessincronizado do status da consulta).
+    await db
+      .update(pagamentos)
+      .set({ status: 'cancelado' })
+      .where(eq(pagamentos.consultaId, consultaId));
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, reserva.medicoId))
+      .limit(1);
+
+    const [paciente] = await db
+      .select()
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    await registrarAuditoria({
+      userId: paciente?.users.id ?? pacienteId,
+      acao: 'atualizar',
+      entidade: 'consultas',
+      entidadeId: consultaId,
+      dadosAntes: { status: 'reservada' },
+      dadosDepois: { status: 'cancelada', por: 'paciente' },
+    });
+
+    // O médico nunca foi avisado desta reserva (só é avisado quando o pagamento é
+    // confirmado de verdade) — não faz sentido notificá-lo de um cancelamento de algo
+    // que ele não sabia que existia.
+    if (paciente && medico) {
+      try {
+        await enviarEmailConsultaCancelada({
+          pacienteNome: paciente.users.nome,
+          pacienteEmail: paciente.users.email,
+          medicoNome: medico.users.nome,
+          dataHora: reserva.dataHora,
+          motivo: 'Você cancelou esta reserva.',
         });
+      } catch (emailError) {
+        console.error('[Action] Erro ao enviar e-mail de cancelamento pelo paciente:', emailError);
       }
     }
 
-    // Atualizar status
-    await db
-      .update(consultas)
-      .set({ status: 'cancelada' })
-      .where(eq(consultas.id, parsed.data.consultaId));
+    revalidatePath('/paciente/agendamento');
 
     return { sucesso: true };
   } catch (error) {
-    console.error('[Action] Erro ao cancelar consulta:', error);
-    return { sucesso: false, erro: 'Erro interno ao cancelar consulta' };
+    console.error('[Action] Erro ao cancelar reserva:', error);
+    return { sucesso: false, erro: 'Erro interno ao cancelar a reserva' };
   }
 }
 
+const remarcarConsultaPacienteSchema = z.object({
+  consultaId: z.string().min(1, 'ID da consulta é obrigatório'),
+  novaDataHora: z.string().datetime('Data/hora inválida'),
+});
+
 /**
- * Lista consultas de um médico em um período.
+ * Remarca (troca a data/hora de) uma consulta a pedido do próprio paciente — permitido
+ * para qualquer status ainda ativo ('reservada', 'agendada', 'confirmada'). Limitado a
+ * UMA vez sem custo por consulta: `consultas.remarcadaPeloPacienteEm` é o próprio limite
+ * — se já estiver preenchido, uma nova remarcação exige contato com o suporte.
  */
-export async function listarConsultasMedico(params: {
-  medicoId: string;
-  dataInicio?: string;
-  dataFim?: string;
-}): Promise<ActionResult<typeof consultas.$inferSelect[]>> {
+export async function remarcarConsultaPaciente(
+  dados: z.infer<typeof remarcarConsultaPacienteSchema>,
+): Promise<ActionResult> {
   try {
-    const condicoes = [eq(consultas.medicoId, params.medicoId)];
-
-    if (params.dataInicio) {
-      condicoes.push(gte(consultas.dataHora, new Date(params.dataInicio)));
-    }
-    if (params.dataFim) {
-      condicoes.push(lte(consultas.dataHora, new Date(params.dataFim)));
+    const parsed = remarcarConsultaPacienteSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { sucesso: false, erro: parsed.error.errors[0].message };
     }
 
-    const resultado = await db
+    const resolvido = await resolverPacienteIdAutenticado();
+    if (!resolvido.sucesso) return { sucesso: false, erro: resolvido.erro };
+    const { pacienteId } = resolvido;
+
+    const { consultaId, novaDataHora } = parsed.data;
+
+    const [consulta] = await db
       .select()
       .from(consultas)
-      .where(and(...condicoes))
-      .orderBy(desc(consultas.dataHora));
+      .where(and(eq(consultas.id, consultaId), eq(consultas.pacienteId, pacienteId)))
+      .limit(1);
 
-    return { sucesso: true, dados: resultado };
+    if (!consulta) {
+      return { sucesso: false, erro: 'Consulta não encontrada.' };
+    }
+
+    if (!['reservada', 'agendada', 'confirmada'].includes(consulta.status)) {
+      return {
+        sucesso: false,
+        erro: 'Esta consulta não pode mais ser remarcada.',
+      };
+    }
+
+    if (consulta.remarcadaPeloPacienteEm !== null) {
+      return {
+        sucesso: false,
+        erro:
+          'Você já remarcou esta consulta uma vez. Para remarcar de novo, entre em ' +
+          'contato com o suporte.',
+      };
+    }
+
+    const dataAnterior = consulta.dataHora;
+    const novaData = new Date(novaDataHora);
+
+    if (novaData.getTime() <= Date.now()) {
+      return { sucesso: false, erro: 'Escolha uma data no futuro.' };
+    }
+
+    const [medico] = await db
+      .select()
+      .from(medicos)
+      .innerJoin(users, eq(medicos.userId, users.id))
+      .where(eq(medicos.id, consulta.medicoId))
+      .limit(1);
+
+    const [paciente] = await db
+      .select()
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    if (!medico || !paciente) {
+      return { sucesso: false, erro: 'Erro ao carregar dados da consulta' };
+    }
+
+    // Se havia evento no Calendar (consulta já confirmada de verdade), atualiza a data
+    // nele também — best-effort, igual ao padrão do resto do arquivo: falha aqui não
+    // pode travar a remarcação.
+    let novoMeetLink: string | null = consulta.googleMeetLink;
+    if (consulta.googleEventId && medico.medicos.googleRefreshToken) {
+      const novaDataFim = new Date(novaData.getTime() + 60 * 60 * 1000);
+      const resultadoGoogle = await atualizarEventoGoogleCalendar({
+        eventId: consulta.googleEventId,
+        refreshToken: medico.medicos.googleRefreshToken,
+        novaDataInicio: novaData,
+        novaDataFim,
+      });
+      if (resultadoGoogle.sucesso && resultadoGoogle.dados) {
+        novoMeetLink = resultadoGoogle.dados.meetLink;
+      } else {
+        console.error(
+          '[Action] Falha ao atualizar evento no Calendar ao remarcar (paciente):',
+          resultadoGoogle.erro,
+        );
+      }
+    }
+
+    // Mesmo índice único que protege `reservarConsulta` — outro médico/horário pode ter
+    // sido ocupado nesse meio tempo.
+    try {
+      await db
+        .update(consultas)
+        .set({
+          dataHora: novaData,
+          googleMeetLink: novoMeetLink,
+          remarcadaPeloPacienteEm: new Date(),
+          // Uma reserva pendente continua pendente, só com prazo renovado — ela não virou
+          // paga só porque a data mudou.
+          expiraEm: consulta.status === 'reservada' ? new Date(Date.now() + RESERVA_TTL_MINUTOS * 60 * 1000) : null,
+        })
+        .where(eq(consultas.id, consultaId));
+    } catch (dbError) {
+      const codigo = (dbError as { code?: string }).code;
+      if (codigo === '23505') {
+        return {
+          sucesso: false,
+          erro: 'Este médico já tem outra consulta nesse horário. Escolha outro horário.',
+        };
+      }
+      throw dbError;
+    }
+
+    await db
+      .update(pagamentos)
+      .set({ dataHora: novaData })
+      .where(eq(pagamentos.consultaId, consultaId));
+
+    await registrarAuditoria({
+      userId: paciente.users.id,
+      acao: 'atualizar',
+      entidade: 'consultas',
+      entidadeId: consultaId,
+      dadosAntes: { dataHora: dataAnterior.toISOString() },
+      dadosDepois: { dataHora: novaData.toISOString(), remarcadaPor: 'paciente' },
+    });
+
+    try {
+      await enviarEmailConsultaRemarcada({
+        pacienteNome: paciente.users.nome,
+        pacienteEmail: paciente.users.email,
+        medicoNome: medico.users.nome,
+        dataHoraAnterior: dataAnterior,
+        dataHoraNova: novaData,
+      });
+    } catch (emailError) {
+      console.error('[Action] Erro ao enviar e-mail de remarcação ao paciente:', emailError);
+    }
+
+    // O médico só é avisado se já sabia da consulta (status já era 'agendada'/'confirmada'
+    // antes desta remarcação) — uma 'reservada' nunca chegou a ser comunicada a ele.
+    if (consulta.status !== 'reservada') {
+      try {
+        await enviarEmailConsultaRemarcadaPeloPacienteMedico({
+          medicoNome: medico.users.nome,
+          medicoEmail: medico.users.email,
+          pacienteNome: paciente.users.nome,
+          dataHoraAntiga: dataAnterior,
+          dataHoraNova: novaData,
+        });
+      } catch (emailError) {
+        console.error('[Action] Erro ao enviar e-mail de remarcação ao médico:', emailError);
+      }
+    }
+
+    revalidatePath('/paciente/agendamento');
+    revalidatePath('/medico/agenda');
+
+    return { sucesso: true };
   } catch (error) {
-    console.error('[Action] Erro ao listar consultas:', error);
-    return { sucesso: false, erro: 'Erro ao listar consultas' };
+    console.error('[Action] Erro ao remarcar consulta (paciente):', error);
+    return { sucesso: false, erro: 'Erro interno ao remarcar a consulta' };
   }
 }
 
@@ -301,9 +1026,17 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
   nome: string;
   especialidade: string;
   bio: string | null;
+  crm: string | null;
   avatarUrl: string | null;
   valorConsulta: number | null;
   googleConectado: boolean;
+  /**
+   * O paciente pode seguir com este médico? `podeAgendarCom`: `false` só com o interruptor
+   * `MERCADOPAGO_BLOQUEIO_AGENDAMENTO_ATIVO` ligado E o médico sem conta do Mercado Pago. É a
+   * mesma regra de `reservarConsulta`, aplicada ANTES — na escolha do médico, não depois de o
+   * paciente ter escolhido data e horário.
+   */
+  agendavel: boolean;
 }>>> {
   try {
     const resultado = await db
@@ -312,6 +1045,7 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
         nome: users.nome,
         especialidade: medicos.especialidade,
         bio: medicos.bio,
+        crm: medicos.crm,
         avatarUrl: users.avatarUrl,
         valorConsulta: medicos.valorConsulta,
         googleRefreshToken: medicos.googleRefreshToken,
@@ -321,14 +1055,19 @@ export async function listarMedicosDisponiveis(): Promise<ActionResult<Array<{
       .where(isNull(users.deletedAt))
       .orderBy(asc(medicos.ordem), asc(medicos.createdAt));
 
-    const lista = resultado.map((m) => ({
+    // Não decifra nada: `podeAgendarCom` só confere que existe vínculo (ADR-0024 §5).
+    const permissoes = await Promise.all(resultado.map((m) => podeAgendarCom(m.id)));
+
+    const lista = resultado.map((m, i) => ({
       id: m.id,
       nome: m.nome,
       especialidade: m.especialidade,
       bio: m.bio,
+      crm: m.crm,
       avatarUrl: m.avatarUrl,
       valorConsulta: m.valorConsulta !== null ? Number(m.valorConsulta) : null,
       googleConectado: !!m.googleRefreshToken,
+      agendavel: permissoes[i].permitido,
     }));
 
     return { sucesso: true, dados: lista };

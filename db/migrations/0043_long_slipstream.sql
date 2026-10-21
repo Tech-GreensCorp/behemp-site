@@ -1,0 +1,1 @@
+ALTER TYPE "public"."parceiro_evento_saida_status" ADD VALUE 'cancelado_por_revogacao';

@@ -1,6 +1,7 @@
 import { obterKpisMedico, listarPacientes, obterDadosGraficosDashboard } from '@/app/_actions/pacientes';
 import { obterDadosUsuario } from '@/lib/auth';
 import { DashboardCharts } from '@/components/medico/dashboard-charts';
+import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,23 +77,19 @@ export default async function MedicoDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header com saudação */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Olá, {primeiroNome} 👋
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Visão geral dos seus pacientes e tratamentos
-          </p>
-        </div>
-        <Link href="/medico/pacientes/novo">
-          <Button className="gap-2">
-            <UserPlus size={16} />
-            Novo paciente
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Painel médico"
+        title={`Olá, ${primeiroNome} 👋`}
+        description="Visão geral dos seus pacientes e tratamentos"
+        actions={
+          <Link href="/medico/pacientes/novo">
+            <Button className="gap-2">
+              <UserPlus size={16} />
+              Novo paciente
+            </Button>
+          </Link>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

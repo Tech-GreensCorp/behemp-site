@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { urlAbsoluta } from '@/lib/url';
 import { trocarCodigoPorTokens } from '@/lib/integrations/google-calendar';
 
 /**
@@ -17,15 +18,11 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('[Google Callback] Erro na autorização:', error);
-      return NextResponse.redirect(
-        new URL('/medico?erro=autorizacao_google', request.url),
-      );
+      return NextResponse.redirect(urlAbsoluta('/medico?erro=autorizacao_google'));
     }
 
     if (!code || !state) {
-      return NextResponse.redirect(
-        new URL('/medico?erro=parametros_invalidos', request.url),
-      );
+      return NextResponse.redirect(urlAbsoluta('/medico?erro=parametros_invalidos'));
     }
 
     const tokens = await trocarCodigoPorTokens(code);
@@ -37,13 +34,9 @@ export async function GET(request: NextRequest) {
       `[Google Callback] Tokens obtidos para médico ${state}. refreshToken: ${tokens.refreshToken ? '✅' : '❌'}`,
     );
 
-    return NextResponse.redirect(
-      new URL('/medico?sucesso=google_conectado', request.url),
-    );
+    return NextResponse.redirect(urlAbsoluta('/medico?sucesso=google_conectado'));
   } catch (error) {
     console.error('[Google Callback] Erro ao processar callback:', error);
-    return NextResponse.redirect(
-      new URL('/medico?erro=google_callback', request.url),
-    );
+    return NextResponse.redirect(urlAbsoluta('/medico?erro=google_callback'));
   }
 }

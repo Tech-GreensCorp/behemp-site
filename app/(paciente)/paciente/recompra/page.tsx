@@ -21,6 +21,7 @@ import {
   MessageCircle,
   Info,
 } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 /** Número fixo do WhatsApp da Be4Hope */
 const WHATSAPP_BEHEMP = process.env.NEXT_PUBLIC_WHATSAPP_BEHEMP ?? '5511932047360';
@@ -113,12 +114,10 @@ export default function RecompraPage() {
   if (sucesso) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Solicitação enviada para nossa equipe
-          </p>
-        </div>
+        <PageHeader
+          title="Recompra de Medicamento"
+          description="Solicitação enviada para nossa equipe"
+        />
 
         <Card className="border-border/40 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -170,13 +169,10 @@ export default function RecompraPage() {
   // ── Formulário ───────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Recompra de Medicamento</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Solicite a recompra do seu medicamento
-        </p>
-      </div>
+      <PageHeader
+        title="Recompra de Medicamento"
+        description="Solicite a recompra do seu medicamento"
+      />
 
       {/* Banner informativo */}
       <Card className="border-primary/20 bg-primary/5 shadow-sm">

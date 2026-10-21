@@ -1,15 +1,65 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  /**
+   * 🔴 O ID DESTE DEPLOY — o que impede uma aba aberta de quebrar quando o build troca.
+   *
+   * Os ids de Server Action são hashes gerados NO BUILD. Quando o build muda, a aba que o
+   * paciente deixou aberta continua chamando o hash antigo e o servidor responde
+   * `Failed to find Server Action "…"`. Medido em produção em 11/09/2026: o dono perdeu um
+   * cadastro no meio, com uploads já feitos, e a tela mandava "tentar novamente" — que não
+   * resolve, porque a aba continua velha. Só recarregar resolve, e ninguém sabe disso.
+   *
+   * Com o id declarado, o Next compara o do cliente com o do servidor e, na divergência,
+   * força RECARGA COMPLETA em vez de navegação. Doc oficial: _"triggers a hard navigation
+   * (full page reload) instead of a client-side navigation"_.
+   *
+   * ⚠️ PRECISA SER O MESMO NO BUILD E EM RUNTIME. O `deploy.yml` passa `github.sha` ao passo
+   * de build E grava a variável no `.env` do servidor — se só um lado tiver, o header nunca
+   * bate e toda navegação vira recarga.
+   *
+   * Vazio em desenvolvimento: sem valor, o Next se comporta como antes.
+   */
+  deploymentId: process.env.NEXT_DEPLOYMENT_ID || undefined,
+
   reactStrictMode: true,
   output: 'standalone',
+
+  /**
+   * A RAIZ DO EMPACOTAMENTO E ESTE DIRETORIO, E NAO A QUE O NEXT ADIVINHA.
+   *
+   * O Next infere a raiz do workspace procurando lockfile PARA CIMA. Em maquina de
+   * desenvolvimento com outros projetos ao lado (~/Developer/Projects/*), ele encontra o
+   * "package-lock.json" de um VIZINHO e conclui que a raiz e o diretorio de cima. O
+   * standalone entao reproduz o caminho relativo a essa raiz:
+   *
+   *     .next/standalone/Developer/Projects/behemp-site/server.js   <- o real
+   *     .next/standalone/server.js                                   <- o que o deploy espera
+   *
+   * Medido aqui em 10/09/2026: o build local caia no primeiro caminho.
+   *
+   * NAO ERA A CAUSA DA FALHA DE PRODUCAO. O runner do GitHub clona so este repositorio,
+   * nao ha lockfile vizinho, e o log do deploy #40 mostra o rsync enviando
+   * ".next/standalone/server.js" - no lugar certo. Aquilo era outro problema (o caminho
+   * gravado no PM2). Esta linha resolve uma coisa so, e vale por ela: que o build da
+   * maquina de quem desenvolve seja IGUAL ao do CI. Build que difere por causa do que
+   * existe na pasta ao lado e um diagnostico que nao se pode confiar - foi exatamente o
+   * que me fez apontar a causa errada.
+   *
+   * Doc: nextjs.org/docs/app/api-reference/config/next-config-js/output
+   */
+  outputFileTracingRoot: path.join(__dirname),
 
   serverExternalPackages: ['docusign-esign'],
 
   experimental: {
     serverActions: {
-      bodySizeLimit: '100mb',
+      bodySizeLimit: '200mb',
     },
+    // O proxy/middleware (Clerk) bufferiza o corpo da requisição e, por padrão, corta em 10MB:
+    // `formData()` falha e a rota de upload responde 500. Alinhado ao limite de 200MB dos uploads.
+    proxyClientMaxBodySize: '200mb',
   },
 
   typescript: {
@@ -76,16 +126,21 @@ const nextConfig: NextConfig = {
             ].join(', '),
           },
           {
+            // Mercado Pago (Payment Brick, Fase 5): os hosts abaixo foram MEDIDOS em 28/09/2026,
+            // com o Brick real montado no Chrome headless (chave de teste) e o próprio header de
+            // produção — carregado, com "Cartão de crédito" aberto (os campos de cartão são
+            // iframes de secure-fields) e com "Pix" aberto. Nenhum host a mais: o que o Brick não
+            // pediu não entra. Guarda: `o-csp-conhece-o-payment-brick`.
             key: 'Content-Security-Policy-Report-Only',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org https://*.vercel.app https://js.pusher.com https://www.googletagmanager.com https://*.docusign.net https://*.docusign.com https://sdk.mercadopago.com https://http2.mlstatic.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://img.clerk.com https://images.clerk.dev https://*.public.blob.vercel-storage.com",
-              "connect-src 'self' https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com",
+              "img-src 'self' data: blob: https://img.clerk.com https://images.clerk.dev https://*.public.blob.vercel-storage.com https://www.mercadolibre.com https://www.mercadolivre.com",
+              "connect-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.be4hope.org wss://*.pusher.com https://*.pusherapp.com https://*.neon.tech https://api.brevo.com https://api.inngest.com https://vitals.vercel-insights.com https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://account-d.docusign.com https://clerk-telemetry.com https://api.mercadopago.com https://api.mercadolibre.com https://http2.mlstatic.com https://www.mercadolibre.com https://secure-fields.mercadopago.com",
               "media-src 'self' blob: https://*.public.blob.vercel-storage.com",
-              "frame-src 'self' https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com",
+              "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://demo.docusign.net https://*.docusign.net https://*.docusign.com https://secure-fields.mercadopago.com",
               "worker-src 'self' blob:",
             ].join('; '),
           },

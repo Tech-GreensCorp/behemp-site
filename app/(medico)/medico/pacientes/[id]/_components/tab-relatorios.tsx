@@ -11,6 +11,7 @@ import { listarAjustesDosagem } from '@/app/_actions/ajustes-dosagem';
 import { listarDocumentos } from '@/app/_actions/documentos';
 import { listarExames } from '@/app/_actions/exames';
 import { obterPaciente } from '@/app/_actions/pacientes';
+import { DataList, DataRow } from '@/components/shared/data-list';
 import { toast } from 'sonner';
 import {
   Download,
@@ -354,29 +355,28 @@ export function TabRelatorios({ pacienteId, pacienteNome }: TabRelatoriosProps) 
           {relatorios.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum relatório gerado</p>
           ) : (
-            <div className="space-y-3">
+            <DataList>
               {relatorios.map(r => (
-                <div key={r.id} className="flex items-center justify-between rounded-xl border border-border/30 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C08E3A]/10">
+                <DataRow
+                  key={r.id}
+                  icon={
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[#C08E3A]/10">
                       <FileCheck size={18} className="text-[#C08E3A]" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.titulo}</p>
-                      <p className="text-xs text-muted-foreground">Gerado em {new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {r.urlPdf && (
+                  }
+                  title={r.titulo}
+                  subtitle={`Gerado em ${new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                  trailing={
+                    r.urlPdf && (
                       <>
                         <a href={r.urlPdf} download><Button variant="outline" size="sm" className="gap-1.5"><Download size={14} /> Download</Button></a>
                         <a href={r.urlPdf} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="sm" className="gap-1.5"><Eye size={14} /> Ver</Button></a>
                       </>
-                    )}
-                  </div>
-                </div>
+                    )
+                  }
+                />
               ))}
-            </div>
+            </DataList>
           )}
         </CardContent>
       </Card>

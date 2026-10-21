@@ -18,12 +18,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/shared/page-header';
 import {
   ShieldCheck, FileText, Upload, CheckCircle2, Clock, AlertCircle,
   ChevronRight, Loader2, RefreshCw, FileCheck, CircleDot,
-  XCircle, Info, ExternalLink, Download, Copy, CheckCheck, Users, Navigation
+  XCircle, Info, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConsentimentoQueFaltou } from '@/components/paciente/ConsentimentoQueFaltou';
+import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { documentosDoPacienteAtual } from '@/app/_actions/documentos-do-paciente';
+import { VideoDoPassoAPasso } from '@/components/paciente/anvisa/VideoDoPassoAPasso';
+import { AtendimentoComSuporte } from '@/components/paciente/anvisa/AtendimentoComSuporte';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type AnvisaStatus =
@@ -91,10 +97,31 @@ const STATUS_CONFIG: Record<AnvisaStatus, { label: string; cor: string; icon: Re
   },
 };
 
-const DOC_LABELS: Record<string, { label: string; dica: string }> = {
+/**
+ * 🔴 `opcional` ENTROU EM 23/09/2026. Decisão do dono: _"o laudo médico não é obrigatório"_.
+ *
+ * Ele já era declarado opcional no vocabulário do parceiro — `lib/parceiros/documentos.ts:26`:
+ * _"laudo_medico — opcional de verdade: pode nunca existir, e ninguém vai cobrar"_. Esta tela
+ * não sabia disso, e fazia duas coisas erradas: mostrava o item sem marcação, como os
+ * obrigatórios, e **travava o envio** até ele chegar (ver `todosEnviados` abaixo).
+ */
+const DOC_LABELS: Record<string, { label: string; dica: string; opcional?: boolean }> = {
   receita_medica: {
     label: 'Receita Médica',
     dica: 'A receita emitida pelo seu médico na plataforma Be4Hope.',
+  },
+  /**
+   * 🔴 DOIS NOMES PARA O MESMO DOCUMENTO, e os dois precisam existir aqui.
+   *
+   * `rg` é como a coluna `documentos.tipo` o chama, e é o que o checklist passa a usar desde
+   * 12/09/2026 — sem isso, um RG já recebido nunca casava e a tela pedia de novo. `rg_paciente`
+   * é o nome que as autorizações **já gravadas** carregam no JSON `documentos`: elas continuam
+   * no banco e continuam abrindo esta tela. Tirar o antigo faria o rótulo sumir para quem já
+   * tem autorização em andamento.
+   */
+  rg: {
+    label: 'RG do Paciente',
+    dica: 'Documento de identidade do paciente (frente e verso).',
   },
   rg_paciente: {
     label: 'RG do Paciente',
@@ -111,6 +138,7 @@ const DOC_LABELS: Record<string, { label: string; dica: string }> = {
   laudo_medico: {
     label: 'Laudo Médico',
     dica: 'Laudo com CID, diagnóstico e justificativa para uso de produto não registrado no Brasil.',
+    opcional: true,
   },
 };
 
@@ -119,10 +147,21 @@ function ChecklistItem({
   doc,
   autorizacaoId,
   onUploaded,
+  documentoId,
 }: {
   doc: DocItem;
   autorizacaoId: string;
   onUploaded: () => void;
+  /**
+   * 🔴 O `id` NÃO VEM DESTE JSON — vem da tabela, resolvido por
+   * `documentosDoPacienteAtual()`. O checklist da autorização guarda `urlBlob` e
+   * `nomeArquivo`, e nunca guardou o id da linha em `documentos`.
+   *
+   * E o `urlBlob` daqui não serve: privado não abre por link direto, e público abriria
+   * sem autenticação nem auditoria. `undefined` quando não há correspondência — e aí o
+   * botão simplesmente não aparece, que é melhor que um botão que erra.
+   */
+  documentoId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -172,12 +211,30 @@ function ChecklistItem({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm text-foreground">{config.label}</p>
+        <p className="font-semibold text-sm text-foreground">{config.label}{config.opcional && (
+          <span className="ml-1.5 font-normal text-muted-foreground/60">(opcional)</span>
+        )}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{config.dica}</p>
         {doc.enviado && doc.nomeArquivo && (
           <p className="text-xs text-green-600 mt-1 truncate">✓ {doc.nomeArquivo}</p>
         )}
       </div>
+
+      {/*
+        🔴 VER O QUE FOI ENVIADO — pedido do dono em 14/09/2026, e o motivo dele:
+        "é essencial até pra validar o que está chegando entre empresas".
+
+        "✓ rg.jpg" afirma que um arquivo chegou, não que ele É um RG. O nome é escolhido
+        por quem envia, e um handoff da Greens pode trazer o documento errado sem nada
+        acusar aqui.
+      */}
+      {doc.enviado && documentoId && (
+        <VisualizadorDeDocumento
+          documentoId={documentoId}
+          rotulo={config.label}
+          nomeArquivo={doc.nomeArquivo}
+        />
+      )}
 
       <input
         ref={inputRef}
@@ -211,7 +268,12 @@ function ChecklistItem({
 function Timeline({ autorizacao }: { autorizacao: Autorizacao }) {
   const etapas: { key: AnvisaStatus | '_inicio'; label: string; descricao: string }[] = [
     { key: '_inicio', label: 'Processo iniciado', descricao: 'Processo de autorização criado na plataforma.' },
-    { key: 'documentos_enviados', label: 'Documentos enviados', descricao: 'Checklist completo. Pronto para análise.' },
+    {
+      key: 'documentos_enviados',
+      label: 'Documentos enviados',
+      // Quem age aqui é a Be4Hope, não a ANVISA — e o paciente precisa saber de quem espera.
+      descricao: 'Checklist completo. A equipe Be4Hope confere e protocola na ANVISA.',
+    },
     { key: 'em_analise', label: 'Em análise — ANVISA', descricao: `Prazo estimado: ${autorizacao.prazoEstimado ?? '—'}` },
     { key: 'aprovado', label: 'Autorização concedida', descricao: 'Seu medicamento está autorizado para importação.' },
   ];
@@ -278,12 +340,24 @@ export default function AnvisaPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [autorizacao, setAutorizacao] = useState<Autorizacao | null>(null);
-  const [etapa, setEtapa] = useState<'inicio' | 'escolha' | 'checklist' | 'guiada' | 'formulario' | 'acompanhamento'>('inicio');
+  const [etapa, setEtapa] = useState<'inicio' | 'checklist' | 'guiada' | 'formulario' | 'acompanhamento'>('inicio');
   const [carregando, setCarregando] = useState(false);
   const [temPrescricao, setTemPrescricao] = useState<boolean | null>(null); // null = carregando
   const [verificando, setVerificando] = useState(true);
   const [modalidade, setModalidade] = useState<AnvisaModalidade | null>(null);
-  const [copiado, setCopiado] = useState<string | null>(null);
+  /**
+   * tipo do documento → `id` na tabela `documentos`.
+   *
+   * Lido da TABELA, não do JSON da autorização: assim o botão funciona igual nas
+   * autorizações que já existem e nas novas, sem migration de dado. Ver a nota em
+   * `app/_actions/documentos-do-paciente.ts`.
+   */
+  const [idsPorTipo, setIdsPorTipo] = useState<Record<string, string>>({});
+
+  const recarregarIdsDosDocumentos = async () => {
+    const lista = await documentosDoPacienteAtual();
+    setIdsPorTipo(Object.fromEntries(lista.map((d) => [d.tipo, d.id])));
+  };
 
   useEffect(() => {
     const verificar = async () => {
@@ -300,7 +374,7 @@ export default function AnvisaPage() {
         if (ultima.status !== 'pendente') {
           setEtapa('acompanhamento');
         } else if (!ultima.modalidade) {
-          setEtapa('escolha');
+          setEtapa('guiada');
         } else {
           setEtapa(ultima.modalidade === 'guiada' ? 'guiada' : 'checklist');
         }
@@ -309,6 +383,8 @@ export default function AnvisaPage() {
         setTemPrescricao(null);
       }
       setVerificando(false);
+      // O mapa tipo → id vem da tabela, e é o que faz o botão "Ver" aparecer.
+      await recarregarIdsDosDocumentos();
     };
     verificar();
   }, []);
@@ -323,10 +399,22 @@ export default function AnvisaPage() {
   });
 
   const documentos = (autorizacao?.documentos as DocItem[] | undefined) ?? [];
-  const todosEnviados = documentos.length > 0 && documentos.every((d) => d.enviado);
+  /**
+   * 🔴 O QUE FALTA É O QUE É EXIGIDO — 23/09/2026.
+   *
+   * Era `documentos.every((d) => d.enviado)`, e isso desabilitava o botão de enviar a
+   * documentação enquanto o LAUDO não chegasse. O laudo pode nunca existir: travar o processo
+   * da ANVISA por ele deixa o paciente esperando por um papel que ninguém vai cobrar dele.
+   *
+   * ⚠️ A tela continua MOSTRANDO o laudo e aceitando o upload — ele é útil quando existe. O
+   * que muda é que ele avisa em vez de bloquear.
+   */
+  const todosEnviados = documentos.length > 0 && documentos.every((d) => d.enviado || DOC_LABELS[d.tipo]?.opcional === true);
 
   const recarregarAutorizacao = async () => {
     setCarregando(true);
+    // Sem isto o botão "Ver" só apareceria depois de recarregar a página.
+    void recarregarIdsDosDocumentos();
     const res = await listarAutorizacoesAnvisa();
     if (res.sucesso && res.dados && res.dados.length > 0) {
       const ultima = res.dados[res.dados.length - 1] as Autorizacao;
@@ -337,9 +425,8 @@ export default function AnvisaPage() {
       if (ultima.status !== 'pendente') {
         setEtapa('acompanhamento');
       } else if (!ultima.modalidade) {
-        setEtapa('escolha');
+        setEtapa('guiada');
       } else {
-        const docs = (ultima.documentos as DocItem[]) ?? [];
         setEtapa(ultima.modalidade === 'guiada' ? 'guiada' : 'checklist');
       }
     }
@@ -359,7 +446,8 @@ export default function AnvisaPage() {
 
       if (resultado.sucesso && resultado.dados) {
         setAutorizacao(resultado.dados);
-        setEtapa('escolha');
+        // ADR-0029 D-01 (DO-69): o paciente não escolhe mais a modalidade; cai no passo a passo.
+        setEtapa('guiada');
         toast.success('Processo ANVISA iniciado!');
       } else if (resultado.erro === 'sem_prescricao') {
         setTemPrescricao(false);
@@ -370,12 +458,37 @@ export default function AnvisaPage() {
     });
   };
 
+  /**
+   * O antigo cartão "Be4Hope faz por mim", agora no fim do passo a passo. A resposta do servidor
+   * é lida: `definirModalidadeAnvisa` RECUSA sem o pedido ativado (ADR-0029 D-04.3), e o
+   * paciente precisa saber disso em vez de ver a tela não mudar.
+   */
+  const handleBe4HopeFazPorMim = async () => {
+    if (!autorizacao) return;
+    const res = await definirModalidadeAnvisa(autorizacao.id, 'representacao');
+    if (!res.sucesso) {
+      toast.error(('erro' in res && res.erro) || 'Não foi possível abrir a procuração agora.');
+      return;
+    }
+    setModalidade('representacao');
+    setEtapa('checklist');
+    await recarregarAutorizacao();
+  };
+
   const handleConfirmarEnvio = () => {
     if (!autorizacao) return;
     startTransition(async () => {
       const res = await confirmarEnvioAnvisa(autorizacao.id);
       if (res.sucesso) {
-        toast.success('Documentos confirmados! Iniciando análise ANVISA.');
+        /**
+         * 🔴 A MENSAGEM DIZIA O QUE NÃO ACONTECEU — 23/09/2026.
+         *
+         * Era _"Iniciando análise ANVISA"_, e nada é enviado à ANVISA aqui: o status vai para
+         * `documentos_enviados` e o processo fica esperando um ADMIN conferir e protocolar
+         * (`/admin/anvisa`, seletor de status → `em_analise`). Dizer que a análise começou faz
+         * o paciente contar os 10 dias úteis a partir de agora e cobrar no dia errado.
+         */
+        toast.success('Documentos confirmados. Nossa equipe vai conferir e protocolar na ANVISA.');
         await recarregarAutorizacao();
       } else {
         toast.error('Erro ao confirmar envio.');
@@ -398,7 +511,6 @@ export default function AnvisaPage() {
 
   const progresso = (() => {
     if (etapa === 'inicio') return 0;
-    if (etapa === 'escolha') return 20;
     if (etapa === 'guiada') return 60;
     if (etapa === 'checklist') return 50;
     if (etapa === 'formulario') return 75;
@@ -418,16 +530,20 @@ export default function AnvisaPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6 pb-12">
-      {/* Header */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-display font-bold text-foreground">Autorização ANVISA</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Guia passo a passo para obter sua autorização de importação de medicamento.
-        </p>
-      </div>
+      {/*
+        🔴 O CONSENTIMENTO QUE FALTOU — ADR-0022 D-09, e pedido do dono em 13/09/2026:
+        "toda etapa que é compartilhada com a Greens deve aparecer esse modal de consentimento".
+
+        Esta é a tela onde a reconciliação automática deixa o paciente, e é justamente ela que
+        não tem consentimento: a reconciliação conclui sem a pessoa presente, então não consente
+        por ela. O componente decide sozinho se aparece — só pede a quem veio de parceiro e ainda
+        não autorizou. Nunca bloqueia: aceite obtido como pedágio é viciado (LGPD art. 8º §3º).
+      */}
+      <ConsentimentoQueFaltou origem="tela_anvisa" />
+      <PageHeader
+        title="Autorização ANVISA"
+        description="Guia passo a passo para obter sua autorização de importação de medicamento."
+      />
 
       {/* Progresso */}
       {etapa !== 'inicio' && (
@@ -538,77 +654,11 @@ export default function AnvisaPage() {
         </Card>
       )}
 
-      {/* ── ETAPA ESCOLHA — Como prefere fazer? ────────────── */}
-      {etapa === 'escolha' && autorizacao && (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h2 className="font-display font-bold text-xl text-foreground">
-              Como prefere fazer sua Autorização ANVISA?
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Escolha a modalidade que melhor se adapta à sua situação.
-              Você pode alterar essa escolha a qualquer momento.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* OPÇÃO 1 — Guiada */}
-            <button
-              onClick={async () => {
-                await definirModalidadeAnvisa(autorizacao.id, 'guiada');
-                setModalidade('guiada');
-                setEtapa('guiada');
-              }}
-              className="group text-left rounded-2xl border-2 border-border hover:border-primary/50 bg-white p-5 space-y-3 transition-all hover:shadow-md"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <Navigation className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-base text-foreground">
-                  Faço eu mesmo
-                </p>
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                  Te guiamos passo a passo no Gov.br com todos os
-                  dados já preenchidos. Rápido, gratuito e seguro.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                100% online · Gov.br
-              </div>
-            </button>
-
-            {/* OPÇÃO 2 — Representação */}
-            <button
-              onClick={async () => {
-                await definirModalidadeAnvisa(autorizacao.id, 'representacao');
-                setModalidade('representacao');
-                setEtapa('checklist');
-                await recarregarAutorizacao();
-              }}
-              className="group text-left rounded-2xl border-2 border-border hover:border-secondary/50 bg-white p-5 space-y-3 transition-all hover:shadow-md"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary/10">
-                <Users className="h-6 w-6 text-secondary" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-base text-foreground">
-                  Be4Hope faz por mim
-                </p>
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                  Assine a Procuração Específica e nossa equipe
-                  cuida de todo o processo junto à ANVISA por você.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-secondary">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Procuração Específica · Equipe Be4Hope
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
+      {/*
+        ADR-0029 D-01 (DO-69): a etapa "Como prefere fazer?" SAIU. O paciente não escolhe mais a
+        procuração sozinho; ela aparece no fim do passo a passo, depois que o admin ativa o pedido
+        de atendimento (AtendimentoComSuporte).
+      */}
 
       {/* ── ETAPA GUIADA — Passo a passo Gov.br ─────────────── */}
       {etapa === 'guiada' && autorizacao && (
@@ -622,10 +672,10 @@ export default function AnvisaPage() {
                 Siga cada etapa com atenção. Seus dados já estão prontos para copiar.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setEtapa('escolha')}>
-              Voltar
-            </Button>
           </div>
+
+          {/* ADR-0029 D-07: a área grande de vídeo, configurada em lib/anvisa/video-do-passo-a-passo.ts */}
+          <VideoDoPassoAPasso />
 
           {/* Link direto para o Gov.br */}
           <a
@@ -775,6 +825,16 @@ export default function AnvisaPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/*
+            ADR-0029 D-02 e D-06: no fim do passo a passo, o pedido de atendimento e, logo abaixo,
+            "Be4Hope faz por mim" — só depois que o admin ativa (ou para quem já estava nela, D-08).
+          */}
+          <AtendimentoComSuporte
+            autorizacaoId={autorizacao.id}
+            modalidadeAtual={modalidade ?? 'guiada'}
+            onBe4HopeFazPorMim={handleBe4HopeFazPorMim}
+          />
         </div>
       )}
 
@@ -794,7 +854,7 @@ export default function AnvisaPage() {
 
           {/* Botão voltar para modalidade representação */}
           {modalidade === 'representacao' && autorizacao.status === 'pendente' && (
-            <Button variant="outline" size="sm" onClick={() => setEtapa('escolha')} className="mb-2">
+            <Button variant="outline" size="sm" onClick={() => setEtapa('guiada')} className="mb-2">
               Voltar
             </Button>
           )}
@@ -818,6 +878,7 @@ export default function AnvisaPage() {
                 doc={doc}
                 autorizacaoId={autorizacao.id}
                 onUploaded={recarregarAutorizacao}
+                documentoId={idsPorTipo[doc.tipo]}
               />
             ))}
           </div>

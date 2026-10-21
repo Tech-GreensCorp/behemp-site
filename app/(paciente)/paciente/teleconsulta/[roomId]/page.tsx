@@ -4,6 +4,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { getPusherClient } from '@/lib/integrations/pusher/client';
 import { buscarSalaPorRoomId, pacienteEntrarSala } from '../../../_actions/teleconsulta';
+import { buscarIceServers } from '@/lib/webrtc/ice-servers';
+import { Consentimento } from '@/components/teleconsulta/Consentimento';
+import { EsperaDaTeleconsulta } from '@/components/teleconsulta/EsperaDaTeleconsulta';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, AlertCircle, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,6 +22,9 @@ function TeleconsultaPacienteContent() {
   const [carregando, setCarregando] = useState(true);
 
   const [phase, setPhase] = useState<'lobby' | 'connecting' | 'room'>('lobby');
+  // CFM 2.314/2022 Art. 15: sem autorização do paciente não há atendimento por telemedicina.
+  // O servidor confere de novo — a tela é conveniência, não a garantia.
+  const [consentTeleconsultaOk, setConsentTeleconsultaOk] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -61,6 +67,8 @@ function TeleconsultaPacienteContent() {
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   
   const [micOn, setMicOn] = useState(true);
+  // A faixa do microfone em estado: a espera mede o nível dela, só neste aparelho (ADR-0029 D-30).
+  const [faixaDoMicrofone, setFaixaDoMicrofone] = useState<MediaStreamTrack | null>(null);
   const [camOn, setCamOn] = useState(true);
   const [cameraOk, setCameraOk] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -90,6 +98,7 @@ function TeleconsultaPacienteContent() {
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
       localStreamRef.current = stream;
+      setFaixaDoMicrofone(stream.getAudioTracks()[0] ?? null);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(console.warn);
@@ -99,6 +108,7 @@ function TeleconsultaPacienteContent() {
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         localStreamRef.current = audioStream;
+        setFaixaDoMicrofone(audioStream.getAudioTracks()[0] ?? null);
         setCameraOk(true);
         setCamOn(false);
       } catch {
@@ -148,16 +158,14 @@ function TeleconsultaPacienteContent() {
     const pusher = getPusherClient();
     const channel = pusher.subscribe(`presence-sala-${roomId}`);
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        // TURN público — necessário para atravessar NAT em produção
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-      ],
-    });
+    // CORRIGIDO 20/08/2026 — Item 8 de docs/04-LISTA-DE-AFAZERES.md. Aqui havia relay gratuito
+    // de terceiro com credencial pública: toda a mídia da consulta atravessava operador sem
+    // contrato. Agora a lista vem do servidor, com credencial efêmera (2 h).
+    const config = await buscarIceServers(roomId);
+    if (!config.turnDisponivel) {
+      toast.warning('Sem servidor de retransmissão — se a conexão direta falhar, a chamada não completa.');
+    }
+    const pc = new RTCPeerConnection({ iceServers: config.iceServers });
     pcRef.current = pc;
 
     localStreamRef.current.getTracks().forEach(track => {
@@ -343,18 +351,32 @@ function TeleconsultaPacienteContent() {
             </Button>
           </div>
 
-          <div className="bg-[#2D4F3C]/20 border border-[#2D4F3C]/30 p-4 rounded-xl text-center">
-            <p className="text-sm text-[#2D4F3C] font-medium text-green-300/80">
-              Esta consulta pode ser gravada e transcrita com fins clínicos.
-            </p>
-          </div>
+          {/* SUBSTITUÍDO 20/08/2026 — ADR-0007 D-08. Aqui havia um AVISO passivo que não pedia
+              nada a ninguém: o consentimento era `useState(true)` na tela do MÉDICO.
+              São DOIS consentimentos: o de teleconsulta (CFM 2.314 Art. 15) BLOQUEIA a entrada;
+              o de IA (LGPD) bloqueia só a transcrição. */}
+          {sala?.salaId && (
+            <>
+              <Consentimento
+                tipo="teleconsulta"
+                salaId={sala.salaId}
+                tom="escuro"
+                onMudanca={setConsentTeleconsultaOk}
+              />
+              <Consentimento tipo="ia" salaId={sala.salaId} papel="paciente" tom="escuro" />
+            </>
+          )}
 
           <Button 
             className="w-full h-14 text-lg font-bold bg-[#EA5429] hover:bg-[#D4471E]" 
             onClick={entrarNaSala} 
-            disabled={!cameraOk || phase === 'connecting'}
+            disabled={!cameraOk || phase === 'connecting' || !consentTeleconsultaOk}
           >
-            {phase === 'connecting' ? 'Conectando...' : 'Entrar na Consulta'}
+            {phase === 'connecting'
+              ? 'Conectando...'
+              : !consentTeleconsultaOk
+                ? 'Autorize acima para entrar'
+                : 'Entrar na Consulta'}
           </Button>
         </div>
       </div>
@@ -388,12 +410,21 @@ function TeleconsultaPacienteContent() {
 
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-4 z-[1]">
-            <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-[#EA5429] animate-spin" />
-            <p className="text-slate-400 font-medium">Aguardando médico...</p>
+            {/* ADR-0029 D-30 (01/10/2026): a espera do atendimento, no escuro. Antes, um spinner
+                com "Aguardando médico...". */}
+            <EsperaDaTeleconsulta
+              quem="paciente"
+              fase="aguardando"
+              nomeDoOutro={sala?.medicoNome}
+              microfone={faixaDoMicrofone}
+              mudo={!micOn}
+            />
           </div>
         )}
         
-        <div className="absolute bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
+        {/* z-10: acima da espera (`z-[1]`). Sem ele a própria câmera ficava escondida até o médico
+            entrar — a mesma classe de defeito que o lado do médico teve em 10/09/2026. */}
+        <div className="absolute z-10 bottom-6 right-6 w-48 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl transition-all hover:scale-105 cursor-pointer">
           <video ref={setLocalVideoEl} autoPlay muted playsInline className={`w-full h-full object-cover ${!camOn && 'opacity-0'}`} />
           {!camOn && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-800">

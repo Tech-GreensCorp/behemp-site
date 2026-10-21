@@ -75,7 +75,7 @@ async function converterParaPkcs8(pkcs1Pem: string): Promise<string> {
   return pkcs8Pem;
 }
 
-async function obterAccessToken(): Promise<string> {
+export async function obterAccessToken(): Promise<string> {
   // Usar token em cache se ainda válido (com 5min de margem)
   if (cachedToken && Date.now() < cachedToken.expiraEm - 5 * 60 * 1000) {
     return cachedToken.token;
@@ -311,5 +311,211 @@ export async function downloadPdfAssinado(envelopeId: string): Promise<Buffer | 
   } catch (error) {
     console.error('[DocuSign] Erro ao baixar PDF assinado:', error);
     return null;
+  }
+}
+
+// ── Comunicados enviados pelo admin (Atualização do Programa de Doação) ───────
+//
+// Mesma conta, mesmo JWT, mesma API da procuração — só funções novas. Nada acima mudou.
+// O envelope é "embedded": o DocuSign NÃO manda e-mail ao paciente. O e-mail é nosso (docs@) e
+// leva ao sistema, onde o link de assinatura é gerado na hora, depois de conferir quem pede.
+
+export interface DadosEnvelopeComunicado {
+  pacienteNome: string;
+  pacienteEmail: string;
+  /** Identificador do signatário dentro do envelope. Precisa ser o mesmo ao pedir o link. */
+  clientUserId: string;
+  pdfBuffer: Buffer;
+  tituloDoDocumento: string;
+  assuntoDoEnvelope: string;
+  ancoraAssinatura: string;
+  ancoraData: string;
+  /** URL pública que o DocuSign chama quando o envelope muda (gatilho; o status vem da API). */
+  urlDoWebhook?: string;
+}
+
+export type ResultadoEnvelopeComunicado =
+  | { sucesso: true; envelopeId: string }
+  | { sucesso: false; erro: string };
+
+function baseDocusign() {
+  return {
+    baseUrl: env.DOCUSIGN_BASE_URL ?? 'https://demo.docusign.net/restapi',
+    accountId: env.DOCUSIGN_ACCOUNT_ID!,
+  };
+}
+
+/** Cria o envelope do comunicado, já enviado, com a assinatura ancorada no texto do PDF. */
+export async function criarEnvelopeComunicado(
+  dados: DadosEnvelopeComunicado,
+): Promise<ResultadoEnvelopeComunicado> {
+  if (!docusignConfigurado()) {
+    return { sucesso: false, erro: 'DocuSign não configurado neste ambiente.' };
+  }
+  try {
+    const accessToken = await obterAccessToken();
+    const { baseUrl, accountId } = baseDocusign();
+
+    const corpo: Record<string, unknown> = {
+      emailSubject: dados.assuntoDoEnvelope,
+      status: 'sent',
+      documents: [
+        {
+          documentBase64: dados.pdfBuffer.toString('base64'),
+          name: dados.tituloDoDocumento,
+          fileExtension: 'pdf',
+          documentId: '1',
+        },
+      ],
+      recipients: {
+        signers: [
+          {
+            email: dados.pacienteEmail,
+            name: dados.pacienteNome,
+            recipientId: '1',
+            routingOrder: '1',
+            clientUserId: dados.clientUserId,
+            tabs: {
+              signHereTabs: [
+                {
+                  documentId: '1',
+                  anchorString: dados.ancoraAssinatura,
+                  anchorUnits: 'pixels',
+                  anchorXOffset: '0',
+                  anchorYOffset: '-6',
+                  tabLabel: 'Assinatura do paciente',
+                },
+              ],
+              dateSignedTabs: [
+                {
+                  documentId: '1',
+                  anchorString: dados.ancoraData,
+                  anchorUnits: 'pixels',
+                  anchorXOffset: '0',
+                  anchorYOffset: '0',
+                  tabLabel: 'Data da assinatura',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+
+    if (dados.urlDoWebhook) {
+      corpo.eventNotification = {
+        url: dados.urlDoWebhook,
+        loggingEnabled: 'true',
+        requireAcknowledgment: 'true',
+        useSoapInterface: 'false',
+        includeCertificateWithSoap: 'false',
+        signMessageWithX509Cert: 'false',
+        includeDocuments: 'false',
+        includeEnvelopeVoidReason: 'true',
+        includeTimeZone: 'true',
+        includeSenderAccountAsCustomField: 'false',
+        includeDocumentFields: 'false',
+        includeCertificateOfCompletion: 'false',
+        envelopeEvents: ['sent', 'delivered', 'completed', 'declined', 'voided'].map((s) => ({
+          envelopeEventStatusCode: s,
+        })),
+        eventData: { version: 'restv2.1', format: 'json' },
+      };
+    }
+
+    const res = await fetch(`${baseUrl}/v2.1/accounts/${accountId}/envelopes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+    if (!res.ok) {
+      // Só o status sobe para a tela; o detalhe fica no log do servidor.
+      const detalhe = await res.text();
+      console.error('[DocuSign] criar envelope do comunicado:', res.status, detalhe.slice(0, 500));
+      return { sucesso: false, erro: `DocuSign recusou o envelope (HTTP ${res.status}).` };
+    }
+    const { envelopeId } = (await res.json()) as { envelopeId: string };
+    return { sucesso: true, envelopeId };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'erro desconhecido';
+    console.error('[DocuSign] criar envelope do comunicado:', msg);
+    if (msg === 'CONSENT_REQUIRED' || msg.includes('consent_required')) {
+      return { sucesso: false, erro: 'CONSENT_REQUIRED' };
+    }
+    return { sucesso: false, erro: 'Falha ao falar com o DocuSign.' };
+  }
+}
+
+/** Link de assinatura do signatário — vale poucos minutos; gere um novo a cada clique. */
+export async function gerarUrlAssinaturaComunicado(dados: {
+  envelopeId: string;
+  clientUserId: string;
+  pacienteNome: string;
+  pacienteEmail: string;
+  returnUrl: string;
+}): Promise<{ sucesso: true; url: string } | { sucesso: false; erro: string }> {
+  if (!docusignConfigurado()) return { sucesso: false, erro: 'DocuSign não configurado.' };
+  try {
+    const accessToken = await obterAccessToken();
+    const { baseUrl, accountId } = baseDocusign();
+    const res = await fetch(
+      `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${dados.envelopeId}/views/recipient`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnUrl: dados.returnUrl,
+          authenticationMethod: 'none',
+          email: dados.pacienteEmail,
+          userName: dados.pacienteNome,
+          clientUserId: dados.clientUserId,
+          recipientId: '1',
+        }),
+      },
+    );
+    if (!res.ok) {
+      console.error('[DocuSign] link de assinatura do comunicado:', res.status);
+      return { sucesso: false, erro: `DocuSign recusou o link (HTTP ${res.status}).` };
+    }
+    const { url } = (await res.json()) as { url: string };
+    return { sucesso: true, url };
+  } catch (error) {
+    console.error('[DocuSign] link de assinatura do comunicado:', error);
+    return { sucesso: false, erro: 'Falha ao falar com o DocuSign.' };
+  }
+}
+
+export interface StatusDoEnvelope {
+  /** sent | delivered | completed | declined | voided | … — como o DocuSign devolve. */
+  status: string;
+  completedDateTime: string | null;
+}
+
+/**
+ * Lê o status do envelope DIRETO da API.
+ *
+ * É a fonte de verdade da conclusão: o corpo de um webhook ou o parâmetro `event` da URL de
+ * retorno são entrada de quem chama e não provam nada.
+ */
+export async function consultarStatusDoEnvelope(
+  envelopeId: string,
+): Promise<{ sucesso: true; dados: StatusDoEnvelope } | { sucesso: false; erro: string }> {
+  if (!docusignConfigurado()) return { sucesso: false, erro: 'DocuSign não configurado.' };
+  try {
+    const accessToken = await obterAccessToken();
+    const { baseUrl, accountId } = baseDocusign();
+    const res = await fetch(`${baseUrl}/v2.1/accounts/${accountId}/envelopes/${envelopeId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return { sucesso: false, erro: `DocuSign respondeu HTTP ${res.status}.` };
+    const j = (await res.json()) as { status?: string; completedDateTime?: string };
+    if (!j.status) return { sucesso: false, erro: 'Resposta do DocuSign sem status.' };
+    return {
+      sucesso: true,
+      dados: { status: j.status, completedDateTime: j.completedDateTime ?? null },
+    };
+  } catch (error) {
+    console.error('[DocuSign] consultar envelope:', error);
+    return { sucesso: false, erro: 'Falha ao falar com o DocuSign.' };
   }
 }

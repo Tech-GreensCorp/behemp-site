@@ -127,6 +127,258 @@
       "when": 1786562563276,
       "tag": "0017_nosy_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787568481228,
+      "tag": "0018_nifty_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787575588750,
+      "tag": "0019_cheerful_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787581132843,
+      "tag": "0020_free_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787581582831,
+      "tag": "0021_motionless_madelyne_pryor",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787581642831,
+      "tag": "0022_reconciliar_medico_ordem",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787600542856,
+      "tag": "0023_wise_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787673293164,
+      "tag": "0024_strong_komodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788976483630,
+      "tag": "0025_sudden_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788977541235,
+      "tag": "0026_bumpy_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788980210618,
+      "tag": "0027_magenta_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788999954715,
+      "tag": "0028_plain_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789000920209,
+      "tag": "0029_colorful_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1789003264264,
+      "tag": "0030_lame_madripoor",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789006781583,
+      "tag": "0031_tranquil_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789008320860,
+      "tag": "0032_violet_purifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789009619720,
+      "tag": "0033_panoramic_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789098756350,
+      "tag": "0034_thin_tinkerer",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1789134788403,
+      "tag": "0035_huge_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1789066049422,
+      "tag": "0036_little_omega_red",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789066049423,
+      "tag": "0037_reservada_pagamentos",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789134004694,
+      "tag": "0038_giant_skullbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789142042567,
+      "tag": "0039_secret_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789144093871,
+      "tag": "0040_flippant_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789156866038,
+      "tag": "0041_soft_thor_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1789271387091,
+      "tag": "0042_medical_scourge",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789271398148,
+      "tag": "0043_long_slipstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789588306034,
+      "tag": "0044_fancy_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1790014838175,
+      "tag": "0045_idioma_e_cadastro_transferido",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1790104361903,
+      "tag": "0046_panoramic_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790191412776,
+      "tag": "0047_adorable_lily_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790192565802,
+      "tag": "0048_dados_do_parceiro_na_solicitacao",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790193675250,
+      "tag": "0049_laudo_medico_no_enum",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790784182806,
+      "tag": "0050_pedidos_atendimento_assistido",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792094449634,
+      "tag": "0051_comunicados_assinatura",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792418292033,
+      "tag": "0052_reinicio_do_comunicado",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792438199585,
+      "tag": "0053_tipos_de_documento_manual",
+      "breakpoints": true
     }
   ]
 }

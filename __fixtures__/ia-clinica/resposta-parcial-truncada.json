@@ -1,0 +1,64 @@
+{
+  "grafo": {
+    "dominio": "teleconsulta",
+    "urgencia": "amarelo",
+    "parcial": true,
+    "tituloPrincipal": "Análise incompleta — evidência insuficiente",
+    "sindrome": {
+      "titulo": "Quadro em investigação"
+    },
+    "achados": [
+      {
+        "id": "ach-1",
+        "titulo": "Dor torácica em aperto com irradiação para MSE + sudores…",
+        "resumo": "Dor torácica em aperto com irradiação para MSE + sudorese fria — suspeita de síndrome coronariana aguda, risco de infarto agudo do miocárdio",
+        "proveniencia": "red_flag",
+        "dominio": "alarme",
+        "ancoraSecao": "panorama-red-flags",
+        "fonte_campo": "red_flags",
+        "fonte_id": "f1qpavga"
+      },
+      {
+        "id": "ach-2",
+        "titulo": "Encaminhamento imediato: eletrocardiograma e avaliação p…",
+        "resumo": "Encaminhamento imediato: eletrocardiograma e avaliação presencial urgentes",
+        "proveniencia": "red_flag",
+        "dominio": "alarme",
+        "ancoraSecao": "panorama-red-flags",
+        "fonte_campo": "red_flags",
+        "fonte_id": "fpndojh"
+      }
+    ],
+    "hipoteses": [],
+    "arestas": [],
+    "alertasOcultos": [],
+    "schema_version": "1.0.4-s13",
+    "achados_inconclusivos": [
+      {
+        "texto": "Dor torácica sem caracterização suficiente para ranquear hipótese",
+        "hipoteses_afetadas": [],
+        "perguntas_medico": [
+          "A dor irradia para mandíbula ou membro superior esquerdo?",
+          "Há relação com esforço?"
+        ]
+      }
+    ],
+    "completude": {
+      "nivel": "parcial",
+      "inconclusivos": 1,
+      "red_flags_nao_explicadas": 1,
+      "motivos": [
+        "1 achado sem suporta/contradiz definido",
+        "1 sinal de alarme sem hipótese que explique",
+        "análise interrompida antes do ranqueamento"
+      ]
+    },
+    "salvaguardas_deterministicas": [
+      "[SISTEMA] Dor torácica em investigação — avaliar via presencial"
+    ]
+  },
+  "blocos": [],
+  "analiseIA": {
+    "nivel_urgencia": "atencao"
+  }
+}

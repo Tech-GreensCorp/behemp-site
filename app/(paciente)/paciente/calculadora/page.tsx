@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { PageHeader } from '@/components/shared/page-header';
 
 const GOTAS_POR_ML = 20;
 
@@ -64,13 +65,7 @@ export default function CalculadoraPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">Calculadora</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Calcule quando seu medicamento vai terminar
-        </p>
-      </div>
+      <PageHeader title="Calculadora" description="Calcule quando seu medicamento vai terminar" />
 
       {/* Dica */}
       <Card className="border-primary/20 bg-primary/5">

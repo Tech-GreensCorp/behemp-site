@@ -15,6 +15,7 @@ import { BuscaPaciente } from "@/components/busca-paciente";
 import { getPusherClient } from "@/lib/integrations/pusher/client";
 import { listarConsultasMedico, listarPacientesMedico } from "@/app/(medico)/_actions/consultas";
 import { listarPacientesParaPresenca, iniciarConsultaAvulsa, iniciarTeleconsulta } from "@/app/(medico)/_actions/notificar-teleconsulta";
+import { PageHeader } from "@/components/shared/page-header";
 
 interface ConsultaAgendada {
     id: string;
@@ -230,16 +231,11 @@ function TeleconsultaLobbyContent() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
-            {/* Header */}
-            <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Command Center</p>
-                <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-foreground">
-                    Recepção de <span className="text-primary italic">Teleconsulta</span>
-                </h1>
-                <p className="text-muted-foreground mt-2 text-sm">
-                    Inicie seus atendimentos agendados ou crie consultas de urgência imediatamente.
-                </p>
-            </div>
+            <PageHeader
+                eyebrow="Command Center"
+                title="Recepção de Teleconsulta"
+                description="Inicie seus atendimentos agendados ou crie consultas de urgência imediatamente."
+            />
 
             {/* Alerta se já há chamada ativa */}
             {state.salaId && (

@@ -1,16 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Database, Globe, Shield } from 'lucide-react';
+import { PageHeader } from '@/components/shared/page-header';
 
 export default function ConfiguracoesAdminPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-sm text-muted-foreground">
-          Configurações gerais da plataforma
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Plataforma"
+        title="Configurações"
+        description="Configurações gerais da plataforma"
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-0 shadow-sm">

@@ -5,7 +5,7 @@ import { documentos, users, pacientes } from '@/db/schema';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { obterUsuarioAtual } from '@/lib/auth';
-import { put } from '@vercel/blob';
+import { guardarDocumentoPrivado } from '@/lib/documentos/store-privado';
 
 /**
  * Server Actions de documentos — uso pelo paciente autenticado.
@@ -102,8 +102,8 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     if (!file || file.size === 0) {
       return { sucesso: false, erro: 'Selecione um arquivo.' };
     }
-    if (file.size > 100 * 1024 * 1024) {
-      return { sucesso: false, erro: 'Arquivo excede 100MB.' };
+    if (file.size > 200 * 1024 * 1024) {
+      return { sucesso: false, erro: 'Arquivo excede 200MB.' };
     }
     const tiposPermitidos = ['image/jpeg', 'image/png', 'application/pdf'];
     if (!tiposPermitidos.includes(file.type)) {
@@ -124,10 +124,9 @@ export async function uploadDocumentoPaciente(formData: FormData) {
     const nomeSeguro = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const blobPath = `documentos/${pacienteId}/${nomeSeguro}`;
 
-    const blob = await put(blobPath, file, {
-      access: 'public',
-      token: process.env.BLOB_BEHEMP_READ_WRITE_TOKEN,
-    });
+    // O store sai de `store-privado`: `BLOB_BEHEMP_READ_WRITE_TOKEN` é a mesma
+    // variável com que avatar e exame gravam `public`, e um store tem um só acesso.
+    const blob = await guardarDocumentoPrivado(blobPath, file);
 
     // Calcular validade
     const emissao = new Date(parsed.data.dataEmissao);
@@ -175,7 +174,8 @@ export async function listarDocumentosPaciente() {
       SELECT
         d.id,
         d.tipo,
-        d.url_blob         AS "urlBlob",
+        d.tipo_personalizado AS "tipoPersonalizado",
+        d.url_blob        AS "urlBlob",
         d.nome_arquivo     AS "nomeArquivo",
         d.data_emissao     AS "dataEmissao",
         d.data_validade    AS "dataValidade",

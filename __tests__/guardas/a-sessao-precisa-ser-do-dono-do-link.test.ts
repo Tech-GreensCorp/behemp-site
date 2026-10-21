@@ -1,0 +1,227 @@
+/**
+ * A FICHA SÓ ENTRA NA CONTA DE QUEM O LINK CHAMA.
+ *
+ * 🔴 ACHADO PELO DONO em 12/09/2026, com três contas de teste no mesmo navegador: ele abriu
+ * um link de cadastro emitido para um e-mail estando logado com **outro**.
+ *
+ * ⚠️ O QUE ACONTECERIA SEM ESTA TRAVA. `concluirCadastroPorLink` resolve a linha de `users`
+ * pelo `clerkId` **da sessão**. A ficha do paciente do link — CPF, telefone e os documentos
+ * que o parceiro mandou — seria gravada na conta de quem estivesse logado. Numa plataforma de
+ * saúde é o pior tipo de erro: dado clínico na pessoa errada, sem nenhum sinal de que houve
+ * troca. Nem o paciente nem o médico teriam como notar.
+ *
+ * 🔴 E É EXPLORÁVEL, NÃO SÓ ACIDENTAL. O link chega por WhatsApp e vale 7 dias. Quem receber
+ * um link alheio — encaminhado, printado num grupo — e abrir logado passa a ter, na própria
+ * conta, a ficha e os documentos de outra pessoa. É OWASP API1 (BOLA) por um caminho novo, e
+ * o repositório já trata essa classe em `autorizacao-tem-escopo-de-objeto` e
+ * `o-documento-do-paciente-nao-abre-sem-escopo`.
+ *
+ * ⚠️ EU PIOREI ISSO NO MESMO DIA. A retomada de cadastro (`o-cadastro-retoma-de-onde-parou`)
+ * fez a tela **pular o Clerk** quando há sessão viva — sem conferir de quem ela é. O risco
+ * existia antes por outro caminho; a retomada o deixou a um clique. Fica escrito porque
+ * conserto que abre buraco novo é o modo de falha mais caro que existe.
+ *
+ * 🔴 A COMPARAÇÃO É COM O E-MAIL DA SOLICITAÇÃO, NUNCA COM O CAMPO DA TELA. O campo `email`
+ * é editável: quem estivesse logado em outra conta poderia digitar o próprio endereço e fazer
+ * a checagem passar — que é exatamente o que ela existe para impedir.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const RAIZ = join(__dirname, '..', '..');
+const ler = (p: string) => readFileSync(join(RAIZ, p), 'utf8');
+const semComentarios = (f: string) =>
+  f.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+const ACTION = semComentarios(ler('app/_actions/cadastro-por-link.ts'));
+const TELA = semComentarios(
+  ler('app/(auth)/cadastro/[token]/_components/formulario-de-cadastro.tsx'),
+);
+
+describe('a sessão precisa ser do dono do link', () => {
+  it('⚠️ VACUIDADE: a action ainda resolve o usuário pelo clerkId da sessão', () => {
+    // Se isto sumir, a trava abaixo perde o sentido — e o guarda precisa ser repensado.
+    expect(ACTION).toMatch(/eq\(users\.clerkId, clerkId\)/);
+  });
+
+  it('🔴 O SERVIDOR confere a SESSÃO contra o cadastro — e recusa quando não bate', () => {
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026, e a versão anterior deste caso era um guarda que congelava
+     * a implementação: ela exigia o literal `emailDaSessao !== emailDaSolicitacao`.
+     *
+     * Quando o dono ficou preso na própria tela — ele corrigira o e-mail pelo "Corrigir meus
+     * dados", a conta nasceu certa, e a trava comparou com a solicitação errada —, a correção
+     * fez este caso ficar VERMELHO. O sinal invertido de novo: verde com o beco, vermelho com
+     * o conserto.
+     *
+     * **A propriedade é: existe uma conferência da sessão, e ela recusa.** Não a forma dela.
+     */
+    expect(ACTION).toMatch(/emailDaSessao/);
+    expect(ACTION).toMatch(/emailDaSolicitacao/);
+
+    const i = ACTION.indexOf('if (!emailDaSessao');
+    expect(i, 'a conferência da sessão sumiu').toBeGreaterThan(-1);
+    const bloco = ACTION.slice(i, ACTION.indexOf('}', ACTION.indexOf('return falha', i)));
+    expect(bloco, 'a conferência não recusa nada').toMatch(/return falha\(/);
+  });
+
+  it('🔴 e a sessão só é aceita por uma razão DECLARADA — nunca por omissão', () => {
+    /**
+     * As duas razões válidas hoje: a sessão casa com o e-mail da solicitação, ou casa com o
+     * e-mail que o paciente confirmou neste fluxo (o Clerk só cria a conta depois do código,
+     * então esse endereço é comprovadamente controlado por quem está ali).
+     *
+     * ⚠️ Se alguém acrescentar uma terceira razão, este caso não impede — mas a condição tem
+     * de continuar sendo uma lista de razões explícitas, e não um `if` que virou sempre-falso.
+     */
+    const i = ACTION.indexOf('if (!emailDaSessao');
+    const condicao = ACTION.slice(i, ACTION.indexOf(') {', i));
+    expect(condicao, 'a condição não olha a solicitação').toMatch(/confereComASolicitacao/);
+    expect(condicao, 'a condição não olha o cadastro em curso').toMatch(/sessaoEDoCadastroEmCurso/);
+  });
+
+  it('🔴 e a correção do e-mail é GRAVADA — senão o beco volta pela próxima tela', () => {
+    /**
+     * Aceitar a correção e não persistir faria a sentinela, o aviso de pendência e o painel
+     * continuarem lendo o e-mail velho — o mesmo bloqueio, por outra porta.
+     */
+    const i = ACTION.indexOf('if (!confereComASolicitacao)');
+    expect(i, 'a correção do e-mail não é persistida').toBeGreaterThan(-1);
+    const bloco = ACTION.slice(i, i + 500);
+    expect(bloco, 'não atualiza a solicitação').toMatch(/update\(solicitacoesCadastro\)/);
+    expect(bloco, 'não grava o e-mail da sessão').toMatch(/email: emailDaSessao/);
+  });
+
+  it('🔴 e a comparação usa `solicitacao.email` — não o e-mail do formulário', () => {
+    // `dados.email` vem do cliente e é editável. Comparar com ele deixaria o atacante
+    // escolher o alvo, que é o oposto da trava.
+    const i = ACTION.indexOf('const emailDaSolicitacao');
+    expect(ACTION.slice(i, i + 160)).toMatch(/solicitacao\.email/);
+  });
+
+  it('🔴 FALHA FECHADA: sem e-mail na sessão, recusa', () => {
+    // Sem e-mail não há como provar que é a pessoa certa. Deixar passar "porque não deu
+    // para verificar" é como a maioria dos controles morre.
+    expect(ACTION, 'a falha fechada por sessão ausente sumiu').toMatch(/if \(!emailDaSessao \|\|/);
+  });
+
+  it('🔴 e a recusa acontece ANTES de qualquer escrita', () => {
+    const trava = ACTION.indexOf('if (!emailDaSessao');
+    // Âncora pela chamada, não pelo cliente: `db` não suporta transação em produção
+    // (neon-http lança), e o ponto passou a usar `dbTransacional()` em 13/09/2026.
+    const transacao = ACTION.search(/\.transaction\s*\(/);
+    expect(trava).toBeGreaterThan(-1);
+    expect(transacao).toBeGreaterThan(trava);
+  });
+
+  it('⚠️ o log NÃO carrega os endereços — e-mail é dado pessoal', () => {
+    /**
+     * ⚠️ DEFEITO MEU, achado ao rodar: a primeira versão recusava `emailDaSessao[,)]`, e
+     * isso acusava `Boolean(emailDaSessao)` — que é exatamente a forma SEGURA, e a que o
+     * código usa. Guarda que reprova o conserto certo é pior que guarda ausente: ele ensina
+     * a contornar.
+     *
+     * O que não pode é o VALOR virar campo do log. `Boolean(...)` e `.length` não revelam
+     * endereço nenhum; `emailDaSessao,` como valor de uma chave, sim.
+     */
+    const i = ACTION.indexOf('sessão de outro e-mail');
+    const bloco = ACTION.slice(i, i + 320);
+
+    // Nenhuma chave recebe o e-mail cru.
+    expect(bloco).not.toMatch(/:\s*emailDaSessao\b/);
+    expect(bloco).not.toMatch(/:\s*emailDaSolicitacao\b/);
+    expect(bloco).not.toMatch(/:\s*(dados\.email|emailConfirmado)\b/);
+
+    // E registra o FATO, não o valor.
+    expect(bloco).toMatch(/temSessao/);
+  });
+
+  it('🔴 A TELA não usa o atalho da sessão quando ela é de outra pessoa', () => {
+    expect(TELA).toMatch(/sessaoEDeOutraPessoa/);
+    expect(TELA).toMatch(/if \(authCarregou && isSignedIn && !sessaoEDeOutraPessoa\)/);
+  });
+
+  it('🔴 e a tela compara com o e-mail do LINK, não com o campo editável', () => {
+    const i = TELA.indexOf('const emailDoLink');
+    expect(i).toBeGreaterThan(-1);
+    // `emailInicial` é prop vinda do servidor; `email` é estado do formulário.
+    expect(TELA.slice(i, i + 120)).toMatch(/emailInicial/);
+    const j = TELA.indexOf('const sessaoEDeOutraPessoa');
+    expect(TELA.slice(j, j + 260)).toMatch(/emailDaSessao !== emailDoLink/);
+  });
+
+  it('🔴 o paciente tem DUAS saídas — e a que faltava é a que resolve o caso comum', () => {
+    /**
+     * 🔴 RETIFICADO EM 13/09/2026. A versão anterior exigia o texto literal
+     * `"Sair desta conta e continuar"` — congelava a redação **e** o desenho errado.
+     *
+     * Havia uma saída só: sair da conta. Para quem trocou o próprio e-mail porque o parceiro
+     * mandou o antigo, essa saída não serve — **a conta certa é a que está aberta**. O dono
+     * ficou preso exatamente aí: _"teoricamente, se eu logasse nessa conta, era para aparecer
+     * justamente essa tela"_. Oferecer só o caminho que não resolve é o que transforma
+     * proteção em beco.
+     *
+     * A propriedade: o aviso oferece **continuar com a sessão** e **sair**, e a escolha é do
+     * paciente — não uma inferência nossa.
+     */
+    /**
+     * ⚠️ O recorte termina no fechamento do BLOCO — a linha que contém só `)}`. Fatiar no
+     * primeiro `)}` que aparecer pega um fechamento interno do JSX e corta o aviso pela metade,
+     * acusando o que está logo abaixo do corte. Recorte se faz na granularidade do defeito.
+     */
+    /**
+     * 🔴 RETIFICADO EM 28/09/2026 (ADR-0028 D-05, `DO-60`) — a FORMA mudou, a propriedade não.
+     *
+     * O aviso virou o componente `AvisoDeSessaoAlheia`, porque passou a aparecer DUAS vezes (na
+     * etapa 1, pedido de 28/09, e na 3, para a sessão que nasce entre as etapas) — duas cópias
+     * inline divergiriam. E "sair" deixou de ser `signOut()`: sem argumento, o Clerk navega para
+     * `/` e a pessoa perde o formulário. Agora é `sairDaSessao`, que sai sem deixar a página.
+     *
+     * Este caso passou a exigir o que protege, na nova forma: TODA ocorrência do aviso passa as
+     * DUAS saídas, e o componente liga as duas a botões.
+     */
+    const ocorrencias = TELA.split('{sessaoEDeOutraPessoa && (').slice(1);
+    expect(ocorrencias.length, 'o aviso de sessão alheia sumiu da tela').toBeGreaterThan(0);
+    for (const bloco of ocorrencias) {
+      const fim = bloco.search(/\n\s*\)\}/);
+      expect(fim, 'não achei o fim do bloco do aviso').toBeGreaterThan(-1);
+      const aviso = bloco.slice(0, fim);
+      expect(aviso, 'sumiu a saída de trocar de conta').toMatch(/aoSair=\{sairDaSessao\}/);
+      expect(aviso, 'sumiu a saída de continuar com a conta aberta').toMatch(
+        /aoContinuar=\{continuarComASessaoAberta\}/,
+      );
+    }
+
+    const componente = TELA.slice(TELA.indexOf('function AvisoDeSessaoAlheia('));
+    const corpo = componente.slice(0, componente.indexOf('\n}\n'));
+    expect(corpo, 'o componente não liga "continuar" a um botão').toMatch(
+      /onClick=\{aoContinuar\}/,
+    );
+    expect(corpo, 'o componente não liga "sair" a um botão').toMatch(/onClick=\{aoSair\}/);
+
+    const continuar = TELA.slice(TELA.indexOf('function continuarComASessaoAberta('));
+    expect(continuar.slice(0, 200), 'continuar não registra a escolha').toMatch(
+      /setContinuarComASessao\(true\)/,
+    );
+  });
+
+  it('🔴 e continuar com a sessão ALINHA o e-mail do formulário — senão o servidor recusa', () => {
+    /**
+     * A action aceita a sessão quando ela casa com o e-mail confirmado no fluxo (`dados.email`).
+     * Escolher "continuar" sem levar o campo junto deixaria a tela dizendo uma coisa e o
+     * servidor recebendo outra — e o paciente voltaria ao mesmo erro, agora sem entender por quê.
+     */
+    const bloco = TELA.slice(TELA.indexOf('setContinuarComASessao(true)'));
+    expect(bloco.slice(0, 200), 'a escolha não alinha o e-mail do formulário').toMatch(
+      /setEmail\(emailDaSessao\)/,
+    );
+  });
+
+  it('⚠️ o aviso de "sessão aberta" NÃO aparece junto com o de conta errada', () => {
+    // Dois avisos sobre sessão ao mesmo tempo, um dizendo "pode seguir" e outro "não pode",
+    // é pior que nenhum.
+    expect(TELA).toMatch(/authCarregou && isSignedIn && !sessaoEDeOutraPessoa && !jaTemConta/);
+  });
+});

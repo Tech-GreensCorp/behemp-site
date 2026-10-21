@@ -1,0 +1,34 @@
+{
+  "_comentario": [
+    "Tetos de tolerância do portão de CI. Conferidos por scripts/conferir-baseline.mjs.",
+    "Medidos por execução em 20/08/2026, na Sprint 0. Ver docs/03-CHECKLIST-MESTRE.md.",
+    "REGRA: teto só se BAIXA. Subir um número aqui é afrouxar o portão, e aparece no diff",
+    "para que a decisão seja consciente e de quem manda — nunca efeito colateral de um PR.",
+    "",
+    "EXCEÇÃO REGISTRADA, 20/08/2026: prettier_arquivos subiu de 350 para 352.",
+    "Motivo: o número havia CAÍDO porque eu formatei GlobalTeleconsultaHost.tsx e a página do",
+    "paciente por inteiro — inflando o diff em ~1.400 linhas de reordenação de classe Tailwind",
+    "em arquivos de PRODUÇÃO. O dono vetou ('alterar essas coisas é mudança de padrão já",
+    "existente e pode dar problema para mim'), e a formatação foi desfeita, preservando só as",
+    "mudanças de conteúdo: de +755/-644 para +46/-22 no host, e de +206/-100 para +34/-17 na",
+    "página do paciente. O teto voltar a 352 é restaurar o estado de produção, não aceitar",
+    "dívida nova. Os dois arquivos já estavam fora do Prettier antes de qualquer mudança minha.",
+    "",
+    "APERTADO em 24/08/2026: 352 -> 351. Um arquivo saiu da lista porque docs/TECNICA-DOS-GUARDAS.md foi formatado -- doc criada nesta sequencia de sprints, nao arquivo de producao. Nenhum arquivo de producao foi reformatado.",
+    "APERTADO em 24/08/2026 (2a vez): 351 -> 350. Saiu o docs/02-CATALOGO-DE-REGRAS.md, doc desta sequencia de sprints. Nenhum arquivo de producao reformatado -- os que seguem fora (host da teleconsulta, actions, snapshots de migration) continuam intocados de proposito, DO-35.",
+    "APERTADO em 24/08/2026 (3a vez): saiu docs/sprints/SPRINT-5 e outras docs desta sequencia, formatadas ao serem editadas. Nenhum arquivo de producao reformatado (DO-35).",
+    "APERTADO em 25/08/2026, na Sprint 5: lint_erros 210 -> 206. O numero CAIU porque tab-dosagem.tsx foi reescrito por decisao do dono (DO-48: a tela antiga vira somente leitura), e a versao antiga carregava `any` e estado nao tipado. Nao houve supressao de regra nem reformatacao de arquivo de producao: o arquivo mudou de conteudo por ordem expressa. prettier_arquivos permanece 348 -- os arquivos de producao que seguem fora (medico-sidebar.tsx, db/schema/medicamentos.ts, host da teleconsulta, 24 snapshots de migration) continuam intocados de proposito, DO-35.",
+    "APERTADO em 25/08/2026, cartoes 16-19: prettier_arquivos 348 -> 323. O numero CAIU 25 porque `db/migrations/meta/*.json` entrou no .prettierignore -- sao snapshots GERADOS pelo drizzle-kit, nunca editados a mao, e os 25 ja estavam TODOS fora do Prettier antes. Nao e afrouxamento: tira do portao arquivo que ninguem escreve, e impede que cada migration nova empurre o teto (ja havia empurrado 3 vezes). Nenhum arquivo de producao foi reformatado (DO-35).",
+    "APERTADO em 25/08/2026: prettier_arquivos 323 -> 322, ao montar o SeloDeUrgencia no PainelHipoteses (o arquivo entrou em conformidade ao ser editado). Nenhuma reformatacao de arquivo de producao (DO-35).",
+    "APERTADO em 13/09/2026 (nao registrado antes desta linha): lint_erros 206 -> 203 e prettier_arquivos 322 -> 319, nos commits 9992e63 e 88c1ead (fix do store privado de documentos e do log que vazava dado clinico). O numero caiu como efeito dos arquivos tocados entrarem em conformidade; nao houve reformatacao de arquivo de producao fora do que essas correcoes ja mudavam.",
+    "APERTADO em 14/09/2026, apos o deploy #138 (merge da PR #93, commit be3394a) falhar no portao com prettier_arquivos = 322 (teto 319): a PR introduziu 3 componentes novos em components/shared/ (data-list.tsx, page-header.tsx, pagination-bar.tsx) sem rodar Prettier, e ao usa-los em app/(admin)/admin/pagamentos/{page,medicos/page}.tsx esses dois arquivos tambem saíram de conformidade -- 5 arquivos novos fora do padrao. A PR TAMBEM corrigiu, como efeito colateral, 2 arquivos que já estavam fora (app/(admin)/admin/invoices/[id]/page.tsx e .../nova/page.tsx), entao o saldo liquido medido em CI foi +3 (319 -> 322), nao +5. Corrigido rodando Prettier SÓ nos 5 arquivos que a PR tocou (3 novos + 2 existentes, diff de formatacao mínimo nos existentes, sem reformatacao de arquivo de producao alheio -- DO-35). Medido contra pnpm 9 + Node 20 + checkout LF (mesmo ambiente do runner ubuntu-latest, ja que Windows com core.autocrlf=true infla a contagem local com falso positivo de CRLF): prettier_arquivos 322 -> 317, lint_warnings 130 -> 124 (melhoria já presente na PR, nao capturada antes por nenhum apertar registrado), lint_erros seguiu 203 e typecheck_erros seguiu 0.",
+    "APERTADO em 15/09/2026, apos o deploy do PR #106 (merge de refactor/melhorias-codigo) falhar no portao 'Baseline nao piorou' com lint_warnings = 125 (teto 124): a PR trouxe consigo commits de outra sessao (o merge de main que ela ja continha) que deixaram 6 warnings de codigo morto em app/(paciente)/paciente/anvisa/page.tsx -- 3 imports do lucide-react (Download, Copy, CheckCheck) e 2 variaveis de estado (copiado/setCopiado) e uma variavel local (docs), todos residuo da migracao daquela tela para <VisualizadorDeDocumento>, que tornou o copiar/baixar manual e o calculo antigo de 'docs' obsoletos sem que ninguem removesse o codigo morto. Um PR seguinte (#107) corrigiu um guarda diferente (toda-porta-declara-de-onde-veio) sem rodar pnpm lint com o baseline em mente, e o numero so foi medido de verdade ao investigar esta falha. Corrigido removendo os 6 pontos de codigo morto (nenhum tinha uso em outro lugar, confirmado por grep antes de remover). Medido: lint_warnings 125 -> 119, lint_erros seguiu 203, typecheck_erros seguiu 0. Teto apertado para 119 para travar o ganho -- 124 teria deixado a mesma classe de residuo se acumular de novo sem acusar."
+  ],
+  "medido_em": "2026-09-15",
+  "tetos": {
+    "lint_erros": 202,
+    "lint_warnings": 119,
+    "prettier_arquivos": 317,
+    "typecheck_erros": 0
+  }
+}
