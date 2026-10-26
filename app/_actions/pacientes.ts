@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { users, pacientes, medicos } from '@/db/schema';
-import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
+import { eq, ne, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
 import { registrarAuditoria } from '@/lib/utils/audit';
@@ -12,6 +12,8 @@ import {
   tratamentoDaEdicaoSchema,
   valoresParaGravar,
 } from '@/lib/pacientes/edicao';
+import { decidirContato } from '@/lib/pacientes/contato';
+import { trocarEmailNoClerk } from '@/lib/pacientes/clerk-email';
 
 /**
  * Server Actions de pacientes.
@@ -69,6 +71,8 @@ const atualizarPacienteSchema = criarPacienteSchema.partial().extend({
   // Na edição o formulário manda `''` para campo sem valor: ver lib/pacientes/edicao.ts.
   tratamentoTipo: tratamentoDaEdicaoSchema.optional(),
   status: statusDaEdicaoSchema.optional(),
+  // `''` = não alterar o e-mail (lib/pacientes/contato.ts); valor preenchido segue validado.
+  email: z.string().email('E-mail inválido').or(z.literal('')).optional(),
 });
 
 // ── Types ─────────────────────────────────────────────────────
@@ -197,6 +201,7 @@ export async function criarPaciente(
 export async function atualizarPaciente(
   dados: z.infer<typeof atualizarPacienteSchema>,
 ): Promise<ActionResult> {
+  let desfazerTrocaNoClerk: (() => Promise<void>) | null = null;
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) {
@@ -209,6 +214,48 @@ export async function atualizarPaciente(
     }
 
     const { pacienteId, nome, email, telefone, ...dadosPaciente } = parsed.data;
+
+    // Contato (lib/pacientes/contato.ts): decidido e conferido ANTES de qualquer escrita, para uma
+    // recusa não deixar a ficha gravada pela metade (o driver HTTP do Neon não tem transação).
+    const [atual] = await db
+      .select({
+        userId: pacientes.userId,
+        email: users.email,
+        telefone: users.telefone,
+        clerkId: users.clerkId,
+      })
+      .from(pacientes)
+      .innerJoin(users, eq(pacientes.userId, users.id))
+      .where(eq(pacientes.id, pacienteId))
+      .limit(1);
+
+    let contato: { email?: string; telefone?: string | null } = {};
+    if (atual) {
+      const decisao = decidirContato(
+        { email: atual.email, telefone: atual.telefone, temContaDeAcesso: Boolean(atual.clerkId) },
+        { email, telefone },
+        { eAdmin: auth.role === 'admin' },
+      );
+      if (!decisao.ok) return { sucesso: false, erro: decisao.erro };
+      contato = decisao.gravar;
+
+      if (contato.email) {
+        const [emUso] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(sql`lower(${users.email}) = ${contato.email}`, ne(users.id, atual.userId)))
+          .limit(1);
+        if (emUso) return { sucesso: false, erro: 'Este e-mail já está em uso por outro cadastro.' };
+      }
+
+      // Com conta de acesso o login muda junto (só admin; ver lib/pacientes/contato.ts). O Clerk é o
+      // passo que mais falha, então vai primeiro; se uma escrita no banco falhar depois, o catch o desfaz.
+      if (decisao.trocarNoClerk && contato.email && atual.clerkId) {
+        const troca = await trocarEmailNoClerk(atual.clerkId, atual.email, contato.email);
+        if (!troca.ok) return { sucesso: false, erro: troca.erro };
+        desfazerTrocaNoClerk = troca.desfazer;
+      }
+    }
 
     // Campos que pertencem à tabela pacientes
     const CAMPOS_PACIENTE = [
@@ -236,23 +283,12 @@ export async function atualizarPaciente(
     }
 
     // Atualizar dados do user associado se necessário
-    if (nome || email || telefone) {
-      const [pacienteData] = await db
-        .select({ userId: pacientes.userId })
-        .from(pacientes)
-        .where(eq(pacientes.id, pacienteId))
-        .limit(1);
+    if (atual) {
+      const updateUser: Record<string, unknown> = { ...contato };
+      if (nome) updateUser.nome = nome;
 
-      if (pacienteData) {
-        const updateUser: Record<string, unknown> = {};
-        if (nome) updateUser.nome = nome;
-        if (email) updateUser.email = email;
-        if (telefone) updateUser.telefone = telefone;
-
-        await db
-          .update(users)
-          .set(updateUser)
-          .where(eq(users.id, pacienteData.userId));
+      if (Object.keys(updateUser).length > 0) {
+        await db.update(users).set(updateUser).where(eq(users.id, atual.userId));
       }
     }
 
@@ -264,12 +300,14 @@ export async function atualizarPaciente(
         acao: 'atualizar',
         entidade: 'pacientes',
         entidadeId: pacienteId,
-        dadosDepois: dadosPaciente,
+        ...(contato.email && atual ? { dadosAntes: { email: atual.email } } : {}),
+        dadosDepois: contato.email ? { ...dadosPaciente, email: contato.email } : dadosPaciente,
       });
     }
 
     return { sucesso: true };
   } catch (error) {
+    await desfazerTrocaNoClerk?.();
     console.error('[Action] Erro ao atualizar paciente:', error);
     return { sucesso: false, erro: 'Erro ao atualizar paciente' };
   }
@@ -512,6 +550,10 @@ export type PacienteCompleto = {
   nome: string;
   email: string;
   telefone: string | null;
+  /** Tem conta de acesso (Clerk): o e-mail é o login. */
+  temContaDeAcesso: boolean;
+  /** Quem está vendo pode alterar o e-mail (e, se há conta, o login junto). */
+  emailEditavel: boolean;
   status: string;
   tratamentoTipo: string | null;
   jornadaFase: string | null;
@@ -565,6 +607,7 @@ export async function obterPaciente(
         u.nome,
         u.email,
         u.telefone,
+        (u.clerk_id IS NOT NULL) as "temContaDeAcesso",
         p.status,
         p.tratamento_tipo as "tratamentoTipo",
         p.jornada_fase as "jornadaFase",
@@ -614,7 +657,10 @@ export async function obterPaciente(
       return { sucesso: false, erro: 'Paciente não encontrado' };
     }
 
-    return { sucesso: true, dados: resultado.rows[0] as unknown as PacienteCompleto };
+    const paciente = resultado.rows[0] as unknown as PacienteCompleto;
+    // Com conta de acesso, o e-mail é o login: só admin troca (lib/pacientes/contato.ts).
+    paciente.emailEditavel = !paciente.temContaDeAcesso || auth.role === 'admin';
+    return { sucesso: true, dados: paciente };
   } catch (error) {
     console.error('[Action] Erro ao obter paciente:', error);
     return { sucesso: false, erro: 'Erro ao obter paciente' };

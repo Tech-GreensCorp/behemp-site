@@ -149,6 +149,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
 
   function syncForm(p: PacienteCompleto) {
     setForm({
+      email: p.email ?? '', telefone: p.telefone ?? '',
       dataNascimento: p.dataNascimento ?? '', cpf: p.cpf ?? '', rg: p.rg ?? '',
       genero: p.genero ?? '', cep: p.cep ?? '', endereco: p.endereco ?? '',
       cidade: p.cidade ?? '', uf: p.uf ?? '', peso: p.peso ?? '', altura: p.altura ?? '',
@@ -280,6 +281,18 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
               {editando ? (<>
                 <div><Label>Data de Nascimento</Label><Input type="date" value={form.dataNascimento} onChange={e => u('dataNascimento', e.target.value)} /></div>
                 <div><Label>CPF</Label><Input value={form.cpf} onChange={e => u('cpf', mascaraCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} /></div>
+                <div><Label>Telefone</Label><Input type="tel" value={form.telefone} onChange={e => u('telefone', e.target.value)} placeholder="(00) 00000-0000" /></div>
+                <div>
+                  <Label>E-mail</Label>
+                  <Input type="email" value={form.email} onChange={e => u('email', e.target.value)} disabled={!paciente.emailEditavel} />
+                  {paciente.temContaDeAcesso && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {paciente.emailEditavel
+                        ? "Paciente com conta de acesso: alterar este e-mail muda também o e-mail de login."
+                        : "Paciente com conta de acesso: só um administrador altera o e-mail de login."}
+                    </p>
+                  )}
+                </div>
                 <div><Label>RG</Label><Input value={form.rg} onChange={e => u('rg', mascaraRg(e.target.value))} placeholder="00.000.000-0" maxLength={12} /></div>
                 <div>
                   <Label>Gênero</Label>
