@@ -17,7 +17,8 @@ export type TrocaNoClerk =
   | { ok: true; desfazer: () => Promise<void> }
   | { ok: false; erro: string };
 
-const MENSAGEM_GENERICA = 'Não foi possível alterar o e-mail de login. Nada foi alterado; tente novamente.';
+const MENSAGEM_GENERICA =
+  'Não foi possível alterar o e-mail de login. Nada foi alterado; tente novamente.';
 
 function codigosDoClerk(e: unknown): string[] {
   const erros = (e as { errors?: Array<{ code?: string }> } | null)?.errors;
@@ -47,7 +48,10 @@ export async function trocarEmailNoClerk(
     });
     idNovo = criado.id;
   } catch (e) {
-    console.error('[Clerk] Falha ao criar o e-mail novo:', codigosDoClerk(e).join(',') || 'desconhecido');
+    console.error(
+      '[Clerk] Falha ao criar o e-mail novo:',
+      codigosDoClerk(e).join(',') || 'desconhecido',
+    );
     return {
       ok: false,
       erro: codigosDoClerk(e).includes('form_identifier_exists')
@@ -61,7 +65,10 @@ export async function trocarEmailNoClerk(
       if (idAntigo) await client.emailAddresses.updateEmailAddress(idAntigo, { primary: true });
       await client.emailAddresses.deleteEmailAddress(idNovo);
     } catch (e) {
-      console.error('[Clerk] Falha ao desfazer a troca de e-mail:', codigosDoClerk(e).join(',') || 'desconhecido');
+      console.error(
+        '[Clerk] Falha ao desfazer a troca de e-mail:',
+        codigosDoClerk(e).join(',') || 'desconhecido',
+      );
     }
   };
 
@@ -69,7 +76,10 @@ export async function trocarEmailNoClerk(
     try {
       await client.emailAddresses.deleteEmailAddress(idAntigo);
     } catch (e) {
-      console.error('[Clerk] Falha ao remover o e-mail antigo:', codigosDoClerk(e).join(',') || 'desconhecido');
+      console.error(
+        '[Clerk] Falha ao remover o e-mail antigo:',
+        codigosDoClerk(e).join(',') || 'desconhecido',
+      );
       await desfazer();
       return { ok: false, erro: MENSAGEM_GENERICA };
     }
@@ -90,7 +100,10 @@ export async function trocarEmailNoClerk(
         }
         await client.emailAddresses.deleteEmailAddress(idNovo);
       } catch (e) {
-        console.error('[Clerk] Falha ao desfazer a troca de e-mail:', codigosDoClerk(e).join(',') || 'desconhecido');
+        console.error(
+          '[Clerk] Falha ao desfazer a troca de e-mail:',
+          codigosDoClerk(e).join(',') || 'desconhecido',
+        );
       }
     },
   };

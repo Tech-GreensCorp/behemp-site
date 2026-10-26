@@ -45,6 +45,9 @@ describe('contato do paciente na edição', () => {
   });
 
   it('telefone igual ao atual não gera escrita', () => {
-    expect(decidirContato(sem, { telefone: '(81) 9' }, admin)).toMatchObject({ ok: true, gravar: {} });
+    expect(decidirContato(sem, { telefone: '(81) 9' }, admin)).toMatchObject({
+      ok: true,
+      gravar: {},
+    });
   });
 });
