@@ -12,6 +12,7 @@ import {
   tratamentoDaEdicaoSchema,
   valoresParaGravar,
 } from '@/lib/pacientes/edicao';
+import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/erro-de-cadastro';
 
 /**
  * Server Actions de pacientes.
@@ -186,8 +187,9 @@ export async function criarPaciente(
 
     return { sucesso: true, dados: { pacienteId: novoPaciente.id } };
   } catch (error) {
-    console.error('[Action] Erro ao criar paciente:', error);
-    return { sucesso: false, erro: 'Erro ao criar paciente' };
+    // Só `code:constraint:table` vai ao log: a mensagem do Drizzle traz a query com CPF e nome.
+    console.error('[Action] Erro ao criar paciente:', diagnosticoDoErro(error));
+    return { sucesso: false, erro: mensagemDoErroDeCadastro(error) };
   }
 }
 
