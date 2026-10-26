@@ -36,22 +36,37 @@ vi.mock('@clerk/nextjs/server', () => ({
       getUser: async (id: string) => ({ emailAddresses: clerk.emails.get(id) ?? [] }),
     },
     emailAddresses: {
-      createEmailAddress: async (p: { userId: string; emailAddress: string; primary?: boolean }) => {
+      createEmailAddress: async (p: {
+        userId: string;
+        emailAddress: string;
+        primary?: boolean;
+      }) => {
         if (clerk.falha === 'criar') throw new Error('clerk fora do ar');
-        if (clerk.falha === 'criar_duplicado') throw { errors: [{ code: 'form_identifier_exists' }] };
+        if (clerk.falha === 'criar_duplicado')
+          throw { errors: [{ code: 'form_identifier_exists' }] };
         const lista = clerk.emails.get(p.userId) ?? [];
         if (p.primary) lista.forEach((e) => (e.primary = false));
-        const novo = { id: 'idn_' + ++clerk.seq, emailAddress: p.emailAddress, primary: Boolean(p.primary) };
+        const novo = {
+          id: 'idn_' + ++clerk.seq,
+          emailAddress: p.emailAddress,
+          primary: Boolean(p.primary),
+        };
         clerk.emails.set(p.userId, [...lista, novo]);
         return novo;
       },
       updateEmailAddress: async (id: string, p: { primary?: boolean }) => {
         for (const lista of clerk.emails.values())
-          lista.forEach((e) => { if (e.id === id && p.primary) e.primary = true; });
+          lista.forEach((e) => {
+            if (e.id === id && p.primary) e.primary = true;
+          });
       },
       deleteEmailAddress: async (id: string) => {
         if (clerk.falha === 'apagar') throw new Error('clerk fora do ar');
-        for (const [k, lista] of clerk.emails) clerk.emails.set(k, lista.filter((e) => e.id !== id));
+        for (const [k, lista] of clerk.emails)
+          clerk.emails.set(
+            k,
+            lista.filter((e) => e.id !== id),
+          );
       },
     },
   }),
@@ -73,7 +88,13 @@ async function limpar() {
 async function novoPaciente(email: string, extra: Record<string, unknown> = {}, cidade = 'Recife') {
   const [u] = await db
     .insert(schema.users)
-    .values({ email, nome: `Pac ${email}`, role: 'paciente', telefone: '(81) 90000-0000', ...extra } as never)
+    .values({
+      email,
+      nome: `Pac ${email}`,
+      role: 'paciente',
+      telefone: '(81) 90000-0000',
+      ...extra,
+    } as never)
     .returning({ id: schema.users.id });
   const [p] = await db
     .insert(schema.pacientes)
@@ -118,7 +139,11 @@ describe('telefone e e-mail se alteram e persistem', () => {
   });
 
   it('telefone vazio apaga (NULL); e-mail vazio não toca', async () => {
-    const r = await atualizarPaciente({ pacienteId: a.pacienteId, email: '', telefone: '' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: a.pacienteId,
+      email: '',
+      telefone: '',
+    } as never);
     expect(r.sucesso).toBe(true);
     const u = await lerUser(a.userId);
     expect(u.telefone).toBeNull();
@@ -126,14 +151,20 @@ describe('telefone e e-mail se alteram e persistem', () => {
   });
 
   it('só telefone (campos ausentes) não mexe no e-mail nem no resto', async () => {
-    const r = await atualizarPaciente({ pacienteId: a.pacienteId, telefone: '(11) 98888-0000' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: a.pacienteId,
+      telefone: '(11) 98888-0000',
+    } as never);
     expect(r.sucesso).toBe(true);
     expect((await lerUser(a.userId)).email).toBe('a@teste.invalid');
     expect((await lerPac(a.pacienteId)).cidade).toBe('Recife');
   });
 
   it('reenviar o próprio e-mail (inclusive com outra caixa) não conflita consigo mesmo', async () => {
-    const r = await atualizarPaciente({ pacienteId: a.pacienteId, email: 'A@Teste.invalid' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: a.pacienteId,
+      email: 'A@Teste.invalid',
+    } as never);
     expect(r.sucesso).toBe(true);
     expect((await lerUser(a.userId)).email).toBe('a@teste.invalid');
   });
@@ -155,9 +186,15 @@ describe('conflito com outro cadastro', () => {
   });
 
   it('o mesmo telefone em dois pacientes é permitido (não há unicidade de telefone)', async () => {
-    const r = await atualizarPaciente({ pacienteId: a.pacienteId, telefone: '(81) 90000-0000' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: a.pacienteId,
+      telefone: '(81) 90000-0000',
+    } as never);
     expect(r.sucesso).toBe(true);
-    const r2 = await atualizarPaciente({ pacienteId: b.pacienteId, telefone: '(81) 90000-0000' } as never);
+    const r2 = await atualizarPaciente({
+      pacienteId: b.pacienteId,
+      telefone: '(81) 90000-0000',
+    } as never);
     expect(r2.sucesso).toBe(true);
   });
 });
@@ -165,27 +202,42 @@ describe('conflito com outro cadastro', () => {
 describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () => {
   const comConta = async () => {
     const c = await novoPaciente('c@teste.invalid', { clerkId: 'ck_pac_c' });
-    clerk.emails.set('ck_pac_c', [{ id: 'idn_velho', emailAddress: 'c@teste.invalid', primary: true }]);
+    clerk.emails.set('ck_pac_c', [
+      { id: 'idn_velho', emailAddress: 'c@teste.invalid', primary: true },
+    ]);
     return c;
   };
 
   it('admin troca: o Clerk fica só com o e-mail novo (primário) e o banco acompanha', async () => {
     const c = await comConta();
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'Novo@teste.invalid' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'Novo@teste.invalid',
+    } as never);
     expect(r.sucesso).toBe(true);
-    expect(clerk.emails.get('ck_pac_c')).toMatchObject([{ emailAddress: 'novo@teste.invalid', primary: true }]);
+    expect(clerk.emails.get('ck_pac_c')).toMatchObject([
+      { emailAddress: 'novo@teste.invalid', primary: true },
+    ]);
     expect((await lerUser(c.userId)).email).toBe('novo@teste.invalid');
-    const [log] = await db.select().from(schema.logsAuditoria).where(eq(schema.logsAuditoria.entidadeId, c.pacienteId));
+    const [log] = await db
+      .select()
+      .from(schema.logsAuditoria)
+      .where(eq(schema.logsAuditoria.entidadeId, c.pacienteId));
     expect(log.dadosAntes).toMatchObject({ email: 'c@teste.invalid' });
     expect(log.dadosDepois).toMatchObject({ email: 'novo@teste.invalid' });
   });
 
   it('médico não troca o e-mail de login: recusa, e o Clerk não é tocado', async () => {
     const c = await comConta();
-    await db.insert(schema.users).values({ clerkId: 'ck_med', email: 'm@teste.invalid', nome: 'M', role: 'medico' });
+    await db
+      .insert(schema.users)
+      .values({ clerkId: 'ck_med', email: 'm@teste.invalid', nome: 'M', role: 'medico' });
     sessao.clerkId = 'ck_med';
     sessao.role = 'medico';
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'novo@teste.invalid' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'novo@teste.invalid',
+    } as never);
     expect(r.sucesso).toBe(false);
     expect(r.erro).toMatch(/administrador/i);
     expect(clerk.emails.get('ck_pac_c')).toMatchObject([{ emailAddress: 'c@teste.invalid' }]);
@@ -194,10 +246,16 @@ describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () 
 
   it('médico altera o telefone reenviando o mesmo e-mail (campo travado na tela)', async () => {
     const c = await comConta();
-    await db.insert(schema.users).values({ clerkId: 'ck_med', email: 'm@teste.invalid', nome: 'M', role: 'medico' });
+    await db
+      .insert(schema.users)
+      .values({ clerkId: 'ck_med', email: 'm@teste.invalid', nome: 'M', role: 'medico' });
     sessao.clerkId = 'ck_med';
     sessao.role = 'medico';
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'c@teste.invalid', telefone: '(21) 97777-0000' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'c@teste.invalid',
+      telefone: '(21) 97777-0000',
+    } as never);
     expect(r.sucesso).toBe(true);
     expect((await lerUser(c.userId)).telefone).toBe('(21) 97777-0000');
   });
@@ -205,7 +263,11 @@ describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () 
   it('e-mail que já é login de OUTRA conta no Clerk: recusa clara, nada muda', async () => {
     const c = await comConta();
     clerk.falha = 'criar_duplicado';
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'novo@teste.invalid', cidade: 'Outra' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'novo@teste.invalid',
+      cidade: 'Outra',
+    } as never);
     expect(r.sucesso).toBe(false);
     expect(r.erro).toMatch(/outra conta de acesso/i);
     expect((await lerUser(c.userId)).email).toBe('c@teste.invalid');
@@ -215,7 +277,10 @@ describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () 
   it('Clerk fora do ar ao criar: nada é gravado, a mensagem não vaza detalhe', async () => {
     const c = await comConta();
     clerk.falha = 'criar';
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'novo@teste.invalid' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'novo@teste.invalid',
+    } as never);
     expect(r.sucesso).toBe(false);
     expect(r.erro).not.toMatch(/fora do ar/);
     expect((await lerUser(c.userId)).email).toBe('c@teste.invalid');
@@ -238,7 +303,10 @@ describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () 
   it('falha ao remover o e-mail antigo: desfaz, o login volta ao antigo e o banco não muda', async () => {
     const c = await comConta();
     clerk.falha = 'apagar';
-    const r = await atualizarPaciente({ pacienteId: c.pacienteId, email: 'novo@teste.invalid' } as never);
+    const r = await atualizarPaciente({
+      pacienteId: c.pacienteId,
+      email: 'novo@teste.invalid',
+    } as never);
     expect(r.sucesso).toBe(false);
     const lista = clerk.emails.get('ck_pac_c')!;
     expect(lista.find((e) => e.primary)?.emailAddress).toBe('c@teste.invalid');
