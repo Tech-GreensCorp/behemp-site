@@ -79,6 +79,7 @@ const schema = await import('@/db/schema');
 const { atualizarPaciente } = await import('@/app/_actions/pacientes');
 
 async function limpar() {
+  await db.delete(schema.comunicadosAssinatura);
   await db.delete(schema.logsAuditoria);
   await db.delete(schema.pacientes);
   await db.delete(schema.medicos);
@@ -311,5 +312,58 @@ describe('paciente com conta de acesso (Clerk): o login acompanha o e-mail', () 
     const lista = clerk.emails.get('ck_pac_c')!;
     expect(lista.find((e) => e.primary)?.emailAddress).toBe('c@teste.invalid');
     expect((await lerUser(c.userId)).email).toBe('c@teste.invalid');
+  });
+});
+
+describe('comunicado em andamento carrega o e-mail antigo (signatário do DocuSign)', () => {
+  const comunicado = async (pacienteId: string, status: 'pendente' | 'assinado' | 'erro') => {
+    const [adm] = await db.select().from(schema.users).where(eq(schema.users.clerkId, 'ck_adm'));
+    const [c] = await db
+      .insert(schema.comunicadosAssinatura)
+      .values({
+        pacienteId,
+        tipo: status === 'assinado' ? 'atualizacao_programa_doacao' : 'atualizacao_programa_doacao',
+        titulo: 'Carta',
+        status,
+        enviadoPorUserId: adm.id,
+        nomeDestino: 'Pac',
+        emailDestino: 'a@teste.invalid',
+      } as never)
+      .returning({ id: schema.comunicadosAssinatura.id });
+    return c.id;
+  };
+  const lerCom = async (id: string) =>
+    (
+      await db
+        .select()
+        .from(schema.comunicadosAssinatura)
+        .where(eq(schema.comunicadosAssinatura.id, id))
+    )[0];
+
+  it('trocar o e-mail cancela o pendente (libera o reenvio) e preserva o assinado', async () => {
+    const pendente = await comunicado(a.pacienteId, 'pendente');
+    const r = await atualizarPaciente({
+      pacienteId: a.pacienteId,
+      email: 'novo@teste.invalid',
+    } as never);
+    expect(r.sucesso).toBe(true);
+    const c = await lerCom(pendente);
+    expect(c.status).toBe('cancelado');
+    expect(c.motivoCancelamento).toMatch(/e-mail/i);
+    expect(c.emailDestino).toBe('a@teste.invalid'); // histórico intacto
+  });
+
+  it('o assinado não é tocado, e outro paciente não é afetado', async () => {
+    const assinado = await comunicado(a.pacienteId, 'assinado');
+    const deOutro = await comunicado(b.pacienteId, 'pendente');
+    await atualizarPaciente({ pacienteId: a.pacienteId, email: 'novo@teste.invalid' } as never);
+    expect((await lerCom(assinado)).status).toBe('assinado');
+    expect((await lerCom(deOutro)).status).toBe('pendente');
+  });
+
+  it('mudar só o telefone não cancela nada', async () => {
+    const pendente = await comunicado(a.pacienteId, 'pendente');
+    await atualizarPaciente({ pacienteId: a.pacienteId, telefone: '(11) 90000-1111' } as never);
+    expect((await lerCom(pendente)).status).toBe('pendente');
   });
 });

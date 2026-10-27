@@ -29,6 +29,8 @@ interface ClerkUserCreatedData {
     id: string;
     verification: { status: string };
   }>;
+  /** E-mail principal (login). A lista `email_addresses` não garante que ele seja o primeiro. */
+  primary_email_address_id?: string | null;
   first_name: string | null;
   last_name: string | null;
   phone_numbers: Array<{
@@ -109,7 +111,12 @@ export async function POST(req: Request) {
 
 async function sincronizarPerfilUsuario(data: ClerkUserCreatedData) {
   const clerkId = data.id;
-  const email = data.email_addresses?.[0]?.email_address;
+  // O principal, não o [0]: ao trocar o e-mail de login (admin), por instantes a lista tem o antigo
+  // e o novo, e [0] devolvia o antigo ao banco — a carta/PDF saía no e-mail velho.
+  const email = (
+    data.email_addresses?.find((e) => e.id === data.primary_email_address_id) ??
+    data.email_addresses?.[0]
+  )?.email_address;
   const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || undefined;
   const avatarUrl = data.image_url ?? null;
 

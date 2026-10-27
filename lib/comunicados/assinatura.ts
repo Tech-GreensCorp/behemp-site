@@ -746,6 +746,48 @@ export async function listarParaPaciente(pacienteId: string): Promise<Comunicado
 }
 
 /**
+ * O e-mail do paciente mudou: cancela os comunicados PENDENTES dele, para poderem ser reenviados.
+ *
+ * 🔴 `emailDestino` é o signatário do envelope no DocuSign — foto do momento do envio, que o
+ * DocuSign exige idêntica ao pedir o link de assinatura (e o PDF da carta já saiu com ele). Trocar
+ * o e-mail do paciente não alcança um envelope pendente: o aviso, o PDF e o link seguiriam no
+ * e-mail antigo. Cancelar libera o índice único parcial e o admin reenvia, agora com o e-mail
+ * novo. NADA é apagado (mesma regra de `reiniciarComunicado`); `assinado` não é tocado — é prova
+ * do que o paciente assinou, com o e-mail da época.
+ */
+export async function cancelarPendentesPorTrocaDeEmail(params: {
+  pacienteId: string;
+  adminUserId: string | null;
+}): Promise<number> {
+  if (!params.adminUserId) return 0; // `canceladoPorUserId` referencia users: sem quem, não cancela.
+  const cancelados = await db
+    .update(comunicadosAssinatura)
+    .set({
+      status: 'cancelado',
+      canceladoEm: new Date(),
+      canceladoPorUserId: params.adminUserId,
+      motivoCancelamento: 'E-mail do paciente alterado: reenviar para o e-mail novo.',
+    })
+    .where(
+      and(
+        eq(comunicadosAssinatura.pacienteId, params.pacienteId),
+        eq(comunicadosAssinatura.status, 'pendente'),
+      ),
+    )
+    .returning({ id: comunicadosAssinatura.id });
+  for (const c of cancelados) {
+    await registrarAuditoria({
+      userId: params.adminUserId,
+      acao: 'atualizar',
+      entidade: ENTIDADE,
+      entidadeId: c.id,
+      dadosDepois: { status: 'cancelado', motivo: 'troca_de_email_do_paciente' },
+    });
+  }
+  return cancelados.length;
+}
+
+/**
  * "Cancelar e reenviar": para um comunicado PENDENTE que saiu com dados velhos (por exemplo, o
  * e-mail do paciente mudou depois do envio). O envelope do DocuSign e o PDF já nasceram com o
  * e-mail antigo e não se editam, então a saída é um envio NOVO, lido do cadastro de hoje.
