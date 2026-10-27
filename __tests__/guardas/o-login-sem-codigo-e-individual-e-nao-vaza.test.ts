@@ -288,7 +288,7 @@ describe('3. a entrada sem código', () => {
   it('é a tela OFICIAL (/entrar) que decide: o formulário nosso na raiz, o widget do Clerk nas etapas dele', () => {
     const pagina = semComentarios(ler(PAGINA_DE_LOGIN));
     // o formulário é RENDERIZADO (não só importado) e recebe o destino já filtrado
-    expect(pagina).toMatch(/<FormularioDeEntrada\b[^>]*destino=\{redirectUrl\}/s);
+    expect(pagina).toMatch(/<FormularioDeEntrada\b[\s\S]*?destino=\{redirectUrl\}/);
     expect(pagina).toContain('destinoInternoSeguro(');
     // subcaminho do Clerk (factor-two, sso-callback, reset-password) segue com o widget
     expect(pagina).toMatch(/useParams/);
