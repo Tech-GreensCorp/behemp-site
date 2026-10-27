@@ -251,9 +251,11 @@ describe('as quatro telas mostram o documento pelo visualizador', () => {
 
   it.each(TELAS)('%s NÃO abre documento por `urlBlob`', (tela) => {
     /**
-     * ⚠️ `urlBlob` ainda aparece legitimamente nestas telas — o botão "Baixar" usa. O que se
-     * proíbe é ele virar `href`/`src` de um link de VER: aí o navegador abre o blob direto,
-     * fora da rota que autentica e audita.
+     * ⚠️ `urlBlob` pode ainda aparecer nestas telas (tipo do registro). O que se proíbe é ele
+     * virar `href`/`src` de um link de VER: aí o navegador abre o blob direto, fora da rota
+     * que autentica e audita. (Até 27/10/2026 o "Baixar" também usava a coluna e baixava um
+     * `Forbidden` de 10 bytes — agora o guarda `o-baixar-documento-passa-pela-porta-autenticada`
+     * o cobre.)
      */
     const t = readFileSync(join(RAIZ, tela), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')

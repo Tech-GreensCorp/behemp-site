@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { autorizacoesAnvisa, pacientes, users, procuracoesEspecificas, medicos } from '@/db/schema';
 import { and, eq, desc, isNull } from 'drizzle-orm';
+import { checklistParaTela } from '@/lib/anvisa/checklist-para-tela';
 
 export async function GET(_request: NextRequest) {
   const { userId } = await auth();
@@ -76,10 +77,20 @@ export async function GET(_request: NextRequest) {
 
       return {
         ...aut,
+        // 🔴 O navegador não recebe URL de blob: o "Ver" abre por /api/admin/anvisa/documento/….
+        documentos: checklistParaTela(aut.documentos),
         medicoNome: medicoData?.nome ?? 'Médico não encontrado',
         medicoCrm: medicoData?.crm ?? '',
         medicoEspecialidade: medicoData?.especialidade ?? '',
-        procuracao: proc ?? null,
+        procuracao: proc
+          ? {
+              id: proc.id,
+              docusignStatus: proc.docusignStatus,
+              assinadoEm: proc.assinadoEm,
+              temPdfAssinado: Boolean(proc.urlPdfAssinado),
+              temPdfGerado: Boolean(proc.urlPdfGerado),
+            }
+          : null,
       };
     })
   );

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { exames } from '@/db/schema';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { garantirMedicoDoPaciente } from '@/lib/auth/escopo-paciente';
 import { z } from 'zod';
 
 /**
@@ -48,6 +49,13 @@ export async function POST(request: Request) {
         { sucesso: false, erro: parsed.error.errors[0].message },
         { status: 400 },
       );
+    }
+
+    // 🔴 Papel certo com id alheio é BOLA: o paciente tem de ser DESTE médico. Antes do put —
+    // senão o arquivo já foi gravado quando a recusa chega.
+    const escopo = await garantirMedicoDoPaciente(parsed.data.pacienteId);
+    if (!escopo.ok) {
+      return NextResponse.json({ sucesso: false, erro: escopo.erro }, { status: 404 });
     }
 
     // Upload opcional de arquivo

@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { head } from '@vercel/blob';
 
+import { disposicaoInline } from '@/lib/documentos/disposicao-do-arquivo';
 import { ehDoStorePrivado, lerDocumentoPrivado } from '@/lib/documentos/store-privado';
 
 import { garantirLeitorDoDocumento } from '@/lib/auth/escopo-documento';
@@ -104,8 +105,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   /** Cabeçalhos da entrega — os mesmos nos dois caminhos, para não divergirem em silêncio. */
   const cabecalhos = (contentType: string) => ({
     'content-type': contentType,
-    // `inline` para abrir no navegador; o nome ajuda quem salva.
-    'content-disposition': `inline; filename="${escopo.documento.nomeArquivo ?? id}"`,
+    // `inline` para abrir no navegador; o nome ajuda quem salva. Nome com "—" ou aspas LANÇAVA
+    // aqui (valor de cabeçalho só aceita Latin-1) e a rota respondia 502 para arquivo que existe.
+    'content-disposition': disposicaoInline(escopo.documento.nomeArquivo, id),
     // 🔴 Dado de saúde não entra em cache de CDN nem de proxy.
     'cache-control': 'private, no-store',
   });

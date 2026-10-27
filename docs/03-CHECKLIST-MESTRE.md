@@ -432,6 +432,32 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [x] 🔴 **Item 89 — CORRIGIDO, 27/10/2026 (não commitado): downloads e "Ver" de documentos e
+      exames de paciente.** Medido no arquivo baixado pelo admin
+      (`TERMO_DE_RESPONSABILIDADE_E_USO_ADEQUADO.docx.pdf` → 10 bytes, texto `Forbidden`).
+      Quatro defeitos, todos corrigidos e cobertos por guarda:
+      (1) **Baixar** documento fazia `fetch(doc.urlBlob)` (URL crua; no store privado = 403) e
+      `response.blob()` sem `response.ok` — corrigido em `tab-documentos.tsx` e
+      `paciente/documentos/page.tsx` via `components/shared/documentos/baixar-documento.ts`
+      (guarda `o-baixar-documento-passa-pela-porta-autenticada`, 21 casos);
+      (2) **"Ver" da ANVISA do admin** abria `doc.urlBlob`/`urlPdfAssinado` direto (403 no
+      privado; sem auth nem auditoria no público) — nova rota
+      `/api/admin/anvisa/documento/{autorizacaoId}/{tipo}` (admin, limite, auditoria), e
+      `/api/admin/anvisa/listar` deixou de devolver URL de blob (guarda
+      `o-anvisa-do-admin-abre-pela-rota-autenticada`);
+      (3) **Exames sem escopo de objeto (BOLA, OWASP API1)** — `listarExames`, `excluirExame`,
+      `criarExame` e `/api/upload-exame` só conferiam o PAPEL; agora conferem o vínculo
+      médico-paciente (`garantirMedicoDoPaciente`). Exame abre por `/api/exames/{id}/arquivo`
+      (escopo + limite + auditoria); a lista e o prontuário vivo não levam mais a URL do blob
+      (guarda `os-exames-tem-escopo-e-abrem-pela-rota-autenticada`);
+      (4) **nome de arquivo com "—" ou aspas derrubava a entrega** — `content-disposition` cru
+      lança com caractere > 255 e a rota respondia 502; agora `disposicaoInline`, também na
+      rota de documentos.
+      **NÃO feito:** o blob do exame continua em store PÚBLICO (`upload-exame`, `criarExame`) —
+      a URL antiga segue legível por quem a tiver; privatizar exige migrar os arquivos já
+      enviados (Item 6). **Não verificado em produção/navegador:** sem sessão Clerk local, as
+      rotas novas não foram exercidas de ponta a ponta. O limite de 30 leituras/min agora vale
+      também para o Baixar.
 - [ ] ⚪ **Item 56 — CATALOGADO, 30/09/2026 (baixa prioridade): o Brick promete "Parcelamento
       disponível" num pagamento só à vista.** Medido no Payment Brick real (chave `TEST-`,
       Chrome headless): com `minInstallments: 1` e `maxInstallments: 1`, o seletor de parcelas

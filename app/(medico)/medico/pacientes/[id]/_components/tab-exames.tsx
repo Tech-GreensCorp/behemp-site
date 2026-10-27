@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { listarExames, excluirExame } from '@/app/_actions/exames';
 import { DataList, DataRow } from '@/components/shared/data-list';
+import { baixarExame, enderecoDoExame } from '@/components/shared/documentos/baixar-documento';
 import { toast } from 'sonner';
 import {
   Download,
@@ -97,22 +98,12 @@ export function TabExames({ pacienteId }: TabExamesProps) {
     }
   }
 
-  /** Força download do arquivo */
-  async function handleDownload(url: string, nomeArquivo: string) {
+  /** Força download do arquivo — pela rota autenticada; erro vira mensagem, nunca arquivo. */
+  async function handleDownload(exameId: string, nomeArquivo: string) {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = nomeArquivo;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // Fallback: abre em nova aba se houver CORS
-      window.open(url, '_blank', 'noopener,noreferrer');
+      await baixarExame(exameId, nomeArquivo);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : 'Não foi possível baixar o exame.');
     }
   }
 
@@ -189,10 +180,10 @@ export function TabExames({ pacienteId }: TabExamesProps) {
               }
               trailing={
                 <>
-                  {e.urlArquivo ? (
+                  {e.temArquivo ? (
                     <>
                       {/* Visualizar */}
-                      <a href={e.urlArquivo} target="_blank" rel="noopener noreferrer">
+                      <a href={enderecoDoExame(e.id)} target="_blank" rel="noopener noreferrer">
                         <Button variant="outline" size="sm" className="gap-1.5">
                           <ExternalLink size={13} />
                           Ver
@@ -204,7 +195,7 @@ export function TabExames({ pacienteId }: TabExamesProps) {
                         variant="outline"
                         size="sm"
                         className="gap-1.5"
-                        onClick={() => handleDownload(e.urlArquivo, e.nomeArquivo ?? e.nomeExame)}
+                        onClick={() => handleDownload(e.id, e.nomeArquivo ?? e.nomeExame)}
                       >
                         <Download size={13} />
                         Baixar
