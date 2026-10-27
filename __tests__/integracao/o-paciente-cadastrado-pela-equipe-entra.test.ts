@@ -514,8 +514,8 @@ describe('entrar só com e-mail e senha', () => {
     for (let i = 1; i <= 5; i++) {
       rede.ip = `10.3.0.${++ipSeq}`;
       expect(
-        (await entrarSemCodigo({ email: 'limite@teste.invalid', senha: 'errada-errada1' })).erro,
-      ).toBe(MENSAGEM_ENTRADA_RECUSADA);
+        await entrarSemCodigo({ email: 'limite@teste.invalid', senha: 'errada-errada1' }),
+      ).toEqual({ sucesso: false, erro: MENSAGEM_ENTRADA_RECUSADA });
     }
     rede.ip = `10.3.0.${++ipSeq}`;
     // até a senha CERTA é cortada: o limite vem antes de qualquer conferência
