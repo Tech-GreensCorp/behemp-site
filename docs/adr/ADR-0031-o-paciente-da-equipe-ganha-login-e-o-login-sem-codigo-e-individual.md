@@ -78,15 +78,15 @@ e-mail, não o e-mail.
 
 ## §3 — Rejeitado, e por quê
 
-| alternativa                                       | por que não                                                                                                                                  |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| alternativa                                                              | por que não                                                                                                                                    |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ler a senha do formulário do widget do Clerk (escutar o `submit` no DOM) | É raspar campo de senha de um componente de terceiro: quebra em qualquer mudança de markup e põe a credencial num caminho que ninguém projetou |
-| Desligar o Device Trust na instância              | Tira a verificação de **todos**; o pedido é exceção individual                                                                                |
-| Coluna nova `users.login_simplificado` + migration | Migration em produção sem rollback, para um flag que vale **junto** da credencial. O `privateMetadata` morre com a conta e dispensa migration |
-| Criar o login só quando o paciente se cadastra    | É o desenho que gerou o defeito                                                                                                               |
-| Senha gerada no servidor e devolvida à tela       | Faria a credencial trafegar numa resposta de API; gerar no navegador do admin evita isso                                                      |
-| `skipPasswordChecks: true` (como `definirSenhaTemporaria`) | A senha vira o único fator; aceitar `maria1234` seria pior que o código que se está tirando                                         |
-| Liberar o login sem código também para médico/admin | A porta mais valiosa, com um fator só. Recusado no servidor (flag, senha e entrada)                                                         |
+| Desligar o Device Trust na instância                                     | Tira a verificação de **todos**; o pedido é exceção individual                                                                                 |
+| Coluna nova `users.login_simplificado` + migration                       | Migration em produção sem rollback, para um flag que vale **junto** da credencial. O `privateMetadata` morre com a conta e dispensa migration  |
+| Criar o login só quando o paciente se cadastra                           | É o desenho que gerou o defeito                                                                                                                |
+| Senha gerada no servidor e devolvida à tela                              | Faria a credencial trafegar numa resposta de API; gerar no navegador do admin evita isso                                                       |
+| `skipPasswordChecks: true` (como `definirSenhaTemporaria`)               | A senha vira o único fator; aceitar `maria1234` seria pior que o código que se está tirando                                                    |
+| Liberar o login sem código também para médico/admin                      | A porta mais valiosa, com um fator só. Recusado no servidor (flag, senha e entrada)                                                            |
 
 ## §4 — O que mudou de comportamento (para quem consome)
 
