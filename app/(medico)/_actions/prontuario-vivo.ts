@@ -158,7 +158,8 @@ export async function buscarProntuarioCompleto(input: unknown): Promise<{
             resumo: r.observacoes || 'Sem observações',
             detalhes: {
               nomeArquivo: r.nomeArquivo,
-              urlArquivo: r.urlArquivo,
+              // 🔴 O ENDEREÇO da rota autenticada, nunca a URL do blob (pública, sem auditoria).
+              urlArquivo: r.urlArquivo ? `/api/exames/${r.id}/arquivo` : null,
               observacoes: r.observacoes,
             }
           });
@@ -210,7 +211,8 @@ export async function buscarProntuarioCompleto(input: unknown): Promise<{
             detalhes: {
               tipo: r.tipo,
               validade: isoSafe(r.dataValidade),
-              url: r.urlBlob,
+              // 🔴 O ENDEREÇO da rota autenticada, nunca a URL do blob (privada responde 403).
+              url: r.urlBlob ? `/api/documentos/${r.id}/arquivo` : null,
               observacoes: r.observacoes,
             }
           });

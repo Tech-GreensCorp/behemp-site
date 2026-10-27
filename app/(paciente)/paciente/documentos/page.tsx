@@ -20,6 +20,7 @@ import {
 import { uploadDocumentoPaciente, listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-self';
 import Link from 'next/link';
 import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { baixarDocumento } from '@/components/shared/documentos/baixar-documento';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
 import { ComunicadosParaAssinar } from '@/components/paciente/comunicados/ComunicadosParaAssinar';
@@ -101,20 +102,11 @@ export default function DocumentosPacientePage() {
     }
   }
 
-  async function handleDownload(url: string, nome: string) {
+  async function handleDownload(documentoId: string, nome: string) {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = nome;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      await baixarDocumento(documentoId, nome);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : 'Não foi possível baixar o documento.');
     }
   }
 
@@ -295,7 +287,7 @@ export default function DocumentosPacientePage() {
                             variant="outline"
                             size="sm"
                             className="h-8 gap-1.5 rounded-full text-xs"
-                            onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
+                            onClick={() => handleDownload(doc.id, doc.nomeArquivo ?? 'documento')}
                           >
                             <Download size={13} /> Baixar
                           </Button>

@@ -38,7 +38,7 @@ type Autorizacao = {
   medicoId: string;
   status: AnvisaStatus;
   modalidade: 'guiada' | 'representacao' | null;
-  documentos: { tipo: string; enviado: boolean; urlBlob: string | null; nomeArquivo: string | null; validado: boolean }[];
+  documentos: { tipo: string; enviado: boolean; temArquivo: boolean; nomeArquivo: string | null; validado: boolean }[];
   dataEnvio: string | null;
   dataAprovacao: string | null;
   prazoEstimado: string | null;
@@ -56,8 +56,8 @@ type Autorizacao = {
   // Procuração
   procuracao: {
     id: string;
-    urlPdfAssinado: string | null;
-    urlPdfGerado: string | null;
+    temPdfAssinado: boolean;
+    temPdfGerado: boolean;
     docusignStatus: string;
     assinadoEm: string | null;
   } | null;
@@ -257,8 +257,8 @@ export default function AdminAnvisaPage() {
                           <span className="text-xs text-foreground capitalize">
                             {doc.tipo.replace(/_/g, ' ')}
                           </span>
-                          {doc.urlBlob && (
-                            <a href={doc.urlBlob} target="_blank" rel="noopener noreferrer"
+                          {doc.temArquivo && (
+                            <a href={`/api/admin/anvisa/documento/${aut.id}/${encodeURIComponent(doc.tipo)}`} target="_blank" rel="noopener noreferrer"
                               className="text-xs text-primary hover:underline ml-auto">
                               Ver
                             </a>
@@ -270,7 +270,7 @@ export default function AdminAnvisaPage() {
                 )}
 
                 {/* Procuração Específica assinada */}
-                {aut.procuracao?.urlPdfAssinado && (
+                {aut.procuracao?.temPdfAssinado && (
                   <div className="rounded-xl border border-green-200 bg-green-50/50 p-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-green-600 shrink-0" />
@@ -284,7 +284,7 @@ export default function AdminAnvisaPage() {
                       </div>
                     </div>
                     <a
-                      href={aut.procuracao.urlPdfAssinado}
+                      href={`/api/admin/anvisa/documento/${aut.id}/procuracao_assinada`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-900"
@@ -307,7 +307,7 @@ export default function AdminAnvisaPage() {
                 {/* Ações */}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {/* Botão Gov.br — aparece quando tem Procuração assinada */}
-                  {aut.procuracao?.urlPdfAssinado && aut.status !== 'aprovado' && (
+                  {aut.procuracao?.temPdfAssinado && aut.status !== 'aprovado' && (
                     <a
                       href="https://www.gov.br/pt-br/servicos/solicitar-autorizacao-para-importacao-excepcional-de-produtos-a-base-de-canabidiol"
                       target="_blank"

@@ -5,6 +5,7 @@ import { exames } from '@/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { verificarMedicoOuAdmin } from '@/lib/auth';
+import { garantirMedicoDoPaciente } from '@/lib/auth/escopo-paciente';
 import { put } from '@vercel/blob';
 
 const criarExameSchema = z.object({
@@ -28,6 +29,10 @@ export async function criarExame(formData: FormData) {
 
     const parsed = criarExameSchema.safeParse(dados);
     if (!parsed.success) return { sucesso: false, erro: parsed.error.errors[0].message };
+
+    // 🔴 Papel certo com id alheio é BOLA: o paciente tem de ser DESTE médico.
+    const escopo = await garantirMedicoDoPaciente(parsed.data.pacienteId);
+    if (!escopo.ok) return { sucesso: false, erro: escopo.erro };
 
     let urlArquivo: string | null = null;
     let nomeArquivo: string | null = null;
@@ -60,10 +65,22 @@ export async function listarExames(pacienteId: string) {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    // 🔴 Papel certo com id alheio é BOLA: o paciente tem de ser DESTE médico.
+    const escopo = await garantirMedicoDoPaciente(pacienteId);
+    if (!escopo.ok) return { sucesso: false, erro: escopo.erro };
+
     const lista = await db.select().from(exames)
       .where(and(eq(exames.pacienteId, pacienteId), isNull(exames.deletedAt)))
       .orderBy(desc(exames.dataExame));
-    return { sucesso: true, dados: lista };
+
+    // 🔴 A URL do blob não vai ao navegador: o arquivo abre por /api/exames/{id}/arquivo, que
+    // autentica, confere o vínculo e audita.
+    const dados = lista.map(({ urlArquivo, ...exame }) => ({
+      ...exame,
+      temArquivo: Boolean(urlArquivo),
+    }));
+    return { sucesso: true, dados };
   } catch (error) {
     console.error('[Action] Erro ao listar exames:', error);
     return { sucesso: false, erro: 'Erro ao listar exames' };
@@ -78,6 +95,17 @@ export async function excluirExame(exameId: string) {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) return { sucesso: false, erro: auth.erro };
+
+    // 🔴 O paciente sai do EXAME, nunca do cliente — e tem de ser deste médico.
+    const [exame] = await db
+      .select({ pacienteId: exames.pacienteId })
+      .from(exames)
+      .where(and(eq(exames.id, exameId), isNull(exames.deletedAt)))
+      .limit(1);
+    if (!exame) return { sucesso: false, erro: 'Exame não encontrado' };
+
+    const escopo = await garantirMedicoDoPaciente(exame.pacienteId);
+    if (!escopo.ok) return { sucesso: false, erro: 'Exame não encontrado' };
 
     await db
       .update(exames)

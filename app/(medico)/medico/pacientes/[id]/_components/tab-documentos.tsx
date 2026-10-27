@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useUser } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { VisualizadorDeDocumento } from '@/components/shared/documentos/visualizador-de-documento';
+import { baixarDocumento } from '@/components/shared/documentos/baixar-documento';
 import { CartaoComunicadoDoacao } from '@/components/admin/comunicados/CartaoComunicadoDoacao';
 import {
   Download,
@@ -124,22 +125,15 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
     }
   }
 
-  /** Força download do arquivo (não apenas abertura em nova aba) */
-  async function handleDownload(url: string, nomeArquivo: string) {
+  /**
+   * Força download do arquivo. Passa pela rota autenticada, a mesma do Ver: a URL crua do blob
+   * responde 403 no store privado, e o 403 virava um "PDF" de 10 bytes.
+   */
+  async function handleDownload(documentoId: string, nomeArquivo: string) {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = nomeArquivo;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // Fallback: abre em nova aba se o download falhar (CORS)
-      window.open(url, '_blank', 'noopener,noreferrer');
+      await baixarDocumento(documentoId, nomeArquivo);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : 'Não foi possível baixar o documento.');
     }
   }
 
@@ -292,7 +286,7 @@ export function TabDocumentos({ pacienteId }: TabDocumentosProps) {
                           variant="outline"
                           size="sm"
                           className="gap-1.5"
-                          onClick={() => handleDownload(doc.urlBlob, doc.nomeArquivo ?? 'documento')}
+                          onClick={() => handleDownload(doc.id, doc.nomeArquivo ?? 'documento')}
                         >
                           <Download size={13} />
                           Baixar
