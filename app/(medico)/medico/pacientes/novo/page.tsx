@@ -100,6 +100,11 @@ export default function NovoPacientePage() {
 
     if (resultado.sucesso) {
       toast.success('Paciente cadastrado com sucesso!');
+      if (resultado.dados?.avisoDeAcesso) {
+        toast.warning(
+          `${resultado.dados.avisoDeAcesso} O paciente ainda não consegue entrar: crie o acesso em Usuários.`,
+        );
+      }
       router.push(listaHref);
     } else {
       toast.error(resultado.erro || 'Erro ao cadastrar paciente');

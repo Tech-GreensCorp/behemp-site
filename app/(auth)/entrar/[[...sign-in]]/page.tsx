@@ -2,8 +2,9 @@
 
 import { SignIn, useAuth } from '@clerk/nextjs';
 import { useEffect, useState, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { destinoInternoSeguro } from '@/lib/auth/destino-interno';
+import { FormularioDeEntrada } from '@/components/auth/formulario-de-entrada';
 import {
   CalendarDays,
   HeartPulse,
@@ -103,6 +104,14 @@ export default function SignInPage() {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  /**
+   * Na raiz (`/entrar`) o e-mail e a senha são o formulário nosso, que decide se o paciente liberado
+   * pela equipe entra sem o código (ADR-0031). Qualquer subcaminho (`/entrar/factor-two`,
+   * `/entrar/sso-callback`, `/entrar/reset-password`…) é uma etapa do Clerk em andamento e fica com o
+   * widget dele — assim Google, código por e-mail e recuperação de senha seguem como eram.
+   */
+  const emEtapaDoClerk = Boolean(useParams<{ 'sign-in'?: string[] }>()['sign-in']?.length);
+  const [usarWidget, setUsarWidget] = useState(false);
   /**
    * 🔴 O DESTINO VEM DA URL, LOGO É ENTRADA DO USUÁRIO. Sem filtrar, um
    * `/entrar?redirect_url=https://site-falso.com` leva o paciente para fora depois de ele
@@ -463,6 +472,13 @@ export default function SignInPage() {
                 <p className="text-sm text-gray-400">Entre com suas credenciais para continuar.</p>
               </div>
 
+              {!emEtapaDoClerk && !usarWidget ? (
+                <FormularioDeEntrada
+                  destino={redirectUrl}
+                  onOutrasFormas={() => setUsarWidget(true)}
+                />
+              ) : (
+              <>
               <SignIn
                 path="/entrar"
                 signUpUrl="/registrar-se"
@@ -500,6 +516,18 @@ export default function SignInPage() {
                   },
                 }}
               />
+
+              {usarWidget && !emEtapaDoClerk && (
+                <button
+                  type="button"
+                  onClick={() => setUsarWidget(false)}
+                  className="mt-5 w-full text-center text-sm font-semibold text-[#EA5429] hover:text-[#D64319]"
+                >
+                  Entrar com e-mail e senha
+                </button>
+              )}
+              </>
+              )}
             </>
           )}
         </div>

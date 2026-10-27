@@ -1069,6 +1069,17 @@ aqui. Diagnóstico, `caminho:linha` e o perigo de mexer de cada um em [04 — It
 - [ ] ⚪ **Item 87 — defeitos de tela do admin, não de segurança:** link do Monitoramento ANVISA para rota que não
       existe, Invoices que falha sem mensagem e sem exclusão, botões da Auditoria que voltam vazios, tela de
       Configurações estática, aba Prescrições que manda o admin para o login (**medido**).
+- [x] 🔴 **Item 88 — ✅ 27/10/2026 (ADR-0031): paciente cadastrado pela equipe não conseguia entrar, e o login sem código é
+      individual.** Causa: `criarPaciente` gravava `users` sem `clerk_id` e nunca chamava o Clerk (_"não foi possível
+      encontrar o usuário"_, reproduzido no navegador). Agora cria/religa o login, com o e-mail em minúsculas (o webhook casa por
+      igualdade exata). Admin: diálogo "Acesso ao sistema" (criar acesso, gerar/definir senha, liberar a entrada sem código) e
+      "Criar acessos" em lote. Entrada na tela oficial `/entrar` (formulário próprio; o widget do Clerk fica em "Outras formas de entrar") por ticket de uso único (60 s), limite 5 por e-mail e 20 por origem.
+      Guarda `o-login-sem-codigo-e-individual-e-nao-vaza` (35 casos, 23 sabotagens) + 24 casos de integração.
+      **Não verificado em produção:** o Device Trust da instância e quantos pacientes estão sem login (o botão conta).
+      **Achados catalogados, não corrigidos:** 88a `(medico)/_actions/pacientes.ts:60,:120` sem autenticação; 88b
+      `definirSenhaTemporaria` com `clerkId` do cliente e `skipPasswordChecks`; 88c o webhook casa e-mail por igualdade
+      exata e lê `email_addresses[0]`; 88d notificação "novo paciente" incondicional; 88e os hooks `.py` não rodam sem
+      Python (Windows) e o `novo/page.tsx` editado não está em `autorizacoes.txt`.
 
 ### 🟠 Achado de 01/10/2026 — fora do repositório, os hooks travam a sessão (Item 77)
 
