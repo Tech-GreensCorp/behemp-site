@@ -220,9 +220,9 @@ export function DialogoAcessoDoPaciente({
                   Entrar sem o código do e-mail
                 </Label>
                 <p className="text-muted-foreground text-xs">
-                  Só para este paciente: ele entra pela tela de login normal, com e-mail e senha, sem digitar
-                  código. A senha passa a ser o único fator — use para quem não consegue acessar o
-                  e-mail.
+                  Só para este paciente: ele entra pela tela de login normal, com e-mail e senha,
+                  sem digitar código. A senha passa a ser o único fator — use para quem não consegue
+                  acessar o e-mail.
                 </p>
                 {!acesso.temSenha && (
                   <p className="text-xs text-amber-700">Defina uma senha primeiro.</p>
