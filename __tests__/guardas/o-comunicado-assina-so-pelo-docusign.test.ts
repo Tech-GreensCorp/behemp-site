@@ -64,14 +64,32 @@ describe('o status vem do DocuSign, nunca do cliente', () => {
     expect(trecho).not.toMatch(/body\??\.event|envelopeSummary\??\.status|statusMap/);
   });
 
-  it('só a sincronização muda o status para assinado, e só a partir de pendente', () => {
+  it('só DUAS escritas mudam o status para assinado — a sincronização e o registro manual do admin — e as duas só a partir de pendente', () => {
     const src = semComentarios(ler('lib/comunicados/assinatura.ts'));
     const escritas = src.match(/\.set\(\{\s*status:\s*'assinado'/g) ?? [];
-    // só a transição escreve 'assinado'; o resto são retornos, comparações e tipos
-    expect(escritas.length).toBe(1);
+    // a sincronização (DocuSign) e o registro manual (ADR-0032); o resto são retornos, comparações e tipos
+    expect(escritas.length).toBe(2);
     const i = src.indexOf("status: 'assinado',\n      docusignStatus");
     expect(i).toBeGreaterThan(-1);
     expect(src.slice(i, i + 700)).toContain("eq(comunicadosAssinatura.status, 'pendente')");
+
+    // A segunda mora DENTRO de `registrarAssinaturaManual`, que é só do admin (a rota exige) e
+    // também condiciona a `pendente`. Escrita nova fora dessas duas é a regra sendo furada.
+    const inicio = src.indexOf('export async function registrarAssinaturaManual');
+    const fim = src.indexOf('export ', inicio + 10);
+    const manual = src.slice(inicio, fim);
+    expect(manual).toMatch(/\.set\(\{\s*status:\s*'assinado'/);
+    expect(manual).toContain("eq(comunicadosAssinatura.status, 'pendente')");
+    // e quem chama essa função precisa exigir admin
+    const rota = semComentarios(ler('app/api/comunicados/[id]/assinatura-manual/route.ts'));
+    expect(rota).toContain('verificarAdmin(');
+    for (const outro of [
+      'app/api/comunicados/[id]/retorno/route.ts',
+      'app/api/webhooks/docusign/route.ts',
+      'app/_actions/comunicados.ts',
+    ]) {
+      expect(semComentarios(ler(outro))).not.toContain('registrarAssinaturaManual');
+    }
   });
 
   it('o identificador do signatário deriva do id da linha', () => {
@@ -224,7 +242,10 @@ describe('escopo e vazamento', () => {
   it('reiniciar o fluxo NÃO apaga: a função só atualiza a linha e preserva o PDF assinado', () => {
     const lib = semComentarios(ler('lib/comunicados/assinatura.ts'));
     const i = lib.indexOf('export async function reiniciarComunicado');
-    const corpo = lib.slice(i, lib.indexOf('// ── Leituras', i));
+    // Até a PRÓXIMA função exportada. O corte anterior (`// ── Leituras`) nunca existiu depois de
+    // `semComentarios`: `indexOf` dava -1 e o `slice` ia até o fim do arquivo — o guarda lia o que
+    // viesse depois de `reiniciarComunicado`, e passou a acusar uma função que não é ela.
+    const corpo = lib.slice(i, lib.indexOf('export ', i + 10));
     expect(corpo).toContain("status: 'cancelado'");
     expect(corpo).toContain("eq(comunicadosAssinatura.status, 'assinado')"); // só sai de assinado
     expect(corpo).toContain('motivoCancelamento');

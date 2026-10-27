@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Send,
   RotateCcw,
+  PenLine,
 } from 'lucide-react';
 
 import {
@@ -30,6 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -68,7 +70,10 @@ function rotuloDe(c: ComunicadoParaAdmin | undefined): Rotulo {
     case 'pendente':
       return { texto: 'Pendente de assinatura', classe: 'border-[#C08E3A]/50 text-[#C08E3A]' };
     case 'assinado':
-      return { texto: 'Assinado', classe: 'border-[#16a34a]/50 text-[#16a34a]' };
+      return {
+        texto: c.registroManual ? 'Assinado (registro manual)' : 'Assinado',
+        classe: 'border-[#16a34a]/50 text-[#16a34a]',
+      };
     case 'erro':
       return { texto: 'Erro no envio', classe: '', destrutivo: true };
     case 'recusado':
@@ -93,6 +98,11 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
   const [reiniciando, setReiniciando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [motivo, setMotivo] = useState('');
+  // Registro manual da assinatura (ADR-0032)
+  const [registrando, setRegistrando] = useState(false);
+  const [arquivoManual, setArquivoManual] = useState<File | null>(null);
+  const [dataManual, setDataManual] = useState('');
+  const [observacaoManual, setObservacaoManual] = useState('');
 
   const carregar = useCallback(async () => {
     const res = await listarComunicadosDoPaciente(pacienteId);
@@ -161,6 +171,47 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
     setReiniciando(false);
     setMotivo('');
     await carregar();
+  }
+
+  /** Hoje, no calendário do admin (`AAAA-MM-DD`) — é também o teto do campo de data. */
+  const hojeIso = () => new Date().toLocaleDateString('en-CA');
+
+  function abrirRegistroManual() {
+    setArquivoManual(null);
+    setObservacaoManual('');
+    setDataManual(hojeIso());
+    setRegistrando(true);
+  }
+
+  /** Anexa o documento assinado por outra plataforma e marca o comunicado como assinado. */
+  async function registrarManual(id: string) {
+    if (!arquivoManual) return;
+    setOcupado(`manual-${id}`);
+    try {
+      const form = new FormData();
+      form.append('arquivo', arquivoManual);
+      form.append('dataAssinatura', dataManual);
+      form.append('observacao', observacaoManual);
+      const resposta = await fetch(`/api/comunicados/${id}/assinatura-manual`, {
+        method: 'POST',
+        body: form,
+      });
+      const corpo = (await resposta.json().catch(() => null)) as {
+        sucesso?: boolean;
+        erro?: string;
+      } | null;
+      if (!resposta.ok || !corpo?.sucesso) {
+        toast.error(corpo?.erro ?? 'Não foi possível registrar a assinatura.');
+        return;
+      }
+      toast.success('Assinatura registrada. O documento assinado foi guardado.');
+      setRegistrando(false);
+      await carregar();
+    } catch {
+      toast.error('Não foi possível registrar a assinatura. Verifique a conexão e tente de novo.');
+    } finally {
+      setOcupado(null);
+    }
   }
 
   /** Copia o mesmo link do e-mail de aviso, para o admin mandar ao paciente por outro canal. */
@@ -300,11 +351,23 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                   </div>
                   <div className="min-w-0">
                     <p className="font-heading text-foreground truncate text-sm font-semibold">
-                      {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} — Assinado.pdf
+                      {TITULO_ATUALIZACAO_PROGRAMA_DOACAO} —{' '}
+                      {atual.registroManual ? 'Assinado' : 'Assinado.pdf'}
                     </p>
-                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
-                      Documento com assinatura eletrônica confirmada pelo DocuSign
-                    </p>
+                    {atual.registroManual ? (
+                      <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                        Registrado manualmente por {atual.registroManual.porNome ?? '—'} em{' '}
+                        {quando(atual.registroManual.em)}. Assinado em outra plataforma, sem
+                        confirmação do DocuSign.
+                        {atual.registroManual.observacao
+                          ? ` Observação: ${atual.registroManual.observacao}`
+                          : ''}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                        Documento com assinatura eletrônica confirmada pelo DocuSign
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -414,6 +477,18 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                 <Mail size={14} />
               )}
               Reenviar e-mail
+            </Button>
+          )}
+          {atual?.status === 'pendente' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 rounded-xl"
+              onClick={abrirRegistroManual}
+              disabled={ocupado !== null}
+            >
+              <PenLine size={14} />
+              Registrar assinatura manualmente
             </Button>
           )}
           {atual &&
@@ -594,6 +669,76 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog
+        open={registrando}
+        onOpenChange={(aberto) => !aberto && ocupado === null && setRegistrando(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registrar a assinatura manualmente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Use quando o paciente já assinou por <strong>outra plataforma</strong> e enviou o
+              documento (por exemplo, pelo WhatsApp). O documento assinado é guardado em Documentos
+              do paciente, o comunicado passa a <strong>Assinado</strong> e a pendência some para o
+              paciente. Nada é apagado: o registro fica marcado como manual, com o seu nome, a data
+              e a observação. Não há confirmação do DocuSign nem e-mail automático.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="arquivo-manual">
+                Documento assinado (PDF, JPG ou PNG, até 10 MB)
+              </Label>
+              <Input
+                id="arquivo-manual"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(e) => setArquivoManual(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="data-manual">Data em que o paciente assinou</Label>
+              <Input
+                id="data-manual"
+                type="date"
+                value={dataManual}
+                max={hojeIso()}
+                onChange={(e) => setDataManual(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="observacao-manual">Observação (opcional)</Label>
+              <Textarea
+                id="observacao-manual"
+                value={observacaoManual}
+                onChange={(e) => setObservacaoManual(e.target.value)}
+                maxLength={500}
+                placeholder="Ex.: assinado em outra plataforma e enviado pelo WhatsApp"
+                rows={2}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ocupado !== null}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (atual) void registrarManual(atual.id);
+              }}
+              disabled={ocupado !== null || !arquivoManual || !dataManual}
+              className="gap-1.5"
+            >
+              {ocupado?.startsWith('manual-') ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <PenLine size={14} />
+              )}
+              {ocupado?.startsWith('manual-') ? 'Registrando...' : 'Confirmar registro'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog
         open={reenviando}
         onOpenChange={(aberto) => !aberto && ocupado === null && setReenviando(false)}
