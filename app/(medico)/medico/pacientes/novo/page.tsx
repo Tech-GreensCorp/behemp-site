@@ -130,7 +130,7 @@ export default function NovoPacientePage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-secondary/10">
                 <User size={16} className="text-secondary" />
               </div>
-              <CardTitle className="font-heading text-lg">Dados Pessoais</CardTitle>
+              <CardTitle className="font-heading text-lg">Dados Pessoais do Paciente</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">

@@ -36,6 +36,7 @@ import { obterDadosDashboard, type DadosDashboard } from '@/app/_actions/dashboa
 import { AvisoDaProcuracao } from '@/components/paciente/AvisoDaProcuracao';
 import { AvisoDeCadastroPendente } from '@/components/paciente/AvisoDeCadastroPendente';
 import { AvisoDeEnderecoPendente } from '@/components/paciente/AvisoDeEnderecoPendente';
+import { AvisoDeDocumentoParaAssinar } from '@/components/paciente/AvisoDeDocumentoParaAssinar';
 import { AvisoDoQueNaoChegou } from '@/components/paciente/AvisoDoQueNaoChegou';
 import { AnvisaCard } from './_components/anvisa-card';
 
@@ -465,6 +466,8 @@ export default function PacienteDashboardPage() {
           />
 
           <AvisoDeCadastroPendente cadastro={dados?.cadastroPendente ?? null} />
+
+          <AvisoDeDocumentoParaAssinar />
 
           <AvisoDaProcuracao precisaDaProcuracao={dados?.precisaDaProcuracao ?? false} />
 

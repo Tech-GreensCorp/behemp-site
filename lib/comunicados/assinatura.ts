@@ -786,3 +786,68 @@ export async function cancelarPendentesPorTrocaDeEmail(params: {
   }
   return cancelados.length;
 }
+
+/**
+ * "Cancelar e reenviar": para um comunicado PENDENTE que saiu com dados velhos (por exemplo, o
+ * e-mail do paciente mudou depois do envio). O envelope do DocuSign e o PDF já nasceram com o
+ * e-mail antigo e não se editam, então a saída é um envio NOVO, lido do cadastro de hoje.
+ *
+ * O pendente vira `cancelado` (nada é apagado, mesma regra de `reiniciarComunicado`), o que libera
+ * o índice único parcial, e `enviarComunicado` cria o novo. Se o DocuSign não está configurado, nada
+ * é cancelado. Se o novo envio falhar depois do cancelamento, a mensagem diz isso, e o botão
+ * "Enviar" da aba segue disponível.
+ */
+export async function cancelarEReenviarComunicado(params: {
+  comunicadoId: string;
+  adminUserId: string;
+}): Promise<ResultadoDoEnvio> {
+  if (!docusignConfigurado()) {
+    return {
+      sucesso: false,
+      erro: 'O DocuSign não está configurado neste ambiente. Nada foi cancelado nem enviado.',
+    };
+  }
+  const [c] = await db
+    .select()
+    .from(comunicadosAssinatura)
+    .where(eq(comunicadosAssinatura.id, params.comunicadoId))
+    .limit(1);
+  if (!c) return { sucesso: false, erro: 'Comunicado não encontrado.' };
+  if (c.status !== 'pendente') {
+    return { sucesso: false, erro: 'Só um comunicado pendente de assinatura pode ser reenviado.' };
+  }
+
+  const [virou] = await db
+    .update(comunicadosAssinatura)
+    .set({
+      status: 'cancelado',
+      canceladoEm: new Date(),
+      canceladoPorUserId: params.adminUserId,
+      motivoCancelamento: 'Reenviado: envio anterior saiu com dados desatualizados.',
+    })
+    .where(and(eq(comunicadosAssinatura.id, c.id), eq(comunicadosAssinatura.status, 'pendente')))
+    .returning({ id: comunicadosAssinatura.id });
+  if (!virou) {
+    return { sucesso: false, erro: 'O comunicado mudou de situação. Atualize a tela e confira.' };
+  }
+  await registrarAuditoria({
+    userId: params.adminUserId,
+    acao: 'atualizar',
+    entidade: ENTIDADE,
+    entidadeId: c.id,
+    dadosAntes: { status: 'pendente', docusignEnvelopeId: c.docusignEnvelopeId },
+    dadosDepois: { status: 'cancelado', motivo: 'cancelar_e_reenviar' },
+  });
+
+  const novo = await enviarComunicado({
+    pacienteId: c.pacienteId,
+    adminUserId: params.adminUserId,
+  });
+  if (!novo.sucesso) {
+    return {
+      sucesso: false,
+      erro: `O envio anterior foi cancelado, mas o novo não saiu: ${novo.erro}`,
+    };
+  }
+  return novo;
+}

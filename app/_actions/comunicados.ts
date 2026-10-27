@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { comunicadosAssinatura, pacientes, triagens, users } from '@/db/schema';
 import { verificarAdmin, obterUsuarioAtual } from '@/lib/auth';
 import {
+  cancelarEReenviarComunicado,
   enviarAvisoPorEmail,
   enviarComunicado,
   gerarLinkDeAssinatura,
@@ -219,6 +220,20 @@ export async function reenviarEmailDoComunicado(
   });
   if (!emailEnviado) return { sucesso: false, erro: 'O e-mail não pôde ser enviado agora.' };
   return { sucesso: true, dados: { emailEnviado } };
+}
+
+/** Cancela um envio pendente (dados velhos) e envia de novo, com o cadastro de hoje. Só admin. */
+export async function cancelarEReenviarComunicadoPendente(
+  comunicadoId: string,
+): Promise<Resposta<{ comunicadoId: string; emailEnviado: boolean }>> {
+  const admin = await adminAtual();
+  if (!admin) return { sucesso: false, erro: 'Apenas administradores podem reenviar.' };
+  const id = idSchema.safeParse(comunicadoId);
+  if (!id.success) return { sucesso: false, erro: 'Comunicado inválido.' };
+
+  const r = await cancelarEReenviarComunicado({ comunicadoId: id.data, adminUserId: admin.userId });
+  if (!r.sucesso) return { sucesso: false, erro: r.erro };
+  return { sucesso: true, dados: { comunicadoId: r.comunicadoId, emailEnviado: r.emailEnviado } };
 }
 
 /** "Atualizar status": pergunta ao DocuSign e retoma qualquer passo que tenha ficado pela metade. */
