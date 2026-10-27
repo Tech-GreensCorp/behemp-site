@@ -17,12 +17,15 @@ import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
 import { DialogoEditarUsuario } from './_components/dialogo-editar-usuario';
 import { DialogoExcluirUsuario } from './_components/dialogo-excluir-usuario';
 import { DialogoCriarAdmin } from './_components/dialogo-criar-admin';
+import { DialogoAcessoDoPaciente } from '@/components/admin/acesso-do-paciente/dialogo-acesso-do-paciente';
+import { AvisoDeAcessosPendentes } from '@/components/admin/acesso-do-paciente/aviso-de-acessos-pendentes';
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
+  KeyRound,
   Loader2,
   Pencil,
   Search,
@@ -93,6 +96,7 @@ export default function UsuariosPage() {
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [excluindo, setExcluindo] = useState<Usuario | null>(null);
   const [criandoAdmin, setCriandoAdmin] = useState(false);
+  const [gerenciandoAcesso, setGerenciandoAcesso] = useState<Usuario | null>(null);
   const { user: euMesmo } = useUser();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,6 +158,8 @@ export default function UsuariosPage() {
           </Button>
         }
       />
+
+      <AvisoDeAcessosPendentes onCriados={carregar} />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -263,6 +269,18 @@ export default function UsuariosPage() {
                 trailing={
                   <>
                     <Badge variant={config?.variant ?? 'outline'}>{config?.label ?? 'Desconhecido'}</Badge>
+                    {user.role === 'paciente' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title={user.clerkId ? 'Acesso e senha' : 'Sem login — criar acesso'}
+                        aria-label={`Acesso e senha de ${user.nome}`}
+                        className={user.clerkId ? undefined : 'text-amber-600'}
+                        onClick={() => setGerenciandoAcesso(user)}
+                      >
+                        <KeyRound size={16} />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -314,6 +332,16 @@ export default function UsuariosPage() {
           usuario={editando}
           onFechar={() => setEditando(null)}
           onSalvo={carregar}
+        />
+      )}
+      {gerenciandoAcesso && (
+        <DialogoAcessoDoPaciente
+          key={gerenciandoAcesso.id}
+          usuario={gerenciandoAcesso}
+          onFechar={() => {
+            setGerenciandoAcesso(null);
+            carregar();
+          }}
         />
       )}
       {criandoAdmin && (

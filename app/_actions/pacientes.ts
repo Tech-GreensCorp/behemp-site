@@ -12,7 +12,8 @@ import {
   tratamentoDaEdicaoSchema,
   valoresParaGravar,
 } from '@/lib/pacientes/edicao';
-import { decidirContato } from '@/lib/pacientes/contato';
+import { decidirContato, normalizarEmail } from '@/lib/pacientes/contato';
+import { garantirContaDeAcesso, type ResultadoDoAcesso } from '@/lib/pacientes/conta-de-acesso';
 import { trocarEmailNoClerk } from '@/lib/pacientes/clerk-email';
 import { cancelarPendentesPorTrocaDeEmail } from '@/lib/comunicados/assinatura';
 import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/erro-de-cadastro';
@@ -93,7 +94,7 @@ interface ActionResult<T = unknown> {
  */
 export async function criarPaciente(
   dados: z.infer<typeof criarPacienteSchema>,
-): Promise<ActionResult<{ pacienteId: string }>> {
+): Promise<ActionResult<{ pacienteId: string; acessoCriado: boolean; avisoDeAcesso?: string }>> {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) {
@@ -108,11 +109,15 @@ export async function criarPaciente(
     // `''` = campo em branco no formulário: some do INSERT e a coluna fica NULL (lib/pacientes/edicao.ts).
     const d = semCamposVazios(parsed.data);
 
-    // Verificar se já existe user com esse e-mail
+    // E-mail em minúsculas e sem espaço, como o Clerk o guarda: o webhook `user.created` procura o
+    // usuário por igualdade exata, e "Maria@x.com" aqui viraria um SEGUNDO usuário no primeiro login.
+    const email = normalizarEmail(d.email);
+
+    // Verificar se já existe user (ativo) com esse e-mail, sem diferenciar maiúsculas
     const [userExistente] = await db
       .select()
       .from(users)
-      .where(eq(users.email, d.email))
+      .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.deletedAt)))
       .limit(1);
 
     let userId: string;
@@ -124,7 +129,7 @@ export async function criarPaciente(
       const [novoUser] = await db
         .insert(users)
         .values({
-          email: d.email,
+          email,
           nome: d.nome,
           role: 'paciente',
           telefone: d.telefone,
@@ -186,11 +191,27 @@ export async function criarPaciente(
         acao: 'criar',
         entidade: 'pacientes',
         entidadeId: novoPaciente.id,
-        dadosDepois: { nome: d.nome, email: d.email },
+        dadosDepois: { nome: d.nome, email },
       });
     }
 
-    return { sucesso: true, dados: { pacienteId: novoPaciente.id } };
+    // Conta de acesso (login no Clerk). Sem ela o paciente aparece na lista, mas ao entrar recebe
+    // "usuário não encontrado". A FICHA já está gravada: falha aqui não a desfaz — a tela avisa e
+    // o admin cria o acesso depois (Usuários → Acesso do paciente). Nunca lança.
+    const acesso = await garantirContaDeAcesso(userId).catch(
+      (): ResultadoDoAcesso => ({ ok: false, motivo: 'clerk_recusou', erro: 'Falha ao criar o acesso.' }),
+    );
+    // `nao_e_paciente` = o e-mail já era de admin/médico, que tem login próprio: não é falha.
+    const semAcesso = !acesso.ok && acesso.motivo !== 'nao_e_paciente';
+
+    return {
+      sucesso: true,
+      dados: {
+        pacienteId: novoPaciente.id,
+        acessoCriado: !semAcesso,
+        avisoDeAcesso: semAcesso ? acesso.erro : undefined,
+      },
+    };
   } catch (error) {
     // Só `code:constraint:table` vai ao log: a mensagem do Drizzle traz a query com CPF e nome.
     console.error('[Action] Erro ao criar paciente:', diagnosticoDoErro(error));

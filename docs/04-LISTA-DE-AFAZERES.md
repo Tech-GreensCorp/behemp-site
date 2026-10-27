@@ -19,6 +19,31 @@
 
 ---
 
+## ✅ Item 88 — IMPLEMENTADO, 27/10/2026 (ADR-0031): o paciente da equipe não tinha login, e o login sem código é individual
+
+**Status:** implementado e provado local; **não verificado em produção**. Decisões, rejeitados e o que mudou de
+comportamento: [ADR-0031](adr/ADR-0031-o-paciente-da-equipe-ganha-login-e-o-login-sem-codigo-e-individual.md).
+
+**Diagnóstico (`caminho:linha`).** `app/_actions/pacientes.ts` (`criarPaciente`) inseria `users` sem `clerkId` e não chamava o
+Clerk; a tela de usuários lê o banco (`app/(admin)/_actions/usuarios.ts:36`), o Clerk autentica. Para o e-mail em grafia mista, o
+webhook `app/api/webhooks/clerk/route.ts:164` não achava a linha (igualdade exata) e criaria usuário e ficha duplicados.
+
+**O que existe agora:** `lib/pacientes/conta-de-acesso.ts` (`garantirContaDeAcesso`), `app/_actions/acesso-do-paciente.ts`
+(admin), `app/_actions/entrar-so-com-senha.ts` (pública, com limite), `lib/auth/login-simplificado.ts` (regras puras),
+`components/auth/formulario-de-entrada.tsx` (o formulário de e-mail e senha da `/entrar` oficial), `components/admin/acesso-do-paciente/`. Sem migration.
+
+**Perigo de mexer (medido):** `criarPaciente` tem 1 consumidor (`novo/page.tsx`, usado também em `/admin/pacientes/novo`) e 1
+integração o executa (`o-cadastro-de-paciente-aceita-campo-vazio`, verde). O limite é por
+processo (Item 31).
+
+**Achados catalogados, não corrigidos:** 88a `app/(medico)/_actions/pacientes.ts:60` e `:120` sem autenticação (sem importador
+hoje); 88b `definirSenhaTemporaria` (`usuarios.ts:652`) com `clerkId` vindo do cliente e `skipPasswordChecks: true`; 88c o webhook
+usa `email_addresses[0]` e igualdade exata (`route.ts:145`, `:164`); 88d notificação "novo paciente" incondicional (`route.ts:268`);
+88e os hooks `.claude/hooks/*.py` não rodam em Windows sem Python, e `app/(medico)/medico/pacientes/novo/page.tsx` foi editado sem
+linha em `.claude/autorizacoes.txt`.
+
+---
+
 ## ⚪ Item 87 — CATALOGADO, 15/10/2026: defeitos de tela do painel admin (não são segurança)
 
 **Status:** catalogado, **não corrigido**. Achados ao escrever o guia do Admin (`~/Documents/behemp-treinamento`),

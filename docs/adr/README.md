@@ -55,6 +55,7 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0028](ADR-0028-a-identidade-se-confere-na-etapa-1-e-a-tela-nao-vira-oraculo.md)       | A identidade se confere na etapa 1 do cadastro, e a tela não vira oráculo                                       | ✅ aceita e implementada (não em produção) | 28/09/2026 |
 | [0029](ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin                                           | ✅ em produção; Fase 2.3 só local          | 29/09/2026 |
 | [0030](ADR-0030-o-que-depende-da-ti-no-levantamento-dos-consentimentos.md)             | O que depende só da TI no levantamento dos consentimentos fica aqui, para depois                                | 📋 proposta                                | 01/10/2026 |
+| [0031](ADR-0031-o-paciente-da-equipe-ganha-login-e-o-login-sem-codigo-e-individual.md) | O paciente cadastrado pela equipe ganha login, e o login sem código é individual | ✅ implementada | 27/10/2026 |
 
 ⚠️ **Acréscimo, 01/10/2026.** Entrou a 0030 como 📋 proposta (`DO-84`). As contagens por status abaixo **não foram refeitas** nesta entrada: a da 0029 já diverge entre esta tabela e o arquivo dela, e alinhar é trabalho de quem mexer na 0029.
 
