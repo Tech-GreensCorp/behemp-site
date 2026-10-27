@@ -104,10 +104,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const privado = await lerDocumentoPrivado(c.urlPdfAssinado);
     if (!privado) return NextResponse.json({ erro: 'Documento indisponível' }, { status: 502 });
     const download = request.nextUrl.searchParams.get('download') === '1';
+    // O tipo REAL do arquivo: o do DocuSign é PDF, mas um registro manual (ADR-0032) pode ser um
+    // JPG/PNG mandado pelo WhatsApp — servido como PDF, abriria quebrado.
+    const tipoDoArquivo = privado.contentType || 'application/pdf';
+    const extensao =
+      tipoDoArquivo === 'image/png' ? 'png' : tipoDoArquivo === 'image/jpeg' ? 'jpg' : 'pdf';
     return new NextResponse(privado.stream, {
       headers: {
-        'content-type': 'application/pdf',
-        'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${c.id}-assinado.pdf"`,
+        'content-type': tipoDoArquivo,
+        'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${c.id}-assinado.${extensao}"`,
         'cache-control': 'private, no-store',
       },
     });

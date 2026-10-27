@@ -53,6 +53,17 @@ export const comunicadosAssinatura = pgTable(
     canceladoPorUserId: text('cancelado_por_user_id').references(() => users.id),
     motivoCancelamento: text('motivo_cancelamento'),
 
+    // ── Registro MANUAL da assinatura (ADR-0032) ──
+    // Quando o paciente assinou por outra plataforma e mandou o arquivo (WhatsApp), o admin
+    // registra a assinatura aqui. É a ÚNICA forma de `assinado` que não vem do DocuSign, e por
+    // isso fica marcada: `registroManualEm` preenchido = registro manual. A linha é a mesma
+    // do envio (nada é duplicado) e o arquivo vai para `urlPdfAssinado`, em store privado.
+    registroManualEm: timestamp('registro_manual_em', { withTimezone: true }),
+    registroManualPorUserId: text('registro_manual_por_user_id').references(() => users.id),
+    registroManualObservacao: text('registro_manual_observacao'),
+    /** Nome do arquivo como o admin o anexou — só para o admin reconhecer o que subiu. */
+    registroManualNomeArquivo: text('registro_manual_nome_arquivo'),
+
     // ── Falhas (texto seguro, sem dado pessoal) ──
     erro: text('erro'),
     erroEm: timestamp('erro_em', { withTimezone: true }),

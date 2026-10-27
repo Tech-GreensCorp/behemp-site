@@ -41,6 +41,7 @@ import {
   LINK_DOS_COMUNICADOS,
 } from '@/lib/email/comunicados';
 import { registrarAuditoria } from '@/lib/utils/audit';
+import type { ArquivoDaAssinatura } from '@/lib/comunicados/registro-manual';
 import { gerarPdfCartaDoacao } from '@/lib/comunicados/carta-doacao-pdf';
 import {
   ANCORA_ASSINATURA,
@@ -416,6 +417,10 @@ export async function finalizarAssinatura(comunicadoId: string): Promise<{ compl
     .where(eq(comunicadosAssinatura.id, comunicadoId))
     .limit(1);
   if (!c || c.status !== 'assinado' || !c.docusignEnvelopeId) return { completo: false };
+  // 🔴 Registro MANUAL (ADR-0032): o arquivo veio do admin, não do DocuSign, e as duas travas de
+  // e-mail já nascem preenchidas. O envelope segue aberto lá — se o paciente o assinar depois, o
+  // webhook chega aqui e NÃO pode baixar outro PDF por cima nem mandar e-mail de "confirmação".
+  if (c.registroManualEm) return { completo: true };
   const envelopeId = c.docusignEnvelopeId;
 
   const registrarFalha = async (mensagem: string) => {
@@ -640,6 +645,114 @@ export async function reiniciarComunicado(params: {
   return { sucesso: true };
 }
 
+// ── Registro manual da assinatura (admin) ─────────────────────
+
+export type ResultadoDoRegistroManual = { sucesso: true } | { sucesso: false; erro: string };
+
+/**
+ * O paciente assinou por OUTRA plataforma e mandou o arquivo (WhatsApp): o admin registra aqui.
+ *
+ * 🔴 EXCEÇÃO CONSCIENTE a "quem diz que assinou é o DocuSign" (ADR-0032), e por isso estreita:
+ *   · transiciona só de `pendente`, com UPDATE condicional — nunca sobrescreve um `assinado`
+ *     (inclusive o que o webhook acabou de marcar), nunca reabre `recusado`, `erro` ou `cancelado`;
+ *   · usa a MESMA linha do envio: não cria comunicado novo, então nada duplica e o índice único
+ *     parcial segue valendo;
+ *   · fica marcado como manual (quem, quando, observação, nome do arquivo) e auditado;
+ *   · NÃO finge ser DocuSign: as duas travas de e-mail nascem preenchidas, então nem a confirmação
+ *     ao paciente nem a notificação a docs@ (que cita o "envelope") saem.
+ *
+ * Quem chama JÁ provou que é admin e já validou o arquivo (`identificarArquivoDaAssinatura`).
+ * Nada é apagado: o envelope do DocuSign e o PDF original continuam citados na linha.
+ */
+export async function registrarAssinaturaManual(params: {
+  comunicadoId: string;
+  adminUserId: string;
+  arquivo: Uint8Array;
+  tipoDoArquivo: ArquivoDaAssinatura;
+  nomeDoArquivo: string;
+  dataDaAssinatura: Date;
+  observacao: string | null;
+}): Promise<ResultadoDoRegistroManual> {
+  const [c] = await db
+    .select()
+    .from(comunicadosAssinatura)
+    .where(eq(comunicadosAssinatura.id, params.comunicadoId))
+    .limit(1);
+  if (!c) return { sucesso: false, erro: 'Comunicado não encontrado.' };
+  if (c.status !== 'pendente') {
+    return {
+      sucesso: false,
+      erro:
+        c.status === 'assinado'
+          ? 'Este comunicado já está assinado.'
+          : 'Só um comunicado pendente de assinatura aceita o registro manual.',
+    };
+  }
+
+  // O arquivo primeiro: se o UPDATE perder a corrida, o blob é recolhido abaixo. O nome leva a
+  // hora para uma segunda tentativa nunca esbarrar no blob da primeira.
+  let url: string;
+  try {
+    const guardado = await guardarDocumentoPrivado(
+      `comunicados/${c.pacienteId}/${c.id}-assinado-manual-${Date.now()}.${params.tipoDoArquivo.extensao}`,
+      Buffer.from(params.arquivo),
+      { contentType: params.tipoDoArquivo.contentType },
+    );
+    url = guardado.url;
+  } catch (erro) {
+    console.error(
+      '[comunicados] guardar arquivo manual:',
+      erro instanceof Error ? erro.name : 'erro',
+    );
+    return {
+      sucesso: false,
+      erro: mensagemSegura(erro, 'Não foi possível guardar o arquivo. Tente de novo.'),
+    };
+  }
+
+  const agora = new Date();
+  const [virou] = await db
+    .update(comunicadosAssinatura)
+    .set({
+      status: 'assinado',
+      assinadoEm: params.dataDaAssinatura,
+      urlPdfAssinado: url,
+      registroManualEm: agora,
+      registroManualPorUserId: params.adminUserId,
+      registroManualObservacao: params.observacao,
+      registroManualNomeArquivo: params.nomeDoArquivo.slice(0, 200),
+      // As duas travas de e-mail nascem preenchidas: este registro não manda e-mail nenhum.
+      emailConfirmacaoPacienteEm: agora,
+      emailNotificacaoDocsEm: agora,
+      erro: null,
+      erroEm: null,
+    })
+    .where(and(eq(comunicadosAssinatura.id, c.id), eq(comunicadosAssinatura.status, 'pendente')))
+    .returning({ id: comunicadosAssinatura.id });
+  if (!virou) {
+    // Outro processo (webhook, outro admin) mudou o status no meio: este blob é sobra.
+    await apagarDocumentoPrivado(url).catch(() => {});
+    return { sucesso: false, erro: 'O comunicado mudou de situação. Atualize a tela e confira.' };
+  }
+
+  await registrarAuditoria({
+    userId: params.adminUserId,
+    acao: 'atualizar',
+    entidade: ENTIDADE,
+    entidadeId: c.id,
+    dadosAntes: { status: 'pendente', docusignEnvelopeId: c.docusignEnvelopeId },
+    dadosDepois: {
+      status: 'assinado',
+      origem: 'registro_manual',
+      assinadoEm: params.dataDaAssinatura.toISOString(),
+      arquivo: params.nomeDoArquivo.slice(0, 200),
+      tipoDoArquivo: params.tipoDoArquivo.contentType,
+      comObservacao: !!params.observacao,
+    },
+  });
+  return { sucesso: true };
+}
+
 // ── Leituras ──────────────────────────────────────────────────
 
 /** Campos que o admin vê. Sem URL de arquivo: o acesso passa pela rota autenticada. */
@@ -666,9 +779,17 @@ export interface ComunicadoParaAdmin {
   reiniciadoEm: Date | null;
   reiniciadoPorNome: string | null;
   motivoDoReinicio: string | null;
+  /** Não-nulo quando a assinatura foi REGISTRADA MANUALMENTE (e não confirmada pelo DocuSign). */
+  registroManual: {
+    em: Date;
+    porNome: string | null;
+    observacao: string | null;
+    nomeDoArquivo: string | null;
+  } | null;
 }
 
 const quemReiniciou = alias(users, 'quem_reiniciou');
+const quemRegistrou = alias(users, 'quem_registrou');
 
 export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoParaAdmin[]> {
   const linhas = await db
@@ -676,10 +797,12 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
       c: comunicadosAssinatura,
       enviadoPorNome: users.nome,
       reiniciadoPorNome: quemReiniciou.nome,
+      registradoPorNome: quemRegistrou.nome,
     })
     .from(comunicadosAssinatura)
     .leftJoin(users, eq(comunicadosAssinatura.enviadoPorUserId, users.id))
     .leftJoin(quemReiniciou, eq(comunicadosAssinatura.canceladoPorUserId, quemReiniciou.id))
+    .leftJoin(quemRegistrou, eq(comunicadosAssinatura.registroManualPorUserId, quemRegistrou.id))
     .where(
       and(
         eq(comunicadosAssinatura.pacienteId, pacienteId),
@@ -687,7 +810,7 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
       ),
     )
     .orderBy(desc(comunicadosAssinatura.enviadoEm));
-  return linhas.map(({ c, enviadoPorNome, reiniciadoPorNome }) => ({
+  return linhas.map(({ c, enviadoPorNome, reiniciadoPorNome, registradoPorNome }) => ({
     id: c.id,
     titulo: c.titulo,
     status: c.status,
@@ -704,6 +827,14 @@ export async function listarParaAdmin(pacienteId: string): Promise<ComunicadoPar
     reiniciadoEm: c.canceladoEm,
     reiniciadoPorNome,
     motivoDoReinicio: c.motivoCancelamento,
+    registroManual: c.registroManualEm
+      ? {
+          em: c.registroManualEm,
+          porNome: registradoPorNome,
+          observacao: c.registroManualObservacao,
+          nomeDoArquivo: c.registroManualNomeArquivo,
+        }
+      : null,
   }));
 }
 

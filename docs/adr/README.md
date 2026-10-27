@@ -6,7 +6,7 @@
 🔴 **Toda ADR nova entra nesta tabela NO MESMO COMMIT que a cria. Índice atrasado é defeito,
 não atraso.**
 
-**Atualizado em 01/10/2026 — 30 ADRs, medidas em `docs/adr/`.** (era _"29/09/2026 — 29 ADRs"_; antes, _"28/09/2026 — 28 ADRs"_)
+**Atualizado em 27/10/2026 — 32 ADRs, medidas em `docs/adr/`.** (era _"01/10/2026 — 30 ADRs"_, desatualizado desde a 0031; antes, _"29/09/2026 — 29 ADRs"_; antes, _"28/09/2026 — 28 ADRs"_)
 
 ⚠️ **Retificação, 19/09/2026.** O cabeçalho anterior dizia _"as 7 ADRs abaixo"_ e a tabela
 listava 10; hoje existem **23**. A nota _"quatro estão como proposta"_ contradizia a própria
@@ -56,6 +56,7 @@ remoção está em [`../05-HANDOFF-SESSAO.md`](../05-HANDOFF-SESSAO.md) §3.
 | [0029](ADR-0029-a-anvisa-abre-no-faco-eu-mesmo-e-a-procuracao-e-ativada-pelo-admin.md) | A ANVISA abre no "Faço eu mesmo", e a procuração é ativada pelo admin                                           | ✅ em produção; Fase 2.3 só local          | 29/09/2026 |
 | [0030](ADR-0030-o-que-depende-da-ti-no-levantamento-dos-consentimentos.md)             | O que depende só da TI no levantamento dos consentimentos fica aqui, para depois                                | 📋 proposta                                | 01/10/2026 |
 | [0031](ADR-0031-o-paciente-da-equipe-ganha-login-e-o-login-sem-codigo-e-individual.md) | O paciente cadastrado pela equipe ganha login, e o login sem código é individual                                | ✅ implementada                            | 27/10/2026 |
+| [0032](ADR-0032-registro-manual-da-assinatura-do-comunicado.md)                        | O admin registra a assinatura do comunicado quando o paciente assinou por outra plataforma                      | ✅ implementada (não em produção)          | 27/10/2026 |
 
 ⚠️ **Acréscimo, 01/10/2026.** Entrou a 0030 como 📋 proposta (`DO-84`). As contagens por status abaixo **não foram refeitas** nesta entrada: a da 0029 já diverge entre esta tabela e o arquivo dela, e alinhar é trabalho de quem mexer na 0029.
 

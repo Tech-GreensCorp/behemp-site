@@ -432,6 +432,22 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [x] 🔴 **Item 90 — IMPLEMENTADO, 27/10/2026 (não em produção): registro manual da assinatura do
+      comunicado "Atualização do Programa de Doação".** O paciente assinou por outra plataforma e
+      mandou o arquivo pelo WhatsApp; o card ficava "pendente" e o dashboard do paciente cobrava uma
+      assinatura que já existia. **ADR-0032.** O admin ganha "Registrar assinatura manualmente" (ao
+      lado de "Reenviar e-mail"): anexa o arquivo, informa a data e confirma. A MESMA linha vira
+      `assinado` (sem linha nova, sem duplicar), o arquivo vai para store privado, o registro fica
+      marcado como manual (migration aditiva `0054`, 4 colunas nulas + auditoria) e **nenhum e-mail
+      sai**. O aviso grande do dashboard some porque só conta `pendente`. Guarda
+      `o-comunicado-registra-assinatura-manual-sem-fingir-docusign` (40 casos) + integração
+      `o-comunicado-registra-assinatura-manual` (28 casos, Postgres real). **Exceção consciente** a
+      "quem diz que assinou é o DocuSign": o guarda `o-comunicado-assina-so-pelo-docusign` agora
+      exige DUAS escritas de `assinado`, nomeadas. **Em aberto (ADR-0032 §5):** validade jurídica de
+      assinatura atestada pelo admin; aparecer também em "Contrato e termos"; aviso próprio ao
+      paciente; registrar a partir de `erro`/`recusado`; o envelope segue aberto no DocuSign.
+      **Não verificado:** o clique no diálogo, o Vercel Blob real e o DocuSign real. A migration
+      `0054` foi aplicada só no banco local; em produção roda no deploy, sem rollback.
 - [x] 🔴 **Item 89 — CORRIGIDO, 27/10/2026 (não commitado): downloads e "Ver" de documentos e
       exames de paciente.** Medido no arquivo baixado pelo admin
       (`TERMO_DE_RESPONSABILIDADE_E_USO_ADEQUADO.docx.pdf` → 10 bytes, texto `Forbidden`).
