@@ -14,6 +14,7 @@ import {
 } from '@/lib/pacientes/edicao';
 import { decidirContato } from '@/lib/pacientes/contato';
 import { trocarEmailNoClerk } from '@/lib/pacientes/clerk-email';
+import { cancelarPendentesPorTrocaDeEmail } from '@/lib/comunicados/assinatura';
 import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/erro-de-cadastro';
 
 /**
@@ -305,6 +306,16 @@ export async function atualizarPaciente(
         ...(contato.email && atual ? { dadosAntes: { email: atual.email } } : {}),
         dadosDepois: contato.email ? { ...dadosPaciente, email: contato.email } : dadosPaciente,
       });
+    }
+
+    // Comunicado pendente carrega o e-mail ANTIGO (signatário do DocuSign): cancela para reenviar ao novo.
+    // O e-mail já mudou; uma falha aqui não pode desfazer o Clerk, então só vai ao log.
+    if (contato.email && atual) {
+      try {
+        await cancelarPendentesPorTrocaDeEmail({ pacienteId, adminUserId: userIdInterno ?? null });
+      } catch (e) {
+        console.error('[Action] Falha ao cancelar comunicados pendentes:', diagnosticoDoErro(e));
+      }
     }
 
     return { sucesso: true };
