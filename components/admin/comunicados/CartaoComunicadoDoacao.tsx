@@ -38,6 +38,7 @@ import {
   listarComunicadosDoPaciente,
   reiniciarFluxoDoComunicado,
   reenviarEmailDoComunicado,
+  cancelarEReenviarComunicadoPendente,
 } from '@/app/_actions/comunicados';
 import { TITULO_ATUALIZACAO_PROGRAMA_DOACAO } from '@/lib/comunicados/catalogo';
 import type { ComunicadoParaAdmin } from '@/lib/comunicados/assinatura';
@@ -78,12 +79,19 @@ function rotuloDe(c: ComunicadoParaAdmin | undefined): Rotulo {
   }
 }
 
+/**
+ * Atalhos da linha de baixo OCULTOS a pedido (27/10/2026) — sobram "Reenviar e-mail" e "Cancelar e
+ * reenviar". Baixar e Copiar link seguem no quadro do documento. Para voltar, troque para `true`.
+ */
+const MOSTRAR_ATALHOS_DA_LINHA = false;
+
 export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
   const [historico, setHistorico] = useState<ComunicadoParaAdmin[] | null>(null);
   const [permitido, setPermitido] = useState(true);
   const [confirmando, setConfirmando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [reiniciando, setReiniciando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
   const [motivo, setMotivo] = useState('');
 
   const carregar = useCallback(async () => {
@@ -126,6 +134,18 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
     setOcupado(null);
     if (!res.sucesso) toast.error(res.erro);
     else toast.success('Status atualizado.');
+    await carregar();
+  }
+
+  async function cancelarEReenviar(id: string) {
+    setOcupado(`reenviar-${id}`);
+    const res = await cancelarEReenviarComunicadoPendente(id);
+    setOcupado(null);
+    setReenviando(false);
+    if (!res.sucesso) toast.error(res.erro);
+    else if (res.dados.emailEnviado)
+      toast.success('Novo envio feito, com o e-mail atual do paciente.');
+    else toast.warning('Novo envio feito, mas o e-mail de aviso falhou. Use "Reenviar e-mail".');
     await carregar();
   }
 
@@ -341,7 +361,7 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
               {historico.length > 0 ? 'Enviar novamente' : 'Enviar comunicado'}
             </Button>
           )}
-          {atual && (
+          {MOSTRAR_ATALHOS_DA_LINHA && atual && (
             <Button
               size="sm"
               variant="outline"
@@ -357,7 +377,7 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
               Baixar documento
             </Button>
           )}
-          {atual?.status === 'pendente' && (
+          {MOSTRAR_ATALHOS_DA_LINHA && atual?.status === 'pendente' && (
             <Button
               size="sm"
               variant="outline"
@@ -366,6 +386,18 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             >
               <Link2 size={14} />
               Copiar link de assinatura
+            </Button>
+          )}
+          {atual?.status === 'pendente' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 rounded-xl"
+              onClick={() => setReenviando(true)}
+              disabled={ocupado !== null}
+            >
+              <RotateCcw size={14} />
+              Cancelar e reenviar
             </Button>
           )}
           {atual?.status === 'pendente' && (
@@ -385,7 +417,8 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
             </Button>
           )}
           {atual &&
-            (atual.status === 'pendente' || (atual.status === 'assinado' && !!atual.erro)) && (
+            ((MOSTRAR_ATALHOS_DA_LINHA && atual.status === 'pendente') ||
+              (atual.status === 'assinado' && !!atual.erro)) && (
               <Button
                 size="sm"
                 variant="outline"
@@ -557,6 +590,39 @@ export function CartaoComunicadoDoacao({ pacienteId }: { pacienteId: string }) {
                 <RotateCcw size={14} />
               )}
               Sim, reiniciar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={reenviando}
+        onOpenChange={(aberto) => !aberto && ocupado === null && setReenviando(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar este envio e reenviar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O envio atual é cancelado e um novo é feito agora, com o{' '}
+              <strong>e-mail e os dados atuais do paciente</strong>. Use quando o e-mail mudou
+              depois do envio. Nada é apagado: o envio cancelado fica no histórico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ocupado !== null}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (atual) void cancelarEReenviar(atual.id);
+              }}
+              disabled={ocupado !== null}
+              className="gap-1.5"
+            >
+              {ocupado?.startsWith('reenviar-') ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              Cancelar e reenviar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

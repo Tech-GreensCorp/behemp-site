@@ -125,6 +125,12 @@ function InfoItem({ label, value }: { label: string; value: string | null | unde
   );
 }
 
+/**
+ * Abas OCULTAS a pedido (27/10/2026). O código e os dados seguem no sistema; para voltar uma aba,
+ * troque para `true`.
+ */
+const MOSTRAR_ABA = { dosagem: false, rastreio: false, graficos: false };
+
 export default function PacienteDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   // A mesma tela serve /admin/pacientes/[id]: "Voltar" fica na área de quem está vendo.
@@ -237,7 +243,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
       />
 
       <Tabs defaultValue="dados">
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList className="w-full justify-start overflow-x-auto overflow-y-hidden">
           <TabsTrigger value="dados" className="gap-1.5">
             <Users size={14} /> Dados
           </TabsTrigger>
@@ -256,15 +262,21 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
           <TabsTrigger value="evolucao" className="gap-1.5">
             <Activity size={14} /> Evolução
           </TabsTrigger>
-          <TabsTrigger value="dosagem" className="gap-1.5">
-            <Pill size={14} /> Hist. Dosagem
-          </TabsTrigger>
-          <TabsTrigger value="rastreio" className="gap-1.5">
-            <BellRing size={14} /> Rastreio (Alertas)
-          </TabsTrigger>
-          <TabsTrigger value="graficos" className="gap-1.5">
-            <LineChart size={14} /> Gráficos
-          </TabsTrigger>
+          {MOSTRAR_ABA.dosagem && (
+            <TabsTrigger value="dosagem" className="gap-1.5">
+              <Pill size={14} /> Hist. Dosagem
+            </TabsTrigger>
+          )}
+          {MOSTRAR_ABA.rastreio && (
+            <TabsTrigger value="rastreio" className="gap-1.5">
+              <BellRing size={14} /> Rastreio (Alertas)
+            </TabsTrigger>
+          )}
+          {MOSTRAR_ABA.graficos && (
+            <TabsTrigger value="graficos" className="gap-1.5">
+              <LineChart size={14} /> Gráficos
+            </TabsTrigger>
+          )}
           <TabsTrigger value="relatorios" className="gap-1.5">
             <FileOutput size={14} /> Relatórios
           </TabsTrigger>
@@ -275,7 +287,7 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
           {/* Dados Pessoais */}
           <Card className="border-border/40 shadow-sm">
             <CardHeader className="border-b border-border/30 pb-4">
-              <CardTitle className="font-heading text-lg">Dados Pessoais</CardTitle>
+              <CardTitle className="font-heading text-lg">Dados Pessoais do Paciente</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
               {editando ? (<>
@@ -498,13 +510,13 @@ export default function PacienteDetalhePage({ params }: { params: Promise<{ id: 
         <TabsContent value="evolucao"><TabEvolucao pacienteId={id} /></TabsContent>
 
         {/* ── DOSAGEM ── */}
-        <TabsContent value="dosagem"><TabDosagem pacienteId={id} /></TabsContent>
+        {MOSTRAR_ABA.dosagem && <TabsContent value="dosagem"><TabDosagem pacienteId={id} /></TabsContent>}
 
         {/* ── RASTREIO (ALERTAS) ── */}
-        <TabsContent value="rastreio"><TabRastreio pacienteId={id} /></TabsContent>
+        {MOSTRAR_ABA.rastreio && <TabsContent value="rastreio"><TabRastreio pacienteId={id} /></TabsContent>}
 
         {/* ── GRÁFICOS ── */}
-        <TabsContent value="graficos"><TabGraficos pacienteId={id} /></TabsContent>
+        {MOSTRAR_ABA.graficos && <TabsContent value="graficos"><TabGraficos pacienteId={id} /></TabsContent>}
 
         {/* ── RELATÓRIOS ── */}
         <TabsContent value="relatorios"><TabRelatorios pacienteId={id} pacienteNome={paciente.nome} /></TabsContent>

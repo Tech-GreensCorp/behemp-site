@@ -1,8 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { users, pacientes, autorizacoesAnvisa } from '@/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { users, pacientes } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { reconciliarPelaSessao } from '@/lib/fluxo/reconciliar';
 
 /**
@@ -181,7 +181,7 @@ export default async function AuthRedirectPage() {
    * pré-requisito — ninguém pode ficar sem entrar na própria conta porque um documento não
    * copiou.
    *
-   * 🔴 E ela roda ANTES do `redirect('/paciente/anvisa')` de propósito: mandar para a tela da
+   * 🔴 E ela roda ANTES do redirect ao dashboard de propósito: mostrar a tela da
    * procuração antes de materializar é exatamente o que produziu o relato do dono.
    */
   if (registro?.email) {
@@ -198,27 +198,7 @@ export default async function AuthRedirectPage() {
     }
   }
 
-  // Paciente sem processo de autorização ANVISA iniciado: leva direto para lá
-  if (registro) {
-    const [paciente] = await db
-      .select({ id: pacientes.id })
-      .from(pacientes)
-      .where(and(eq(pacientes.userId, registro.id), isNull(pacientes.deletedAt)))
-      .limit(1);
-
-    if (paciente) {
-      const [autorizacao] = await db
-        .select({ id: autorizacoesAnvisa.id })
-        .from(autorizacoesAnvisa)
-        .where(
-          and(eq(autorizacoesAnvisa.pacienteId, paciente.id), isNull(autorizacoesAnvisa.deletedAt)),
-        )
-        .limit(1);
-
-      if (!autorizacao) redirect('/paciente/anvisa');
-    }
-  }
-
+  // Todo paciente entra no dashboard (/paciente). A ANVISA, quando falta algo, aparece lá como card.
   redirect('/paciente');
 }
 
