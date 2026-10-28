@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { users, pacientes } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { reconciliarPelaSessao } from '@/lib/fluxo/reconciliar';
+import { perfilDaConta } from '@/lib/auth/perfil-da-conta';
 
 /**
  * Página de redirecionamento pós-login — Server Component.
@@ -110,7 +111,13 @@ export default async function AuthRedirectPage() {
           const nome = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Novo Paciente';
           const metadataPhone = (user.unsafeMetadata?.phone as string) || (user.publicMetadata?.phone as string);
           const telefone = user.phoneNumbers[0]?.phoneNumber || metadataPhone || null;
-          const userRole = (user.publicMetadata?.role as 'admin' | 'medico' | 'paciente') || 'paciente';
+          // Mesma regra do webhook (ADR-0033 D-10): o perfil escolhido só vale na CRIAÇÃO da conta.
+          const userRole =
+            (user.publicMetadata?.role as 'admin' | 'medico' | 'paciente' | 'responsavel' | undefined) ||
+            perfilDaConta({
+              unsafeMetadata: user.unsafeMetadata as Record<string, unknown> | undefined,
+              temContaExterna: (user.externalAccounts?.length ?? 0) > 0,
+            });
 
           // 1. Criar usuário na tabela 'users'
           const [novoUser] = await db
@@ -163,6 +170,8 @@ export default async function AuthRedirectPage() {
   // Redireciona para o dashboard conforme o role
   if (role === 'admin') redirect('/admin');
   if (role === 'medico') redirect('/medico');
+  // O responsável não é paciente: não há ficha para reconciliar com a Greens (ADR-0033 D-02).
+  if (role === 'responsavel') redirect('/responsavel');
 
   /**
    * 🔴 RECONCILIAÇÃO NO LOGIN — ADR-0022 D-09, e isto RETIFICA o rejeitado da própria decisão.

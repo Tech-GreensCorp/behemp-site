@@ -6,6 +6,7 @@ import { users, pacientes, notificacoes } from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { enviarNotificacaoRealtime } from '@/lib/integrations/pusher';
 import { clerkClient } from '@clerk/nextjs/server';
+import { perfilDaConta } from '@/lib/auth/perfil-da-conta';
 
 /**
  * Webhook do Clerk — processa eventos de usuário.
@@ -39,6 +40,8 @@ interface ClerkUserCreatedData {
   image_url: string | null;
   public_metadata: Record<string, unknown>;
   unsafe_metadata?: Record<string, unknown>;
+  /** Contas de provedores sociais (Google…). Vazia no cadastro por e-mail e senha. */
+  external_accounts?: unknown[];
   created_at: number;
 }
 
@@ -152,7 +155,14 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
   const nome = [data.first_name, data.last_name].filter(Boolean).join(' ') || email.split('@')[0];
   const metadataPhone = (data.unsafe_metadata?.phone as string) || (data.public_metadata?.phone as string);
   const telefone = data.phone_numbers?.[0]?.phone_number || metadataPhone || null;
-  const role = (data.public_metadata?.role as string) || 'paciente';
+  // O papel de conta NOVA: o `publicMetadata` (só o servidor escreve) manda; sem ele, o perfil escolhido no
+  // `/registrar-se` vale — mas só aqui, na criação, e só `paciente` ou `responsavel` (ADR-0033 D-10).
+  const role =
+    (data.public_metadata?.role as string) ||
+    perfilDaConta({
+      unsafeMetadata: data.unsafe_metadata,
+      temContaExterna: (data.external_accounts?.length ?? 0) > 0,
+    });
 
   console.log(`[Webhook Clerk] Processando novo usuário: ${email} (role: ${role})`);
 
@@ -200,7 +210,7 @@ async function processarNovoUsuario(data: ClerkUserCreatedData) {
           email,
           nome,
           clerkId,
-          role: role as 'admin' | 'medico' | 'paciente',
+          role: role as 'admin' | 'medico' | 'paciente' | 'responsavel',
           telefone,
         })
         .onConflictDoNothing({ target: users.email })

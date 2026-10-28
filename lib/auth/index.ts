@@ -9,6 +9,7 @@ export {
   verificarAdmin,
   verificarMedico,
   verificarPaciente,
+  verificarResponsavel,
   verificarMedicoOuAdmin,
   verificarUsuarioAutenticado,
   type Role,

@@ -59,5 +59,6 @@ export async function GET() {
 
   if (role === 'admin') redirect('/admin');
   if (role === 'medico') redirect('/medico');
+  if (role === 'responsavel') redirect('/responsavel');
   redirect('/paciente');
 }

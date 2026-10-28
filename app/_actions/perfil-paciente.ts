@@ -5,7 +5,6 @@ import { users, pacientes } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { z } from 'zod';
-import { clerkClient } from '@clerk/nextjs/server';
 
 /**
  * Retorna nome, email e telefone do paciente autenticado
@@ -228,45 +227,5 @@ export async function atualizarPerfilCompletoPaciente(dados: {
   } catch (error) {
     console.error('[Action] Erro ao atualizar perfil completo do paciente:', error);
     return { sucesso: false, erro: 'Erro ao salvar perfil completo' };
-  }
-}
-
-export async function excluirMinhaConta(): Promise<{ sucesso: boolean; erro?: string }> {
-  try {
-    const auth = await obterUsuarioAtual();
-    if (!auth.autorizado || !auth.clerkId) {
-      return { sucesso: false, erro: 'Não autenticado' };
-    }
-
-    const client = await clerkClient();
-
-    // 1. Buscar usuário no banco
-    const [user] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, auth.clerkId))
-      .limit(1);
-
-    // 2. Deletar no Clerk
-    await client.users.deleteUser(auth.clerkId);
-
-    // 3. Soft delete no banco (users e pacientes)
-    if (user) {
-      const agora = new Date();
-      await db
-        .update(users)
-        .set({ deletedAt: agora })
-        .where(eq(users.id, user.id));
-
-      await db
-        .update(pacientes)
-        .set({ deletedAt: agora })
-        .where(eq(pacientes.userId, user.id));
-    }
-
-    return { sucesso: true };
-  } catch (error) {
-    console.error('[Action] Erro ao excluir conta própria:', error);
-    return { sucesso: false, erro: 'Erro ao excluir conta' };
   }
 }

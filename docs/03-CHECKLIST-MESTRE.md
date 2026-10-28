@@ -432,6 +432,37 @@ TYPE` e `ADD COLUMN` nullable), mas `db:migrate` roda contra produção sem roll
 Registrados com diagnóstico para que a revisão futura não comece do zero. **Nenhum se corrige
 de passagem.**
 
+- [ ] 🟠 **Item 92 — CATALOGADO, 28/10/2026: `excluirMinhaConta` não checa papel e não grava auditoria.** Achado
+      lendo o código para a P-13b do Item 91. A action (`app/_actions/perfil-paciente.ts:234-272`) só autentica, apaga
+      o usuário no Clerk (`:251`) e faz soft delete de `users` e `pacientes`, **sem `registrarAuditoria`**: qualquer
+      sessão a chama sem passar pela tela. Complementa o **Item 74** (texto que promete apagar tudo e mantém). **Não
+      corrigido.** **Decidido por Dryelle (P-17a):** só o admin exclui contas, para todos os papéis; a autoexclusão sai (ADR-0033 D-16). **Entregue, 28/10/2026 (local, sem commit, branch `feat/papel-responsavel-e-dependentes`):** (1) o Google saiu de todo o `/registrar-se` e o `<SignIn/>` do `/entrar` passa `transferable={false}`; guarda `o-cadastro-nao-oferece-google` (6 casos, 8 sabotagens vermelhas); **o efeito com um Google inexistente NÃO foi testado**. (2) A autoexclusão foi **removida** (action, botão, diálogo e estado da tela do perfil); guarda `so-o-admin-exclui-conta` (5 casos, verde). **Falta (D-16):** o admin recusar apagar responsável com vínculo ativo.
+- [ ] 🟠 **Item 91 — CATALOGADO, 28/10/2026 (ADR-0033, proposta): papel "Responsável" com login e vínculo a pacientes
+      dependentes.** Hoje uma mãe que recebe os medicamentos de dois filhos não entra nem age por eles, e as crianças
+      são pacientes comuns. O "responsável" que existe é texto (`pacientes.responsavelNome`/`responsavelCpf`). **O
+      raio é o modelo de acesso inteiro:** 84 pontos de 50 arquivos resolvem "o paciente sou eu" por
+      `pacientes.userId`, e não há resolvedor único. **Recomendado (ADR-0033):** tabela de vínculo como fonte de
+      verdade, resolvedor único com 404 indistinto, dependente derivado do vínculo, auditoria de quem agiu por quem.
+      **Pré-requisito:** Item 83. **Regras de negócio respondidas por Dryelle em 28/10/2026** (P-01 a P-07 e P-09:
+      só menor de idade; um usuário é uma coisa só, então **existe o papel `responsavel`**; vínculo nasce no
+      cadastro; o dependente **nunca** tem login nem e-mail; aceites sempre do responsável; um só responsável por
+      paciente, removido só pelo admin; avisos só ao responsável). **P-08 respondida depois: a procuração nomeia os
+      dois** (o menor é o outorgante, o responsável assina como representante legal; ADR-0033 D-15). **Abertas pelas respostas (ADR-0033 §5.1):** P-10 (quem é responsável e
+      paciente precisa de duas contas, e a checagem de CPF do ADR-0028 a manda ao suporte), P-11 (maioridade, ao
+      Jurídico), P-12 (por qual porta o responsável se cadastra), P-13 (as crianças já cadastradas e a exclusão de
+      conta do responsável). **Segunda rodada respondida (28/10/2026):** P-10 (maior de idade que se trata continua
+      `paciente`; quem é os dois não foi tratado), P-11 ("ok"), **P-12 (`/registrar-se`, com a opção de responsável e
+      o dependente)**, **P-13 (preservar os dados; o login passa a ser o do responsável; uma ferramenta do admin
+      converte as contas existentes, uma a uma)**. **Terceira rodada (28/10/2026): P-15 fechada (a
+      conversão é só do admin); P-14 fechada (sem cadastro com o Google para o responsável); P-13b respondida em parte
+      (o responsável não exclui a própria conta; D-16).** **Ainda abertas:** P-13b (como se pede a eliminação dos
+      dados, Jurídico), **P-17 fechada: só o admin exclui contas (todos os papéis) e o Google sai de todo o `/registrar-se`; a doc do Clerk mostra que o `<SignIn/>` do `/entrar` ainda pode criar conta (`transferable`, não testado)**) e
+      **P-18** (como qualificar o menor na procuração: o modelo imprimiria `[estado civil]`, `[profissão]` e o e-mail
+      técnico). **P-16 fechada: o responsável entra na procuração só com nome e CPF.**
+      **Retratado na ADR:** a fatia "marcação sem login" era falsa; a ordem agora é modelo, área do responsável e
+      `/registrar-se`, e só então a conversão. **Descoberto:** a teleconsulta recusaria o papel `responsavel`
+      (`lib/auth/escopo-chamada.ts:44`, `escopo-sala.ts:160-166`). **Aguarda o Jurídico:** normas sobre dados de
+      crianças e adolescentes (não lidas), retenção e validade do aceite pelo responsável. **IMPLEMENTAÇÃO PARCIAL, 28/10/2026 (local, sem commit; migration `0055` só no banco local):** **Regra mudada em 28/10/2026 por Dryelle, antes de testar:** o dependente pode ser de **qualquer idade**, inclusive maior de 18 anos; o `paciente` **também pode ser responsável** (quem se trata e cuida de outra pessoa); e **não há limite** de dependentes por responsável. Isso **revoga a P-01 e a P-02** (ADR-0033). Guarda `o-papel-de-responsavel-e-fechado-e-age-por-vinculo` (21 casos) e integração `o-responsavel-age-so-por-vinculo-provado` (20 casos, Postgres real), com 5 sabotagens que trazem a regra antiga de volta, todas vermelhas. o papel `responsavel`, as tabelas `responsaveis` e `responsaveis_pacientes` (índice único: um responsável ativo por paciente), o resolvedor de vínculo, `criarDependente`, a área `/responsavel` (lista e cadastro de dependentes), a escolha "paciente ou responsável" no `/registrar-se` (sem endereço de paciente para o responsável) e o filtro que impede e-mail ao endereço técnico do dependente. Guardas: `o-papel-de-responsavel-e-fechado-e-age-por-vinculo` (16), `o-dependente-nao-recebe-aviso-no-endereco-tecnico` (10) e a integração `o-responsavel-age-so-por-vinculo-provado` (17, Postgres real); 19 sabotagens vermelhas. **FALTA:** a conversão das contas existentes (D-13), o formulário de equipe, o aviso ao responsável (`destinatarioDoPaciente`), migrar as actions do paciente (recompra, documentos, ANVISA, pagamentos), a teleconsulta, a procuração (P-18), e o `/responsavel` **não foi visto com uma sessão real do Clerk**. **A ordem é decisão de quem manda.**
 - [x] 🔴 **Item 90 — IMPLEMENTADO, 27/10/2026 (não em produção): registro manual da assinatura do
       comunicado "Atualização do Programa de Doação".** O paciente assinou por outra plataforma e
       mandou o arquivo pelo WhatsApp; o card ficava "pendente" e o dashboard do paciente cobrava uma

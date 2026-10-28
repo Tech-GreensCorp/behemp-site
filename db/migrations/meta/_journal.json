@@ -386,6 +386,13 @@
       "when": 1793133256704,
       "tag": "0054_registro_manual_do_comunicado",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1793211496818,
+      "tag": "0055_responsavel_e_dependentes",
+      "breakpoints": true
     }
   ]
 }

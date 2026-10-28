@@ -63,3 +63,6 @@ export * from './chamadas-de-atendimento';
 
 // ── Comunicados para assinatura via DocuSign (Atualização do Programa de Doação) ──
 export * from './comunicados-assinatura';
+
+// ── Responsável e dependentes — ADR-0033 ──
+export * from './responsaveis';

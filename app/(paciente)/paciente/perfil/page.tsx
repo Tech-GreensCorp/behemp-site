@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,13 +49,11 @@ import { listarDocumentosPaciente } from '@/app/_actions/documentos-paciente-sel
 import { checklistDosDocumentos } from '@/lib/documentos/o-que-falta-no-painel';
 import { 
   obterPerfilCompletoPaciente, 
-  atualizarPerfilCompletoPaciente,
-  excluirMinhaConta
+  atualizarPerfilCompletoPaciente
 } from '@/app/_actions/perfil-paciente';
 
 export default function PerfilPacientePage() {
   const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
 
   /* ── Edição de nome ───────────────────────────────────────── */
   const [editandoNome, setEditandoNome] = useState(false);
@@ -108,9 +106,6 @@ export default function PerfilPacientePage() {
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('');
   const [salvandoSenha, setSalvandoSenha] = useState(false);
-
-  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
-  const [excluindoConta, setExcluindoConta] = useState(false);
 
   /* ── Documentos ──────────────────────────────────────────── */
   const [docs, setDocs] = useState<any[]>([]);
@@ -236,21 +231,6 @@ export default function PerfilPacientePage() {
       toast.error(err.errors?.[0]?.message || 'Erro ao alterar a senha. Verifique a senha atual.');
     } finally {
       setSalvandoSenha(false);
-    }
-  }
-
-  async function executarExclusaoConta() {
-    setExcluindoConta(true);
-    const res = await excluirMinhaConta();
-    setExcluindoConta(false);
-
-    if (res.sucesso) {
-      toast.success('Sua conta foi excluída com sucesso.');
-      signOut().then(() => {
-        window.location.href = '/';
-      });
-    } else {
-      toast.error(res.erro || 'Não foi possível excluir sua conta.');
     }
   }
 
@@ -842,15 +822,6 @@ export default function PerfilPacientePage() {
             >
               <Lock className="h-3.5 w-3.5" /> Alterar Senha
             </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setModalExcluirAberto(true)}
-              className="w-full rounded-xl text-xs font-semibold gap-1.5 h-9"
-            >
-              <X className="h-3.5 w-3.5" />
-              Excluir Minha Conta
-            </Button>
           </div>
         </Card>
 
@@ -928,47 +899,6 @@ export default function PerfilPacientePage() {
                 className="rounded-full px-6 text-xs font-semibold bg-primary text-white hover:bg-primary/90 h-10 cursor-pointer"
               >
                 {salvandoSenha ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar Alteração'}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Modal de Confirmação de Exclusão de Conta ── */}
-      <Dialog open={modalExcluirAberto} onOpenChange={setModalExcluirAberto}>
-        <DialogContent showCloseButton={false} className="sm:max-w-md bg-white border border-border/30 rounded-3xl p-0 shadow-xl overflow-hidden grain">
-          <div className="relative p-6 w-full h-full">
-            <DialogClose className="absolute top-4 right-4 z-50 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer border-0 bg-transparent">
-              <X className="h-4 w-4" />
-            </DialogClose>
-
-            <DialogHeader className="space-y-2 text-center pb-4 border-b border-border/10">
-              <DialogTitle className="font-heading text-xl font-bold text-foreground">
-                Confirmar Exclusão de Conta
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-                Você realmente deseja excluir permanentemente sua conta e todos os dados associados a ela?
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 text-sm text-muted-foreground text-center">
-              Esta ação não pode ser desfeita. Todos os seus dados pessoais, histórico e documentos serão removidos.
-            </div>
-            <DialogFooter className="flex gap-2 sm:justify-end mt-4 pt-4 border-t border-border/10">
-              <Button
-                variant="outline"
-                onClick={() => setModalExcluirAberto(false)}
-                disabled={excluindoConta}
-                className="rounded-full px-5 text-xs font-semibold h-10"
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={executarExclusaoConta}
-                disabled={excluindoConta}
-                className="rounded-full px-6 text-xs font-semibold h-10 bg-red-600 hover:bg-red-700 text-white"
-              >
-                {excluindoConta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Excluir Conta'}
               </Button>
             </DialogFooter>
           </div>

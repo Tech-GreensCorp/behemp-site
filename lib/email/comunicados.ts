@@ -15,6 +15,7 @@
  * chama decide o que fazer, porque o efeito de uma falha de e-mail difere em cada ponto do fluxo.
  */
 import { BrevoClient } from '@getbrevo/brevo';
+import { comFiltroDeDestinatarios } from '@/lib/email/destinatarios-tecnicos';
 
 import { REMETENTE_DOCUMENTOS } from '@/lib/comunicados/catalogo';
 
@@ -216,7 +217,7 @@ export function montarEmailNotificacaoDocs(dados: {
 function cliente() {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) throw new Error('BREVO_API_KEY ausente — e-mail não enviado.');
-  return new BrevoClient({ apiKey });
+  return comFiltroDeDestinatarios(new BrevoClient({ apiKey }));
 }
 
 /**

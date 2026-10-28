@@ -4,11 +4,12 @@
  */
 
 import { BrevoClient } from '@getbrevo/brevo';
+import { comFiltroDeDestinatarios } from '@/lib/email/destinatarios-tecnicos';
 
 // ── Configuração ───────────────────────────────────────────────
 
 function criarClienteBrevo() {
-  return new BrevoClient({ apiKey: process.env.BREVO_API_KEY! });
+  return comFiltroDeDestinatarios(new BrevoClient({ apiKey: process.env.BREVO_API_KEY! }));
 }
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';

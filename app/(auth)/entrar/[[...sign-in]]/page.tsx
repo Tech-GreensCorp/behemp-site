@@ -479,9 +479,18 @@ export default function SignInPage() {
                 />
               ) : (
               <>
+              {/*
+                🔴 `transferable={false}`: o login NÃO cria conta (ADR-0033 D-14, decisão de Dryelle em
+                28/10/2026: o cadastro é só por e-mail e senha). Pela doc do Clerk o padrão é `true`
+                ("sign in attempts are transferable to the sign up flow"): um Google sem conta seria
+                levado ao cadastro por este widget, sem formulário e sem o "Li e concordo". Quem já tem
+                conta continua entrando pelo Google. NÃO TESTADO com um Google inexistente.
+                Guarda: `o-cadastro-nao-oferece-google`.
+              */}
               <SignIn
                 path="/entrar"
                 signUpUrl="/registrar-se"
+                transferable={false}
                 forceRedirectUrl={redirectUrl}
                 appearance={{
                   options: {

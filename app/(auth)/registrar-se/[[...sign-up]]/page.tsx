@@ -117,6 +117,14 @@ export default function SignUpPage() {
   const [etapaCadastro, setEtapaCadastro] = useState<'dados' | 'endereco'>('dados');
 
   /**
+   * 🔴 COM QUE PERFIL A CONTA NASCE (ADR-0033 D-10, P-12 de Dryelle): "Sou o paciente" ou "Sou responsável
+   * por outra pessoa". Vai em `unsafeMetadata.perfil` e o servidor só a lê NA CRIAÇÃO da conta, validada por
+   * um conjunto fechado (`lib/auth/perfil-da-conta.ts`). O responsável NÃO é paciente: não coleta
+   * endereço de paciente e NÃO ganha ficha — o dependente é cadastrado depois, na área dele.
+   */
+  const [perfil, setPerfil] = useState<'paciente' | 'responsavel'>('paciente');
+
+  /**
    * 🔴 ENDEREÇO OBRIGATÓRIO, COLETADO ANTES DE GERAR O CÓDIGO (decisão do dono, 14/09/2026).
    *
    * `CepRapido` roda em `modoControlado` aqui: a esta altura a conta ainda NÃO existe (é
@@ -269,7 +277,7 @@ export default function SignUpPage() {
       return;
     }
 
-    if (!endereco.completo) {
+    if (perfil === 'paciente' && !endereco.completo) {
       setErro('Informe seu CEP e o número do endereço para continuar.');
       return;
     }
@@ -295,6 +303,7 @@ export default function SignUpPage() {
         lastName,
         unsafeMetadata: {
           phone: cleanPhone,
+          perfil,
         },
       });
 
@@ -343,18 +352,21 @@ export default function SignUpPage() {
          * painel (`AvisoDeEnderecoPendente`) ainda cobre quem escapar sem CEP salvo — não
          * trava o login por isso.
          */
-        try {
-          const gravado = await atualizarPerfilCompletoPaciente({
-            cep: endereco.cep || null,
-            endereco: endereco.endereco || null,
-            cidade: endereco.cidade || null,
-            uf: endereco.uf || null,
-          });
-          if (!gravado.sucesso) {
-            console.warn('[registrar-se] endereço não gravado após verificação', gravado.erro);
+        // O responsável não é paciente: `atualizarPerfilCompletoPaciente` CRIA a ficha se ela não existir.
+        if (perfil === 'paciente') {
+          try {
+            const gravado = await atualizarPerfilCompletoPaciente({
+              cep: endereco.cep || null,
+              endereco: endereco.endereco || null,
+              cidade: endereco.cidade || null,
+              uf: endereco.uf || null,
+            });
+            if (!gravado.sucesso) {
+              console.warn('[registrar-se] endereço não gravado após verificação', gravado.erro);
+            }
+          } catch (enderecoErro) {
+            console.warn('[registrar-se] falha ao gravar endereço', enderecoErro);
           }
-        } catch (enderecoErro) {
-          console.warn('[registrar-se] falha ao gravar endereço', enderecoErro);
         }
 
         router.push(redirectUrl);
@@ -373,22 +385,6 @@ export default function SignUpPage() {
   const handleVoltar = () => {
     setPendingVerification(false);
     setErro('');
-  };
-
-  const handleGoogleSignUp = async () => {
-    if (!isLoaded) return;
-    setLoading(true);
-    setErro('');
-    try {
-      await signUp.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: '/redirect',
-        redirectUrlComplete: '/redirect',
-      });
-    } catch (err) {
-      setErro(translateClerkError(err));
-      setLoading(false);
-    }
   };
 
   return (
@@ -685,7 +681,9 @@ export default function SignUpPage() {
               {pendingVerification
                 ? 'Verifique seu e-mail'
                 : etapaCadastro === 'endereco'
-                  ? 'Seu endereço'
+                  ? perfil === 'paciente'
+                    ? 'Seu endereço'
+                    : 'Quase lá'
                   : 'Crie sua conta.'}
             </h2>
             <p className="text-sm text-gray-400">
@@ -722,6 +720,39 @@ export default function SignUpPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {etapaCadastro === 'dados' && (
                 <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/40">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-gray-700">
+                      Você está se cadastrando como
+                    </Label>
+                    <div
+                      className="grid grid-cols-2 gap-2"
+                      role="radiogroup"
+                      aria-label="Perfil do cadastro"
+                    >
+                      {(
+                        [
+                          { valor: 'paciente', rotulo: 'Sou o paciente' },
+                          { valor: 'responsavel', rotulo: 'Sou responsável por outra pessoa' },
+                        ] as const
+                      ).map((o) => (
+                        <button
+                          key={o.valor}
+                          type="button"
+                          role="radio"
+                          aria-checked={perfil === o.valor}
+                          onClick={() => setPerfil(o.valor)}
+                          className={`h-12 cursor-pointer rounded-xl border px-3 text-xs font-semibold transition-colors ${
+                            perfil === o.valor
+                              ? 'border-[#EA5429] bg-[#EA5429]/10 text-[#EA5429]'
+                              : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {o.rotulo}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <Label htmlFor="nomeCompleto" className="text-xs font-medium text-gray-700">
                       Nome Completo
@@ -843,10 +874,12 @@ export default function SignUpPage() {
                   14/09/2026. `modoControlado`: só reporta os valores, quem grava é
                   `handleVerify`, depois que a conta existir.
                 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-700">Seu endereço</Label>
-                    <CepRapido modoControlado aoMudarValores={setEndereco} />
-                  </div>
+                  {perfil === 'paciente' && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-700">Seu endereço</Label>
+                      <CepRapido modoControlado aoMudarValores={setEndereco} />
+                    </div>
+                  )}
 
                   <label className="flex items-start gap-2.5 text-xs text-gray-600">
                     <input
@@ -878,7 +911,9 @@ export default function SignUpPage() {
 
                   <Button
                     type="submit"
-                    disabled={loading || !endereco.completo || !aceitouTermos}
+                    disabled={
+                      loading || (perfil === 'paciente' && !endereco.completo) || !aceitouTermos
+                    }
                     className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#EA5429] font-semibold tracking-wide text-white transition-colors duration-200 hover:bg-[#D64319] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Criar Conta'}
@@ -887,47 +922,16 @@ export default function SignUpPage() {
               )}
 
               {/*
-                Alternativa ao formulário inteiro (Google) e o link pra quem já tem conta —
-                só fazem sentido na etapa 1: no meio do preenchimento (etapa "endereco") eles
-                confundiriam mais do que ajudariam.
+                O link pra quem já tem conta só faz sentido na etapa 1: no meio do preenchimento
+                (etapa "endereco") ele confundiria mais do que ajudaria.
+
+                ⚠️ NÃO HÁ "Registrar com Google" AQUI, de propósito (ADR-0033 D-14, decisão de
+                Dryelle em 28/10/2026): ele ia direto ao OAuth, sem formulário e sem conferir o
+                "Li e concordo" (Item 70). O cadastro é só por e-mail e senha. O guarda
+                `o-cadastro-nao-oferece-google` falha se o botão voltar.
               */}
               {etapaCadastro === 'dados' && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-gray-200" />
-                    <span className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
-                      ou
-                    </span>
-                    <div className="h-px flex-1 bg-gray-200" />
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={handleGoogleSignUp}
-                    disabled={loading}
-                    className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                      />
-                    </svg>
-                    Registrar com Google
-                  </Button>
-
                   <p className="text-center text-xs text-gray-500">
                     Já possui uma conta?{' '}
                     <Link

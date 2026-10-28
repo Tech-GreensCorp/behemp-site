@@ -8,12 +8,13 @@
  * - admin: acesso global (exceto dados clínicos sem necessidade)
  * - medico: acesso apenas aos próprios pacientes
  * - paciente: acesso apenas aos próprios dados
+ * - responsavel: acesso apenas aos dependentes vinculados a ele (ADR-0033)
  */
 
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { clerkClient } from '@clerk/nextjs/server';
 
-export type Role = 'admin' | 'medico' | 'paciente';
+export type Role = 'admin' | 'medico' | 'paciente' | 'responsavel';
 
 /**
  * Resultado de uma verificação de permissão.
@@ -134,6 +135,14 @@ export async function verificarMedico(): Promise<PermissaoResult> {
  */
 export async function verificarPaciente(): Promise<PermissaoResult> {
   return verificarRole(['paciente']);
+}
+
+/**
+ * Verifica se é responsável por dependentes (ADR-0033). Ser `responsavel` NÃO dá acesso a nenhum paciente:
+ * o acesso a cada dependente é provado pelo vínculo (`lib/auth/escopo-do-responsavel.ts`).
+ */
+export async function verificarResponsavel(): Promise<PermissaoResult> {
+  return verificarRole(['responsavel']);
 }
 
 /**

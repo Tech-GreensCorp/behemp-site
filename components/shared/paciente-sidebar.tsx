@@ -20,6 +20,7 @@ import {
   FileText,
   FolderOpen,
   CalendarDays,
+  Users,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,6 +38,11 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Dashboard', href: '/paciente', icon: LayoutDashboard },
       { label: 'Agendar Consulta', href: '/paciente/agendamento', icon: CalendarDays },
+      /**
+       * Quem faz o próprio tratamento também pode cuidar de outra pessoa (regra de Dryelle, 28/10/2026; ADR-0033).
+       * O acesso a cada dependente é provado pelo vínculo, não por estar neste menu.
+       */
+      { label: 'Meus dependentes', href: '/responsavel', icon: Users },
     ],
   },
   {

@@ -6,7 +6,18 @@ import { pgEnum } from 'drizzle-orm/pg-core';
  */
 
 /** Role do usuário no sistema */
-export const userRoleEnum = pgEnum('user_role', ['admin', 'medico', 'paciente']);
+/**
+ * `responsavel` (ADR-0033 D-02, P-02 de Dryelle em 28/10/2026): quem cuida de menores. Um usuário tem UM
+ * papel só: quem é responsável não é paciente, e quem se trata como adulto continua `paciente`. O
+ * responsável não tem linha em `pacientes`: ele age por vínculo (`responsaveis_pacientes`).
+ */
+export const userRoleEnum = pgEnum('user_role', ['admin', 'medico', 'paciente', 'responsavel']);
+
+/** Situação do vínculo responsável → paciente dependente (ADR-0033 D-01). Linha nunca é apagada. */
+export const vinculoResponsavelStatusEnum = pgEnum('vinculo_responsavel_status', [
+  'ativo',
+  'encerrado',
+]);
 
 /** Status do paciente no tratamento */
 export const pacienteStatusEnum = pgEnum('paciente_status', [

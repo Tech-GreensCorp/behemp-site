@@ -4,6 +4,7 @@
  */
 
 import { BrevoClient } from '@getbrevo/brevo';
+import { comFiltroDeDestinatarios } from '@/lib/email/destinatarios-tecnicos';
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 const LOGO_URL = () => `${APP_URL()}/logo.png`;
@@ -38,7 +39,7 @@ function formatarData(data: Date): string {
 }
 
 function criarClienteBrevo() {
-  return new BrevoClient({ apiKey: process.env.BREVO_API_KEY! });
+  return comFiltroDeDestinatarios(new BrevoClient({ apiKey: process.env.BREVO_API_KEY! }));
 }
 
 // ── Template base ─────────────────────────────────────────────

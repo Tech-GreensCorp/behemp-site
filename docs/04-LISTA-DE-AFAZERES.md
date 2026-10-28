@@ -19,6 +19,104 @@
 
 ---
 
+## 🟠 Item 92 — CATALOGADO, 28/10/2026: `excluirMinhaConta` não checa papel e não grava auditoria
+
+**Status:** **corrigido (local, sem commit)**, com uma pendência (D-16). Achado lendo o código para a P-13b do Item 91 (ADR-0033 D-16). **Entregue, 28/10/2026 (local, sem commit, branch `feat/papel-responsavel-e-dependentes`):** (1) o Google saiu de todo o `/registrar-se` e o `<SignIn/>` do `/entrar` passa `transferable={false}`; guarda `o-cadastro-nao-oferece-google` (6 casos, 8 sabotagens vermelhas); **o efeito com um Google inexistente NÃO foi testado**. (2) A autoexclusão foi **removida** (action, botão, diálogo e estado da tela do perfil); guarda `so-o-admin-exclui-conta` (5 casos, verde). **Falta (D-16):** o admin recusar apagar responsável com vínculo ativo.
+
+`excluirMinhaConta` (`app/_actions/perfil-paciente.ts:234-272`) usa só `obterUsuarioAtual()`, que **autentica** e não confere papel;
+apaga o usuário no Clerk (`:251`) e faz soft delete de `users` e `pacientes` (`:253-265`). `grep` em `registrarAuditoria` no arquivo:
+**zero**. É uma Server Action, ou seja, um endpoint chamável sem passar pela tela. Complementa o **Item 74** (o texto da tela
+promete apagar tudo e a action mantém o histórico).
+
+**Perigo de mexer (medido):** **baixo**. 1 chamador (`app/(paciente)/paciente/perfil/page.tsx:244`) e **nenhum teste** a cita. O
+que a exclusão deve fazer é decisão jurídica (J-12, Item 74). **Caminho:** checagem de papel e auditoria na própria action, com
+teste que a chame como admin, médico e responsável. **Decidido por Dryelle (P-17a, 28/10/2026): apenas o admin exclui contas, para todos os papéis**; a autoexclusão sai da action e da tela (ADR-0033 D-16, Item 91).
+
+---
+
+## 🟠 Item 91 — CATALOGADO, 28/10/2026 (ADR-0033, proposta): não existe "Responsável" com login, e o sistema não distingue paciente dependente
+
+**Status:** catalogado; **implementação parcial em 28/10/2026 (local, sem commit; migration `0055` só no banco local)**, ver ADR-0033 §N. **Regra mudada em 28/10/2026 por Dryelle, antes de testar:** o dependente pode ser de **qualquer idade**, inclusive maior de 18 anos; o `paciente` **também pode ser responsável** (quem se trata e cuida de outra pessoa); e **não há limite** de dependentes por responsável. Isso **revoga a P-01 e a P-02** (ADR-0033). Guarda `o-papel-de-responsavel-e-fechado-e-age-por-vinculo` (21 casos) e integração `o-responsavel-age-so-por-vinculo-provado` (20 casos, Postgres real), com 5 sabotagens que trazem a regra antiga de volta, todas vermelhas. Pedido por **Dryelle** (cartão "Role Responsável com login e vínculo a
+pacientes dependentes"). Decisões recomendadas, rejeitados e perguntas de negócio:
+[ADR-0033](adr/ADR-0033-o-responsavel-age-por-vinculo-e-o-dependente-nao-e-um-login.md). Medido **só por
+leitura de código e `grep`**; nada foi executado contra produção.
+
+**Diagnóstico (`caminho:linha`).**
+
+- Um papel por usuário, enum fechado de 3 valores: `db/schema/enums.ts:9`, `db/schema/users.ts:15`; tipo `Role` em
+  `lib/auth/permissions.ts:16`.
+- Paciente exige conta própria: `pacientes.userId` `notNull` + `unique` (`db/schema/pacientes.ts:22-25`) e `users.email`
+  `notNull` + índice único (`users.ts:13,21`). Uma criança só existe com e-mail próprio.
+- O "responsável" atual é texto solto: `pacientes.responsavelNome`/`responsavelCpf` (`pacientes.ts:80-81`), preenchido só no
+  formulário do médico (`app/(medico)/medico/pacientes/novo/page.tsx:544-558`). Não dá login nem escopo.
+- Não há ponto único de "qual paciente está agindo": `eq(pacientes.userId, …)` em **84 pontos de 50 arquivos** (código de
+  produção), **45 deles** no join `pacientes → users`; **16** comparações explícitas de papel em **13** arquivos.
+- O papel nasce em cinco lugares independentes, todos com default `'paciente'`: `lib/auth/permissions.ts:43,180,190`,
+  `app/(auth)/redirect/page.tsx:113,160`, `app/api/auth/callback/route.ts:57`, `app/api/webhooks/clerk/route.ts:155`, e o
+  layout `app/(paciente)/layout.tsx:14` só deixa passar `paciente` e `admin`.
+- O padrão de escopo existe só para o médico: `garantirMedicoDoPaciente` (`lib/auth/escopo-paciente.ts:54`).
+- A auditoria já comporta "quem agiu por quem": `registrarAuditoria` (`lib/utils/audit.ts:44`) grava `userId`, `entidadeId`
+  e `dadosDepois`.
+
+**Perigo de mexer (medido):** **alto**. É mudança de modelo de acesso, não de tela: o raio são os 84 pontos acima, em
+produção, e o risco é OWASP API1 (BOLA) — com um responsável agindo por vários pacientes, cada `pacienteId` vindo do
+cliente precisa passar por um resolvedor único. **Pré-requisito: o Item 83** (actions de paciente sem escopo de vínculo,
+como `listarPacientesParaRecompra` e `buscarUsuariosChat`), que um papel novo herdaria. A migration é aditiva, mas exige
+autorização por escrito em `.claude/autorizacoes.txt`, e o Item 85 registra que o journal tem datas fora de ordem.
+Nenhum guarda existe; só entram **depois** da correção.
+
+**Regras de negócio, respondidas por Dryelle em 28/10/2026 (ADR-0033 §5.1):** dependente é só menor de idade; um usuário é
+uma coisa só (**existe o papel `responsavel`**, que não tem linha em `pacientes`); o vínculo nasce no cadastro; o dependente
+**nunca** tem login nem e-mail ("por enquanto"); aceites e assinaturas sempre do responsável; um só responsável por paciente,
+removido só pelo admin; médico e admin veem o vínculo; avisos só ao responsável. **P-08, respondida depois: a procuração nomeia
+os dois** (o menor é o outorgante; o responsável assina como representante legal). **Abertas pelas respostas:** P-10 (responsável que também é paciente precisa de duas contas, e
+o ADR-0028 manda "mesmo CPF em outra conta" ao suporte), P-11 (maioridade; ao Jurídico), P-12 (porta de cadastro do
+responsável), P-13 (crianças já cadastradas e exclusão de conta do responsável, Item 74).
+
+**Segunda rodada, respondida por Dryelle em 28/10/2026:** P-10 (o papel novo é para quem cuida de menores; maior de idade
+que se trata continua `paciente`; quem é as duas coisas não foi tratado), P-11 ("ok", e a pergunta de LGPD segue com o
+Jurídico), **P-12 (`/registrar-se` ganha a opção "sou responsável" e o cadastro do dependente)**, **P-13 (preservar os
+dados das crianças; o login passa a ser o do responsável; ajustar o formulário de equipe, que hoje põe o responsável
+abaixo do paciente; e uma ferramenta que converta as contas existentes)**. Desenho em ADR-0033 D-12, D-13 e D-14.
+**Terceira rodada (28/10/2026):** P-15 fechada (a conversão das contas existentes é uma ferramenta só do admin); P-14
+fechada ("remova a opção de cadastro com Google": o responsável só se cadastra por e-mail e senha); P-13b respondida em
+parte ("o paciente/responsável não deve ter acesso a excluir conta"); P-08 respondida ("usa o nome dos dois"). **Ainda
+abertas:** P-13b (como se pede a eliminação dos dados, Jurídico), **P-17 fechada em 28/10/2026** (apenas o admin exclui contas, para todos os papéis; o Google sai de todo o `/registrar-se`; o `<SignIn/>` do `/entrar`, `app/(auth)/entrar/[[...sign-in]]/page.tsx:482`, não passa `transferable` e a doc do Clerk o descreve com padrão `true`: **não testado**) e **P-18** (como qualificar o menor na procuração: `procuracao-pdf.tsx:154-160` imprimiria
+`[estado civil]`, `[profissão]` e o e-mail técnico do dependente). **P-16 fechada em 28/10/2026:** o responsável entra na
+procuração só com nome e CPF.
+
+**Achados da terceira rodada (`caminho:linha`):** `lib/receituario/procuracao-pdf.tsx:109-118` (`DadosProcuracao`) descreve uma
+só pessoa, e `:234-235` imprime o mesmo nome e CPF na assinatura, embora o texto já preveja o representante legal (`:174`,
+`:230`); `app/api/anvisa/procuracao/route.ts:35-56` resolve o paciente por `pacientes.userId` da sessão (falharia para um
+responsável); o DocuSign recebe `pacienteEmail`/`pacienteNome` como signatário (`lib/docusign/docusign-service.ts:194-195`,
+`:373-374`), que para o dependente seria o e-mail técnico. `app/_actions/perfil-paciente.ts:234-272` (`excluirMinhaConta`)
+não checa papel nem audita (**Item 92**); `app/(admin)/_actions/usuarios.ts:315` e `:406` não contam vínculo de responsável.
+`lib/receituario/` e `lib/docusign/` exigem autorização por escrito.
+
+**Achados da segunda rodada (`caminho:linha`):** só **19 colunas** referenciam `users.id` (medido no Postgres local); a única
+que muda de dono na conversão é `pacientes.user_id`, e mensagens, notificações e consentimentos ficam com quem agiu.
+`app/(auth)/registrar-se/[[...sign-up]]/page.tsx:291-299` grava só `unsafeMetadata.phone`, e `:378-386` (Google) não tem
+formulário; `app/api/webhooks/clerk/route.ts:245-257` e `app/(auth)/redirect/page.tsx:141` criam ficha de paciente para todo
+usuário novo, o que não pode ocorrer para um responsável. O bloco "Responsável / Representação Legal" está em
+`app/(medico)/medico/pacientes/novo/page.tsx:532-561` (nome e CPF, no mesmo cartão das perguntas sobre advogado); o cadastro
+por link e o `/registrar-se` não têm esse bloco. `lib/auth/permissions.ts:183-186` lê o papel do Clerk antes do banco, o que
+torna a sincronização com o Clerk o ponto frágil da conversão. Os Termos já prometem "responsável legal devidamente
+cadastrado" (`app/(public)/termos-de-uso/page.tsx:106`).
+
+**Achados novos da leitura (primeira rodada, `caminho:linha`):** `lib/auth/escopo-chamada.ts:44` devolve `null` para papel diferente de
+`paciente`, e `:51` compara `pacientes.userId`; `lib/auth/escopo-sala.ts:160-166` idem; `components/teleconsulta/GlobalTeleconsultaHost.tsx:288`
+ramifica por `role === 'paciente'`. Um `responsavel` seria recusado na teleconsulta. Há **9 pontos de inserção em `pacientes` em
+8 arquivos** (`app/(admin)/_actions/usuarios.ts:276`, `app/(auth)/redirect/page.tsx:141`, `app/(medico)/_actions/pacientes.ts:96`,
+`app/api/webhooks/clerk/route.ts:257`, `app/_actions/cadastro-por-link.ts:521`, `documentos-paciente-self.ts:71`, `pacientes.ts:146`
+e `:997`, `perfil-paciente.ts:220`), e o guarda `cadastro-por-link-abre-sem-conta` (`:108`) exige `role: 'paciente'` literal
+(`cadastro-por-link.ts:465`), a ser **ajustado, não removido**, para um enum fechado de dois valores. **Normas a ler antes**
+(ADR-0033 §5.3): **não foram lidas**, nenhuma é citada.
+
+**Fatias recomendadas:** (1) tabela de vínculo + diferenciar dependente para médico e admin, sem login novo; (2) resolvedor
+único + guardas; (3) login e painel do Responsável; (4) migrar as actions, uma por commit.
+
+---
+
 ## ✅ Item 88 — IMPLEMENTADO, 27/10/2026 (ADR-0031): o paciente da equipe não tinha login, e o login sem código é individual
 
 **Status:** implementado e provado local; **não verificado em produção**. Decisões, rejeitados e o que mudou de

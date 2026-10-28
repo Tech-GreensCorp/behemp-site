@@ -1047,3 +1047,12 @@ path:app/(admin)/admin/usuarios/_components/dialogo-criar-admin.tsx
 path:lib/docusign/docusign-service.ts
 path:app/(paciente)/paciente/documentos/page.tsx
 path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx
+
+# ── Autorizado por Dryelle em 28/10/2026, no chat desta sessão ──────────────────
+# Retirar a autoexclusão de conta do paciente: "apenas admin pode excluir contas!"
+# (ADR-0033 D-16, P-17a; Item 92). Sai o botão "Excluir Minha Conta" e o diálogo de
+# app/(paciente)/paciente/perfil/page.tsx, junto com a action excluirMinhaConta.
+# PERIGO MEDIDO: baixo. 1 chamador (esta tela) e nenhum teste a citava; o guarda
+# so-o-admin-exclui-conta (novo) nasceu vermelho e prova a ausência.
+# Granularidade deliberada: o arquivo exato, nenhum outro de app/(paciente)/.
+path:app/(paciente)/paciente/perfil/page.tsx
