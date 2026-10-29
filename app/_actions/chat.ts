@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { DOMINIO_DO_EMAIL_TECNICO } from '@/lib/dependentes/regras';
 import { gruposChat, participantesGrupo, mensagens, users } from '@/db/schema';
 import { eq, and, desc, sql, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
@@ -381,10 +382,15 @@ export async function buscarUsuariosChat(busca?: string): Promise<ActionResult<A
 
     const userId = await obterUserIdPorClerkId(auth.clerkId);
 
+    // O dependente tem um `users` técnico (`@dependente.invalid`, sem login): ninguém conversa com quem não
+    // existe. Ele não aparece na busca (ADR-0033 D-04).
+    const semTecnicos = '%@' + DOMINIO_DO_EMAIL_TECNICO;
+
     let query = sql`
       SELECT u.id, u.nome, u.email, u.role
       FROM users u
       WHERE u.id != ${userId}
+        AND u.email NOT LIKE ${semTecnicos}
     `;
 
     if (busca && busca.trim()) {
@@ -392,6 +398,7 @@ export async function buscarUsuariosChat(busca?: string): Promise<ActionResult<A
         SELECT u.id, u.nome, u.email, u.role
         FROM users u
         WHERE u.id != ${userId}
+          AND u.email NOT LIKE ${semTecnicos}
           AND (u.nome ILIKE ${'%' + busca + '%'} OR u.email ILIKE ${'%' + busca + '%'})
       `;
     }

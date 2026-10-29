@@ -1,11 +1,12 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { users, pacientes, medicos } from '@/db/schema';
+import { users, pacientes, medicos, responsaveisPacientes } from '@/db/schema';
 import { eq, and, isNull, ilike, desc, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { verificarAdmin } from '@/lib/auth';
+import { ehEmailTecnicoDeDependente } from '@/lib/dependentes/regras';
 import { registrarAuditoria } from '@/lib/utils/audit';
 
 /**
@@ -39,12 +40,15 @@ const filtrosSchema = z.object({
 export type PacienteDoAdmin = {
   id: string;
   nome: string;
-  email: string;
+  /** `null` para o dependente: o `users` dele é técnico (sem e-mail de verdade) e não deve aparecer. */
+  email: string | null;
   telefone: string | null;
   status: string;
   jornadaFase: string | null;
   tratamentoTipo: string | null;
   medicoNome: string | null;
+  /** Quem cuida deste paciente (vínculo ativo); `null` se ninguém. É a flag "tem responsável" da lista. */
+  responsavelNome: string | null;
   createdAt: Date;
 };
 
@@ -66,6 +70,7 @@ export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchem
     const { busca, status, tratamento, jornada, pagina, porPagina } = parsed.data;
 
     const medicoUser = alias(users, 'medico_user');
+    const responsavelUser = alias(users, 'responsavel_user');
 
     const condicoes = [isNull(pacientes.deletedAt)];
     if (status !== 'todos') condicoes.push(eq(pacientes.status, status));
@@ -84,12 +89,22 @@ export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchem
         jornadaFase: pacientes.jornadaFase,
         tratamentoTipo: pacientes.tratamentoTipo,
         medicoNome: medicoUser.nome,
+        responsavelNome: responsavelUser.nome,
         createdAt: pacientes.createdAt,
       })
       .from(pacientes)
       .innerJoin(users, eq(pacientes.userId, users.id))
       .leftJoin(medicos, eq(pacientes.medicoId, medicos.id))
       .leftJoin(medicoUser, eq(medicos.userId, medicoUser.id))
+      // No máximo UM vínculo ativo por paciente (índice único parcial): o join não multiplica linhas.
+      .leftJoin(
+        responsaveisPacientes,
+        and(
+          eq(responsaveisPacientes.pacienteId, pacientes.id),
+          eq(responsaveisPacientes.status, 'ativo'),
+        ),
+      )
+      .leftJoin(responsavelUser, eq(responsaveisPacientes.responsavelUserId, responsavelUser.id))
       .where(where)
       .orderBy(desc(pacientes.createdAt))
       .limit(porPagina)
@@ -104,7 +119,14 @@ export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchem
     const total = count ?? 0;
     return {
       sucesso: true,
-      dados: { pacientes: linhas, total, totalPaginas: Math.max(1, Math.ceil(total / porPagina)) },
+      dados: {
+        pacientes: linhas.map((l) => ({
+          ...l,
+          email: ehEmailTecnicoDeDependente(l.email) ? null : l.email,
+        })),
+        total,
+        totalPaginas: Math.max(1, Math.ceil(total / porPagina)),
+      },
     };
   } catch (error) {
     console.error('[Action] Erro ao listar pacientes (admin):', error);

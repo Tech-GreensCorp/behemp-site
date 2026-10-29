@@ -36,6 +36,10 @@ teste que a chame como admin, médico e responsável. **Decidido por Dryelle (P-
 
 ## 🟠 Item 91 — CATALOGADO, 28/10/2026 (ADR-0033, proposta): não existe "Responsável" com login, e o sistema não distingue paciente dependente
 
+**Atualização 29/10/2026, tarde (ADR-0033 §N, quinta entrega):** admin com "Pacientes e responsáveis" (duas abas, flag de responsável), "Novo responsável" com máscaras e e-mail de boas-vindas, tela de dados do dependente refeita, "Solicitações" corrigida (banco local defasado) e "Minha área de paciente" só para quem tem ficha. **Falta:** tirar Nome/CPF do Responsável da tela de novo paciente (hook de escopo) e reaplicar o papel da conta de teste no Clerk.
+
+**Atualização 29/10/2026 (local, sem commit):** o responsável agora tem uma área por dependente (dados, medicamentos, documentos, solicitações, consultas), recompra e documento por vínculo, cadastro do dependente com a mesma ficha do admin, e o admin ganhou a action e o diálogo de "Novo responsável". **Falta, bloqueado por autorização de escopo:** ligar o botão, o papel e o filtro nas telas de admin e recusar a exclusão de responsável com vínculo ativo (ADR-0033 §N, quarta entrega).
+
 **Status:** catalogado; **implementação parcial em 28/10/2026 (local, sem commit; migration `0055` só no banco local)**, ver ADR-0033 §N. **Regra mudada em 28/10/2026 por Dryelle, antes de testar:** o dependente pode ser de **qualquer idade**, inclusive maior de 18 anos; o `paciente` **também pode ser responsável** (quem se trata e cuida de outra pessoa); e **não há limite** de dependentes por responsável. Isso **revoga a P-01 e a P-02** (ADR-0033). Guarda `o-papel-de-responsavel-e-fechado-e-age-por-vinculo` (21 casos) e integração `o-responsavel-age-so-por-vinculo-provado` (20 casos, Postgres real), com 5 sabotagens que trazem a regra antiga de volta, todas vermelhas. Pedido por **Dryelle** (cartão "Role Responsável com login e vínculo a
 pacientes dependentes"). Decisões recomendadas, rejeitados e perguntas de negócio:
 [ADR-0033](adr/ADR-0033-o-responsavel-age-por-vinculo-e-o-dependente-nao-e-um-login.md). Medido **só por

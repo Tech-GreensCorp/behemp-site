@@ -26,6 +26,12 @@ import { join, relative } from 'node:path';
 import { semComentarios } from './_apoio/codigo';
 import { perfilDaConta } from '../../lib/auth/perfil-da-conta';
 import { dataDeNascimentoPlausivel } from '../../lib/dependentes/regras';
+import {
+  CAMPOS_INTERNOS_DA_ASSOCIACAO,
+  cadastroDeDependenteSchema,
+  fichaDoDependenteSchema,
+} from '../../lib/dependentes/ficha-do-dependente';
+import { criarPacienteSchema } from '../../lib/pacientes/ficha';
 
 const RAIZ = join(__dirname, '..', '..');
 const ler = (p: string) => readFileSync(join(RAIZ, p), 'utf8');
@@ -151,24 +157,21 @@ describe('3. o vínculo nasce com o dependente, e só por uma porta', () => {
     );
   });
 
-  it('🔴 a action não aceita `pacienteId` no schema, e não o repassa', () => {
+  it('🔴 o schema do cadastro não aceita `pacienteId`, e a action não o lê do corpo', () => {
+    const campos = Object.keys(cadastroDeDependenteSchema.shape);
+    expect(campos.length).toBeGreaterThan(20); // a ficha completa: o guarda não está olhando um schema vazio
+    expect(campos).not.toContain('pacienteId');
+    expect(campos).not.toContain('paciente_id');
     const a = codigo('app/_actions/dependentes.ts');
-    const schema = a.slice(
-      a.indexOf('const dependenteSchema'),
-      a.indexOf('export type ResultadoDoCadastroDeDependente'),
-    );
-    expect(schema.length).toBeGreaterThan(100);
-    expect(schema).not.toMatch(/pacienteId|paciente_id/);
     expect(a, 'a action lê o paciente do corpo').not.toMatch(
       /entrada\.pacienteId|\.data\.pacienteId/,
     );
   });
-
   it('🔴 a action prova o papel ANTES de validar e de gravar', () => {
     const a = codigo('app/_actions/dependentes.ts');
     const papel = a.indexOf('await responsavelDaSessao()');
     expect(papel).toBeGreaterThan(-1);
-    expect(papel).toBeLessThan(a.indexOf('dependenteSchema.safeParse'));
+    expect(papel).toBeLessThan(a.indexOf('cadastroDeDependenteSchema.safeParse'));
     expect(papel).toBeLessThan(a.indexOf('await criarDependente('));
   });
 
@@ -209,6 +212,9 @@ describe('4. o resolvedor responde igual e olha o vínculo ativo', () => {
       'lib/auth/escopo-do-responsavel.ts',
       'lib/dependentes/criar-dependente.ts',
       'db/schema/responsaveis.ts',
+      // A LISTAGEM do admin ("Pacientes e responsáveis"): o admin vê todos os vínculos, então não há regra de acesso
+      // para duplicar; o teste de integração dela prova que só o admin lê (`o-admin-lista-responsaveis-…`).
+      'app/_actions/admin-responsaveis.ts',
     ]);
     const onde = PRODUCAO.filter((f) => /\.from\(\s*responsaveisPacientes\s*\)/.test(f.codigo))
       .map((f) => f.caminho)
@@ -246,9 +252,84 @@ describe('5. o dependente pode ter qualquer idade (regra de 28/10/2026), mas a d
     expect(dataDeNascimentoPlausivel('2026-10-28', new Date('2026-10-28T03:00:00Z'))).toBe(true);
   });
 
-  it('🔴 a action não exige mais ser menor de idade', () => {
-    const a = codigo('app/_actions/dependentes.ts');
-    expect(a).not.toMatch(/ehMenorDeIdade|menor de 18|menor de idade/);
-    expect(a).toMatch(/dataDeNascimentoPlausivel\(/);
+  it('🔴 o cadastro não exige mais ser menor de idade, e a data continua obrigatória e plausível', () => {
+    const s = codigo('lib/dependentes/ficha-do-dependente.ts');
+    expect(s).not.toMatch(/ehMenorDeIdade|menor de 18|menor de idade/);
+    expect(s).toMatch(/dataDeNascimentoPlausivel\(/);
+    expect(codigo('app/_actions/dependentes.ts')).toMatch(/cadastroDeDependenteSchema\.safeParse/);
+  });
+});
+
+/**
+ * Os campos INTERNOS da associação, ESCRITOS AQUI de propósito. Quem decide que um campo é da equipe e não do
+ * responsável é o NEGÓCIO (Dryelle, 29/10/2026), e a lista do código não pode ser a régua do próprio teste: se um
+ * campo sair dela, um teste que a percorre deixa de conferi-lo (foi o que a sabotagem A2 mostrou). Mudar esta
+ * lista é mudar a política: precisa de decisão do dono.
+ */
+const INTERNOS_DA_EQUIPE = [
+  'atendimento',
+  'categorizacao',
+  'dataAssociacao',
+  'entradaPaciente',
+  'etapa',
+  'termoAssociado',
+  'valorContribuicao',
+] as const;
+
+describe('6. a ficha do dependente é a do cadastro da equipe, menos o que não é do responsável', () => {
+  const dependente = Object.keys(fichaDoDependenteSchema.shape);
+  const equipe = Object.keys(criarPacienteSchema.shape);
+
+  it('⚠️ VACUIDADE: os dois schemas têm campo de verdade', () => {
+    expect(equipe.length).toBeGreaterThan(30);
+    expect(dependente.length).toBeGreaterThan(20);
+  });
+
+  it('🔴 os campos INTERNOS da associação NÃO estão no schema do responsável', () => {
+    for (const campo of INTERNOS_DA_EQUIPE) {
+      expect(dependente, `${campo} é da equipe`).not.toContain(campo);
+      expect(equipe, `${campo} sumiu do cadastro da equipe: a lista está velha`).toContain(campo);
+    }
+    // A lista do código É a política escrita acima: se divergirem, alguém mudou a regra sem o dono.
+    expect([...CAMPOS_INTERNOS_DA_ASSOCIACAO].sort()).toEqual([...INTERNOS_DA_EQUIPE].sort());
+  });
+
+  it('🔴 contato e responsável NÃO se digitam: vêm do vínculo', () => {
+    for (const campo of ['email', 'telefone', 'responsavelNome', 'responsavelCpf']) {
+      expect(dependente, campo).not.toContain(campo);
+    }
+  });
+
+  it('🔴 todo o resto do cadastro da equipe é do dependente: nenhum campo some por esquecimento', () => {
+    const fora = new Set<string>([
+      ...INTERNOS_DA_EQUIPE,
+      'email',
+      'telefone',
+      'responsavelNome',
+      'responsavelCpf',
+    ]);
+    const esperados = equipe.filter((c) => !fora.has(c));
+    for (const campo of esperados)
+      expect(dependente, `${campo} faltou na ficha do dependente`).toContain(campo);
+  });
+
+  it('🔴 o cadastro da equipe e o do dependente usam o MESMO mapeamento de colunas', () => {
+    expect(codigo('app/_actions/pacientes.ts')).toMatch(/\.\.\.camposDaFicha\(d\)/);
+    expect(codigo('lib/dependentes/criar-dependente.ts')).toMatch(/\.\.\.camposDaFicha\(/);
+    // E o `criarPaciente` não voltou a ter o schema ou o mapeamento copiados.
+    expect(codigo('app/_actions/pacientes.ts')).not.toMatch(/const criarPacienteSchema\s*=/);
+  });
+
+  it('o cadastro de dependente que o servidor recebe é validado pelo schema da ficha', () => {
+    const ok = cadastroDeDependenteSchema.safeParse({
+      nome: 'Fulano',
+      dataNascimento: '2015-05-05',
+      parentesco: 'Pai',
+      cpfDoResponsavel: '529.982.247-25',
+      valorContribuicao: 'R$ 1',
+    });
+    expect(ok.success).toBe(true);
+    // O Zod DESCARTA o campo interno: ele não chega à gravação.
+    if (ok.success) expect(ok.data).not.toHaveProperty('valorContribuicao');
   });
 });

@@ -13,34 +13,12 @@
  * ⚠️ A auditoria leva ids e o parentesco, NUNCA o nome, o CPF nem a data de nascimento do dependente.
  */
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 
 import { responsavelDaSessao } from '@/lib/auth/escopo-do-responsavel';
 import { criarDependente, ErroDoDependente } from '@/lib/dependentes/criar-dependente';
-import { dataDeNascimentoPlausivel } from '@/lib/dependentes/regras';
+import { cadastroDeDependenteSchema } from '@/lib/dependentes/ficha-do-dependente';
 import { motivoLegivel } from '@/lib/erros/motivo-legivel';
-import { cpfEhValido } from '@/lib/validacao/cpf';
 import { registrarAuditoria } from '@/lib/utils/audit';
-
-const dependenteSchema = z.object({
-  nome: z
-    .string()
-    .trim()
-    .min(2, 'Informe o nome completo do dependente.')
-    .max(120, 'O nome é longo demais.'),
-  dataNascimento: z
-    .string()
-    .refine(
-      (v) => dataDeNascimentoPlausivel(v),
-      'Informe uma data de nascimento válida: ela não pode ser no futuro.',
-    ),
-  parentesco: z
-    .string()
-    .trim()
-    .min(2, 'Informe o parentesco.')
-    .max(40, 'O parentesco é longo demais.'),
-  cpfDoResponsavel: z.string().refine((v) => cpfEhValido(v), 'CPF inválido.'),
-});
 
 export type ResultadoDoCadastroDeDependente = {
   sucesso: boolean;
@@ -55,14 +33,19 @@ export async function cadastrarDependente(
     const responsavel = await responsavelDaSessao();
     if (!responsavel) return { sucesso: false, erro: 'Acesso negado.' };
 
-    const parsed = dependenteSchema.safeParse(entrada);
+    const parsed = cadastroDeDependenteSchema.safeParse(entrada);
     if (!parsed.success) {
       return { sucesso: false, erro: parsed.error.issues[0]?.message ?? 'Dados inválidos.' };
     }
 
+    // O Zod DESCARTA o que o schema não conhece: os campos internos da associação nunca chegam aqui.
+    const { parentesco, cpfDoResponsavel, ...ficha } = parsed.data;
     const criado = await criarDependente({
       responsavelUserId: responsavel.id,
-      ...parsed.data,
+      responsavelNome: responsavel.nome,
+      cpfDoResponsavel,
+      parentesco,
+      ficha,
     });
 
     await registrarAuditoria({
@@ -75,11 +58,12 @@ export async function cadastrarDependente(
         dependente: true,
         pacienteId: criado.pacienteId,
         vinculoId: criado.vinculoId,
-        parentesco: parsed.data.parentesco,
+        parentesco,
       },
     });
 
-    revalidatePath('/responsavel');
+    // O menu lateral (layout) lista os dependentes: revalida o layout, não só a página.
+    revalidatePath('/responsavel', 'layout');
     return { sucesso: true, dados: { pacienteId: criado.pacienteId } };
   } catch (erro) {
     if (erro instanceof ErroDoDependente) return { sucesso: false, erro: erro.message };

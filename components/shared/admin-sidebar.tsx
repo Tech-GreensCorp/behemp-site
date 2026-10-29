@@ -48,7 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Usuários', href: '/admin/usuarios', icon: Users },
       { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
       { label: 'Médicos', href: '/admin/medicos', icon: Stethoscope },
-      { label: 'Pacientes', href: '/admin/pacientes', icon: HeartPulse },
+      { label: 'Pacientes e responsáveis', href: '/admin/pacientes', icon: HeartPulse },
       { label: 'Teleconsulta', href: '/admin/teleconsulta', icon: Video },
       { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
       { label: 'Procurações', href: '/admin/procuracoes', icon: FileCheck },

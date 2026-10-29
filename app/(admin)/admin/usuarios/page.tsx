@@ -17,6 +17,7 @@ import { listarUsuariosAdmin } from '@/app/(admin)/_actions/usuarios';
 import { DialogoEditarUsuario } from './_components/dialogo-editar-usuario';
 import { DialogoExcluirUsuario } from './_components/dialogo-excluir-usuario';
 import { DialogoCriarAdmin } from './_components/dialogo-criar-admin';
+import { DialogoCriarResponsavel } from '@/components/admin/responsaveis/dialogo-criar-responsavel';
 import { DialogoAcessoDoPaciente } from '@/components/admin/acesso-do-paciente/dialogo-acesso-do-paciente';
 import { AvisoDeAcessosPendentes } from '@/components/admin/acesso-do-paciente/aviso-de-acessos-pendentes';
 import { PageHeader } from '@/components/shared/page-header';
@@ -35,6 +36,7 @@ import {
   Trash2,
   User,
   Users,
+  UsersRound,
 } from 'lucide-react';
 
 /**
@@ -61,6 +63,7 @@ const ROLE_CONFIG: Record<string, {
   admin: { label: 'Admin', variant: 'default', icon: Shield, cor: 'bg-red-500/10 text-red-600' },
   medico: { label: 'Médico', variant: 'secondary', icon: Stethoscope, cor: 'bg-primary/10 text-primary' },
   paciente: { label: 'Paciente', variant: 'outline', icon: User, cor: 'bg-emerald-500/10 text-emerald-600' },
+  responsavel: { label: 'Responsável', variant: 'secondary', icon: UsersRound, cor: 'bg-amber-500/10 text-amber-600' },
 };
 
 type OrdenacaoKey = 'nome-asc' | 'nome-desc' | 'email-asc' | 'email-desc' | 'createdAt-desc' | 'createdAt-asc';
@@ -92,10 +95,11 @@ export default function UsuariosPage() {
   const [porPagina, setPorPagina] = useState(20);
   const [totalFiltrado, setTotalFiltrado] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
-  const [stats, setStats] = useState({ total: 0, admins: 0, medicos: 0, pacientes: 0 });
+  const [stats, setStats] = useState({ total: 0, admins: 0, medicos: 0, pacientes: 0, responsaveis: 0 });
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [excluindo, setExcluindo] = useState<Usuario | null>(null);
   const [criandoAdmin, setCriandoAdmin] = useState(false);
+  const [criandoResponsavel, setCriandoResponsavel] = useState(false);
   const [gerenciandoAcesso, setGerenciandoAcesso] = useState<Usuario | null>(null);
   const { user: euMesmo } = useUser();
 
@@ -152,22 +156,29 @@ export default function UsuariosPage() {
         title="Usuários"
         description={`${stats.total} usuários registrados na plataforma`}
         actions={
-          <Button onClick={() => setCriandoAdmin(true)}>
-            <ShieldPlus size={16} className="mr-1.5" />
-            Novo admin
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setCriandoResponsavel(true)}>
+              <UsersRound size={16} className="mr-1.5" />
+              Novo responsável
+            </Button>
+            <Button onClick={() => setCriandoAdmin(true)}>
+              <ShieldPlus size={16} className="mr-1.5" />
+              Novo admin
+            </Button>
+          </>
         }
       />
 
       <AvisoDeAcessosPendentes onCriados={carregar} />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {[
           { label: 'Total', valor: stats.total, icon: Users, cor: 'bg-muted text-foreground' },
           { label: 'Admins', valor: stats.admins, icon: Shield, cor: 'bg-red-500/10 text-red-600' },
           { label: 'Médicos', valor: stats.medicos, icon: Stethoscope, cor: 'bg-primary/10 text-primary' },
           { label: 'Pacientes', valor: stats.pacientes, icon: User, cor: 'bg-emerald-500/10 text-emerald-600' },
+          { label: 'Responsáveis', valor: stats.responsaveis, icon: UsersRound, cor: 'bg-amber-500/10 text-amber-600' },
         ].map((kpi) => (
           <Card key={kpi.label} className="border-0 shadow-sm">
             <CardContent className="flex items-center gap-3 p-4">
@@ -217,7 +228,7 @@ export default function UsuariosPage() {
 
       {/* Filtros de role */}
       <div className="flex gap-2">
-        {['admin', 'medico', 'paciente'].map((role) => (
+        {['admin', 'medico', 'paciente', 'responsavel'].map((role) => (
           <Button
             key={role}
             variant={filtroRole === role ? 'default' : 'outline'}
@@ -346,6 +357,9 @@ export default function UsuariosPage() {
       )}
       {criandoAdmin && (
         <DialogoCriarAdmin onFechar={() => setCriandoAdmin(false)} onCriado={carregar} />
+      )}
+      {criandoResponsavel && (
+        <DialogoCriarResponsavel onFechar={() => setCriandoResponsavel(false)} onCriado={carregar} />
       )}
       {excluindo && (
         <DialogoExcluirUsuario

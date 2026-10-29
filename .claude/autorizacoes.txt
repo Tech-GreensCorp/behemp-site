@@ -1056,3 +1056,18 @@ path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx
 # so-o-admin-exclui-conta (novo) nasceu vermelho e prova a ausência.
 # Granularidade deliberada: o arquivo exato, nenhum outro de app/(paciente)/.
 path:app/(paciente)/paciente/perfil/page.tsx
+
+# Autorizado por Dryelle em 29/10/2026, no chat ("Autorizo" e "pode colocar você, eu autorizo"): ADR-0033 / Item 91 — o admin
+# cadastra, lista, filtra e edita o papel "Responsável" e não vê o dependente técnico nas listas; "Novo responsável" ao lado de
+# "Novo paciente"; excluirUsuarioAdmin recusa apagar responsável com vínculo ativo (D-16). Só estes quatro arquivos.
+# PERIGO MEDIDO: baixo-médio. Mexe em listagem e KPI de usuários e numa recusa de exclusão; nenhuma action existente muda de contrato.
+path:app/(admin)/_actions/usuarios.ts
+path:app/(admin)/admin/usuarios/page.tsx
+path:app/(admin)/admin/usuarios/_components/dialogo-editar-usuario.tsx
+path:app/(admin)/admin/pacientes/page.tsx
+
+# Autorizado por Dryelle em 29/10/2026, no chat ("pode colar você, eu autorizo"): ADR-0033 — a tela de novo paciente (compartilhada
+# pelo médico e pelo admin) perde os campos "Nome do Responsável" e "CPF do Responsável"; o responsável passa a ser cadastrado só em
+# "Novo responsável". Só este arquivo.
+# PERIGO MEDIDO: baixo. Remove dois campos opcionais de um formulário; `criarPaciente` já os trata como opcionais.
+path:app/(medico)/medico/pacientes/novo/page.tsx

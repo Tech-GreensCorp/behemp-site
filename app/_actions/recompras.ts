@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { recompras, users, pacientes, notificacoes, emailsNotificacao } from '@/db/schema';
 import { eq, desc, and, or, sql, isNull } from 'drizzle-orm';
 import { z } from 'zod';
+import { garantirResponsavelDoPaciente, type EscopoDoResponsavel } from '@/lib/auth/escopo-do-responsavel';
 import { obterUsuarioAtual } from '@/lib/auth';
 import { inngest } from '@/lib/integrations/inngest';
 
@@ -96,9 +97,21 @@ export async function solicitarRecompraManual(
     // Determinar pacienteId
     let pacienteIdFinal: string | null = null;
 
+    // O RESPONSÁVEL pedindo em nome de um dependente (ADR-0033): o escopo vem do vínculo provado.
+    let escopoDoResponsavel: EscopoDoResponsavel | null = null;
+
     if (parsed.data.pacienteId) {
-      // Médico criando para paciente
-      pacienteIdFinal = parsed.data.pacienteId;
+      if (solicitante.role === 'medico' || solicitante.role === 'admin') {
+        // Equipe criando para paciente
+        pacienteIdFinal = parsed.data.pacienteId;
+      } else {
+        // 🔴 Qualquer outro papel só pede para um paciente que seja DELE por vínculo ativo. Antes, o
+        // `pacienteId` do cliente valia sem conferência para qualquer usuário logado (Item 83, BOLA).
+        const g = await garantirResponsavelDoPaciente(parsed.data.pacienteId);
+        if (!g.ok) return { sucesso: false, erro: g.erro };
+        escopoDoResponsavel = g.escopo;
+        pacienteIdFinal = g.escopo.pacienteId;
+      }
     } else if (solicitante.role === 'paciente') {
       // Paciente criando para si mesmo
       const [pacienteReg] = await db
@@ -107,6 +120,17 @@ export async function solicitarRecompraManual(
         .where(eq(pacientes.userId, solicitante.id))
         .limit(1);
       pacienteIdFinal = pacienteReg?.id ?? null;
+    }
+
+    // Para um dependente, o lembrete e o e-mail falam do DEPENDENTE, e o contato é o do RESPONSÁVEL (P-09).
+    let nomeDoDependente: string | null = null;
+    if (escopoDoResponsavel) {
+      const [dep] = await db
+        .select({ nome: users.nome })
+        .from(users)
+        .where(eq(users.id, escopoDoResponsavel.pacienteUserId))
+        .limit(1);
+      nomeDoDependente = dep?.nome ?? null;
     }
 
     // Inserir recompra
@@ -135,7 +159,7 @@ export async function solicitarRecompraManual(
         data: {
           dataPrevista: dataTerminoStr,
           pacienteEmail: solicitante.email,
-          pacienteNome: solicitante.nome,
+          pacienteNome: nomeDoDependente ?? solicitante.nome,
           nomeMedicamento: parsed.data.medicamentoNome,
           solicitanteUserId: solicitante.id,
         },
@@ -179,7 +203,8 @@ export async function solicitarRecompraManual(
           .limit(1);
         if (pacInfo) {
           nomePaciente = pacInfo.nome;
-          emailPaciente = pacInfo.email;
+          // O endereço do dependente é técnico e não existe: o contato é o do responsável que pediu.
+          emailPaciente = escopoDoResponsavel ? solicitante.email : pacInfo.email;
         }
       }
 
@@ -213,7 +238,7 @@ export async function solicitarRecompraManual(
         await enviarEmailRecompraCompletoEquipe({
           destinatarios: todosDestinatarios,
           solicitanteNome: solicitante.nome,
-          solicitanteRole: solicitante.role ?? 'paciente',
+          solicitanteRole: escopoDoResponsavel ? 'responsavel' : (solicitante.role ?? 'paciente'),
           pacienteNome: nomePaciente,
           pacienteEmail: emailPaciente,
           pacienteTelefone: parsed.data.contatoTelefone ?? null,
@@ -295,7 +320,15 @@ export async function listarMinhasRecompras(): Promise<ActionResult<Array<{
         u.nome as "solicitanteNome"
       FROM recompras r
       INNER JOIN users u ON u.id = r.solicitante_id
-      WHERE r.solicitante_id = ${usuario.id}
+      WHERE (
+           r.solicitante_id = ${usuario.id}
+           -- As pedidas EM NOME DE UM DEPENDENTE moram na área do responsável, e não se misturam com as
+           -- do próprio paciente (ADR-0033). Sem filtro de status: o vínculo encerrado também as exclui.
+           AND NOT EXISTS (
+             SELECT 1 FROM responsaveis_pacientes rp
+             WHERE rp.paciente_id = r.paciente_id AND rp.responsavel_user_id = ${usuario.id}
+           )
+         )
          OR r.paciente_id IN (
            SELECT p.id FROM pacientes p WHERE p.user_id = ${usuario.id}
          )

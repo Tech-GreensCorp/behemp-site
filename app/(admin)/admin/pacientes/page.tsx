@@ -51,7 +51,10 @@ import {
   Upload,
   User,
   UserPlus,
+  UsersRound,
 } from 'lucide-react';
+import { DialogoCriarResponsavel } from '@/components/admin/responsaveis/dialogo-criar-responsavel';
+import { ListaDeResponsaveis } from '@/components/admin/responsaveis/lista-de-responsaveis';
 
 // ── Configurações de display (mesmas da tela do médico) ────────
 
@@ -82,6 +85,10 @@ const JORNADA_LABELS: Record<string, { label: string; icon: string; color: strin
 const POR_PAGINA_OPCOES = [10, 20, 50];
 
 export default function AdminPacientesPage() {
+  const [criandoResponsavel, setCriandoResponsavel] = useState(false);
+  // Duas listas separadas na mesma tela: quem é paciente e quem responde por pacientes.
+  const [aba, setAba] = useState<'pacientes' | 'responsaveis'>('pacientes');
+  const [versaoResponsaveis, setVersaoResponsaveis] = useState(0);
   const [busca, setBusca] = useState('');
   const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
@@ -348,40 +355,62 @@ export default function AdminPacientesPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Gestão"
-        title="Pacientes"
+        title="Pacientes e responsáveis"
         description={
-          carregando
-            ? 'Carregando...'
-            : `${total} paciente${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`
+          aba === 'responsaveis'
+            ? 'Quem responde por pacientes dependentes'
+            : carregando
+              ? 'Carregando...'
+              : `${total} paciente${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}`
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={handleImportar}
-            />
+            {aba === 'pacientes' && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImportar}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 rounded-xl"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importando}
+                >
+                  {importando ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Upload size={14} />
+                  )}
+                  {importando ? 'Importando...' : 'Importar CSV / XLSX'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 rounded-xl"
+                  onClick={handleExportar}
+                  disabled={exportando || total === 0}
+                >
+                  {exportando ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  {exportando ? 'Exportando...' : 'Exportar CSV'}
+                </Button>
+              </>
+            )}
             <Button
               variant="outline"
-              size="sm"
               className="gap-2 rounded-xl"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importando}
+              onClick={() => setCriandoResponsavel(true)}
             >
-              {importando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              {importando ? 'Importando...' : 'Importar CSV / XLSX'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 rounded-xl"
-              onClick={handleExportar}
-              disabled={exportando || total === 0}
-            >
-              {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              {exportando ? 'Exportando...' : 'Exportar CSV'}
+              <UsersRound size={16} />
+              Novo responsável
             </Button>
             <Link href="/admin/pacientes/novo">
               <Button className="gap-2 rounded-xl" nativeButton={false}>
@@ -393,250 +422,316 @@ export default function AdminPacientesPage() {
         }
       />
 
-      {/* Filtros */}
-      <Card className="border-border/40 shadow-sm">
-        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2"
-            />
-            <Input
-              placeholder="Buscar por nome..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={filtroStatus} onValueChange={(v) => mudarFiltro(setFiltroStatus, v)}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Status">
-                {filtroStatus === 'todos'
-                  ? 'Todos os status'
-                  : (STATUS_LABELS[filtroStatus]?.label ?? filtroStatus)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os status</SelectItem>
-              {Object.entries(STATUS_LABELS).map(([valor, { label }]) => (
-                <SelectItem key={valor} value={valor}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filtroTratamento}
-            onValueChange={(v) => mudarFiltro(setFiltroTratamento, v)}
-          >
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Tratamento">
-                {filtroTratamento === 'todos'
-                  ? 'Todos os tipos'
-                  : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              {Object.entries(TRATAMENTO_LABELS).map(([valor, label]) => (
-                <SelectItem key={valor} value={valor}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filtroJornada} onValueChange={(v) => mudarFiltro(setFiltroJornada, v)}>
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Fase da jornada">
-                {filtroJornada === 'todos' ? (
-                  'Todas as fases'
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: JORNADA_LABELS[filtroJornada]?.color }}
-                    />
-                    {JORNADA_LABELS[filtroJornada]?.icon}{' '}
-                    {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
-                  </span>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as fases</SelectItem>
-              {Object.entries(JORNADA_LABELS).map(([key, { label, icon, color }]) => (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                    {icon} {label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      {/* Lista */}
-      {carregando ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={32} className="text-primary animate-spin" />
-        </div>
-      ) : erro ? (
-        <DataEmpty icon={<User size={24} />} title="Não foi possível carregar" description={erro} />
-      ) : pacientes.length === 0 ? (
-        <DataEmpty
-          icon={<User size={24} />}
-          title="Nenhum paciente encontrado"
-          description={
-            filtrando ? 'Tente ajustar os filtros' : 'Comece cadastrando ou importando pacientes'
-          }
+      {criandoResponsavel && (
+        <DialogoCriarResponsavel
+          onFechar={() => setCriandoResponsavel(false)}
+          onCriado={() => {
+            setAba('responsaveis');
+            setVersaoResponsaveis((v) => v + 1);
+          }}
         />
-      ) : (
-        <DataList>
-          <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
-            <span className="text-muted-foreground">
-              {qtdSelecionados > 0
-                ? `${qtdSelecionados} selecionado${qtdSelecionados !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
-                : 'Marque pacientes para enviar o comunicado da carta de doação em lote'}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 rounded-lg text-xs"
-                onClick={selecionarPagina}
+      )}
+
+      <div
+        role="tablist"
+        aria-label="Pacientes ou responsáveis"
+        className="border-border/40 flex gap-1 border-b"
+      >
+        {(
+          [
+            ['pacientes', 'Pacientes'],
+            ['responsaveis', 'Responsáveis'],
+          ] as const
+        ).map(([chave, rotulo]) => (
+          <button
+            key={chave}
+            type="button"
+            role="tab"
+            aria-selected={aba === chave}
+            onClick={() => setAba(chave)}
+            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              aba === chave
+                ? 'border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground border-transparent'
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'responsaveis' && <ListaDeResponsaveis versao={versaoResponsaveis} />}
+
+      {aba === 'pacientes' && (
+        <>
+          {/* Filtros */}
+          <Card className="border-border/40 shadow-sm">
+            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
+              <div className="relative flex-1">
+                <Search
+                  size={16}
+                  className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2"
+                />
+                <Input
+                  placeholder="Buscar por nome..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={filtroStatus} onValueChange={(v) => mudarFiltro(setFiltroStatus, v)}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Status">
+                    {filtroStatus === 'todos'
+                      ? 'Todos os status'
+                      : (STATUS_LABELS[filtroStatus]?.label ?? filtroStatus)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  {Object.entries(STATUS_LABELS).map(([valor, { label }]) => (
+                    <SelectItem key={valor} value={valor}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filtroTratamento}
+                onValueChange={(v) => mudarFiltro(setFiltroTratamento, v)}
               >
-                Selecionar esta página
-              </Button>
-              {qtdSelecionados > 0 && (
-                <>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Tratamento">
+                    {filtroTratamento === 'todos'
+                      ? 'Todos os tipos'
+                      : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os tipos</SelectItem>
+                  {Object.entries(TRATAMENTO_LABELS).map(([valor, label]) => (
+                    <SelectItem key={valor} value={valor}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filtroJornada} onValueChange={(v) => mudarFiltro(setFiltroJornada, v)}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Fase da jornada">
+                    {filtroJornada === 'todos' ? (
+                      'Todas as fases'
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: JORNADA_LABELS[filtroJornada]?.color }}
+                        />
+                        {JORNADA_LABELS[filtroJornada]?.icon}{' '}
+                        {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas as fases</SelectItem>
+                  {Object.entries(JORNADA_LABELS).map(([key, { label, icon, color }]) => (
+                    <SelectItem key={key} value={key}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        {icon} {label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+
+          {/* Lista */}
+          {carregando ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 size={32} className="text-primary animate-spin" />
+            </div>
+          ) : erro ? (
+            <DataEmpty
+              icon={<User size={24} />}
+              title="Não foi possível carregar"
+              description={erro}
+            />
+          ) : pacientes.length === 0 ? (
+            <DataEmpty
+              icon={<User size={24} />}
+              title="Nenhum paciente encontrado"
+              description={
+                filtrando
+                  ? 'Tente ajustar os filtros'
+                  : 'Comece cadastrando ou importando pacientes'
+              }
+            />
+          ) : (
+            <DataList>
+              <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                <span className="text-muted-foreground">
+                  {qtdSelecionados > 0
+                    ? `${qtdSelecionados} selecionado${qtdSelecionados !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
+                    : 'Marque pacientes para enviar o comunicado da carta de doação em lote'}
+                </span>
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 rounded-lg text-xs"
-                    onClick={() => setSelecionados({})}
+                    onClick={selecionarPagina}
                   >
-                    Limpar
+                    Selecionar esta página
                   </Button>
-                  <Button
-                    size="sm"
-                    className="h-7 gap-1.5 rounded-lg text-xs"
-                    onClick={prepararLote}
-                    disabled={preparandoLote}
-                  >
-                    {preparandoLote ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <FileSignature size={13} />
-                    )}
-                    Enviar carta de doação ({qtdSelecionados})
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          {pacientes.map((paciente) => {
-            const statusConfig =
-              STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
-            const jornada = paciente.jornadaFase ? JORNADA_LABELS[paciente.jornadaFase] : undefined;
-            return (
-              <DataRow
-                key={paciente.id}
-                href={`/admin/pacientes/${paciente.id}`}
-                leading={
-                  <span
-                    className="-m-2 p-2"
-                    onClick={(e) => {
-                      // A linha inteira é um link: marcar a caixa não pode navegar. O estado é
-                      // controlado por aqui; a caixa só mostra.
-                      e.preventDefault();
-                      e.stopPropagation();
-                      alternarSelecao(paciente, !(paciente.id in selecionados));
-                    }}
-                  >
-                    <Checkbox
-                      checked={paciente.id in selecionados}
-                      className="pointer-events-none"
-                      aria-label={`Selecionar ${paciente.nome} para o envio em lote`}
-                    />
-                  </span>
-                }
-                icon={
-                  <span className="font-heading text-secondary text-sm font-semibold">
-                    {paciente.nome.charAt(0).toUpperCase()}
-                  </span>
-                }
-                title={paciente.nome}
-                subtitle={paciente.email}
-                trailing={
-                  <>
-                    <div className="hidden items-center gap-2 sm:flex">
-                      <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                        <Stethoscope size={12} />
-                        {paciente.medicoNome ?? 'Sem médico'}
+                  {qtdSelecionados > 0 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 rounded-lg text-xs"
+                        onClick={() => setSelecionados({})}
+                      >
+                        Limpar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1.5 rounded-lg text-xs"
+                        onClick={prepararLote}
+                        disabled={preparandoLote}
+                      >
+                        {preparandoLote ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <FileSignature size={13} />
+                        )}
+                        Enviar carta de doação ({qtdSelecionados})
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {pacientes.map((paciente) => {
+                const statusConfig =
+                  STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
+                const jornada = paciente.jornadaFase
+                  ? JORNADA_LABELS[paciente.jornadaFase]
+                  : undefined;
+                return (
+                  <DataRow
+                    key={paciente.id}
+                    href={`/admin/pacientes/${paciente.id}`}
+                    leading={
+                      <span
+                        className="-m-2 p-2"
+                        onClick={(e) => {
+                          // A linha inteira é um link: marcar a caixa não pode navegar. O estado é
+                          // controlado por aqui; a caixa só mostra.
+                          e.preventDefault();
+                          e.stopPropagation();
+                          alternarSelecao(paciente, !(paciente.id in selecionados));
+                        }}
+                      >
+                        <Checkbox
+                          checked={paciente.id in selecionados}
+                          className="pointer-events-none"
+                          aria-label={`Selecionar ${paciente.nome} para o envio em lote`}
+                        />
                       </span>
-                      {jornada && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                          style={{
-                            backgroundColor: `${jornada.color}18`,
-                            color: jornada.color,
-                            border: `1px solid ${jornada.color}35`,
+                    }
+                    icon={
+                      <span className="font-heading text-secondary text-sm font-semibold">
+                        {paciente.nome.charAt(0).toUpperCase()}
+                      </span>
+                    }
+                    title={paciente.nome}
+                    subtitle={
+                      paciente.email ??
+                      (paciente.responsavelNome ? 'Dependente · sem e-mail próprio' : 'Sem e-mail')
+                    }
+                    trailing={
+                      <>
+                        <div className="hidden items-center gap-2 sm:flex">
+                          {paciente.responsavelNome && (
+                            <Badge
+                              variant="secondary"
+                              className="gap-1 text-xs"
+                              title={`Responsável: ${paciente.responsavelNome}`}
+                            >
+                              <UsersRound size={12} />
+                              Responsável: {paciente.responsavelNome.split(' ')[0]}
+                            </Badge>
+                          )}
+                          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                            <Stethoscope size={12} />
+                            {paciente.medicoNome ?? 'Sem médico'}
+                          </span>
+                          {jornada && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: `${jornada.color}18`,
+                                color: jornada.color,
+                                border: `1px solid ${jornada.color}35`,
+                              }}
+                            >
+                              <span>{jornada.icon}</span>
+                              {jornada.label}
+                            </span>
+                          )}
+                          {paciente.tratamentoTipo && (
+                            <Badge variant="outline" className="text-xs">
+                              {TRATAMENTO_LABELS[paciente.tratamentoTipo] ??
+                                paciente.tratamentoTipo}
+                            </Badge>
+                          )}
+                          <Badge variant={statusConfig.variant} className="text-xs">
+                            {statusConfig.label}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Arquivar paciente"
+                          aria-label={`Arquivar ${paciente.nome}`}
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            // A linha inteira é um link: o clique aqui não pode navegar.
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMotivoArquivo('');
+                            setParaArquivar(paciente);
                           }}
                         >
-                          <span>{jornada.icon}</span>
-                          {jornada.label}
-                        </span>
-                      )}
-                      {paciente.tratamentoTipo && (
-                        <Badge variant="outline" className="text-xs">
-                          {TRATAMENTO_LABELS[paciente.tratamentoTipo] ?? paciente.tratamentoTipo}
-                        </Badge>
-                      )}
-                      <Badge variant={statusConfig.variant} className="text-xs">
-                        {statusConfig.label}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Arquivar paciente"
-                      aria-label={`Arquivar ${paciente.nome}`}
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        // A linha inteira é um link: o clique aqui não pode navegar.
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setMotivoArquivo('');
-                        setParaArquivar(paciente);
-                      }}
-                    >
-                      <Archive size={16} />
-                    </Button>
-                    <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-                  </>
-                }
-              />
-            );
-          })}
-        </DataList>
-      )}
+                          <Archive size={16} />
+                        </Button>
+                        <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                      </>
+                    }
+                  />
+                );
+              })}
+            </DataList>
+          )}
 
-      {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
-        <PaginationBar
-          page={pagina}
-          totalPages={totalPaginas}
-          onPageChange={setPagina}
-          totalItems={total}
-          itemLabel="paciente"
-          pageSize={porPagina}
-          onPageSizeChange={mudarPorPagina}
-          pageSizeOptions={POR_PAGINA_OPCOES}
-        />
+          {totalPaginas > 0 && !carregando && pacientes.length > 0 && (
+            <PaginationBar
+              page={pagina}
+              totalPages={totalPaginas}
+              onPageChange={setPagina}
+              totalItems={total}
+              itemLabel="paciente"
+              pageSize={porPagina}
+              onPageSizeChange={mudarPorPagina}
+              pageSizeOptions={POR_PAGINA_OPCOES}
+            />
+          )}
+        </>
       )}
 
       <AlertDialog

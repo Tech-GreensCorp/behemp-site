@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { users, pacientes, medicos, consultas } from '@/db/schema';
 import { eq, and, ne, isNull, inArray, gt, asc, desc, sql } from 'drizzle-orm';
 import { verificarAdmin } from '@/lib/auth';
+import { contarDependentesAtivos } from '@/lib/auth/escopo-do-responsavel';
+import { DOMINIO_DO_EMAIL_TECNICO } from '@/lib/dependentes/regras';
 import { registrarAuditoria } from '@/lib/utils/audit';
 import { clerkClient } from '@clerk/nextjs/server';
 import { z } from 'zod';
@@ -45,7 +47,7 @@ export async function listarUsuariosAdmin(params?: {
   total: number;
   totalFiltrado: number;
   totalPaginas: number;
-  porRole: { admins: number; medicos: number; pacientes: number };
+  porRole: { admins: number; medicos: number; pacientes: number; responsaveis: number };
 }>> {
   try {
     const auth = await verificarAdmin();
@@ -57,7 +59,12 @@ export async function listarUsuariosAdmin(params?: {
 
     // --- Condições de filtro ---
     // Usuário apagado (soft delete) não aparece, nem nas contagens.
-    const condicoes = [sql`${users.deletedAt} IS NULL`];
+    // O dependente tem um `users` TÉCNICO (`@dependente.invalid`, sem login): não é um usuário da plataforma e
+    // não aparece aqui, nem nas contagens. Ele é um PACIENTE, e mora em Pacientes (ADR-0033 D-04).
+    const condicoes = [
+      sql`${users.deletedAt} IS NULL`,
+      sql`${users.email} NOT LIKE ${'%@' + DOMINIO_DO_EMAIL_TECNICO}`,
+    ];
 
     if (params?.busca) {
       condicoes.push(
@@ -65,7 +72,7 @@ export async function listarUsuariosAdmin(params?: {
       );
     }
     if (params?.role) {
-      condicoes.push(eq(users.role, params.role as 'admin' | 'medico' | 'paciente'));
+      condicoes.push(eq(users.role, params.role as 'admin' | 'medico' | 'paciente' | 'responsavel'));
     }
 
     const whereClause =
@@ -115,12 +122,20 @@ export async function listarUsuariosAdmin(params?: {
         COUNT(*) FILTER (WHERE role = 'admin')::int as admins,
         COUNT(*) FILTER (WHERE role = 'medico')::int as medicos,
         COUNT(*) FILTER (WHERE role = 'paciente')::int as pacientes,
+        COUNT(*) FILTER (WHERE role = 'responsavel')::int as responsaveis,
         COUNT(*)::int as total
       FROM users
       WHERE deleted_at IS NULL
+        AND email NOT LIKE ${'%@' + DOMINIO_DO_EMAIL_TECNICO}
     `);
 
-    const c = contagem.rows[0] as { admins: number; medicos: number; pacientes: number; total: number };
+    const c = contagem.rows[0] as {
+      admins: number;
+      medicos: number;
+      pacientes: number;
+      responsaveis: number;
+      total: number;
+    };
 
     return {
       sucesso: true,
@@ -133,6 +148,7 @@ export async function listarUsuariosAdmin(params?: {
           admins: c.admins,
           medicos: c.medicos,
           pacientes: c.pacientes,
+          responsaveis: c.responsaveis,
         },
       },
     };
@@ -335,6 +351,16 @@ export async function excluirUsuarioAdmin(
     }
     if (usuario.role === 'admin' && !(await existeOutroAdmin(usuarioId))) {
       return { sucesso: false, erro: 'Este é o único admin ativo e não pode ser apagado' };
+    }
+
+    // ADR-0033 D-16: quem responde por dependentes NÃO se apaga enquanto houver vínculo ATIVO: os dependentes
+    // ficariam sem ninguém, com o vínculo apontando para uma conta apagada. Só o admin encerra o vínculo (P-07).
+    const dependentesAtivos = await contarDependentesAtivos(usuarioId);
+    if (dependentesAtivos > 0) {
+      return {
+        sucesso: false,
+        erro: `Este responsável tem ${dependentesAtivos} dependente(s) com vínculo ativo. Encerre os vínculos antes de apagar a conta.`,
+      };
     }
 
     if (usuario.clerkId) {

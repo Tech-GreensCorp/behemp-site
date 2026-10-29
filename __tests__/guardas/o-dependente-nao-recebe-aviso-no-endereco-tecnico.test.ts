@@ -140,3 +140,16 @@ describe('o filtro EXECUTADO', () => {
     aviso.mockRestore();
   });
 });
+
+describe('o dependente também não aparece onde se escolhe alguém para conversar', () => {
+  it('🔴 a busca de usuários do chat exclui o endereço técnico, nas duas consultas', () => {
+    const c = PRODUCAO.find((f) => f.caminho === 'app/_actions/chat.ts')!.codigo;
+    const busca = c.slice(
+      c.indexOf('export async function buscarUsuariosChat'),
+      c.indexOf('export async function contarMensagensNaoLidas'),
+    );
+    expect(busca.length).toBeGreaterThan(300);
+    expect(busca).toMatch(/DOMINIO_DO_EMAIL_TECNICO/);
+    expect([...busca.matchAll(/u\.email NOT LIKE \$\{semTecnicos\}/g)]).toHaveLength(2);
+  });
+});

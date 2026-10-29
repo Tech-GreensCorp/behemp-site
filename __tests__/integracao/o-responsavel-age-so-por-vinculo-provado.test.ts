@@ -47,9 +47,26 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 const { db } = await import('@/lib/db');
 const schema = await import('@/db/schema');
 const { cadastrarDependente } = await import('@/app/_actions/dependentes');
+const { CAMPOS_INTERNOS_DA_ASSOCIACAO } = await import('@/lib/dependentes/ficha-do-dependente');
 const { garantirResponsavelDoPaciente, listarDependentesDoResponsavel } = await import(
   '@/lib/auth/escopo-do-responsavel'
 );
+
+/**
+ * Os campos INTERNOS da associação, ESCRITOS AQUI de propósito. Quem decide que um campo é da equipe e não do
+ * responsável é o NEGÓCIO (Dryelle, 29/10/2026), e a lista do código não pode ser a régua do próprio teste: se um
+ * campo sair dela, um teste que a percorre deixa de conferi-lo (foi o que a sabotagem A2 mostrou). Mudar esta
+ * lista é mudar a política: precisa de decisão do dono.
+ */
+const INTERNOS_DA_EQUIPE = [
+  'atendimento',
+  'categorizacao',
+  'dataAssociacao',
+  'entradaPaciente',
+  'etapa',
+  'termoAssociado',
+  'valorContribuicao',
+] as const;
 
 const CPF_A = '529.982.247-25';
 const CPF_OUTRO = '111.444.777-35';
@@ -412,5 +429,128 @@ describe('dado inválido é recusado e NADA é gravado', () => {
     expect(await contar('vinculos')).toBe(1);
     const [resp] = await db.select().from(schema.responsaveis);
     expect(resp.cpf).toBe('52998224725'); // o CPF original NÃO foi sobrescrito
+  });
+});
+
+describe('o cadastro do dependente usa a ficha COMPLETA do cadastro da equipe (29/10/2026)', () => {
+  const fichaCompleta = () =>
+    dependenteValido({
+      nome: 'Maria Dependente',
+      rg: '12.345.678-9',
+      genero: 'feminino',
+      cep: '01310-100',
+      endereco: 'Av. Paulista, 1000',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      peso: '18',
+      altura: '110',
+      historicoMedico: 'Asma leve',
+      patologia: 'Epilepsia refratária',
+      cid: 'G40.9',
+      tratamentoTipo: 'cbd',
+      hospitalProximo: 'Hospital da Criança',
+      homeCare: 'nao',
+      possuiPlanoSaude: 'sim',
+      planoSaude: 'Plano X',
+      rendaFamilia: 'até 3 salários',
+      temAdvogado: 'nao',
+      comoConheceu: 'Indicação',
+      processoJudicializacao: '',
+    });
+
+  async function fichaDoUltimo() {
+    const [p] = await db
+      .select()
+      .from(schema.pacientes)
+      .orderBy(sql`created_at desc`)
+      .limit(1);
+    return p;
+  }
+
+  it('grava os campos pessoais, de endereço, clínicos e de plano, e o em branco vira NULL', async () => {
+    const r = await cadastrarDependente(fichaCompleta());
+    expect(r.sucesso, r.erro).toBe(true);
+    const p = await fichaDoUltimo();
+    expect(p).toMatchObject({
+      rg: '12.345.678-9',
+      genero: 'feminino',
+      cep: '01310-100',
+      endereco: 'Av. Paulista, 1000',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      peso: '18',
+      altura: '110',
+      historicoMedico: 'Asma leve',
+      patologia: 'Epilepsia refratária',
+      cid: 'G40.9',
+      tratamentoTipo: 'cbd',
+      hospitalProximo: 'Hospital da Criança',
+      homeCare: 'nao',
+      possuiPlanoSaude: 'sim',
+      planoSaude: 'Plano X',
+      rendaFamilia: 'até 3 salários',
+      comoConheceu: 'Indicação',
+      status: 'aguardando_consulta',
+      medicoId: null,
+    });
+    // `''` não vira texto vazio: vira NULL, como no cadastro da equipe.
+    expect(p.processoJudicializacao).toBeNull();
+  });
+
+  it('🔴 os campos INTERNOS da associação são descartados no servidor, mesmo mandados por fora da tela', async () => {
+    const r = await cadastrarDependente(
+      dependenteValido({
+        valorContribuicao: 'R$ 9.999,00',
+        termoAssociado: 'TERMO-123',
+        categorizacao: 'VIP',
+        etapa: 'Etapa 9',
+        atendimento: 'Presencial',
+        entradaPaciente: 'ENT-1',
+        dataAssociacao: '2020-01-01',
+      }),
+    );
+    expect(r.sucesso, r.erro).toBe(true);
+    const p = await fichaDoUltimo();
+    for (const campo of INTERNOS_DA_EQUIPE) {
+      expect((p as Record<string, unknown>)[campo], campo).toBeNull();
+    }
+    // A lista do código É a política escrita acima: se divergirem, alguém mudou a regra sem o dono.
+    expect([...CAMPOS_INTERNOS_DA_ASSOCIACAO].sort()).toEqual([...INTERNOS_DA_EQUIPE].sort());
+  });
+
+  it('o responsável LEGADO vem do vínculo, e não do que o formulário mandar', async () => {
+    const r = await cadastrarDependente(
+      dependenteValido({
+        responsavelNome: 'Outra Pessoa',
+        responsavelCpf: '111.444.777-35',
+        email: 'x@y.com',
+        telefone: '11999999999',
+      }),
+    );
+    expect(r.sucesso, r.erro).toBe(true);
+    const p = await fichaDoUltimo();
+    expect(p.responsavelNome).toBe('Usuário respA');
+    expect(p.responsavelCpf).toBe('529.982.247-25');
+    // O dependente não tem contato próprio: o e-mail e o telefone mandados são ignorados.
+    const [u] = await db.select().from(schema.users).where(eq(schema.users.id, p.userId));
+    expect(u.email).toMatch(/@dependente\.invalid$/);
+    expect(u.telefone).toBeNull();
+  });
+
+  it('o CPF do próprio dependente é opcional, mas se vier tem de ser válido', async () => {
+    expect((await cadastrarDependente(dependenteValido({ cpf: '123.456.789-00' }))).sucesso).toBe(
+      false,
+    );
+    expect(await contar('pacientes')).toBe(0);
+    const ok = await cadastrarDependente(dependenteValido({ cpf: '111.444.777-35' }));
+    expect(ok.sucesso, ok.erro).toBe(true);
+    expect((await fichaDoUltimo()).cpf).toBe('111.444.777-35');
+  });
+
+  it('o tipo de tratamento segue o enum do cadastro da equipe', async () => {
+    expect((await cadastrarDependente(dependenteValido({ tratamentoTipo: 'xyz' }))).sucesso).toBe(
+      false,
+    );
+    expect(await contar('pacientes')).toBe(0);
   });
 });

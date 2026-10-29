@@ -18,7 +18,7 @@
  * ⚠️ O vínculo encerrado NÃO abre acesso: o filtro é `status = 'ativo'`, e o índice único parcial do
  * banco garante que só há um responsável ativo por paciente (P-07).
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { pacientes, responsaveisPacientes, users } from '@/db/schema';
@@ -53,17 +53,36 @@ const NAO_ENCONTRADO = 'Paciente não encontrado';
 const PAPEIS_QUE_PODEM_RESPONDER: string[] = ['responsavel', 'paciente'];
 
 /** O responsável da sessão, lido do banco. `null` para quem não pode responder por ninguém. */
-export async function responsavelDaSessao(): Promise<{ id: string } | null> {
+export async function responsavelDaSessao(): Promise<{
+  id: string;
+  nome: string;
+  email: string;
+} | null> {
   const perm = await obterUsuarioAtual();
   if (!perm.autorizado || !perm.clerkId) return null;
 
   const [user] = await db
-    .select({ id: users.id, role: users.role })
+    .select({ id: users.id, nome: users.nome, email: users.email, role: users.role })
     .from(users)
     .where(and(eq(users.clerkId, perm.clerkId), isNull(users.deletedAt)))
     .limit(1);
 
-  return user && PAPEIS_QUE_PODEM_RESPONDER.includes(user.role) ? { id: user.id } : null;
+  return user && PAPEIS_QUE_PODEM_RESPONDER.includes(user.role)
+    ? { id: user.id, nome: user.nome, email: user.email }
+    : null;
+}
+
+/**
+ * A conta tem a PRÓPRIA ficha de paciente? É isto, e não o papel, que decide se o menu oferece "Minha área de paciente": quem só se
+ * cadastrou como responsável não é paciente, e o papel do Clerk pode estar defasado (ver `obterRoleComFallback`).
+ */
+export async function temFichaDePaciente(userId: string): Promise<boolean> {
+  const [ficha] = await db
+    .select({ id: pacientes.id })
+    .from(pacientes)
+    .where(and(eq(pacientes.userId, userId), isNull(pacientes.deletedAt)))
+    .limit(1);
+  return !!ficha;
 }
 
 /**
@@ -142,4 +161,22 @@ export async function listarDependentesDoResponsavel(): Promise<DependenteDoResp
       ),
     )
     .orderBy(users.nome);
+}
+
+/**
+ * Quantos dependentes com vínculo ATIVO uma conta tem. NÃO é regra de acesso (quem pode ver quem é `garantirResponsavelDoPaciente`):
+ * serve ao admin para recusar apagar um responsável cujos dependentes ficariam sem ninguém (ADR-0033 D-16). Fica aqui para que a
+ * leitura de `responsaveis_pacientes` continue num lugar só.
+ */
+export async function contarDependentesAtivos(responsavelUserId: string): Promise<number> {
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(responsaveisPacientes)
+    .where(
+      and(
+        eq(responsaveisPacientes.responsavelUserId, responsavelUserId),
+        eq(responsaveisPacientes.status, 'ativo'),
+      ),
+    );
+  return total;
 }

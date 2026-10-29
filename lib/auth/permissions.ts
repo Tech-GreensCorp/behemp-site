@@ -219,6 +219,10 @@ export async function obterRoleComFallback(): Promise<{
       console.warn(
         `[Auth] Nenhum registro no banco para clerkId ${user.id} — usando default 'paciente'`,
       );
+      // 🔴 O default NÃO vai para o Clerk: sem linha no banco ainda não se sabe o papel (o `/registrar-se` guarda o perfil
+      // `responsavel` no `unsafeMetadata`, e quem cria a linha — webhook ou `/redirect` — é quem o lê). Gravar 'paciente' aqui
+      // fixava o papel errado no `publicMetadata`, que é lido PRIMEIRO, e o responsável passava a entrar como paciente.
+      precisaSincronizar = false;
     }
   } catch (dbError) {
     console.error('[Auth] Erro ao buscar role no banco:', dbError);

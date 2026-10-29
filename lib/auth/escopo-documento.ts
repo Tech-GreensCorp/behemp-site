@@ -17,6 +17,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { documentos, medicos, pacientes, users } from '@/db/schema';
+import { garantirResponsavelDoPaciente } from '@/lib/auth/escopo-do-responsavel';
 import { obterUsuarioAtual } from '@/lib/auth/permissions';
 
 export type ResultadoDeLeitura =
@@ -78,6 +79,14 @@ export async function garantirLeitorDoDocumento(documentoId: string): Promise<Re
 
   // 1) o próprio paciente
   if (paciente.userId === user.id) return { ok: true, documento: doc, userId: user.id };
+
+  // O RESPONSÁVEL abre o documento de um DEPENDENTE dele (ADR-0033). A regra é UMA SÓ e mora no resolvedor
+  // (`garantirResponsavelDoPaciente`): vínculo `ativo`, papel lido do banco, 404 indistinto. Esta função não a
+  // reescreve: uma segunda cópia divergiria da primeira.
+  if (user.role === 'responsavel' || user.role === 'paciente') {
+    const g = await garantirResponsavelDoPaciente(doc.pacienteId);
+    if (g.ok) return { ok: true, documento: doc, userId: user.id };
+  }
 
   // 2) o médico DESTE paciente — a conjunção é o que importa
   if (user.role === 'medico') {

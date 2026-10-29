@@ -7,10 +7,13 @@
  * admin (ADR-0033 D-13). Por isso esta função não recebe `pacienteId` nenhum.
  *
  * ⚠️ Mais um criador de ficha (D-09 conta 9 pontos de inserção em `pacientes`). Fica centralizado AQUI,
- * e não solto num décimo lugar.
+ * e não solto num décimo lugar. A ficha usa os MESMOS campos e o MESMO mapeamento do cadastro administrativo
+ * (`lib/pacientes/ficha.ts`): `camposDaFicha`.
  *
  * O que ela grava: um `users` técnico (D-04: papel `paciente`, SEM `clerkId`, e-mail que não existe), a
- * ficha em `pacientes`, o vínculo `ativo`, e o CPF do responsável em `responsaveis` (P-16).
+ * ficha em `pacientes`, o vínculo `ativo`, e o CPF do responsável em `responsaveis` (P-16). Os campos legados
+ * `pacientes.responsavel_nome` e `responsavel_cpf` são preenchidos com o responsável do VÍNCULO, para as telas
+ * de médico e admin que ainda os leem mostrarem quem responde pelo paciente.
  *
  * `dbTransacional()` e NÃO `db`: `db` resolve para `neon-http` em produção, que não implementa
  * `transaction()` (o método é um `throw`), e foi a causa raiz do Fluxo 1 · Portão 1.
@@ -20,21 +23,25 @@ import { eq } from 'drizzle-orm';
 
 import { pacientes, responsaveis, responsaveisPacientes, users } from '@/db/schema';
 import { dbTransacional } from '@/lib/db/transacional';
+import type { FichaDoDependente } from '@/lib/dependentes/ficha-do-dependente';
 import { emailTecnicoDoDependente } from '@/lib/dependentes/regras';
-import { somenteDigitosDoCpf } from '@/lib/validacao/cpf';
+import { semCamposVazios } from '@/lib/pacientes/edicao';
+import { camposDaFicha } from '@/lib/pacientes/ficha';
+import { formatarCpf, somenteDigitosDoCpf } from '@/lib/validacao/cpf';
 
 /** Erro com mensagem SEGURA para o usuário (sem detalhe interno, sem dado pessoal). */
 export class ErroDoDependente extends Error {}
 
 export interface EntradaDoDependente {
-  /** id interno de `users` do responsável, já PROVADO pela action (papel `responsavel`). */
+  /** id interno de `users` do responsável, já PROVADO pela action (papel que pode responder). */
   responsavelUserId: string;
-  nome: string;
-  /** `AAAA-MM-DD`, já validada como data plausível. O dependente pode ter QUALQUER idade. */
-  dataNascimento: string;
-  parentesco: string;
+  /** Nome do responsável (`users.nome`), para o campo legado `pacientes.responsavel_nome`. */
+  responsavelNome: string;
   /** CPF do responsável (qualquer formatação). Já validado pela action. */
   cpfDoResponsavel: string;
+  parentesco: string;
+  /** A ficha, já validada por `fichaDoDependenteSchema`. O dependente pode ter QUALQUER idade. */
+  ficha: FichaDoDependente;
 }
 
 export interface DependenteCriado {
@@ -44,6 +51,8 @@ export interface DependenteCriado {
 
 export async function criarDependente(entrada: EntradaDoDependente): Promise<DependenteCriado> {
   const cpf = somenteDigitosDoCpf(entrada.cpfDoResponsavel);
+  // `''` = campo em branco no formulário: some do INSERT e a coluna fica NULL (como no cadastro da equipe).
+  const ficha = semCamposVazios(entrada.ficha);
 
   return dbTransacional().transaction(async (tx) => {
     // ── O responsável (1:1 com users). `onConflictDoNothing` cobre a corrida entre dois cadastros.
@@ -73,17 +82,21 @@ export async function criarDependente(entrada: EntradaDoDependente): Promise<Dep
       .insert(users)
       .values({
         email: emailTecnicoDoDependente(createId()),
-        nome: entrada.nome,
+        nome: ficha.nome,
         role: 'paciente',
       })
       .returning({ id: users.id });
 
-    const [ficha] = await tx
+    const [fichaCriada] = await tx
       .insert(pacientes)
       .values({
         userId: tecnico.id,
         medicoId: null,
-        dataNascimento: entrada.dataNascimento,
+        ...camposDaFicha({
+          ...ficha,
+          responsavelNome: entrada.responsavelNome,
+          responsavelCpf: formatarCpf(cpf),
+        }),
         status: 'aguardando_consulta',
         jornadaFase: 'acolhimento',
       })
@@ -94,11 +107,11 @@ export async function criarDependente(entrada: EntradaDoDependente): Promise<Dep
       .insert(responsaveisPacientes)
       .values({
         responsavelUserId: entrada.responsavelUserId,
-        pacienteId: ficha.id,
+        pacienteId: fichaCriada.id,
         parentesco: entrada.parentesco,
       })
       .returning({ id: responsaveisPacientes.id });
 
-    return { pacienteId: ficha.id, vinculoId: vinculo.id };
+    return { pacienteId: fichaCriada.id, vinculoId: vinculo.id };
   });
 }

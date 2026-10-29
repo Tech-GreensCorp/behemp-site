@@ -340,7 +340,12 @@ export async function enviarEmailRecompraCompletoEquipe(params: {
 }): Promise<void> {
   if (params.destinatarios.length === 0) return;
 
-  const roleLabel = params.solicitanteRole === 'medico' ? 'Médico' : 'Paciente';
+  const roleLabel =
+    params.solicitanteRole === 'medico'
+      ? 'Médico'
+      : params.solicitanteRole === 'responsavel'
+        ? 'Responsável'
+        : 'Paciente';
   const dataInicioFormatada = new Date(params.dataInicioUso).toLocaleDateString('pt-BR');
   const dataTerminoFormatada = new Date(params.dataTermino).toLocaleDateString('pt-BR');
 

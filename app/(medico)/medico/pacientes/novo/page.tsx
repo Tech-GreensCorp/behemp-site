@@ -32,7 +32,8 @@ import {
 /**
  * Página de criação de novo paciente — formulário completo.
  * Design: Organic / Editorial Caloroso.
- * Seções: Dados Pessoais | Endereço | Dados Clínicos | Dados da Associação | Responsável
+ * Seções: Dados Pessoais | Endereço | Dados Clínicos | Dados da Associação | Representação Legal
+ * (o responsável por dependente NÃO se cadastra aqui: é o "Novo responsável", ADR-0033).
  */
 export default function NovoPacientePage() {
   const router = useRouter();
@@ -78,9 +79,6 @@ export default function NovoPacientePage() {
     valorContribuicao: '',
     processoJudicializacao: '',
     tratamentoTipo: '' as '' | 'cbd' | 'thc' | 'cbd_thc',
-    // Responsável
-    responsavelNome: '',
-    responsavelCpf: '',
   });
 
   function updateField(campo: string, valor: string) {
@@ -529,37 +527,17 @@ export default function NovoPacientePage() {
           </CardContent>
         </Card>
 
-        {/* ── 5. Responsável / Representação Legal ────── */}
+        {/* ── 5. Representação Legal (advogado e judicialização) ────── */}
         <Card className="border-border/40 shadow-sm">
           <CardHeader className="border-b border-border/30 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#D4A388]/15">
                 <Users size={16} className="text-[#B08B6E]" />
               </div>
-              <CardTitle className="font-heading text-lg">Responsável / Representação Legal</CardTitle>
+              <CardTitle className="font-heading text-lg">Representação Legal</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="responsavelNome">Nome do Responsável</Label>
-              <Input
-                id="responsavelNome"
-                value={dados.responsavelNome}
-                onChange={(e) => updateField('responsavelNome', e.target.value)}
-                placeholder="Nome completo do responsável"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="responsavelCpf">CPF do Responsável</Label>
-              <Input
-                id="responsavelCpf"
-                value={dados.responsavelCpf}
-                onChange={(e) => updateField('responsavelCpf', e.target.value)}
-                placeholder="000.000.000-00"
-              />
-            </div>
-
             <div>
               <Label htmlFor="temAdvogado">Possui advogado?</Label>
               <Select

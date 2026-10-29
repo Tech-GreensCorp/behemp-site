@@ -437,7 +437,7 @@ de passagem.**
       o usuário no Clerk (`:251`) e faz soft delete de `users` e `pacientes`, **sem `registrarAuditoria`**: qualquer
       sessão a chama sem passar pela tela. Complementa o **Item 74** (texto que promete apagar tudo e mantém). **Não
       corrigido.** **Decidido por Dryelle (P-17a):** só o admin exclui contas, para todos os papéis; a autoexclusão sai (ADR-0033 D-16). **Entregue, 28/10/2026 (local, sem commit, branch `feat/papel-responsavel-e-dependentes`):** (1) o Google saiu de todo o `/registrar-se` e o `<SignIn/>` do `/entrar` passa `transferable={false}`; guarda `o-cadastro-nao-oferece-google` (6 casos, 8 sabotagens vermelhas); **o efeito com um Google inexistente NÃO foi testado**. (2) A autoexclusão foi **removida** (action, botão, diálogo e estado da tela do perfil); guarda `so-o-admin-exclui-conta` (5 casos, verde). **Falta (D-16):** o admin recusar apagar responsável com vínculo ativo.
-- [ ] 🟠 **Item 91 — CATALOGADO, 28/10/2026 (ADR-0033, proposta): papel "Responsável" com login e vínculo a pacientes
+- [ ] 🟠 **Item 91 — 29/10/2026: área por dependente, recompra e documento por vínculo e criação de responsável pelo admin feitos localmente; falta ligar as telas de admin (hook de escopo, aguarda `path:` do dono).** CATALOGADO, 28/10/2026 (ADR-0033, proposta): papel "Responsável" com login e vínculo a pacientes
       dependentes.** Hoje uma mãe que recebe os medicamentos de dois filhos não entra nem age por eles, e as crianças
       são pacientes comuns. O "responsável" que existe é texto (`pacientes.responsavelNome`/`responsavelCpf`). **O
       raio é o modelo de acesso inteiro:** 84 pontos de 50 arquivos resolvem "o paciente sou eu" por

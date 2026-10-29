@@ -17,6 +17,7 @@ import { garantirContaDeAcesso, type ResultadoDoAcesso } from '@/lib/pacientes/c
 import { trocarEmailNoClerk } from '@/lib/pacientes/clerk-email';
 import { cancelarPendentesPorTrocaDeEmail } from '@/lib/comunicados/assinatura';
 import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/erro-de-cadastro';
+import { camposDaFicha, criarPacienteSchema } from '@/lib/pacientes/ficha';
 
 /**
  * Server Actions de pacientes.
@@ -24,50 +25,6 @@ import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/err
  */
 
 // ── Schemas ───────────────────────────────────────────────────
-
-const criarPacienteSchema = z.object({
-  // Dados pessoais
-  nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  email: z.string().email('E-mail inválido'),
-  telefone: z.string().optional(),
-  dataNascimento: z.string().optional(),
-  cpf: z.string().optional(),
-  rg: z.string().optional(),
-  genero: z.string().optional(),
-  // Endereço
-  cep: z.string().optional(),
-  endereco: z.string().optional(),
-  cidade: z.string().optional(),
-  uf: z.string().optional(),
-  // Dados clínicos
-  peso: z.string().optional(),
-  altura: z.string().optional(),
-  historicoMedico: z.string().optional(),
-  patologia: z.string().optional(),
-  // Dados da associação
-  atendimento: z.string().optional(),
-  temAdvogado: z.string().optional(),
-  nomeAdvogado: z.string().optional(),
-  cid: z.string().optional(),
-  categorizacao: z.string().optional(),
-  comoConheceu: z.string().optional(),
-  dataAssociacao: z.string().optional(),
-  entradaPaciente: z.string().optional(),
-  etapa: z.string().optional(),
-  hospitalProximo: z.string().optional(),
-  homeCare: z.string().optional(),
-  planoSaude: z.string().optional(),
-  possuiPlanoSaude: z.string().optional(),
-  rendaFamilia: z.string().optional(),
-  termoAssociado: z.string().optional(),
-  valorContribuicao: z.string().optional(),
-  processoJudicializacao: z.string().optional(),
-  // Responsável
-  responsavelNome: z.string().optional(),
-  responsavelCpf: z.string().optional(),
-  // Tratamento
-  tratamentoTipo: z.enum(['cbd', 'thc', 'cbd_thc']).optional(),
-});
 
 const atualizarPacienteSchema = criarPacienteSchema.partial().extend({
   pacienteId: z.string().min(1, 'ID do paciente é obrigatório'),
@@ -147,38 +104,7 @@ export async function criarPaciente(
       .values({
         userId,
         medicoId,
-        dataNascimento: d.dataNascimento,
-        cpf: d.cpf,
-        rg: d.rg,
-        genero: d.genero,
-        cep: d.cep,
-        endereco: d.endereco,
-        cidade: d.cidade,
-        uf: d.uf,
-        peso: d.peso,
-        altura: d.altura,
-        historicoMedico: d.historicoMedico,
-        patologia: d.patologia,
-        atendimento: d.atendimento,
-        temAdvogado: d.temAdvogado,
-        nomeAdvogado: d.nomeAdvogado,
-        cid: d.cid,
-        categorizacao: d.categorizacao,
-        comoConheceu: d.comoConheceu,
-        dataAssociacao: d.dataAssociacao,
-        entradaPaciente: d.entradaPaciente,
-        etapa: d.etapa,
-        hospitalProximo: d.hospitalProximo,
-        homeCare: d.homeCare,
-        planoSaude: d.planoSaude,
-        possuiPlanoSaude: d.possuiPlanoSaude,
-        rendaFamilia: d.rendaFamilia,
-        termoAssociado: d.termoAssociado,
-        valorContribuicao: d.valorContribuicao,
-        processoJudicializacao: d.processoJudicializacao,
-        responsavelNome: d.responsavelNome,
-        responsavelCpf: d.responsavelCpf,
-        tratamentoTipo: d.tratamentoTipo,
+        ...camposDaFicha(d),
         status: 'aguardando_consulta',
       })
       .returning({ id: pacientes.id });

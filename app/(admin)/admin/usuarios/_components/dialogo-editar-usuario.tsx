@@ -31,7 +31,11 @@ export interface UsuarioEditavel {
   role: string | null;
 }
 
-const PAPEIS: Record<string, string> = { admin: 'Admin', paciente: 'Paciente' };
+const PAPEIS: Record<string, string> = {
+  admin: 'Admin',
+  paciente: 'Paciente',
+  responsavel: 'Responsável',
+};
 
 /**
  * Edição de usuário pelo admin: nome, telefone e papel (admin ↔ paciente).
@@ -136,11 +140,15 @@ export function DialogoEditarUsuario({
                   <SelectValue>{PAPEIS[role] ?? role}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PAPEIS).map(([valor, rotulo]) => (
-                    <SelectItem key={valor} value={valor}>
-                      {rotulo}
-                    </SelectItem>
-                  ))}
+                  {/* `Responsável` só aparece para quem JÁ é responsável: um paciente não vira responsável por
+                      aqui (a ficha dele ficaria sem dono); ele cadastra dependentes na própria conta. */}
+                  {Object.entries(PAPEIS)
+                    .filter(([valor]) => valor !== 'responsavel' || usuario.role === 'responsavel')
+                    .map(([valor, rotulo]) => (
+                      <SelectItem key={valor} value={valor}>
+                        {rotulo}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             )}
