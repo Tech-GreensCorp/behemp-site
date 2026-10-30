@@ -53,6 +53,20 @@ const SHEETS_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PU
 
 const ITENS_POR_PAGINA = 20;
 
+/**
+ * Salva o blob pelo link de download. A URL só é liberada depois de um tempo: o navegador lê o
+ * blob de forma assíncrona depois do clique, e revogar no mesmo tick pode cancelar o download
+ * (Safari). 40 s é o prazo que o FileSaver.js usa.
+ */
+function salvarArquivo(blob: Blob, nomeArquivo: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 40_000);
+}
+
 // ── Status ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
@@ -89,6 +103,8 @@ interface Triagem {
   createdAt: Date;
   /** Calculado no servidor: e-mail bate com paciente de ficha ativa. */
   ehPaciente: boolean;
+  /** O anexo não vem na listagem; sai sob demanda em `/api/triagens/[id]/relatorio`. */
+  temRelatorio: boolean;
 }
 
 // ── LABEL MAP ──────────────────────────────────────────────────────────────
@@ -388,6 +404,7 @@ export default function TriagensAdminPage() {
   const [triagemParaExcluir, setTriagemParaExcluir] = useState<Triagem | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
 
   // Seleção para o envio em lote do comunicado: id da triagem → nome. Vale entre páginas.
   const [selecionadas, setSelecionadas] = useState<Record<string, string>>({});
@@ -571,15 +588,28 @@ export default function TriagensAdminPage() {
     }
   }
 
-  function handleDownloadDocumento(triagem: Triagem) {
+  /** Baixa o relatório anexado — só admin, auditado (`/api/triagens/[id]/relatorio`). */
+  async function handleDownloadDocumento(triagem: Triagem) {
     const dados = triagem.dados as Record<string, string>;
-    const base64 = dados['relatorio_medico_arquivo'];
     const nomeArquivo = dados['relatorio_medico_nome'] || 'relatorio.pdf';
-    if (!base64) return;
-    const link = document.createElement('a');
-    link.href = base64;
-    link.download = nomeArquivo;
-    link.click();
+    // Travar o botão: cada clique baixa o arquivo inteiro, grava um "visualizou" e gasta o limite.
+    setBaixandoRelatorio(true);
+    try {
+      const resposta = await fetch(`/api/triagens/${encodeURIComponent(triagem.id)}/relatorio`);
+      if (!resposta.ok) {
+        toast.error(
+          resposta.status === 429
+            ? 'Muitas tentativas. Aguarde um instante e tente de novo.'
+            : 'Não foi possível baixar o relatório médico.',
+        );
+        return;
+      }
+      salvarArquivo(await resposta.blob(), nomeArquivo);
+    } catch {
+      toast.error('Não foi possível baixar o relatório médico.');
+    } finally {
+      setBaixandoRelatorio(false);
+    }
   }
 
   /** Baixa a triagem em PDF — gerada no servidor, só para admin (`/api/triagens/[id]/ficha-pdf`). */
@@ -606,12 +636,7 @@ export default function TriagensAdminPage() {
           // Mantém o nome de reserva.
         }
       }
-      const url = URL.createObjectURL(await resposta.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nomeArquivo;
-      link.click();
-      URL.revokeObjectURL(url);
+      salvarArquivo(await resposta.blob(), nomeArquivo);
     } catch {
       toast.error('Não foi possível gerar o PDF da ficha.');
     } finally {
@@ -1227,17 +1252,20 @@ export default function TriagensAdminPage() {
               {/* ── Footer ──────────────────────────────── */}
               <div className="flex flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <div className="flex flex-wrap gap-2">
-                  {(triagemSelecionada.dados as Record<string, string>)[
-                    'relatorio_medico_arquivo'
-                  ] && (
+                  {triagemSelecionada.temRelatorio && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="gap-2"
+                      disabled={baixandoRelatorio}
                       onClick={() => handleDownloadDocumento(triagemSelecionada)}
                     >
-                      <Download size={15} />
-                      Baixar relatório médico
+                      {baixandoRelatorio ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Download size={15} />
+                      )}
+                      {baixandoRelatorio ? 'Baixando…' : 'Baixar relatório médico'}
                     </Button>
                   )}
                   <Button

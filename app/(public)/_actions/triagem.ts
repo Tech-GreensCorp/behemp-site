@@ -4,6 +4,11 @@ import { db } from '@/lib/db';
 import { triagens, users, pacientes } from '@/db/schema';
 import { eq, desc, inArray, and, isNull, sql } from 'drizzle-orm';
 import { marcarPacientes, normalizarEmail } from '@/lib/triagens/e-paciente';
+import {
+  CAMPO_DO_ARQUIVO,
+  MIME_DO_RELATORIO_PERMITIDOS,
+  PADRAO_SQL_DO_ANEXO,
+} from '@/lib/triagens/anexo-do-relatorio';
 import { z } from 'zod';
 
 /**
@@ -65,14 +70,12 @@ const criarTriagemSchema = z.object({
 
 // ── Validação do anexo (relatório médico) ──────────────────────
 
-/** Mesmos formatos aceitos pelo input do formulário (accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"). */
-const MIME_TYPES_PERMITIDOS = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]);
+/**
+ * Mesmos formatos aceitos pelo input do formulário (accept=".pdf,.jpg,.jpeg,.png,.doc,.docx").
+ * A lista mora em `lib/triagens/anexo-do-relatorio.ts` porque a rota que entrega o anexo confere
+ * com ela também.
+ */
+const MIME_TYPES_PERMITIDOS = MIME_DO_RELATORIO_PERMITIDOS;
 
 const TAMANHO_MAXIMO_ARQUIVO_BYTES = 10 * 1024 * 1024; // 10MB
 
@@ -187,11 +190,21 @@ export async function criarTriagem(
   }
 }
 
+/** Linha da listagem: `dados` sem o anexo em base64, que vem sob demanda em `/api/triagens/[id]/relatorio`. */
+export type TriagemDaListagem = Omit<typeof triagens.$inferSelect, 'dados'> & {
+  dados: Record<string, unknown>;
+  temRelatorio: boolean;
+};
+
 /**
  * Lista todas as triagens (admin only).
+ *
+ * O anexo (`relatorio_medico_arquivo`, data URL de até 10 MB) sai do `dados` NA QUERY: trazê-lo
+ * aqui mandava os laudos de todas as triagens ao navegador a cada abertura da tela — era o que
+ * deixava `/admin/triagens` e `/admin` lentas.
  */
 export async function listarTriagens(): Promise<
-  ActionResult<Array<typeof triagens.$inferSelect & { ehPaciente: boolean }>>
+  ActionResult<Array<TriagemDaListagem & { ehPaciente: boolean }>>
 > {
   try {
     const { verificarAdmin } = await import('@/lib/auth');
@@ -201,7 +214,20 @@ export async function listarTriagens(): Promise<
     }
 
     const resultado = await db
-      .select()
+      .select({
+        id: triagens.id,
+        createdAt: triagens.createdAt,
+        updatedAt: triagens.updatedAt,
+        dados: sql<Record<string, unknown>>`${triagens.dados} - ${CAMPO_DO_ARQUIVO}::text`,
+        // Mesmo formato que a rota aceita (`lerDataUrl`). Com `%` no fim, o LIKE decide ao casar
+        // `;base64,`; o `length()` de antes contava os caracteres do anexo inteiro.
+        temRelatorio: sql<boolean>`coalesce((${triagens.dados} ->> ${CAMPO_DO_ARQUIVO}::text) like ${PADRAO_SQL_DO_ANEXO}::text, false)`,
+        emailContato: triagens.emailContato,
+        telefoneContato: triagens.telefoneContato,
+        nomeContato: triagens.nomeContato,
+        statusVisualizacao: triagens.statusVisualizacao,
+        medicoClerkId: triagens.medicoClerkId,
+      })
       .from(triagens)
       .orderBy(desc(triagens.createdAt));
 
