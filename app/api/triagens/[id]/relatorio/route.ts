@@ -12,13 +12,16 @@
  * Quanto tempo fica: nada é gravado aqui; o arquivo continua onde já estava (o `dados` da
  * triagem). `cache-control: private, no-store`.
  *
- * O acesso é auditado: cada entrega grava `visualizar` em `logs_auditoria`, só com ids.
+ * O acesso é auditado, e SEM auditoria não há entrega: se o registro em `logs_auditoria` falhar,
+ * a rota responde 500 e o arquivo não sai. É o contrário de `/api/documentos/[id]/arquivo`, de
+ * propósito: lá o leitor é o próprio paciente ("auditoria indisponível não pode impedir o
+ * paciente de ver o próprio RG"); aqui é o admin lendo o laudo de outra pessoa.
  */
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { triagens, users } from '@/db/schema';
+import { logsAuditoria, triagens, users } from '@/db/schema';
 import { obterUsuarioAtual } from '@/lib/auth/permissions';
 import { db } from '@/lib/db';
 import { motivoLegivel } from '@/lib/erros/motivo-legivel';
@@ -27,8 +30,14 @@ import {
   consumir,
   identificarChamador,
 } from '@/lib/seguranca/limite-de-requisicao';
+import {
+  CAMPO_DO_ARQUIVO,
+  codificarNomeRfc5987,
+  decodificarConteudo,
+  lerDataUrl,
+  tipoDaEntrega,
+} from '@/lib/triagens/anexo-do-relatorio';
 import { nomeAscii } from '@/lib/triagens/ficha-formatos';
-import { registrarAuditoria } from '@/lib/utils/audit';
 
 /** Cada entrega pode ter 10 MB: 20 por minuto por chamador (OWASP API4:2023). */
 const LIMITE = 20;
@@ -65,20 +74,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const id = idSchema.safeParse(idBruto);
   if (!id.success) return NAO_ENCONTRADO();
 
-  // O papel vem do banco, não do JWT — mesma fonte de `/api/triagens/[id]/ficha-pdf`.
-  const [usuario] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(and(eq(users.clerkId, perm.clerkId), isNull(users.deletedAt)))
-    .limit(1);
-  if (!usuario || usuario.role !== 'admin') return NAO_ENCONTRADO();
-
   try {
+    // O papel vem do banco, não do JWT — mesma fonte de `/api/triagens/[id]/ficha-pdf`.
+    const [usuario] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(and(eq(users.clerkId, perm.clerkId), isNull(users.deletedAt)))
+      .limit(1);
+    if (!usuario || usuario.role !== 'admin') return NAO_ENCONTRADO();
+
     // Só os dois campos do anexo: o resto do `dados` não precisa sair do banco aqui.
     const [triagem] = await db
       .select({
         id: triagens.id,
-        arquivo: sql<string | null>`${triagens.dados} ->> 'relatorio_medico_arquivo'`,
+        arquivo: sql<string | null>`${triagens.dados} ->> ${CAMPO_DO_ARQUIVO}::text`,
         nome: sql<string | null>`${triagens.dados} ->> 'relatorio_medico_nome'`,
       })
       .from(triagens)
@@ -86,33 +95,41 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .limit(1);
     if (!triagem?.arquivo) return NAO_ENCONTRADO();
 
-    // A data URL foi validada na gravação (`criarTriagem`), mas triagem antiga pode não ter sido.
-    const partes = /^data:([^;,]+);base64,([\s\S]+)$/.exec(triagem.arquivo);
-    if (!partes) return NAO_ENCONTRADO();
-    const [, mimeType, conteudo] = partes;
-    const arquivo = Buffer.from(conteudo, 'base64');
+    // Valida ANTES de auditar: arquivo vazio ou corrompido não é entrega, e não pode virar um
+    // "visualizou" no registro. A data URL foi validada na gravação (`criarTriagem`), mas
+    // triagem antiga pode não ter sido.
+    const dataUrl = lerDataUrl(triagem.arquivo);
+    const arquivo = dataUrl ? decodificarConteudo(dataUrl.conteudo) : null;
+    if (!dataUrl || !arquivo) return NAO_ENCONTRADO();
 
-    // Audita ANTES de entregar. O registro leva só ids.
-    await registrarAuditoria({
+    // Insert direto, e não `registrarAuditoria`: o helper engole a própria falha, e aqui a
+    // falha tem de impedir a entrega (ver o cabeçalho). O registro leva só ids.
+    await db.insert(logsAuditoria).values({
       userId: usuario.id,
       acao: 'visualizar',
       entidade: 'triagens',
       entidadeId: triagem.id,
       dadosDepois: { exportacao: 'triagem_relatorio_medico' },
+      ip:
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+        request.headers.get('x-real-ip') ??
+        null,
     });
 
-    const nomeArquivo = triagem.nome?.trim() || 'relatorio.pdf';
+    const nomeArquivo = triagem.nome?.trim() || 'relatorio';
 
     return new NextResponse(new Uint8Array(arquivo), {
       headers: {
-        'content-type': mimeType,
+        'content-type': tipoDaEntrega(dataUrl.mimeType),
         'content-length': String(arquivo.length),
-        'content-disposition': `attachment; filename="${nomeAscii(nomeArquivo) || 'relatorio'}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`,
+        'content-disposition': `attachment; filename="${nomeAscii(nomeArquivo) || 'relatorio'}"; filename*=UTF-8''${codificarNomeRfc5987(nomeArquivo)}`,
         'cache-control': 'private, no-store',
         'x-content-type-options': 'nosniff',
       },
     });
   } catch (erro) {
+    // `motivoLegivel` diagnostica sem vazar: a mensagem crua do Drizzle traz a query com os
+    // valores inline.
     console.error('[triagens] falha ao entregar o relatório:', motivoLegivel(erro));
     return NextResponse.json({ erro: 'Não foi possível baixar o relatório' }, { status: 500 });
   }

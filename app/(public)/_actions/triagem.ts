@@ -4,6 +4,11 @@ import { db } from '@/lib/db';
 import { triagens, users, pacientes } from '@/db/schema';
 import { eq, desc, inArray, and, isNull, sql } from 'drizzle-orm';
 import { marcarPacientes, normalizarEmail } from '@/lib/triagens/e-paciente';
+import {
+  CAMPO_DO_ARQUIVO,
+  MIME_DO_RELATORIO_PERMITIDOS,
+  PADRAO_SQL_DO_ANEXO,
+} from '@/lib/triagens/anexo-do-relatorio';
 import { z } from 'zod';
 
 /**
@@ -65,14 +70,12 @@ const criarTriagemSchema = z.object({
 
 // ── Validação do anexo (relatório médico) ──────────────────────
 
-/** Mesmos formatos aceitos pelo input do formulário (accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"). */
-const MIME_TYPES_PERMITIDOS = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]);
+/**
+ * Mesmos formatos aceitos pelo input do formulário (accept=".pdf,.jpg,.jpeg,.png,.doc,.docx").
+ * A lista mora em `lib/triagens/anexo-do-relatorio.ts` porque a rota que entrega o anexo confere
+ * com ela também.
+ */
+const MIME_TYPES_PERMITIDOS = MIME_DO_RELATORIO_PERMITIDOS;
 
 const TAMANHO_MAXIMO_ARQUIVO_BYTES = 10 * 1024 * 1024; // 10MB
 
@@ -215,8 +218,10 @@ export async function listarTriagens(): Promise<
         id: triagens.id,
         createdAt: triagens.createdAt,
         updatedAt: triagens.updatedAt,
-        dados: sql<Record<string, unknown>>`${triagens.dados} - 'relatorio_medico_arquivo'`,
-        temRelatorio: sql<boolean>`coalesce(length(${triagens.dados} ->> 'relatorio_medico_arquivo'), 0) > 0`,
+        dados: sql<Record<string, unknown>>`${triagens.dados} - ${CAMPO_DO_ARQUIVO}::text`,
+        // Mesmo formato que a rota aceita (`lerDataUrl`). Com `%` no fim, o LIKE decide ao casar
+        // `;base64,`; o `length()` de antes contava os caracteres do anexo inteiro.
+        temRelatorio: sql<boolean>`coalesce((${triagens.dados} ->> ${CAMPO_DO_ARQUIVO}::text) like ${PADRAO_SQL_DO_ANEXO}::text, false)`,
         emailContato: triagens.emailContato,
         telefoneContato: triagens.telefoneContato,
         nomeContato: triagens.nomeContato,

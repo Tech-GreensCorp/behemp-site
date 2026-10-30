@@ -53,6 +53,20 @@ const SHEETS_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PU
 
 const ITENS_POR_PAGINA = 20;
 
+/**
+ * Salva o blob pelo link de download. A URL só é liberada depois de um tempo: o navegador lê o
+ * blob de forma assíncrona depois do clique, e revogar no mesmo tick pode cancelar o download
+ * (Safari). 40 s é o prazo que o FileSaver.js usa.
+ */
+function salvarArquivo(blob: Blob, nomeArquivo: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 40_000);
+}
+
 // ── Status ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
@@ -390,6 +404,7 @@ export default function TriagensAdminPage() {
   const [triagemParaExcluir, setTriagemParaExcluir] = useState<Triagem | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
 
   // Seleção para o envio em lote do comunicado: id da triagem → nome. Vale entre páginas.
   const [selecionadas, setSelecionadas] = useState<Record<string, string>>({});
@@ -577,6 +592,8 @@ export default function TriagensAdminPage() {
   async function handleDownloadDocumento(triagem: Triagem) {
     const dados = triagem.dados as Record<string, string>;
     const nomeArquivo = dados['relatorio_medico_nome'] || 'relatorio.pdf';
+    // Travar o botão: cada clique baixa o arquivo inteiro, grava um "visualizou" e gasta o limite.
+    setBaixandoRelatorio(true);
     try {
       const resposta = await fetch(`/api/triagens/${encodeURIComponent(triagem.id)}/relatorio`);
       if (!resposta.ok) {
@@ -587,14 +604,11 @@ export default function TriagensAdminPage() {
         );
         return;
       }
-      const url = URL.createObjectURL(await resposta.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nomeArquivo;
-      link.click();
-      URL.revokeObjectURL(url);
+      salvarArquivo(await resposta.blob(), nomeArquivo);
     } catch {
       toast.error('Não foi possível baixar o relatório médico.');
+    } finally {
+      setBaixandoRelatorio(false);
     }
   }
 
@@ -622,12 +636,7 @@ export default function TriagensAdminPage() {
           // Mantém o nome de reserva.
         }
       }
-      const url = URL.createObjectURL(await resposta.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nomeArquivo;
-      link.click();
-      URL.revokeObjectURL(url);
+      salvarArquivo(await resposta.blob(), nomeArquivo);
     } catch {
       toast.error('Não foi possível gerar o PDF da ficha.');
     } finally {
@@ -1248,10 +1257,15 @@ export default function TriagensAdminPage() {
                       variant="outline"
                       size="sm"
                       className="gap-2"
+                      disabled={baixandoRelatorio}
                       onClick={() => handleDownloadDocumento(triagemSelecionada)}
                     >
-                      <Download size={15} />
-                      Baixar relatório médico
+                      {baixandoRelatorio ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Download size={15} />
+                      )}
+                      {baixandoRelatorio ? 'Baixando…' : 'Baixar relatório médico'}
                     </Button>
                   )}
                   <Button
