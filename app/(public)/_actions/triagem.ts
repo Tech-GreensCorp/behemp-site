@@ -187,11 +187,21 @@ export async function criarTriagem(
   }
 }
 
+/** Linha da listagem: `dados` sem o anexo em base64, que vem sob demanda em `/api/triagens/[id]/relatorio`. */
+export type TriagemDaListagem = Omit<typeof triagens.$inferSelect, 'dados'> & {
+  dados: Record<string, unknown>;
+  temRelatorio: boolean;
+};
+
 /**
  * Lista todas as triagens (admin only).
+ *
+ * O anexo (`relatorio_medico_arquivo`, data URL de até 10 MB) sai do `dados` NA QUERY: trazê-lo
+ * aqui mandava os laudos de todas as triagens ao navegador a cada abertura da tela — era o que
+ * deixava `/admin/triagens` e `/admin` lentas.
  */
 export async function listarTriagens(): Promise<
-  ActionResult<Array<typeof triagens.$inferSelect & { ehPaciente: boolean }>>
+  ActionResult<Array<TriagemDaListagem & { ehPaciente: boolean }>>
 > {
   try {
     const { verificarAdmin } = await import('@/lib/auth');
@@ -201,7 +211,18 @@ export async function listarTriagens(): Promise<
     }
 
     const resultado = await db
-      .select()
+      .select({
+        id: triagens.id,
+        createdAt: triagens.createdAt,
+        updatedAt: triagens.updatedAt,
+        dados: sql<Record<string, unknown>>`${triagens.dados} - 'relatorio_medico_arquivo'`,
+        temRelatorio: sql<boolean>`coalesce(length(${triagens.dados} ->> 'relatorio_medico_arquivo'), 0) > 0`,
+        emailContato: triagens.emailContato,
+        telefoneContato: triagens.telefoneContato,
+        nomeContato: triagens.nomeContato,
+        statusVisualizacao: triagens.statusVisualizacao,
+        medicoClerkId: triagens.medicoClerkId,
+      })
       .from(triagens)
       .orderBy(desc(triagens.createdAt));
 

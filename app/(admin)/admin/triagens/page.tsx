@@ -89,6 +89,8 @@ interface Triagem {
   createdAt: Date;
   /** Calculado no servidor: e-mail bate com paciente de ficha ativa. */
   ehPaciente: boolean;
+  /** O anexo não vem na listagem; sai sob demanda em `/api/triagens/[id]/relatorio`. */
+  temRelatorio: boolean;
 }
 
 // ── LABEL MAP ──────────────────────────────────────────────────────────────
@@ -571,15 +573,29 @@ export default function TriagensAdminPage() {
     }
   }
 
-  function handleDownloadDocumento(triagem: Triagem) {
+  /** Baixa o relatório anexado — só admin, auditado (`/api/triagens/[id]/relatorio`). */
+  async function handleDownloadDocumento(triagem: Triagem) {
     const dados = triagem.dados as Record<string, string>;
-    const base64 = dados['relatorio_medico_arquivo'];
     const nomeArquivo = dados['relatorio_medico_nome'] || 'relatorio.pdf';
-    if (!base64) return;
-    const link = document.createElement('a');
-    link.href = base64;
-    link.download = nomeArquivo;
-    link.click();
+    try {
+      const resposta = await fetch(`/api/triagens/${encodeURIComponent(triagem.id)}/relatorio`);
+      if (!resposta.ok) {
+        toast.error(
+          resposta.status === 429
+            ? 'Muitas tentativas. Aguarde um instante e tente de novo.'
+            : 'Não foi possível baixar o relatório médico.',
+        );
+        return;
+      }
+      const url = URL.createObjectURL(await resposta.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Não foi possível baixar o relatório médico.');
+    }
   }
 
   /** Baixa a triagem em PDF — gerada no servidor, só para admin (`/api/triagens/[id]/ficha-pdf`). */
@@ -1227,9 +1243,7 @@ export default function TriagensAdminPage() {
               {/* ── Footer ──────────────────────────────── */}
               <div className="flex flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <div className="flex flex-wrap gap-2">
-                  {(triagemSelecionada.dados as Record<string, string>)[
-                    'relatorio_medico_arquivo'
-                  ] && (
+                  {triagemSelecionada.temRelatorio && (
                     <Button
                       variant="outline"
                       size="sm"
