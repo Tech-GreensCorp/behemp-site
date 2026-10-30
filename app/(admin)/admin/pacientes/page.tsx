@@ -402,22 +402,20 @@ export default function AdminPacientesPage() {
                   )}
                   {exportando ? 'Exportando...' : 'Exportar CSV'}
                 </Button>
+                <Link href="/admin/pacientes/novo">
+                  <Button className="gap-2 rounded-xl" nativeButton={false}>
+                    <UserPlus size={16} />
+                    Novo paciente
+                  </Button>
+                </Link>
               </>
             )}
-            <Button
-              variant="outline"
-              className="gap-2 rounded-xl"
-              onClick={() => setCriandoResponsavel(true)}
-            >
-              <UsersRound size={16} />
-              Novo responsável
-            </Button>
-            <Link href="/admin/pacientes/novo">
-              <Button className="gap-2 rounded-xl" nativeButton={false}>
-                <UserPlus size={16} />
-                Novo paciente
+            {aba === 'responsaveis' && (
+              <Button className="gap-2 rounded-xl" onClick={() => setCriandoResponsavel(true)}>
+                <UsersRound size={16} />
+                Novo responsável
               </Button>
-            </Link>
+            )}
           </div>
         }
       />
