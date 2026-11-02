@@ -112,14 +112,14 @@ describe('o teto de 25 mora num lugar só e vale nos dois lados', () => {
     }
   });
 
-  it.each(['pacientes', 'triagens'] as const)('a tela de %s barra a seleção no teto', (tela) => {
+  it.each(['pacientes'] as const)('a tela de %s barra a seleção no teto', (tela) => {
     expect(PAGINAS[tela]).toContain('LIMITE_DO_LOTE');
     expect(PAGINAS[tela]).toMatch(/>= LIMITE_DO_LOTE/);
   });
 });
 
 describe('o lote chega à tela', () => {
-  it.each(['pacientes', 'triagens'] as const)('a tela de %s renderiza o diálogo', (tela) => {
+  it.each(['pacientes'] as const)('a tela de %s renderiza o diálogo', (tela) => {
     const codigo = PAGINAS[tela];
     expect(codigo).toContain("from '@/components/admin/comunicados/DialogoEnvioEmLote'");
     // Com fronteira: `<DialogoEnvioEmLoteX` não pode passar por `<DialogoEnvioEmLote`.
@@ -128,8 +128,15 @@ describe('o lote chega à tela', () => {
     expect(codigo).toMatch(/<Checkbox\s/);
   });
 
-  it('a triagem resolve o paciente NO SERVIDOR (não há FK; o elo é o e-mail)', () => {
-    expect(PAGINAS.triagens).toContain('resolverPacientesDasTriagens(');
+  // Decisão do dono (nov/2026): o lote da carta de doação existe SÓ em Pacientes. Triagem é
+  // interesse declarado, não cadastro aceito — a carta vai a quem já tem ficha.
+  it('a tela de triagens NÃO oferece o lote da carta de doação', () => {
+    expect(PAGINAS.triagens).not.toContain('DialogoEnvioEmLote');
+    expect(PAGINAS.triagens).not.toContain('resolverPacientesDasTriagens');
+    expect(PAGINAS.triagens).not.toContain('LIMITE_DO_LOTE');
+  });
+
+  it('a action que casa triagem com paciente pelo e-mail segue correta (não há FK)', () => {
     const corpo = corpoDe(ACOES, 'resolverPacientesDasTriagens');
     expect(corpo).toContain('normalizarEmail(');
     expect(corpo).toContain('isNull(pacientes.deletedAt)');

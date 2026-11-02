@@ -14,6 +14,7 @@ import {
 } from '@/lib/pacientes/edicao';
 import { decidirContato, normalizarEmail } from '@/lib/pacientes/contato';
 import { garantirContaDeAcesso, type ResultadoDoAcesso } from '@/lib/pacientes/conta-de-acesso';
+import { enviarBoasVindasComLinkDeSenha } from '@/lib/pacientes/boas-vindas';
 import { trocarEmailNoClerk } from '@/lib/pacientes/clerk-email';
 import { cancelarPendentesPorTrocaDeEmail } from '@/lib/comunicados/assinatura';
 import { diagnosticoDoErro, mensagemDoErroDeCadastro } from '@/lib/pacientes/erro-de-cadastro';
@@ -94,7 +95,14 @@ interface ActionResult<T = unknown> {
  */
 export async function criarPaciente(
   dados: z.infer<typeof criarPacienteSchema>,
-): Promise<ActionResult<{ pacienteId: string; acessoCriado: boolean; avisoDeAcesso?: string }>> {
+): Promise<
+  ActionResult<{
+    pacienteId: string;
+    acessoCriado: boolean;
+    avisoDeAcesso?: string;
+    boasVindasEnviadas: boolean;
+  }>
+> {
   try {
     const auth = await verificarMedicoOuAdmin();
     if (!auth.autorizado) {
@@ -204,12 +212,22 @@ export async function criarPaciente(
     // `nao_e_paciente` = o e-mail já era de admin/médico, que tem login próprio: não é falha.
     const semAcesso = !acesso.ok && acesso.motivo !== 'nao_e_paciente';
 
+    // Boas-vindas com o link para o próprio paciente definir a senha: só quando a conta acabou de
+    // ser CRIADA. Conta que já existia (vinculada/ja_tinha) não é convidada a trocar de senha.
+    const boasVindas =
+      acesso.ok && acesso.situacao === 'criada' ? await enviarBoasVindasComLinkDeSenha(userId) : null;
+
     return {
       sucesso: true,
       dados: {
         pacienteId: novoPaciente.id,
         acessoCriado: !semAcesso,
-        avisoDeAcesso: semAcesso ? acesso.erro : undefined,
+        avisoDeAcesso: semAcesso
+          ? acesso.erro
+          : boasVindas && !boasVindas.ok
+            ? `Paciente e acesso criados, mas o e-mail de boas-vindas não foi enviado: ${boasVindas.erro}`
+            : undefined,
+        boasVindasEnviadas: boasVindas?.ok === true,
       },
     };
   } catch (error) {
