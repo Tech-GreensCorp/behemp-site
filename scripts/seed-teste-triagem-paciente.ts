@@ -26,7 +26,10 @@ function abortarSeProducao() {
 }
 
 async function remover() {
-  const us = await db.select({ id: users.id }).from(users).where(like(users.email, `${MARCA}%`));
+  const us = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(like(users.email, `${MARCA}%`));
   const ids = us.map((u) => u.id);
   await db.delete(triagens).where(like(triagens.emailContato, `${MARCA}%`));
   if (ids.length) {
@@ -60,19 +63,31 @@ async function criar() {
 
   // Dois médicos de teste (para atribuir e reatribuir).
   const medicosIds: string[] = [];
-  for (const [n, nome] of [['medico1', 'Dr. Seed Um'], ['medico2', 'Dra. Seed Dois']]) {
-    const [u] = await db.insert(users).values({ email: email(n), nome: `[SEED] ${nome}`, role: 'medico' }).returning();
-    const [m] = await db.insert(medicos).values({ userId: u.id, crm: `CRM/SP 0000${n.slice(-1)}-SEED`, especialidade: 'Teste' }).returning();
+  for (const [n, nome] of [
+    ['medico1', 'Dr. Seed Um'],
+    ['medico2', 'Dra. Seed Dois'],
+  ]) {
+    const [u] = await db
+      .insert(users)
+      .values({ email: email(n), nome: `[SEED] ${nome}`, role: 'medico' })
+      .returning();
+    const [m] = await db
+      .insert(medicos)
+      .values({ userId: u.id, crm: `CRM/SP 0000${n.slice(-1)}-SEED`, especialidade: 'Teste' })
+      .returning();
     medicosIds.push(m.id);
   }
 
   // 30 pacientes ativos (2 páginas de 20): os 10 primeiros sem médico, o resto com.
   for (let i = 1; i <= 30; i++) {
-    const [u] = await db.insert(users).values({
-      email: email(`paciente${String(i).padStart(2, '0')}`),
-      nome: `[SEED] Paciente ${String(i).padStart(2, '0')}`,
-      role: 'paciente',
-    }).returning();
+    const [u] = await db
+      .insert(users)
+      .values({
+        email: email(`paciente${String(i).padStart(2, '0')}`),
+        nome: `[SEED] Paciente ${String(i).padStart(2, '0')}`,
+        role: 'paciente',
+      })
+      .returning();
     await db.insert(pacientes).values({
       userId: u.id,
       medicoId: i <= 10 ? null : medicosIds[i % 2],
@@ -81,15 +96,18 @@ async function criar() {
   }
 
   // 1 paciente arquivado (para o filtro "Arquivado").
-  const [ua] = await db.insert(users).values({ email: email('arquivado'), nome: '[SEED] Paciente Arquivado', role: 'paciente' }).returning();
+  const [ua] = await db
+    .insert(users)
+    .values({ email: email('arquivado'), nome: '[SEED] Paciente Arquivado', role: 'paciente' })
+    .returning();
   await db.insert(pacientes).values({ userId: ua.id, status: 'arquivado', deletedAt: new Date() });
 
   // Triagens: pendentes e lidas, com cada situação da conversão.
   const T = [
-    ['nova1', '[SEED] Triagem Nova Um', 'pendente'],            // converter → vira paciente
-    ['nova2', '[SEED] Triagem Nova Dois', 'pendente'],          // converter → vira paciente
-    ['paciente03', '[SEED] Paciente 03', 'visualizada'],        // já é paciente → flag "Paciente"
-    ['arquivado', '[SEED] Paciente Arquivado', 'pendente'],     // ficha arquivada → conversão recusa
+    ['nova1', '[SEED] Triagem Nova Um', 'pendente'], // converter → vira paciente
+    ['nova2', '[SEED] Triagem Nova Dois', 'pendente'], // converter → vira paciente
+    ['paciente03', '[SEED] Paciente 03', 'visualizada'], // já é paciente → flag "Paciente"
+    ['arquivado', '[SEED] Paciente Arquivado', 'pendente'], // ficha arquivada → conversão recusa
     ['lida1', '[SEED] Triagem Lida', 'visualizada'],
   ] as const;
   for (const [n, nome, status] of T) {
@@ -102,7 +120,11 @@ async function criar() {
     });
   }
   // Triagem sem e-mail: a conversão deve recusar com mensagem clara.
-  await db.insert(triagens).values({ dados: { nome_paciente: '[SEED] Sem Email' }, nomeContato: '[SEED] Triagem Sem E-mail', statusVisualizacao: 'pendente' });
+  await db.insert(triagens).values({
+    dados: { nome_paciente: '[SEED] Sem Email' },
+    nomeContato: '[SEED] Triagem Sem E-mail',
+    statusVisualizacao: 'pendente',
+  });
 
   console.log('Seed criado: 2 médicos, 30 pacientes (1–10 sem médico), 1 arquivado, 6 triagens.');
 }
@@ -110,4 +132,7 @@ async function criar() {
 abortarSeProducao();
 (process.argv.includes('--remover') ? remover : criar)()
   .then(() => process.exit(0))
-  .catch((e) => { console.error('🔴', e instanceof Error ? e.message : e); process.exit(1); });
+  .catch((e) => {
+    console.error('🔴', e instanceof Error ? e.message : e);
+    process.exit(1);
+  });

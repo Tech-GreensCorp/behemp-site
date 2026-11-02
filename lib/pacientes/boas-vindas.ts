@@ -45,7 +45,9 @@ export async function enviarBoasVindasComLinkDeSenha(
     const link = `${base}/entrar/definir-senha#ticket=${encodeURIComponent(token.token)}`;
     const { assunto, html } = montarEmailDeBoasVindas({ nome: u.nome, link });
 
-    await new BrevoClient({ apiKey: process.env.BREVO_API_KEY }).transactionalEmails.sendTransacEmail({
+    await new BrevoClient({
+      apiKey: process.env.BREVO_API_KEY,
+    }).transactionalEmails.sendTransacEmail({
       subject: assunto,
       htmlContent: html,
       sender: { name: 'Be4Hope', email: process.env.BREVO_FROM_EMAIL ?? 'tech@be4hope.org' },

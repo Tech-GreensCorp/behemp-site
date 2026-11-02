@@ -51,7 +51,9 @@ export function dataDeNascimento(valor: unknown): string | undefined {
     d.getUTCFullYear() === Number(ano) &&
     d.getUTCMonth() + 1 === Number(mes) &&
     d.getUTCDate() === Number(dia);
-  return confere && Number(ano) > 1900 && d.getTime() <= Date.now() ? `${ano}-${mes}-${dia}` : undefined;
+  return confere && Number(ano) > 1900 && d.getTime() <= Date.now()
+    ? `${ano}-${mes}-${dia}`
+    : undefined;
 }
 
 export function dadosDoPacienteDaTriagem(t: Triagem): DadosParaOPaciente | null {
