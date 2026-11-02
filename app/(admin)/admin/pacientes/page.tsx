@@ -16,6 +16,7 @@ import {
 import {
   listarPacientesAdmin,
   arquivarPacienteAdmin,
+  reativarPacienteAdmin,
   type PacienteDoAdmin,
 } from '@/app/_actions/admin-pacientes';
 import { importarPacientesCSV, exportarPacientesCSV } from '@/app/_actions/pacientes';
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Archive,
+  ArchiveRestore,
   ChevronRight,
   Download,
   FileSignature,
@@ -85,8 +87,6 @@ export default function AdminPacientesPage() {
   const [busca, setBusca] = useState('');
   const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
-  const [filtroTratamento, setFiltroTratamento] = useState('todos');
-  const [filtroJornada, setFiltroJornada] = useState('todos');
   const [pacientes, setPacientes] = useState<PacienteDoAdmin[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -100,6 +100,8 @@ export default function AdminPacientesPage() {
   const [paraArquivar, setParaArquivar] = useState<PacienteDoAdmin | null>(null);
   const [motivoArquivo, setMotivoArquivo] = useState('');
   const [arquivando, setArquivando] = useState(false);
+  const [paraReativar, setParaReativar] = useState<PacienteDoAdmin | null>(null);
+  const [reativando, setReativando] = useState(false);
 
   // Seleção para o envio em lote do comunicado: id → nome, e vale entre páginas e filtros.
   const [selecionados, setSelecionados] = useState<Record<string, string>>({});
@@ -113,15 +115,7 @@ export default function AdminPacientesPage() {
   // Quais parâmetros geraram os dados que estão na tela. "Carregando" é DERIVADO disso:
   // enquanto a busca atual não for a que está exibida. Um booleano setado à mão travava
   // quando o valor voltava a ser igual ao anterior (nenhum effect rodava para desligá-lo).
-  const chave = JSON.stringify([
-    buscaDebounced,
-    filtroStatus,
-    filtroTratamento,
-    filtroJornada,
-    pagina,
-    porPagina,
-    versao,
-  ]);
+  const chave = JSON.stringify([buscaDebounced, filtroStatus, pagina, porPagina, versao]);
   const [chaveExibida, setChaveExibida] = useState<string | null>(null);
   const carregando = chaveExibida !== chave;
 
@@ -152,8 +146,6 @@ export default function AdminPacientesPage() {
     listarPacientesAdmin({
       busca: buscaDebounced || undefined,
       status: filtroStatus as 'todos',
-      tratamento: filtroTratamento as 'todos',
-      jornada: filtroJornada as 'todos',
       pagina,
       porPagina,
     })
@@ -177,7 +169,7 @@ export default function AdminPacientesPage() {
     return () => {
       cancelado = true;
     };
-  }, [chave, buscaDebounced, filtroStatus, filtroTratamento, filtroJornada, pagina, porPagina]);
+  }, [chave, buscaDebounced, filtroStatus, pagina, porPagina]);
 
   // ── Envio em lote do comunicado ───────────────────────────────
   function alternarSelecao(paciente: PacienteDoAdmin, marcado: boolean) {
@@ -312,6 +304,28 @@ export default function AdminPacientesPage() {
     }
   }
 
+  // ── Reativar paciente arquivado (só admin) ────────────────────
+  async function handleReativar() {
+    if (!paraReativar) return;
+    setReativando(true);
+    try {
+      const resultado = await reativarPacienteAdmin({ pacienteId: paraReativar.id });
+      if (resultado.sucesso) {
+        toast.success(`${paraReativar.nome} foi reativado e voltou à lista de pacientes.`);
+        // Estava no filtro "Arquivado": some dele. Volta uma página se era o único da última.
+        if (pacientes.length === 1 && pagina > 1) setPagina(pagina - 1);
+        else setVersao((v) => v + 1);
+        setParaReativar(null);
+      } else {
+        toast.error(resultado.erro || 'Erro ao reativar paciente');
+      }
+    } catch {
+      toast.error('Erro ao reativar paciente');
+    } finally {
+      setReativando(false);
+    }
+  }
+
   // ── Exportar CSV ──────────────────────────────────────────────
   async function handleExportar() {
     setExportando(true);
@@ -338,11 +352,7 @@ export default function AdminPacientesPage() {
     }
   }
 
-  const filtrando =
-    busca !== '' ||
-    filtroStatus !== 'todos' ||
-    filtroTratamento !== 'todos' ||
-    filtroJornada !== 'todos';
+  const filtrando = busca !== '' || filtroStatus !== 'todos';
 
   return (
     <div className="space-y-6">
@@ -402,7 +412,7 @@ export default function AdminPacientesPage() {
               className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2"
             />
             <Input
-              placeholder="Buscar por nome..."
+              placeholder="Buscar por nome ou e-mail..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="pl-9"
@@ -421,58 +431,6 @@ export default function AdminPacientesPage() {
               {Object.entries(STATUS_LABELS).map(([valor, { label }]) => (
                 <SelectItem key={valor} value={valor}>
                   {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filtroTratamento}
-            onValueChange={(v) => mudarFiltro(setFiltroTratamento, v)}
-          >
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Tratamento">
-                {filtroTratamento === 'todos'
-                  ? 'Todos os tipos'
-                  : (TRATAMENTO_LABELS[filtroTratamento] ?? filtroTratamento)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              {Object.entries(TRATAMENTO_LABELS).map(([valor, label]) => (
-                <SelectItem key={valor} value={valor}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filtroJornada} onValueChange={(v) => mudarFiltro(setFiltroJornada, v)}>
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Fase da jornada">
-                {filtroJornada === 'todos' ? (
-                  'Todas as fases'
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: JORNADA_LABELS[filtroJornada]?.color }}
-                    />
-                    {JORNADA_LABELS[filtroJornada]?.icon}{' '}
-                    {JORNADA_LABELS[filtroJornada]?.label ?? filtroJornada}
-                  </span>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as fases</SelectItem>
-              {Object.entries(JORNADA_LABELS).map(([key, { label, icon, color }]) => (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                    {icon} {label}
-                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -540,8 +498,6 @@ export default function AdminPacientesPage() {
             </div>
           </div>
           {pacientes.map((paciente) => {
-            const statusConfig =
-              STATUS_LABELS[paciente.status] ?? STATUS_LABELS.aguardando_consulta;
             const jornada = paciente.jornadaFase ? JORNADA_LABELS[paciente.jornadaFase] : undefined;
             return (
               <DataRow
@@ -597,26 +553,47 @@ export default function AdminPacientesPage() {
                           {TRATAMENTO_LABELS[paciente.tratamentoTipo] ?? paciente.tratamentoTipo}
                         </Badge>
                       )}
-                      <Badge variant={statusConfig.variant} className="text-xs">
-                        {statusConfig.label}
-                      </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Arquivar paciente"
-                      aria-label={`Arquivar ${paciente.nome}`}
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        // A linha inteira é um link: o clique aqui não pode navegar.
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setMotivoArquivo('');
-                        setParaArquivar(paciente);
-                      }}
-                    >
-                      <Archive size={16} />
-                    </Button>
+                    {paciente.arquivado ? (
+                      <>
+                        <Badge variant="destructive" className="text-xs">
+                          Arquivado
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reativar paciente"
+                          aria-label={`Reativar ${paciente.nome}`}
+                          className="gap-1.5 rounded-lg text-xs"
+                          onClick={(e) => {
+                            // A linha inteira é um link: o clique aqui não pode navegar.
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setParaReativar(paciente);
+                          }}
+                        >
+                          <ArchiveRestore size={14} />
+                          Reativar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Arquivar paciente"
+                        aria-label={`Arquivar ${paciente.nome}`}
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          // A linha inteira é um link: o clique aqui não pode navegar.
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMotivoArquivo('');
+                          setParaArquivar(paciente);
+                        }}
+                      >
+                        <Archive size={16} />
+                      </Button>
+                    )}
                     <ChevronRight size={16} className="text-muted-foreground shrink-0" />
                   </>
                 }
@@ -651,8 +628,8 @@ export default function AdminPacientesPage() {
             <AlertDialogDescription>
               <strong>{paraArquivar?.nome}</strong> sai da lista de pacientes e deixa de contar como
               paciente (nas triagens volta a aparecer como &quot;Não paciente&quot;). O histórico
-              clínico é preservado e a ação fica registrada na auditoria. Não há como desfazer por
-              esta tela.
+              clínico é preservado e a ação fica registrada na auditoria. Para desfazer, use o
+              filtro &quot;Arquivado&quot; e clique em &quot;Reativar&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
@@ -674,6 +651,42 @@ export default function AdminPacientesPage() {
             >
               {arquivando ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
               {arquivando ? 'Arquivando...' : 'Sim, arquivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!paraReativar}
+        onOpenChange={(aberto) => {
+          if (!aberto && !reativando) setParaReativar(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reativar paciente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{paraReativar?.nome}</strong> volta para a lista de pacientes com o mesmo
+              histórico e o mesmo médico, e nas triagens volta a aparecer como &quot;Paciente&quot;.
+              A ação fica registrada na auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reativando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // só fecha quando a action responder
+                handleReativar();
+              }}
+              disabled={reativando}
+              className="gap-1.5"
+            >
+              {reativando ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ArchiveRestore size={14} />
+              )}
+              {reativando ? 'Reativando...' : 'Sim, reativar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

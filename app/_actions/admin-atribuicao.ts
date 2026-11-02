@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { users, pacientes, medicos } from '@/db/schema';
-import { eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { verificarAdmin } from '@/lib/auth';
 import { criarNotificacao } from '@/app/(medico)/_actions/notificacoes';
 import { enviarEmailMedicoNovoPaciente } from '@/lib/email/notificacoes';
@@ -134,9 +134,12 @@ export async function listarPacientesComMedicoPaginado(params?: {
       WHERE p.deleted_at IS NULL
         ${filtroAtribuicao}
         ${buscaTerm ? sql`AND (u.nome ILIKE ${buscaTerm} OR u.email ILIKE ${buscaTerm})` : sql``}
+      -- Sem agrupar por "tem médico": com o CASE, atribuir um médico jogava a linha para depois de
+      -- TODOS os sem médico, e a lista recarregada já não a mostrava na página — o paciente
+      -- "sumia" no clique. A fila dos sem médico é o filtro "Sem médico", não a ordenação.
       ORDER BY
-        CASE WHEN p.medico_id IS NULL THEN 0 ELSE 1 END,
-        ${sql.raw(`${coluna} ${direcao}`)}
+        ${sql.raw(`${coluna} ${direcao}`)},
+        p.id DESC
       LIMIT ${porPagina}
       OFFSET ${offset}
     `);
@@ -232,22 +235,23 @@ export async function atribuirMedicoAoPaciente(
       return { sucesso: false, erro: 'Médico não encontrado' };
     }
 
-    // Verificar se o paciente existe
+    // Verificar se o paciente existe e está ativo (ficha arquivada não recebe médico)
     const [paciente] = await db
       .select({ id: pacientes.id })
       .from(pacientes)
-      .where(eq(pacientes.id, pacienteId))
+      .where(and(eq(pacientes.id, pacienteId), isNull(pacientes.deletedAt)))
       .limit(1);
 
     if (!paciente) {
       return { sucesso: false, erro: 'Paciente não encontrado' };
     }
 
-    // Atualizar
+    // Atualizar. Só `medicoId`: a atribuição NÃO mexe em status, `deletedAt` nem em `users`, então
+    // a ficha continua na lista de Pacientes — nenhum efeito sobre as triagens.
     await db
       .update(pacientes)
       .set({ medicoId })
-      .where(eq(pacientes.id, pacienteId));
+      .where(and(eq(pacientes.id, pacienteId), isNull(pacientes.deletedAt)));
 
     // ── Notificar médico (email + in-app) — não bloqueia em caso de falha
     try {
@@ -310,7 +314,7 @@ export async function contarPacientesSemMedico(): Promise<ActionResult<number>> 
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(pacientes)
-      .where(isNull(pacientes.medicoId));
+      .where(and(isNull(pacientes.medicoId), isNull(pacientes.deletedAt)));
 
     return { sucesso: true, dados: count };
   } catch (error) {
@@ -358,13 +362,15 @@ export async function reatribuirTodosPacientes(
       resultado = await db
         .update(pacientes)
         .set({ medicoId: medicoDestinoId })
-        .where(eq(pacientes.medicoId, medicoOrigemId))
+        .where(and(eq(pacientes.medicoId, medicoOrigemId), isNull(pacientes.deletedAt)))
         .returning({ id: pacientes.id });
     } else {
-      // Reatribuir TODOS os pacientes (inclusive sem médico)
+      // Reatribuir TODOS os pacientes ATIVOS (inclusive sem médico). Arquivado fica de fora:
+      // a tela conta só os ativos, e o histórico do arquivado não deve mudar de responsável.
       resultado = await db
         .update(pacientes)
         .set({ medicoId: medicoDestinoId })
+        .where(isNull(pacientes.deletedAt))
         .returning({ id: pacientes.id });
     }
 

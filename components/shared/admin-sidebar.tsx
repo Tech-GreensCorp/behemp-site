@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Users,
   FileCheck,
+  FileSignature,
   Shield,
   LogOut,
   ChevronLeft,
@@ -38,27 +39,29 @@ interface NavGroup {
 }
 
 const NAV_GROUPS: NavGroup[] = [
+  // A ordem segue o caminho da pessoa: triagem → paciente → médico responsável. Todas as rotas
+  // anteriores continuam existindo; só mudou o agrupamento.
   {
-    title: 'Geral',
-    items: [{ label: 'Visão Geral', href: '/admin', icon: LayoutDashboard }],
-  },
-  {
-    title: 'Controle',
+    title: 'Pacientes e equipe',
     items: [
-      { label: 'Usuários', href: '/admin/usuarios', icon: Users },
+      { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
+      { label: 'Pacientes', href: '/admin/pacientes', icon: HeartPulse },
       { label: 'Atribuir Médico', href: '/admin/atribuir-medico', icon: UserPlus },
       { label: 'Médicos', href: '/admin/medicos', icon: Stethoscope },
-      { label: 'Pacientes', href: '/admin/pacientes', icon: HeartPulse },
+    ],
+  },
+  {
+    title: 'Atendimento',
+    items: [
       { label: 'Teleconsulta', href: '/admin/teleconsulta', icon: Video },
-      { label: 'Triagens', href: '/admin/triagens', icon: FileCheck },
-      { label: 'Procurações', href: '/admin/procuracoes', icon: FileCheck },
+      { label: 'Procurações', href: '/admin/procuracoes', icon: FileSignature },
       { label: 'ANVISA', href: '/admin/anvisa', icon: Shield },
       { label: 'Alertas', href: '/admin/alertas', icon: Bell },
       { label: 'Calculadora', href: '/admin/calculadora', icon: Calculator },
     ],
   },
   {
-    title: 'Mensagens',
+    title: 'Comunicação',
     items: [
       { label: 'Chat', href: '/admin/chat', icon: MessageSquare },
       { label: 'Mensagens', href: '/admin/mensagens', icon: MessageSquare },
@@ -80,8 +83,10 @@ const NAV_GROUPS: NavGroup[] = [
   //   ],
   // },
   {
-    title: 'Configurações',
+    title: 'Administração',
     items: [
+      { label: 'Visão Geral', href: '/admin', icon: LayoutDashboard },
+      { label: 'Usuários', href: '/admin/usuarios', icon: Users },
       { label: 'Meu Perfil', href: '/admin/perfil', icon: User },
     ],
   },

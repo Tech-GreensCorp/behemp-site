@@ -8,24 +8,15 @@ import {
   listarTriagens,
   atualizarStatusTriagem,
   excluirTriagem,
-  excluirTriagensEmLote,
 } from '@/app/(public)/_actions/triagem';
+import { converterTriagemEmPaciente } from '@/app/_actions/converter-triagem';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataList, DataRow, DataEmpty } from '@/components/shared/data-list';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DialogoEnvioEmLote,
-  montarLinhasDoLote,
-  type LinhaDoLote,
-} from '@/components/admin/comunicados/DialogoEnvioEmLote';
-import { resolverPacientesDasTriagens } from '@/app/_actions/comunicados';
-import { LIMITE_DO_LOTE } from '@/lib/comunicados/lote';
 import {
   AlertTriangle,
   Calendar,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   DollarSign,
@@ -33,8 +24,6 @@ import {
   Eye,
   FileCheck,
   FileDown,
-  FileSpreadsheet,
-  FileSignature,
   Filter,
   HeartCrack,
   Home,
@@ -45,11 +34,9 @@ import {
   Stethoscope,
   Trash2,
   User,
+  UserPlus,
   X,
 } from 'lucide-react';
-
-/** URL da planilha Google Sheets centralizada */
-const SHEETS_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_SHEETS_SPREADSHEET_ID || '1hchr4CFjtHmVYGrRyBjp7H7RbBM0PWRMeuBWWhQjmJ8'}/edit`;
 
 const ITENS_POR_PAGINA = 20;
 
@@ -66,29 +53,6 @@ function salvarArquivo(blob: Blob, nomeArquivo: string) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 40_000);
 }
-
-// ── Status ─────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'outline'; cor: string }
-> = {
-  pendente: {
-    label: 'Pendente',
-    variant: 'default',
-    cor: 'bg-amber-500/10 text-amber-600',
-  },
-  visualizada: {
-    label: 'Visualizada',
-    variant: 'secondary',
-    cor: 'bg-sky-500/10 text-sky-600',
-  },
-  respondida: {
-    label: 'Respondida',
-    variant: 'outline',
-    cor: 'bg-emerald-500/10 text-emerald-600',
-  },
-};
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -403,19 +367,13 @@ export default function TriagensAdminPage() {
   const [triagemSelecionada, setTriagemSelecionada] = useState<Triagem | null>(null);
   const [triagemParaExcluir, setTriagemParaExcluir] = useState<Triagem | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [convertendo, setConvertendo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
-
-  // Seleção para o envio em lote do comunicado: id da triagem → nome. Vale entre páginas.
-  const [selecionadas, setSelecionadas] = useState<Record<string, string>>({});
-  const [linhasDoLote, setLinhasDoLote] = useState<LinhaDoLote[] | null>(null);
-  const [preparandoLote, setPreparandoLote] = useState(false);
-  const qtdSelecionadas = Object.keys(selecionadas).length;
 
   // Filtros
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
-  const [filtroOrigem, setFiltroOrigem] = useState<string>('todos');
 
   // Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -427,11 +385,10 @@ export default function TriagensAdminPage() {
   // Resetar página ao mudar filtros
   useEffect(() => {
     setPaginaAtual(1);
-  }, [busca, filtroStatus, filtroOrigem]);
+  }, [busca, filtroStatus]);
 
-  // Trava o scroll da página por trás enquanto um modal está aberto — sem isto, o
-  // backdrop fixed tem overflow próprio mas o body por trás também rola, e dá pra
-  // ver a lista se movendo por baixo do modal.
+  // Trava o scroll da página por trás enquanto o modal está aberto — sem isto, o
+  // body por trás também rola, e dá pra ver a lista se movendo por baixo do modal.
   useEffect(() => {
     if (!triagemSelecionada && !triagemParaExcluir) return;
     const overflowOriginal = document.body.style.overflow;
@@ -466,21 +423,13 @@ export default function TriagensAdminPage() {
         }
       }
 
-      // Status
-      if (filtroStatus !== 'todos' && t.statusVisualizacao !== filtroStatus) {
-        return false;
-      }
-
-      // Origem
-      if (filtroOrigem !== 'todos') {
-        const formulario = (t.dados as Record<string, string>)['_formulario'] ?? '';
-        if (filtroOrigem === 'importado' && !formulario) return false;
-        if (filtroOrigem === 'novo' && formulario) return false;
-      }
+      // Lida = qualquer status diferente de `pendente` (visualizada ou respondida).
+      if (filtroStatus === 'nao_lida' && t.statusVisualizacao !== 'pendente') return false;
+      if (filtroStatus === 'lida' && t.statusVisualizacao === 'pendente') return false;
 
       return true;
     });
-  }, [todasTriagens, busca, filtroStatus, filtroOrigem]);
+  }, [todasTriagens, busca, filtroStatus]);
 
   // ── Paginação ────────────────────────────────────────────────
 
@@ -492,82 +441,20 @@ export default function TriagensAdminPage() {
     return triagensFiltradas.slice(inicio, inicio + ITENS_POR_PAGINA);
   }, [triagensFiltradas, paginaSegura]);
 
-  // ── Envio em lote do comunicado ──────────────────────────────
-
-  function alternarSelecao(triagem: Triagem, marcado: boolean) {
-    const novo = { ...selecionadas };
-    if (!marcado) {
-      delete novo[triagem.id];
-    } else if (qtdSelecionadas >= LIMITE_DO_LOTE) {
-      toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
-      return;
-    } else {
-      novo[triagem.id] = triagem.nomeContato || triagem.emailContato || 'Sem nome';
-    }
-    setSelecionadas(novo);
-  }
-
-  function selecionarPagina() {
-    const novo = { ...selecionadas };
-    for (const t of triagensPagina) {
-      if (Object.keys(novo).length >= LIMITE_DO_LOTE) {
-        toast.error(`O envio em lote aceita até ${LIMITE_DO_LOTE} pessoas por vez.`);
-        break;
-      }
-      novo[t.id] = t.nomeContato || t.emailContato || 'Sem nome';
-    }
-    setSelecionadas(novo);
-  }
-
-  async function prepararLote() {
-    setPreparandoLote(true);
-    // Triagem não tem FK para paciente: o servidor casa pelo e-mail com a ficha ativa.
-    const resolvidas = await resolverPacientesDasTriagens(Object.keys(selecionadas));
-    if (!resolvidas.sucesso) {
-      setPreparandoLote(false);
-      toast.error(resolvidas.erro);
-      return;
-    }
-    const res = await montarLinhasDoLote(
-      resolvidas.dados.map((r) => ({
-        chave: r.triagemId,
-        nome: selecionadas[r.triagemId] ?? 'Sem nome',
-        pacienteId: r.pacienteId,
-      })),
-    );
-    setPreparandoLote(false);
-    if (!res.sucesso) {
-      toast.error(res.erro);
-      return;
-    }
-    setLinhasDoLote(res.linhas);
-  }
-
   // ── Ações ────────────────────────────────────────────────────
 
+  /** Abrir os detalhes É ler: a triagem pendente vira lida e o estado persiste no servidor. */
   async function handleVisualizarTriagem(triagem: Triagem) {
     setTriagemSelecionada(triagem);
-    if (triagem.statusVisualizacao === 'pendente') {
-      await atualizarStatusTriagem(triagem.id, 'visualizada');
-      setTodasTriagens((prev) =>
-        prev.map((t) =>
-          t.id === triagem.id ? { ...t, statusVisualizacao: 'visualizada' } : t,
-        ),
-      );
-    }
-  }
-
-  async function handleMarcarRespondida(triagemId: string) {
-    const resultado = await atualizarStatusTriagem(triagemId, 'respondida');
-    if (resultado.sucesso) {
-      setTodasTriagens((prev) =>
-        prev.map((t) =>
-          t.id === triagemId ? { ...t, statusVisualizacao: 'respondida' } : t,
-        ),
-      );
-      setTriagemSelecionada(null);
-      toast.success('Triagem marcada como respondida');
-    }
+    if (triagem.statusVisualizacao !== 'pendente') return;
+    const resultado = await atualizarStatusTriagem(triagem.id, 'visualizada');
+    // Só reflete na tela o que o servidor gravou: do contrário, o próximo reload a mostraria
+    // como não lida de novo, e a tela teria dito que estava lida.
+    if (!resultado.sucesso) return;
+    const marcar = <T extends { id: string; statusVisualizacao: string }>(t: T): T =>
+      t.id === triagem.id ? { ...t, statusVisualizacao: 'visualizada' } : t;
+    setTodasTriagens((prev) => prev.map(marcar));
+    setTriagemSelecionada((atual) => (atual ? marcar(atual) : atual));
   }
 
   async function handleConfirmarExclusao() {
@@ -585,6 +472,43 @@ export default function TriagensAdminPage() {
       toast.success('Triagem excluída com sucesso');
     } else {
       toast.error(resultado.erro ?? 'Erro ao excluir triagem');
+    }
+  }
+
+  /**
+   * Conversão em paciente, por ato do admin depois de analisar a triagem. A triagem NÃO é
+   * alterada: ela passa a exibir "Paciente" porque o e-mail agora bate com uma ficha ativa.
+   */
+  async function handleConverterEmPaciente(triagem: Triagem) {
+    setConvertendo(true);
+    try {
+      const r = await converterTriagemEmPaciente(triagem.id);
+      if (!r.sucesso) {
+        toast.error(r.erro);
+        return;
+      }
+      if (r.dados.jaEraPaciente) {
+        toast.info('Esta pessoa já é paciente. Nada foi criado.');
+      } else {
+        toast.success('Triagem convertida em paciente. A ficha está no topo da lista de Pacientes.', {
+          description: r.dados.aviso
+            ? r.dados.aviso
+            : r.dados.boasVindasEnviadas
+              ? 'E-mail de boas-vindas enviado para definir a senha.'
+              : undefined,
+        });
+      }
+      const emailAlvo = triagem.emailContato?.trim().toLowerCase();
+      const virar = <T extends { emailContato: string | null; ehPaciente: boolean }>(t: T): T =>
+        emailAlvo && t.emailContato?.trim().toLowerCase() === emailAlvo
+          ? { ...t, ehPaciente: true }
+          : t;
+      setTodasTriagens((prev) => prev.map(virar));
+      setTriagemSelecionada((atual) => (atual ? virar(atual) : atual));
+    } catch {
+      toast.error('Erro ao converter a triagem em paciente');
+    } finally {
+      setConvertendo(false);
     }
   }
 
@@ -667,11 +591,10 @@ export default function TriagensAdminPage() {
         title="Triagens"
         description={
           <>
-            {todasTriagens.length} triagem{todasTriagens.length !== 1 ? 'ns' : ''} recebida
-            {todasTriagens.length !== 1 ? 's' : ''}
+            {todasTriagens.length} {todasTriagens.length !== 1 ? 'triagens recebidas' : 'triagem recebida'}
             {pendentes > 0 && (
               <span className="ml-1 font-semibold text-amber-600">
-                · {pendentes} pendente{pendentes > 1 ? 's' : ''}
+                · {pendentes} não lida{pendentes > 1 ? 's' : ''}
               </span>
             )}
           </>
@@ -688,7 +611,7 @@ export default function TriagensAdminPage() {
           />
           <Input
             id="busca-triagens"
-            placeholder="Buscar por nome, e-mail, telefone..."
+            placeholder="Buscar por nome, e-mail, telefone ou qualquer resposta..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="pl-9 text-sm"
@@ -708,10 +631,9 @@ export default function TriagensAdminPage() {
           <Filter size={14} className="shrink-0 text-muted-foreground" />
           <div className="flex flex-wrap gap-1.5">
             {[
-              { value: 'todos', label: 'Todos' },
-              { value: 'pendente', label: 'Pendentes' },
-              { value: 'visualizada', label: 'Visualizadas' },
-              { value: 'respondida', label: 'Respondidas' },
+              { value: 'todos', label: 'Todas' },
+              { value: 'nao_lida', label: 'Não lidas' },
+              { value: 'lida', label: 'Lidas' },
             ].map((op) => (
               <button
                 key={op.value}
@@ -729,33 +651,10 @@ export default function TriagensAdminPage() {
             ))}
           </div>
         </div>
-
-        {/* Filtro origem */}
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { value: 'todos', label: 'Todas origens' },
-            { value: 'importado', label: 'Elementor' },
-            { value: 'novo', label: 'Formulário novo' },
-          ].map((op) => (
-            <button
-              key={op.value}
-              id={`filtro-origem-${op.value}`}
-              onClick={() => setFiltroOrigem(op.value)}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
-                filtroOrigem === op.value
-                  ? 'bg-foreground text-background shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80',
-              )}
-            >
-              {op.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* ── Resultado da busca ───────────────────────────────── */}
-      {(busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
+      {(busca || filtroStatus !== 'todos') && (
         <p className="text-sm text-muted-foreground">
           {triagensFiltradas.length} resultado
           {triagensFiltradas.length !== 1 ? 's' : ''} encontrado
@@ -781,14 +680,13 @@ export default function TriagensAdminPage() {
               : 'Quando alguém preencher o formulário de triagem, os dados aparecerão aqui.'
           }
           actions={
-            (busca || filtroStatus !== 'todos' || filtroOrigem !== 'todos') && (
+            (busca || filtroStatus !== 'todos') && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setBusca('');
                   setFiltroStatus('todos');
-                  setFiltroOrigem('todos');
                 }}
               >
                 Limpar filtros
@@ -799,77 +697,37 @@ export default function TriagensAdminPage() {
       ) : (
         <>
           <DataList>
-            <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
-              <span className="text-muted-foreground">
-                {qtdSelecionadas > 0
-                  ? `${qtdSelecionadas} selecionada${qtdSelecionadas !== 1 ? 's' : ''} (máximo ${LIMITE_DO_LOTE} por envio)`
-                  : 'Marque pessoas para enviar o comunicado da carta de doação em lote'}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 rounded-lg text-xs"
-                  onClick={selecionarPagina}
-                >
-                  Selecionar esta página
-                </Button>
-                {qtdSelecionadas > 0 && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 rounded-lg text-xs"
-                      onClick={() => setSelecionadas({})}
-                    >
-                      Limpar
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-7 gap-1.5 rounded-lg text-xs"
-                      onClick={prepararLote}
-                      disabled={preparandoLote}
-                    >
-                      {preparandoLote ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <FileSignature size={13} />
-                      )}
-                      Enviar carta de doação ({qtdSelecionadas})
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
             {triagensPagina.map((triagem) => {
-              const config = STATUS_CONFIG[triagem.statusVisualizacao] || STATUS_CONFIG.pendente;
+              const naoLida = triagem.statusVisualizacao === 'pendente';
               const formulario =
                 (triagem.dados as Record<string, string>)['_formulario'] ?? '';
               return (
                 <DataRow
                   key={triagem.id}
-                  className={cn(
-                    'group',
-                    triagem.statusVisualizacao === 'pendente' && 'bg-primary-soft/30',
-                  )}
-                  leading={
-                    <Checkbox
-                      checked={triagem.id in selecionadas}
-                      onCheckedChange={(marcado) => alternarSelecao(triagem, marcado === true)}
-                      aria-label={`Selecionar ${triagem.nomeContato || 'triagem'} para o envio em lote`}
-                    />
-                  }
+                  className={cn('group', naoLida && 'bg-primary-soft/30')}
                   icon={
                     <div
-                      className="flex h-full w-full cursor-pointer items-center justify-center"
+                      className="relative flex h-full w-full cursor-pointer items-center justify-center"
                       onClick={() => handleVisualizarTriagem(triagem)}
                     >
-                      <FileCheck size={20} className="text-primary" />
+                      <FileCheck
+                        size={20}
+                        className={naoLida ? 'text-primary' : 'text-muted-foreground/60'}
+                      />
+                      {naoLida && (
+                        <span
+                          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"
+                          role="img"
+                          aria-label="Não lida"
+                        />
+                      )}
                     </div>
                   }
                   title={
                     <div className="cursor-pointer" onClick={() => handleVisualizarTriagem(triagem)}>
-                      <div className="truncate text-sm font-medium">{triagem.nomeContato || 'Sem nome'}</div>
+                      <div className={cn('truncate text-sm', naoLida ? 'font-semibold' : 'font-medium text-foreground/80')}>
+                        {triagem.nomeContato || 'Sem nome'}
+                      </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {triagem.emailContato || triagem.telefoneContato || 'Sem contato'}
                       </div>
@@ -898,7 +756,6 @@ export default function TriagensAdminPage() {
                         </Badge>
                       )}
                       <span>{new Date(triagem.createdAt).toLocaleDateString('pt-BR')}</span>
-                      <Badge className={cn('border-0 font-medium', config.cor)}>{config.label}</Badge>
                     </div>
                   }
                   trailing={
@@ -1016,38 +873,27 @@ export default function TriagensAdminPage() {
       {/* ══════════════════════════════════════════════════════════ */}
       {triagemSelecionada && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 pb-8 pt-8 backdrop-blur-sm sm:items-center sm:pt-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overscroll-contain bg-black/50 p-3 backdrop-blur-sm sm:p-6"
           onClick={(e) => {
             if (e.target === e.currentTarget) setTriagemSelecionada(null);
           }}
         >
-          <div className="relative w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="overflow-hidden rounded-xl bg-card shadow-2xl">
+          {/* Coluna flex com altura limitada à tela: cabeçalho e rodapé fixos, só o corpo rola. */}
+          <div className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-300 sm:max-h-[calc(100dvh-3rem)]">
+            <div className="flex min-h-0 w-full flex-col overflow-hidden rounded-xl bg-card shadow-2xl">
               {/* ── Header ──────────────────────────────── */}
-              <div className="relative border-b px-6 pt-6 pb-4 sm:px-8">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <Badge
-                        className={cn(
-                          'border-0 px-2.5 py-0.5 text-[11px] font-semibold',
-                          (
-                            STATUS_CONFIG[triagemSelecionada.statusVisualizacao] ||
-                            STATUS_CONFIG.pendente
-                          ).cor,
-                        )}
-                      >
-                        {STATUS_CONFIG[triagemSelecionada.statusVisualizacao]?.label ||
-                          'Pendente'}
-                      </Badge>
-                      {(triagemSelecionada.dados as Record<string, string>)['_formulario'] && (
+              <div className="relative shrink-0 border-b px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    {(triagemSelecionada.dados as Record<string, string>)['_formulario'] && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
                         <Badge className="border-0 bg-violet-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-violet-600">
                           Importado · Elementor
                         </Badge>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
+                    <h2 className="break-words text-xl font-bold leading-tight sm:text-3xl">
                       {triagemSelecionada.nomeContato || 'Paciente sem nome'}
                     </h2>
 
@@ -1118,6 +964,7 @@ export default function TriagensAdminPage() {
 
                   <button
                     onClick={() => setTriagemSelecionada(null)}
+                    aria-label="Fechar detalhes"
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <X size={18} />
@@ -1163,10 +1010,7 @@ export default function TriagensAdminPage() {
               </div>
 
               {/* ── Corpo — Seções agrupadas ────────────── */}
-              <div
-                className="max-h-[55vh] overflow-y-auto px-6 pb-6 sm:px-8"
-                style={{ marginTop: 0, paddingTop: 0 }}
-              >
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 sm:px-8">
                 {(() => {
                   const dados = triagemSelecionada.dados as Record<string, string>;
                   let primeiraVisivel = true;
@@ -1250,7 +1094,7 @@ export default function TriagensAdminPage() {
               </div>
 
               {/* ── Footer ──────────────────────────────── */}
-              <div className="flex flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+              <div className="flex shrink-0 flex-col gap-3 border-t bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <div className="flex flex-wrap gap-2">
                   {triagemSelecionada.temRelatorio && (
                     <Button
@@ -1282,69 +1126,40 @@ export default function TriagensAdminPage() {
                     )}
                     {gerandoPdf ? 'Gerando PDF…' : 'Baixar ficha completa em PDF'}
                   </Button>
-                  <a href={SHEETS_URL} target="_blank" rel="noopener noreferrer">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                    >
-                      <FileSpreadsheet size={15} />
-                      Ver na planilha
-                    </Button>
-                  </a>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => {
-                      setTriagemParaExcluir(triagemSelecionada);
-                      setTriagemSelecionada(null);
-                    }}
-                  >
-                    <Trash2 size={15} />
-                    Excluir triagem
-                  </Button>
                 </div>
 
-                <div className="flex items-center gap-3 sm:ml-auto">
-                  <Button variant="ghost" onClick={() => setTriagemSelecionada(null)}>
-                    Fechar
+                {triagemSelecionada.ehPaciente ? (
+                  <span className="text-xs font-medium text-emerald-700 sm:ml-auto">
+                    Já é paciente
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="gap-2 sm:ml-auto"
+                    disabled={convertendo}
+                    onClick={() => handleConverterEmPaciente(triagemSelecionada)}
+                    title="Cria a ficha de paciente, a conta de acesso e envia o e-mail para definir a senha"
+                  >
+                    {convertendo ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <UserPlus size={15} />
+                    )}
+                    {convertendo ? 'Convertendo…' : 'Converter em paciente'}
                   </Button>
-                  {triagemSelecionada.statusVisualizacao !== 'respondida' && (
-                    <Button
-                      onClick={() => handleMarcarRespondida(triagemSelecionada.id)}
-                      className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                      <CheckCircle2 size={16} />
-                      Marcar como respondida
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════ */}
-      {/* ══ Modal de confirmação de exclusão ══════════════════════ */}
-      {/* ══════════════════════════════════════════════════════════ */}
       {triagemParaExcluir && (
         <ModalConfirmarExclusao
           triagem={triagemParaExcluir}
           onConfirmar={handleConfirmarExclusao}
           onCancelar={() => setTriagemParaExcluir(null)}
           carregando={excluindo}
-        />
-      )}
-
-      {linhasDoLote && (
-        <DialogoEnvioEmLote
-          linhasIniciais={linhasDoLote}
-          onFechar={(limpar) => {
-            setLinhasDoLote(null);
-            if (limpar) setSelecionadas({});
-          }}
         />
       )}
     </div>
