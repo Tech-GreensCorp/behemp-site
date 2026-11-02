@@ -17,7 +17,8 @@ import { montarEmailDeBoasVindas } from '@/lib/pacientes/email-de-boas-vindas';
 
 const ler = (rel: string) =>
   readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
-const semComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const semComentarios = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const CONVERTER = semComentarios(ler('app/_actions/converter-triagem.ts'));
 const TELA_TRIAGENS = semComentarios(ler('app/(admin)/admin/triagens/page.tsx'));
@@ -48,7 +49,12 @@ describe('a tradução triagem → ficha (pura)', () => {
 
   it('leva só o que a ficha guarda e o formulário pergunta', () => {
     const d = dadosDoPacienteDaTriagem(base)!;
-    expect(d).toMatchObject({ nome: 'Maria Souza', cpf: '123.456.789-09', uf: 'SP', patologia: 'Epilepsia' });
+    expect(d).toMatchObject({
+      nome: 'Maria Souza',
+      cpf: '123.456.789-09',
+      uf: 'SP',
+      patologia: 'Epilepsia',
+    });
     expect(Object.keys(d)).not.toContain('renda_total');
   });
 
@@ -58,7 +64,11 @@ describe('a tradução triagem → ficha (pura)', () => {
   });
 
   it('o e-mail pode vir do formulário quando o contato está vazio', () => {
-    const d = dadosDoPacienteDaTriagem({ ...base, emailContato: null, dados: { email: 'A@b.com' } });
+    const d = dadosDoPacienteDaTriagem({
+      ...base,
+      emailContato: null,
+      dados: { email: 'A@b.com' },
+    });
     expect(d?.email).toBe('a@b.com');
   });
 
@@ -110,7 +120,9 @@ describe('a conversão é ato do admin e não duplica', () => {
 
 describe('a conta e o e-mail de boas-vindas', () => {
   it('só se convida quem teve a conta CRIADA agora (conta existente não é convidada a trocar senha)', () => {
-    expect(CRIAR_PACIENTE).toMatch(/acesso\.situacao === 'criada'[\s\S]{0,80}enviarBoasVindasComLinkDeSenha\(/);
+    expect(CRIAR_PACIENTE).toMatch(
+      /acesso\.situacao === 'criada'[\s\S]{0,80}enviarBoasVindasComLinkDeSenha\(/,
+    );
   });
 
   it('o link leva o token no FRAGMENTO, nunca no query', () => {
@@ -139,7 +151,9 @@ describe('a conta e o e-mail de boas-vindas', () => {
 
 describe('a lista de Pacientes e a atribuição de médico', () => {
   it('o filtro "Arquivado" enxerga os arquivados (deletedAt NOT NULL), os demais só os ativos', () => {
-    expect(LISTA_ADMIN).toMatch(/status === 'arquivado'[\s\S]{0,60}isNotNull\(pacientes\.deletedAt\)/);
+    expect(LISTA_ADMIN).toMatch(
+      /status === 'arquivado'[\s\S]{0,60}isNotNull\(pacientes\.deletedAt\)/,
+    );
     expect(LISTA_ADMIN).toMatch(/isNull\(pacientes\.deletedAt\)/);
   });
 
@@ -154,7 +168,11 @@ describe('a lista de Pacientes e a atribuição de médico', () => {
   });
 
   it('atribuir, contar e reatribuir ignoram ficha arquivada', () => {
-    for (const nome of ['atribuirMedicoAoPaciente', 'contarPacientesSemMedico', 'reatribuirTodosPacientes']) {
+    for (const nome of [
+      'atribuirMedicoAoPaciente',
+      'contarPacientesSemMedico',
+      'reatribuirTodosPacientes',
+    ]) {
       const ini = ATRIBUICAO.indexOf(`function ${nome}`);
       const proxima = ATRIBUICAO.indexOf('\nexport async function', ini + 1);
       const corpo = ATRIBUICAO.slice(ini, proxima === -1 ? undefined : proxima);
@@ -199,7 +217,9 @@ describe('a tela de triagens', () => {
     const corpo = TELA_TRIAGENS.slice(ini, TELA_TRIAGENS.indexOf('async function handleConverter'));
     expect(corpo).toContain("atualizarStatusTriagem(triagem.id, 'visualizada')");
     expect(corpo).toMatch(/if \(!resultado\.sucesso\) return;/);
-    expect(corpo.indexOf('if (!resultado.sucesso)')).toBeLessThan(corpo.indexOf('setTodasTriagens'));
+    expect(corpo.indexOf('if (!resultado.sucesso)')).toBeLessThan(
+      corpo.indexOf('setTodasTriagens'),
+    );
   });
 
   it('o modal tem altura limitada à tela e rolagem só no corpo', () => {
@@ -254,7 +274,9 @@ describe('reativar paciente arquivado', () => {
   const REATIVAR = LISTA_ADMIN.slice(LISTA_ADMIN.indexOf('function reativarPacienteAdmin'));
 
   it('é só admin, só mexe em ficha ARQUIVADA e não apaga nem recria nada', () => {
-    expect(REATIVAR.indexOf('verificarAdmin()')).toBeLessThan(REATIVAR.indexOf('db\n      .select'));
+    expect(REATIVAR.indexOf('verificarAdmin()')).toBeLessThan(
+      REATIVAR.indexOf('db\n      .select'),
+    );
     expect(REATIVAR).toMatch(/\.update\(pacientes\)[\s\S]{0,120}deletedAt: null/);
     expect(REATIVAR).toMatch(/isNotNull\(pacientes\.deletedAt\)/);
     expect(REATIVAR).not.toMatch(/\.delete\(|\.insert\(pacientes\)/);

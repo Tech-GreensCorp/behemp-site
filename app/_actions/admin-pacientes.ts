@@ -63,9 +63,7 @@ export async function listarPacientesAdmin(entrada?: z.input<typeof filtrosSchem
     // inverte a condição. Antes, `deletedAt IS NULL` valia sempre, e esse filtro nunca achava
     // ninguém, mesmo com fichas arquivadas no banco.
     const condicoes =
-      status === 'arquivado'
-        ? [isNotNull(pacientes.deletedAt)]
-        : [isNull(pacientes.deletedAt)];
+      status === 'arquivado' ? [isNotNull(pacientes.deletedAt)] : [isNull(pacientes.deletedAt)];
     if (status !== 'todos' && status !== 'arquivado') condicoes.push(eq(pacientes.status, status));
     // Nome OU e-mail (como nas telas Usuários e Atribuir Médico).
     if (busca) {
@@ -235,7 +233,10 @@ export async function reativarPacienteAdmin(
 
     if (!atual) return { sucesso: false, erro: 'Paciente não encontrado ou não está arquivado' };
     if (atual.userApagadoEm) {
-      return { sucesso: false, erro: 'A conta deste paciente foi apagada e não pode ser reativada.' };
+      return {
+        sucesso: false,
+        erro: 'A conta deste paciente foi apagada e não pode ser reativada.',
+      };
     }
 
     // Status de antes do arquivamento, da própria auditoria.
@@ -252,8 +253,7 @@ export async function reativarPacienteAdmin(
       .orderBy(desc(logsAuditoria.createdAt))
       .limit(1);
     const anterior = (ultimo?.dadosAntes as { status?: string } | null)?.status;
-    const status =
-      STATUS_REATIVAVEIS.find((s) => s === anterior) ?? 'aguardando_consulta';
+    const status = STATUS_REATIVAVEIS.find((s) => s === anterior) ?? 'aguardando_consulta';
 
     // `deletedAt IS NOT NULL` no UPDATE: dois cliques não reativam duas vezes.
     const reativados = await db

@@ -32,7 +32,16 @@ import { criarPaciente } from '@/app/_actions/pacientes';
 const idSchema = z.string().min(1).max(64);
 
 type Resposta =
-  | { sucesso: true; dados: { pacienteId: string; jaEraPaciente: boolean; acessoCriado: boolean; boasVindasEnviadas: boolean; aviso?: string } }
+  | {
+      sucesso: true;
+      dados: {
+        pacienteId: string;
+        jaEraPaciente: boolean;
+        acessoCriado: boolean;
+        boasVindasEnviadas: boolean;
+        aviso?: string;
+      };
+    }
   | { sucesso: false; erro: string };
 
 export async function converterTriagemEmPaciente(triagemId: string): Promise<Resposta> {
@@ -63,7 +72,12 @@ export async function converterTriagemEmPaciente(triagemId: string): Promise<Res
     }
 
     const [existente] = await db
-      .select({ userId: users.id, role: users.role, pacienteId: pacientes.id, arquivadoEm: pacientes.deletedAt })
+      .select({
+        userId: users.id,
+        role: users.role,
+        pacienteId: pacientes.id,
+        arquivadoEm: pacientes.deletedAt,
+      })
       .from(users)
       .leftJoin(pacientes, eq(pacientes.userId, users.id))
       .where(and(sql`lower(${users.email}) = ${dados.email}`, isNull(users.deletedAt)))
@@ -93,7 +107,8 @@ export async function converterTriagemEmPaciente(triagemId: string): Promise<Res
     }
 
     const r = await criarPaciente(dados);
-    if (!r.sucesso || !r.dados) return { sucesso: false, erro: r.erro ?? 'Erro ao converter a triagem' };
+    if (!r.sucesso || !r.dados)
+      return { sucesso: false, erro: r.erro ?? 'Erro ao converter a triagem' };
 
     return {
       sucesso: true,
@@ -106,7 +121,10 @@ export async function converterTriagemEmPaciente(triagemId: string): Promise<Res
       },
     };
   } catch (error) {
-    console.error('[Action] Erro ao converter triagem em paciente:', error instanceof Error ? error.name : 'desconhecido');
+    console.error(
+      '[Action] Erro ao converter triagem em paciente:',
+      error instanceof Error ? error.name : 'desconhecido',
+    );
     return { sucesso: false, erro: 'Erro ao converter a triagem' };
   }
 }
