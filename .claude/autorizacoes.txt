@@ -1047,3 +1047,12 @@ path:app/(admin)/admin/usuarios/_components/dialogo-criar-admin.tsx
 path:lib/docusign/docusign-service.ts
 path:app/(paciente)/paciente/documentos/page.tsx
 path:app/(medico)/medico/pacientes/[id]/_components/tab-documentos.tsx
+
+
+# ── Autorizado no chat em 19/11/2026 — Plano de Tratamento (Adesão Collab) ──
+# "eu autorizo a migration". Migration SÓ ADITIVA: tabela `planos_tratamento` + enum
+# `plano_tratamento_status`, FK para `pacientes` e índices. Nada existente é alterado.
+# PERIGO: BAIXO (lock instantâneo da FK). Conferir o `when` da 0055 > max(created_at) de produção.
+path:db/migrations/0055_planos_tratamento.sql
+path:db/migrations/meta/0055_snapshot.json
+path:db/migrations/meta/_journal.json

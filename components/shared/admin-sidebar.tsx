@@ -16,6 +16,7 @@ import {
   MessageSquare,
   UserPlus,
   Receipt,
+  ClipboardList,
   ShoppingCart,
   Wallet,
   User,
@@ -73,6 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Pagamentos', href: '/admin/pagamentos', icon: Wallet },
       { label: 'Invoices', href: '/admin/invoices', icon: Receipt },
+      { label: 'Plano de Tratamento', href: '/admin/planos-tratamento', icon: ClipboardList },
       { label: 'Recompras', href: '/admin/recompras', icon: ShoppingCart },
     ],
   },

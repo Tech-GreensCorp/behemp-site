@@ -23,6 +23,10 @@ interface InvoicePaginationProps {
   tipoAtual?: string;
   statusAtual?: string;
   buscaAtual?: string;
+  /** Rota da lista. Reaproveitado por Planos de Tratamento (`/admin/planos-tratamento`). */
+  basePath?: string;
+  /** Rótulo plural no "Mostrando X–Y de N …". */
+  rotuloPlural?: string;
 }
 
 export function InvoicePagination({
@@ -33,6 +37,8 @@ export function InvoicePagination({
   tipoAtual,
   statusAtual,
   buscaAtual,
+  basePath = '/admin/invoices',
+  rotuloPlural = 'invoices',
 }: InvoicePaginationProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,10 +56,10 @@ export function InvoicePagination({
 
       startTransition(() => {
         const qs = params.toString();
-        router.push(`/admin/invoices${qs ? `?${qs}` : ''}`);
+        router.push(`${basePath}${qs ? `?${qs}` : ''}`);
       });
     },
-    [router, searchParams],
+    [router, searchParams, basePath],
   );
 
   // Calcular range de registros exibidos
@@ -96,7 +102,7 @@ export function InvoicePagination({
       <p className="text-sm text-muted-foreground">
         Mostrando <span className="font-medium text-foreground">{inicio}</span>–
         <span className="font-medium text-foreground">{fim}</span> de{' '}
-        <span className="font-medium text-foreground">{totalRegistros}</span> invoices
+        <span className="font-medium text-foreground">{totalRegistros}</span> {rotuloPlural}
       </p>
 
       {/* Controles de paginação */}

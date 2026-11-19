@@ -29,12 +29,18 @@ interface InvoiceFiltersProps {
   tipoAtual?: string;
   statusAtual?: string;
   buscaAtual?: string;
+  /** Rota da lista. Reaproveitado por Planos de Tratamento (`/admin/planos-tratamento`). */
+  basePath?: string;
+  /** Planos de Tratamento são sempre Collab — lá os chips de tipo não aparecem. */
+  mostrarTipos?: boolean;
 }
 
 export function InvoiceFilters({
   tipoAtual = '',
   statusAtual = '',
   buscaAtual = '',
+  basePath = '/admin/invoices',
+  mostrarTipos = true,
 }: InvoiceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,7 +70,7 @@ export function InvoiceFilters({
   const aplicarFiltro = (key: string, value: string) => {
     startTransition(() => {
       const qs = createQueryString({ [key]: value });
-      router.push(`/admin/invoices${qs ? `?${qs}` : ''}`);
+      router.push(`${basePath}${qs ? `?${qs}` : ''}`);
     });
   };
 
@@ -145,31 +151,36 @@ export function InvoiceFilters({
       </div>
 
       {/* Tabs de tipo */}
+      {(mostrarTipos || hasActiveFilters) && (
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <Filter size={14} className="shrink-0 text-muted-foreground" />
-        <div className="flex items-center gap-1.5">
-          {TIPOS.map((tipo) => (
-            <button
-              key={tipo.value}
-              onClick={() => aplicarFiltro('tipo', tipo.value)}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
-                (tipoAtual || '') === tipo.value
-                  ? 'border-primary/30 bg-primary/10 text-primary shadow-sm'
-                  : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <span>{tipo.icon}</span>
-              {tipo.label}
-            </button>
-          ))}
-        </div>
+        {mostrarTipos && (
+          <>
+            <Filter size={14} className="shrink-0 text-muted-foreground" />
+            <div className="flex items-center gap-1.5">
+              {TIPOS.map((tipo) => (
+                <button
+                  key={tipo.value}
+                  onClick={() => aplicarFiltro('tipo', tipo.value)}
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                    (tipoAtual || '') === tipo.value
+                      ? 'border-primary/30 bg-primary/10 text-primary shadow-sm'
+                      : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <span>{tipo.icon}</span>
+                  {tipo.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Limpar filtros */}
         {hasActiveFilters && (
           <button
             onClick={() => {
               setBusca('');
-              startTransition(() => router.push('/admin/invoices'));
+              startTransition(() => router.push(basePath));
             }}
             className="ml-auto flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground transition-colors hover:text-destructive"
           >
@@ -178,6 +189,7 @@ export function InvoiceFilters({
           </button>
         )}
       </div>
+      )}
 
       {/* Loading state */}
       {isPending && (
