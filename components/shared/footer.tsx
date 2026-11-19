@@ -6,7 +6,8 @@ const LINKS_RAPIDOS = [
   { label: 'Início', href: '/' },
   { label: 'Quem Somos', href: '/#quem-somos' },
   { label: 'Triagem', href: '/triagem' },
-  { label: 'Simulador de custos', href: '/simulador' },
+  // Simulador ocultado em produção (19/11/2026) — ver app/(public)/simulador/page.tsx
+  // { label: 'Simulador de custos', href: '/simulador' },
   { label: 'Histórias', href: '/historias' },
 ];
 

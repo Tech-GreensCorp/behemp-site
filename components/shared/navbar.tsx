@@ -34,7 +34,8 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { label: 'Quem somos', href: '/#quem-somos' },
   { label: 'Triagem', href: '/triagem' },
-  { label: 'Simulador', href: '/simulador' },
+  // Simulador ocultado em produção (19/11/2026) — ver app/(public)/simulador/page.tsx
+  // { label: 'Simulador', href: '/simulador' },
   { label: 'Histórias', href: '/historias' },
   { label: 'Ebooks', href: '/ebooks' },
   { label: 'Programas de Acesso', href: '/programa-acesso-solidario' },
