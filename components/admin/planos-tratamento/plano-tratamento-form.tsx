@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Save, FileText, Search, Loader2, Link2, X } from 'lucide-react';
 import { formatarCpf } from '@/lib/validacao/cpf';
+import { BotaoExcluirPlano } from './botao-excluir-plano';
 import {
   criarPlanoTratamento,
   atualizarPlanoTratamento,
@@ -87,6 +88,8 @@ interface PlanoTratamentoFormProps {
    * com `toISOString()` dava a data UTC — depois das 21h o formulário já sugeria amanhã.
    */
   dataPadrao?: string;
+  /** Mostra o botão Excluir (só na edição). Decidido no servidor com `verificarAdmin()`. */
+  podeExcluir?: boolean;
 }
 
 /** Paciente cadastrado vinculado ao plano — fica visível e removível no formulário. */
@@ -101,7 +104,11 @@ interface Vinculo {
  * A prévia usa a MESMA função de cálculo que a action e o documento (`calcularAdesao`), mas é só
  * prévia: o servidor recalcula e é o valor dele que fica gravado.
  */
-export function PlanoTratamentoForm({ plano, dataPadrao }: PlanoTratamentoFormProps) {
+export function PlanoTratamentoForm({
+  plano,
+  dataPadrao,
+  podeExcluir = false,
+}: PlanoTratamentoFormProps) {
   const router = useRouter();
   const isEdit = !!plano;
   const [saving, setSaving] = useState(false);
@@ -552,9 +559,12 @@ export function PlanoTratamentoForm({ plano, dataPadrao }: PlanoTratamentoFormPr
 
       {/* Ações */}
       <div className="flex items-center justify-between border-t pt-6">
-        <Button type="button" variant="outline" onClick={() => router.push(ROTA_LISTA)}>
-          Cancelar
-        </Button>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={() => router.push(ROTA_LISTA)}>
+            Cancelar
+          </Button>
+          {isEdit && podeExcluir && <BotaoExcluirPlano id={plano.id} numero={plano.planoNumber} />}
+        </div>
         <div className="flex gap-3">
           {isEdit && (
             <a

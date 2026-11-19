@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { buscarPlanoTratamento } from '@/app/(admin)/_actions/planos-tratamento';
 import { PlanoTratamentoForm } from '@/components/admin/planos-tratamento/plano-tratamento-form';
 import { PageHeader } from '@/components/shared/page-header';
+import { verificarAdmin } from '@/lib/auth';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -9,7 +10,7 @@ interface Props {
 
 export default async function EditarPlanoTratamentoPage({ params }: Props) {
   const { id } = await params;
-  const resultado = await buscarPlanoTratamento(id);
+  const [resultado, auth] = await Promise.all([buscarPlanoTratamento(id), verificarAdmin()]);
 
   if (!resultado.sucesso || !resultado.dados) {
     redirect('/admin/planos-tratamento');
@@ -22,7 +23,9 @@ export default async function EditarPlanoTratamentoPage({ params }: Props) {
         title="Editar Plano de Tratamento"
         description={resultado.dados.planoNumber}
       />
-      <PlanoTratamentoForm plano={resultado.dados} />
+      {/* O botão Excluir só existe para admin — decidido aqui, no servidor. A action confere de
+          novo; esconder o botão não é a barreira, é a cortesia. */}
+      <PlanoTratamentoForm plano={resultado.dados} podeExcluir={auth.autorizado} />
     </div>
   );
 }
