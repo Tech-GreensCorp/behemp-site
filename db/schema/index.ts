@@ -29,6 +29,7 @@ export * from './exames';
 export * from './ajustes-dosagem';
 export * from './relatorios';
 export * from './invoices';
+export * from './planos-tratamento';
 export * from './leads-ebook';
 export * from './receituario-templates';
 export * from './prescricoes';

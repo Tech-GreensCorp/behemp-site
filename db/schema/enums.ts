@@ -127,6 +127,9 @@ export const invoiceTipoEnum = pgEnum('invoice_tipo', [
 /** Status da invoice */
 export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'completed']);
 
+/** Status do plano de tratamento (Adesão Collab) — enum próprio, independente da invoice. */
+export const planoTratamentoStatusEnum = pgEnum('plano_tratamento_status', ['draft', 'completed']);
+
 // ── Receituário / Assinatura ICP-Brasil ───────────────────────
 
 /** Tipo de receituário / prescrição */
