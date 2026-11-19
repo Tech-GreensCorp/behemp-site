@@ -402,6 +402,14 @@
   textarea {
     text-align: inherit;
   }
+
+  /* Itens do menu lateral: o link tem `text-sm`, e `.text-sm` (0,1,0) vence o `a` acima, então
+     o rótulo herdava o justify e "Plano de Tratamento" abria um buraco entre as palavras. As
+     utilidades do Tailwind v4 ficam em @layer e não vencem esta regra, por isso o ajuste é aqui. */
+  .sidebar-ambar a,
+  .sidebar-ambar a * {
+    text-align: left;
+  }
 }
 
 /* ── Utilitários do design Lovable ──────────────── */

@@ -171,10 +171,7 @@ export function AdminSidebar() {
   return (
     <>
       {/* Mobile Header */}
-      <header className="sidebar-ambar lg:hidden flex h-16 w-full items-center justify-between px-4 shrink-0 shadow-sm">
-        <Link href="/admin" className="flex items-center">
-          <img src="/logo.png" alt="Be4Hope" className="h-10 w-auto object-contain brightness-0 invert" />
-        </Link>
+      <header className="sidebar-ambar lg:hidden flex h-16 w-full items-center gap-2 px-4 shrink-0 shadow-sm">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex h-10 w-10 items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition-all"
@@ -182,6 +179,9 @@ export function AdminSidebar() {
         >
           <Menu size={24} />
         </button>
+        <Link href="/admin" className="flex items-center">
+          <img src="/logo.png" alt="Be4Hope" className="h-10 w-auto object-contain brightness-0 invert" />
+        </Link>
       </header>
 
       {!collapsed && (
@@ -193,8 +193,8 @@ export function AdminSidebar() {
 
       <aside
         className={cn(
-          'sidebar-ambar fixed inset-y-0 right-0 z-40 flex flex-col shadow-xl transition-all duration-300 lg:left-0 lg:right-auto lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:overflow-hidden lg:translate-x-0 w-[50vw] lg:w-64',
-          collapsed ? 'translate-x-full lg:w-20' : 'translate-x-0',
+          'sidebar-ambar fixed inset-y-0 left-0 z-40 flex flex-col shadow-xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:overflow-hidden lg:translate-x-0 w-72 max-w-[85vw] lg:w-64',
+          collapsed ? '-translate-x-full lg:w-20' : 'translate-x-0',
         )}
       >
         <div
@@ -223,11 +223,7 @@ export function AdminSidebar() {
           >
             <ChevronLeft
               size={18}
-              className={cn(
-                'transition-transform duration-300',
-                'lg:rotate-0 rotate-180',
-                collapsed && 'lg:rotate-180'
-              )}
+              className={cn('transition-transform duration-300', collapsed && 'rotate-180')}
             />
           </button>
         </div>
