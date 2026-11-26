@@ -17,7 +17,7 @@
  * `legenda` é opcional: um arquivo `.vtt` no mesmo lugar, para quem assiste sem som.
  */
 export const VIDEO_DO_PASSO_A_PASSO = {
-  url: 'https://b60dc39mhd72vr7m.public.blob.vercel-storage.com/videos/anvisa-passo-a-passo-v1-el1rvP5KsEwPSMFnFJL16OZ0qMSlc2.mp4',
+  url: 'https://b60dc39mhd72vr7m.public.blob.vercel-storage.com/videos/anvisa-passo-a-passo-v4-narrado-zIx7WmiZOUruIE5DHwIK5UDMuru2iB.mp4',
   legenda: '',
 };
 
